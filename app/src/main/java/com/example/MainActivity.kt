@@ -586,7 +586,9 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .then(
-                                        if (renderQuality.realtimeGlass) Modifier.layerBackdrop(tabBackdrop)
+                                        if (renderQuality.realtimeGlass && !tabBarCollapseState.scrolling) {
+                                            Modifier.layerBackdrop(tabBackdrop)
+                                        }
                                         else Modifier
                                     )
                             ) {
@@ -972,7 +974,12 @@ class MainActivity : ComponentActivity() {
                                     selectedIndex = selectedTab,
                                     onTabSelected = { selectedTab = it },
                                     collapseState = tabBarCollapseState,
-                                    backdrop = tabBackdrop.takeIf { renderQuality.realtimeGlass },
+                                    // Freeze the expensive backdrop capture during a gesture;
+                                    // the tab bar itself stays responsive and resumes glass sampling
+                                    // shortly after scrolling stops.
+                                    backdrop = tabBackdrop.takeIf {
+                                        renderQuality.realtimeGlass && !tabBarCollapseState.scrolling
+                                    },
                                 )
                             }
                             }

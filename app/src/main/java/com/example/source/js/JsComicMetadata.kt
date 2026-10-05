@@ -11,7 +11,8 @@ internal object JsComicMetadata {
     private fun values(value: Any?): List<String> = when (value) {
         is String -> listOf(value.trim()).filter { it.isNotEmpty() && it != "null" }
         is JSONArray -> (0 until value.length()).flatMap { values(value.opt(it)) }
-        is JSONObject -> values(value.opt("name"))
+        is JSONObject -> (values(value.opt("name")) + values(value.opt("nick")) +
+            values(value.opt("username")) + values(value.opt("title"))).distinct()
         else -> emptyList()
     }
 

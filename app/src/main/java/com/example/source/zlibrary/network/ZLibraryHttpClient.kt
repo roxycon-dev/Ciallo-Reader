@@ -71,7 +71,7 @@ class ZLibraryHttpClient(
                 chain.proceed(requestBuilder.build())
             }
         // Use the same system proxy as WebView/browsers when one is configured
-        SystemProxyResolver.resolve(context)?.let { builder.proxy(it) }
+        context?.let { SystemProxyResolver.resolve(it)?.let(builder::proxy) }
         builder.build()
     }
 

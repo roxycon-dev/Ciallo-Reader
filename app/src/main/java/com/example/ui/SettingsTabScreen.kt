@@ -79,6 +79,11 @@ import kotlinx.coroutines.ensureActive
 import androidx.compose.foundation.layout.widthIn
 import com.example.ui.adaptive.AdaptiveSpec
 import com.example.ui.components.AppToast
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -129,6 +134,8 @@ fun SettingsTabScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var updateChecking by remember { mutableStateOf(false) }
+    var updateMessage by remember { mutableStateOf<String?>(null) }
     var backupBusy by remember { mutableStateOf(false) }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     val exportBackupLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
@@ -1348,14 +1355,51 @@ LazyColumn(
                             Spacer(modifier = Modifier.height(4.dp))
                             val versionName = remember {
                                 try {
-                                    context.packageManager.getPackageInfo(context.packageName, 0)?.versionName ?: "1.0"
-                                } catch (_: Exception) { "1.0" }
+                                    context.packageManager.getPackageInfo(context.packageName, 0)?.versionName ?: "1.2.0"
+                                } catch (_: Exception) { "1.2.0" }
                             }
                             Text(
                                 "版本 $versionName",
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Spacer(Modifier.height(10.dp))
+                            AppActionButton(
+                                text = if (updateChecking) "检查中…" else "检查更新",
+                                enabled = !updateChecking,
+                                buttonSize = AppButtonSize.Small,
+                                onClick = {
+                                    updateChecking = true
+                                    updateMessage = null
+                                    scope.launch {
+                                        val result = withContext(Dispatchers.IO) {
+                                            runCatching {
+                                                val connection = (URL("https://api.github.com/repos/roxycon-dev/Ciallo-Reader/releases/latest").openConnection() as HttpURLConnection).apply {
+                                                    connectTimeout = 8_000
+                                                    readTimeout = 8_000
+                                                    requestMethod = "GET"
+                                                    setRequestProperty("Accept", "application/vnd.github+json")
+                                                    setRequestProperty("User-Agent", "Ciallo-Reader")
+                                                }
+                                                connection.inputStream.bufferedReader().use { JSONObject(it.readText()).optString("tag_name") }
+                                            }
+                                        }
+                                        updateChecking = false
+                                        val latest = result.getOrNull()?.removePrefix("v")
+                                        updateMessage = when {
+                                            latest.isNullOrBlank() -> "暂时无法检查更新；国内访问 GitHub 可能不稳定，请稍后重试。"
+                                            latest == versionName -> "当前已是最新版本。"
+                                            else -> "发现新版本 $latest，点击下方 GitHub 链接下载。"
+                                        }
+                                    }
+                                }
+                            )
+                            updateMessage?.let { message ->
+                                Spacer(Modifier.height(6.dp))
+                                Text(message, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Text("更新信息来自 GitHub；国内网络可能导致检查或下载失败。", fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f))
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 "轻量级本地 / 在线小说阅读器",
@@ -1370,7 +1414,7 @@ LazyColumn(
                             ) {
                                 Row(
                                     modifier = Modifier.clickable {
-                                        runCatching { githubUriHandler.openUri("https://github.com/roxycon-dev/Ciallo-Reader") }
+                                        runCatching { githubUriHandler.openUri("https://github.com/roxycon-dev/Ciallo-Reader/releases") }
                                             .onFailure { AppToast.makeText(context, "暂时打不开 GitHub，稍后再来喵～", Toast.LENGTH_SHORT).show() }
                                     }.padding(horizontal = 16.dp, vertical = 11.dp),
                                     verticalAlignment = Alignment.CenterVertically,

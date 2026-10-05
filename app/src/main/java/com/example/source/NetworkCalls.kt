@@ -37,7 +37,9 @@ internal fun Call.executeWithCancellation(job: Job?):Response {
 internal object SharedHttpTransport {
     private val pool=okhttp3.ConnectionPool(8,5,java.util.concurrent.TimeUnit.MINUTES)
     private val dispatcher=okhttp3.Dispatcher().apply { maxRequests=32; maxRequestsPerHost=4 }
-    fun builder():okhttp3.OkHttpClient.Builder=okhttp3.OkHttpClient.Builder().connectionPool(pool).dispatcher(dispatcher)
+    fun builder():okhttp3.OkHttpClient.Builder=okhttp3.OkHttpClient.Builder()
+        .connectionPool(pool)
+        .dispatcher(dispatcher)
 }
 
 internal object SourceNetworkPolicy {

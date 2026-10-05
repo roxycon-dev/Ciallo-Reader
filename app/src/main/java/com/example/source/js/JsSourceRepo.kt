@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 object JsSourceRepo {
 
     /** 本地补丁版本：升级后尝试更新源脚本，失败时仍可使用旧缓存。 */
-    private const val PATCH_VERSION = 39
+    private const val PATCH_VERSION = 40
     // Raw cache format stays stable when compatibility patches change.
     private const val RAW_CACHE_PREFIX = "// EASYREADER_RAW_SOURCE_V28\n"
 
@@ -411,6 +411,61 @@ object JsSourceRepo {
      * 针对远端脚本的本地兼容补丁（站点改版后脚本选择器失效，等上游更新前先兜底）。
      * 仅做最小改动，不破坏源脚本其它逻辑。
      */
+    /**
+     * 禁漫天堂的线路会周期性下线，旧版脚本遇到一条失效线路就直接把 404
+     * 暴露给搜索界面。保留上游脚本逻辑，同时给它一个有效的初始线路、
+     * 防止未初始化设置生成 https://undefined，并在 API 返回 404 时自动换线。
+     */
+    private fun patchJm(script: String): String {
+        var patched = script.replace(
+            "this.convertData(await res.text(), domainSecret)",
+            "this.convertData((await res.text()).replace(/^\\uFEFF/, ''), domainSecret)"
+        )
+        patched = patched.replace(
+            "    static imageUrl = \"https://cdn-msp.jmapinodeudzn.net\"",
+            """
+    static apiDomains = [
+        "www.cdntwice.org",
+        "www.cdnsha.org",
+        "www.cdnaspa.cc",
+        "www.cdnntr.cc",
+    ]
+
+    static imageUrl = "https://cdn-msp.jmapinodeudzn.net"
+            """.trimIndent()
+        )
+        patched = patched.replace(
+            """        let index = parseInt(this.loadSetting('apiDomain')) - 1
+        return `https://${'$'}{JM.apiDomains[index]}`""",
+            """        let index = parseInt(this.loadSetting('apiDomain')) - 1
+        if (!Number.isFinite(index) || index < 0 || index >= JM.apiDomains.length) index = 0
+        return `https://${'$'}{JM.apiDomains[index]}`"""
+        )
+        patched = patched.replace(
+            """        let res = await Network.get(url, this.getApiHeaders(time))
+        if(res.status !== 200) {""",
+            """        let res = await Network.get(url, this.getApiHeaders(time))
+        if (res.status === 404 && JM.apiDomains && JM.apiDomains.length > 1) {
+            const current = this.baseUrl
+            const path = url.startsWith(current) ? url.substring(current.length) : ''
+            for (const domain of JM.apiDomains) {
+                const candidate = 'https://' + domain
+                if (candidate === current || !path) continue
+                try {
+                    const retry = await Network.get(candidate + path, this.getApiHeaders(time))
+                    if (retry.status === 200) {
+                        JM.apiDomains = [domain, ...JM.apiDomains.filter((e) => e !== domain)]
+                        res = retry
+                        break
+                    }
+                } catch (e) {}
+            }
+        }
+        if(res.status !== 200) {"""
+        )
+        return patched
+    }
+
     private fun patchScript(key: String, script: String): String = when (key) {
         // 漫蛙吧 API 域名迁移（mwuu.cc 301 → manwaxu.cc），2026-09-26 实测
         "manwaba" -> script.replace("https://mwuu.cc", "https://manwaxu.cc")
@@ -960,10 +1015,7 @@ object JsSourceRepo {
             }
             patched
         }
-        "jm" -> script.replace(
-            "this.convertData(await res.text(), domainSecret)",
-            "this.convertData((await res.text()).replace(/^\\uFEFF/, ''), domainSecret)"
-        )
+        "jm" -> patchJm(script)
         "nhentai" -> script.replace(
             "    getApiBaseHeaders() {\n        return {",
             """

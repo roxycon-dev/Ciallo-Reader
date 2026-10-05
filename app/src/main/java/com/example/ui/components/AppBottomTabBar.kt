@@ -2,9 +2,6 @@ package com.example.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -37,7 +34,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,7 +43,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -61,13 +56,10 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.onColor
 import com.kashif_e.backdrop.Backdrop
-import kotlinx.coroutines.launch
 import me.trishiraj.shadowglow.consistentShadow
 
 /**
@@ -98,9 +90,6 @@ private val TabBarLowOutlineColor: Color = Color.White.copy(alpha = 0.15f)
 private val TabBarNeutralOutlineColor: Color = Color.White.copy(alpha = 0.22f)
 
 /** 选中指示器的弹簧：与旧实现逐参数一致（保留手感）。 */
-private val TabIndicatorSpring: FiniteAnimationSpec<Float> =
-    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
-
 /** 未选中项文字/图标的透明度：0.55 → 0.48，让选中项更突出。 */
 private const val TAB_UNSELECTED_ALPHA = 0.48f
 
@@ -128,12 +117,19 @@ data class AppTabItem(
 class TabBarCollapseState {
     var collapsed by mutableStateOf(false)
         private set
+    var scrolling by mutableStateOf(false)
+        private set
+    private val scrollHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val stopScrolling = Runnable { scrolling = false }
 
     fun connection(): NestedScrollConnection = object : NestedScrollConnection {
         override fun onPreScroll(
             available: Offset,
             source: NestedScrollSource
         ): Offset {
+            scrolling = true
+            scrollHandler.removeCallbacks(stopScrolling)
+            scrollHandler.postDelayed(stopScrolling, 120L)
             if (available.y < -4f) collapsed = true
             if (available.y > 4f) collapsed = false
             return Offset.Zero
@@ -195,16 +191,11 @@ fun AppBottomTabBar(
         ),
         label = "tabBarHeight"
     )
-    val horizontalMargin by animateDpAsState(
-        targetValue = if (collapseState.collapsed) 48.dp else 16.dp,
-        animationSpec = spring(
-            dampingRatio = TAB_COLLAPSE_DAMPING,
-            stiffness = TAB_COLLAPSE_STIFFNESS
-        ),
-        label = "tabBarMargin"
-    )
+    // Keep the bar's horizontal frame fixed while a list scrolls. Animating the
+    // outer margin changed the Row width and made the selected black indicator
+    // visibly drift left/right on every vertical gesture.
+    val horizontalMargin = 16.dp
 
-    val tabPositions = remember { mutableStateMapOf<Int, Rect>() }
     val shape = TabBarShape
     val quality = LocalRenderQuality.current
 
@@ -222,44 +213,6 @@ fun AppBottomTabBar(
         Modifier.tabBarGlassTint(primary = animatedPrimary)
     }
 
-    /* ── ② 选中指示器：药丸高亮（位置/尺寸由 Animatable 驱动）────────────
-     *
-     * ⚠️ 性能关键：这里**刻意不用** `animateFloatAsState`。
-     *    animate*AsState 是组合期状态 —— 每帧变化都会**重组** AppBottomTabBar，
-     *    连带重建整条 Row 的 Modifier 链，把 liquidGlass / iridescentBorder /
-     *    consistentShadow 的绘制缓存全部打掉（极致档掉帧的主因之一）。
-     *    改用 Animatable + 在**绘制期**读 `.value`：快照只会让绘制阶段失效，
-     *    Row 不重组、上面那些重缓存完全不受影响。
-     *    弹簧参数与旧实现逐参数一致，手感不变。 */
-    val indicatorLeft = remember { Animatable(0f) }
-    val indicatorTop = remember { Animatable(0f) }
-    val indicatorWidth = remember { Animatable(0f) }
-    val indicatorHeight = remember { Animatable(0f) }
-    val indicatorAlpha = remember { Animatable(0f) }
-    var indicatorInitialized by remember { mutableStateOf(false) }
-
-    val targetRect = tabPositions[selectedIndex]
-    LaunchedEffect(targetRect, selectedIndex) {
-        if (targetRect == null) {
-            indicatorAlpha.animateTo(0f, tween(140))
-            return@LaunchedEffect
-        }
-        // 首次拿到位置时直接落位（避免从左上角 0×0 长出来），只做淡入
-        if (!indicatorInitialized) {
-            indicatorLeft.snapTo(targetRect.left)
-            indicatorTop.snapTo(targetRect.top)
-            indicatorWidth.snapTo(targetRect.width)
-            indicatorHeight.snapTo(targetRect.height)
-            indicatorAlpha.snapTo(0f)
-            indicatorInitialized = true
-        }
-        launch { indicatorLeft.animateTo(targetRect.left, TabIndicatorSpring) }
-        launch { indicatorTop.animateTo(targetRect.top, TabIndicatorSpring) }
-        launch { indicatorWidth.animateTo(targetRect.width, TabIndicatorSpring) }
-        launch { indicatorHeight.animateTo(targetRect.height, TabIndicatorSpring) }
-        launch { indicatorAlpha.animateTo(1f, tween(180, easing = FastOutSlowInEasing)) }
-    }
-
     // ② 选中指示：Tab 项顶部那条 3dp 小黑条（宽度 = 所在项宽度的 40%，水平居中）。
     // ⚠️ 这是用户明确认可、要求还原的**原始形态** —— 不要再改成背景高亮 / 药丸气泡。
     // 仍走 Animatable + 绘制期读 `.value`（不触发组合期重组），弹簧用 TabIndicatorSpring。
@@ -267,14 +220,16 @@ fun AppBottomTabBar(
         val barTopPx = 2.dp.toPx()
         val barHeightPx = 3.dp.toPx()
         val barRadius = CornerRadius(barHeightPx / 2f)
+        val slotWidth = size.width / items.size.coerceAtLeast(1)
+        val barWidth = slotWidth * 0.40f
+        val barLeft = selectedIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0)) * slotWidth +
+            (slotWidth - barWidth) / 2f
         onDrawWithContent {
-            val itemWidth = indicatorWidth.value
-            val a = indicatorAlpha.value
-            if (itemWidth > 0f && a > 0.01f) {
-                val barWidth = itemWidth * 0.40f
+            val a = 1f
+            if (a > 0.01f) {
                 drawRoundRect(
                     color = contrast.copy(alpha = a),
-                    topLeft = Offset(indicatorLeft.value + (itemWidth - barWidth) / 2f, barTopPx),
+                    topLeft = Offset(barLeft, barTopPx),
                     size = Size(barWidth, barHeightPx),
                     cornerRadius = barRadius
                 )
@@ -372,19 +327,26 @@ fun AppBottomTabBar(
                     )
                     // ② 选中项背后的药丸高亮：画在栏体之上、图标之下
                     .then(selectionIndicator),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.Start,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 items.forEachIndexed { index, item ->
-                    TabIcon(
-                        item = item,
-                        selected = index == selectedIndex,
-                        collapsed = collapseState.collapsed,
-                        contrast = contrast,
-                        ringColor = barBase,
-                        onClick = { onTabSelected(index) },
-                        onPositioned = { rect -> tabPositions[index] = rect }
-                    )
+                    // Keep every tab in an equal-width slot. The indicator is
+                    // drawn from the same slot geometry, so it stays centered
+                    // over the icon while the list scrolls or labels collapse.
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        TabIcon(
+                            item = item,
+                            selected = index == selectedIndex,
+                            collapsed = collapseState.collapsed,
+                            contrast = contrast,
+                            ringColor = barBase,
+                            onClick = { onTabSelected(index) }
+                        )
+                    }
                 }
             }
         }
@@ -476,8 +438,7 @@ private fun TabIcon(
     collapsed: Boolean,
     contrast: Color,
     ringColor: Color,
-    onClick: () -> Unit,
-    onPositioned: (Rect) -> Unit
+    onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     // B7：Tab 此前 indication = null 且无任何按压缩放/触觉，点下去完全没有手感。
@@ -515,17 +476,6 @@ private fun TabIcon(
             .graphicsLayer {
                 scaleX = pressScale
                 scaleY = pressScale
-            }
-            .onGloballyPositioned { coords ->
-                onPositioned(
-                    Rect(
-                        offset = coords.positionInParent(),
-                        size = Size(
-                            coords.size.width.toFloat(),
-                            coords.size.height.toFloat()
-                        )
-                    )
-                )
             }
             .clickable(
                 interactionSource = interactionSource,

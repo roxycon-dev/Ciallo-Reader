@@ -496,7 +496,8 @@ fun ComicChaptersScreen(
                         ) {
                             // ── 头部：封面模糊背景 + 封面卡 + 标题 + 徽章 + 作者 + 简介（旧版样式） ──
                             item(key = "hero") { ComicHeroHeader(book = book, textMode = textMode,
-                                onTextLongPress = { label, text -> textActions = label to text }) }
+                                onTextLongPress = { label, text -> textActions = label to text },
+                                onTextClick = onSearchText) }
 
                             // ── 信息行（13，secondary；「已读 N 话」accent） ──
                             item(key = "info") {
@@ -1283,7 +1284,8 @@ private fun CheckCircleSpec(checked: Boolean, uncheckedStroke: Color = MaterialT
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ComicHeroHeader(book: SearchBook?, textMode: Boolean, onTextLongPress: (String, String) -> Unit) {
+private fun ComicHeroHeader(book: SearchBook?, textMode: Boolean, onTextLongPress: (String, String) -> Unit,
+    onTextClick: (String) -> Unit) {
     if (book == null) return
     var descriptionExpanded by remember(book.sourceId, book.id) { mutableStateOf(false) }
     val scrimSurface = MaterialTheme.colorScheme.surface
@@ -1392,9 +1394,9 @@ private fun ComicHeroHeader(book: SearchBook?, textMode: Boolean, onTextLongPres
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = book.title,
-                        modifier = Modifier.combinedClickable(onClick = {}, onLongClick = {
+                        Text(
+                            text = book.title,
+                            modifier = Modifier.combinedClickable(onClick = { onTextClick(book.title) }, onLongClick = {
                             onTextLongPress(if (textMode) "书名" else "漫画名", book.title)
                         }),
                         fontSize = 20.sp,
@@ -1417,7 +1419,7 @@ private fun ComicHeroHeader(book: SearchBook?, textMode: Boolean, onTextLongPres
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "作者：${book.author}",
-                            modifier = Modifier.combinedClickable(onClick = {}, onLongClick = {
+                            modifier = Modifier.combinedClickable(onClick = { onTextClick(book.author) }, onLongClick = {
                                 onTextLongPress("作者名", book.author)
                             }),
                             fontSize = 12.sp,
@@ -1429,6 +1431,18 @@ private fun ComicHeroHeader(book: SearchBook?, textMode: Boolean, onTextLongPres
                     if (!book.author.isKnownComicAuthor()) {
                         Spacer(Modifier.height(6.dp))
                         Text("源站未提供作者", fontSize = 12.sp, color = Color.White.copy(alpha = 0.75f))
+                    }
+                    book.comicId?.trim()?.takeIf { it.isNotBlank() }?.let { comicId ->
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "编号：$comicId",
+                            modifier = Modifier.combinedClickable(
+                                onClick = { onTextClick(comicId) },
+                                onLongClick = { onTextLongPress("作品编号", comicId) },
+                            ),
+                            fontSize = 12.sp,
+                            color = Color.White.copy(alpha = 0.75f),
+                        )
                     }
                 }
             }
