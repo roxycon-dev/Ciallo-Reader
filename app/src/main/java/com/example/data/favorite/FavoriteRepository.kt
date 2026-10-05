@@ -361,17 +361,23 @@ class FavoriteRepository(
         catalogMutex.lock()
         try {
             val catalog=ChapterCatalog(context)
-            val mapping=catalog.mapping(catalog.read(source,comic),chapters)
+            val oldChapters=catalog.read(source,comic)
+            val mapping=catalog.mapping(oldChapters,chapters)
             val orders=ComicReadingLogic.ordered(chapters).associate { it.chapter.id to it.order }
             val states=dao.chapterStatesSync(source,comic)
-            val changed=states.mapNotNull { state -> mapping[state.chapterId]?.takeIf { it.id!=state.chapterId }?.let { chapter ->
+            val byId=chapters.associateBy { it.id }
+            val knownIds=oldChapters.mapTo(HashSet()) { it.id }
+            fun resolved(id:String)=mapping[id] ?: byId[id]?.takeIf { id !in knownIds }
+            // Reindex even unchanged IDs after normalizing a previously descending catalogue.
+            val changed=states.mapNotNull { state -> resolved(state.chapterId)?.let { chapter ->
                 state.copy(chapterId=chapter.id,chapterIndex=orders[chapter.id] ?: state.chapterIndex)
+                    .takeIf { it != state }
             } }
             val progress=dao.progress(source,comic)
-            val mapped=progress?.lastChapterId?.let { mapping[it] }
+            val mapped=progress?.lastChapterId?.let(::resolved)
             val updated=if(mapped!=null) progress?.copy(lastChapterId=mapped.id,lastChapterIndex=orders[mapped.id] ?: progress.lastChapterIndex) else null
             val changedIds=changed.mapTo(HashSet()) { it.chapterId }
-            val oldIds=states.filter { mapping[it.chapterId]?.id in changedIds }.map { it.chapterId }
+            val oldIds=states.filter { state -> mapping[state.chapterId]?.let { it.id != state.chapterId && it.id in changedIds } == true }.map { it.chapterId }
             dao.reconcileChapterIds(source,comic,changed,updated,oldIds)
             catalog.write(source,comic,chapters)
         } finally { catalogMutex.unlock() }

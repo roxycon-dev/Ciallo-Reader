@@ -7,6 +7,7 @@
 按对应功能分组的 Android / JVM 回归用例。
 
 ## 内容
+- `ComicCatalogOrderReconciliationTest.kt`
 - `ComicChapterMatchingTest.kt`
 - `ComicFavoriteMatchingTest.kt`
 - `ComicReadingLogicTest.kt`

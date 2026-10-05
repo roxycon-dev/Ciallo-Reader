@@ -8,6 +8,7 @@
 
 ## 内容
 - `JsComicMetadataTest.kt`
+- `JsChapterOrderTest.kt`
 - `JsHtmlStoreTest.kt`
 - `MxsSpacerPagesTest.kt`
 - `README.md`

@@ -56,6 +56,26 @@ class JsSourceEngineCompatibilityTest {
     @Test fun initializesBundledBiliManga() = verifyBundledSource("bilimanga")
     @Test fun initializesBundledVomic() = verifyBundledSource("vomic")
 
+    @Test fun jsChapterLoadingNormalizesBothSourceDirectionsBeforeCaching() = runBlocking {
+        val context = context()
+        for ((key, descending) in listOf("manhuaren" to true, "copy_manga" to false)) {
+            val source = JsComicSource(context, key, key, "1", """
+                class TestSource extends ComicSource {
+                    key='$key';
+                    comic={loadInfo:async()=>new ComicDetails({title:'百合甜心',chapters:new Map(
+                        ${if (descending) "[[\"c3\",\"第3话\"],[\"c2\",\"第2话\"],[\"c1\",\"第1话\"]]" else "[[\"c1\",\"第1话\"],[\"c2\",\"第2话\"],[\"c3\",\"第3话\"]]"}
+                    )})};
+                }
+            """.trimIndent())
+            val result = source.getChapters("book")
+            assertTrue(result.toString(), result is SourceResult.Success)
+            val chapters = (result as SourceResult.Success).data
+            assertEquals(listOf("第1话", "第2话", "第3话"), chapters.map { it.title })
+            assertEquals(listOf(0f, 1f, 2f), chapters.map { it.order })
+            assertEquals(chapters, (source.getChapters("book") as SourceResult.Success).data)
+        }
+    }
+
     @Test fun mycomicPreservesOriginalHeadersUntilACompletedVerificationIsStored() = runBlocking {
         val context = context()
         val preferences = context.getSharedPreferences("js_source_website_verification", Context.MODE_PRIVATE)

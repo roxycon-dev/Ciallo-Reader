@@ -10,6 +10,7 @@ Venera JavaScript 源运行时、消息桥、DOM 和异步生命周期。
 - `CfWebViewSolver.kt`
 - `JsComicMetadata.kt`
 - `JsComicSource.kt`
+- `JsChapterOrder.kt` — JS 目录按话数趋势和来源默认方向归一化，保留分组与同话分篇。
 - `JsCookieJar.kt`
 - `JsHtmlStore.kt`
 - `JsImageProcessor.kt`

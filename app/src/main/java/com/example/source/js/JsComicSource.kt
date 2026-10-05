@@ -326,11 +326,14 @@ class JsComicSource(
                     }
                 }
                 val chapters = data.optJSONArray("chapters") ?: JSONArray()
+                var hasExplicitOrder = true
                 val list = (0 until chapters.length()).mapNotNull { i ->
                     val c = chapters.optJSONObject(i) ?: return@mapNotNull null
                     val epId = c.optString("id")
                     val title = c.optString("title")
                     if (epId.isBlank() || title.isBlank()) return@mapNotNull null
+                    hasExplicitOrder = hasExplicitOrder && c.has("order") && !c.isNull("order") &&
+                        c.optDouble("order", Double.NaN).toFloat().isFinite()
                     ComicChapter(
                         id = "$bookId\u0001$epId",
                         title = title,
@@ -353,7 +356,7 @@ class JsComicSource(
                         )
                     )
                 } else {
-                    SourceResult.Success(list)
+                    SourceResult.Success(JsChapterOrder.normalize(list, sourceKey, hasExplicitOrder))
                 }
             } catch (e: CancellationException) {
                 throw e

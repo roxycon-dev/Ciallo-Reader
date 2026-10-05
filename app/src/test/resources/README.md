@@ -8,6 +8,7 @@ JVM/Robolectric 测试使用的本地 fixtures。
 
 ## 内容
 - `comic/`
+- `comic-order/`
 - `novel-covers/`
 - `README.md`
 
