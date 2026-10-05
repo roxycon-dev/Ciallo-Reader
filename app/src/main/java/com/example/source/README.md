@@ -11,6 +11,7 @@
 - `impl/`
 - `importer/`
 - `js/`
+- `keyword/`：普通关键词多语言扩展，本地优先、缺失资料在线补充
 - `parser/`
 - `storage/`
 - `zlibrary/`

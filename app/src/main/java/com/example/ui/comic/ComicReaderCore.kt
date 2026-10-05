@@ -383,8 +383,9 @@ fun ComicReaderCore(
     var controlsVisible by remember { mutableStateOf(true) }
     var panel by remember { mutableStateOf(ComicPanel.NONE) }
     var autoRead by remember { mutableStateOf(false) }
-    // 无缝滚动像素级进度（第 6 条）：0..1，底栏百分比按此显示
-    var scrollFraction by remember { mutableStateOf(0f) }
+    // 条漫与无缝模式共用滚动位置；页码仍跟随最可见项。
+    var scrollMetrics by remember(pages, config.mode) { mutableStateOf<ComicScrollMetrics?>(null) }
+    var scrollJump by remember(pages, config.mode) { mutableStateOf<Pair<Int, Float>?>(null) }
     val latestExit by rememberUpdatedState(onExit)
 
     var chapterNavigationPending by remember(pages) { mutableStateOf(false) }
@@ -622,7 +623,8 @@ fun ComicReaderCore(
                 autoScrollActive = autoRead,
                 autoScrollSpeedDp = config.autoScrollSpeedDp,
                 onReachEnd = { goNext() },
-                onScrollFraction = { scrollFraction = it },
+                onScrollMetrics = { scrollMetrics = it },
+                scrollJump = scrollJump,
                 onPreviousChapter = { navigateChapter(next = false) },
                 onNextChapter = { navigateChapter(next = true) },
             )
@@ -725,7 +727,11 @@ fun ComicReaderCore(
         onGoNext = { goNext() },
         autoRead = autoRead,
         onAutoReadToggle = { autoRead = !autoRead },
-        continuousFraction = if (config.mode == ComicMode.CONTINUOUS) scrollFraction else -1f,
+        continuousFraction = if (verticalMode) scrollMetrics?.fraction ?: 0f else -1f,
+        onJumpToScrollFraction = if (verticalMode) ({ fraction ->
+            scrollJump = ((scrollJump?.first ?: 0) + 1) to fraction
+        }) else null,
+        spreadAtScrollFraction = { fraction -> scrollMetrics?.target(fraction)?.index ?: currentSpread },
         toc = toc,
         currentChapterIndex = currentChapterIndex,
         onJumpToChapter = onJumpToChapter,
@@ -1295,7 +1301,8 @@ private fun ComicVerticalList(
     autoScrollActive: Boolean,
     autoScrollSpeedDp: Float,
     onReachEnd: () -> Unit,
-    onScrollFraction: ((Float) -> Unit)? = null,
+    onScrollMetrics: (ComicScrollMetrics) -> Unit,
+    scrollJump: Pair<Int, Float>?,
     translationModelState: com.example.mangatranslate.TranslateModelManager.DownloadState =
         com.example.mangatranslate.TranslateModelManager.DownloadState.NotDownloaded,
     onScheduleTranslation: (List<ComicPageLoader.WindowEntry>, ComicReaderConfig) -> Unit = { _, _ -> },
@@ -1308,6 +1315,9 @@ private fun ComicVerticalList(
     val strategy = remember(config.mode, config.pageSpacingDp, config.webtoonSnap) {
         ComicScrollStrategy.forConfig(config)
     }
+    val measuredHeights = remember(layout.spreads) { mutableMapOf<Int, Int>() }
+    val latestScrollMetrics by rememberUpdatedState(onScrollMetrics)
+    var latestMetrics by remember(layout.spreads) { mutableStateOf<ComicScrollMetrics?>(null) }
 
     // 当前列表项 = 屏幕上可见面积最大的项（非首可见项）——
     // 垂直模式进度/旋转/临时合页的目标页跟随用户正在看的页，
@@ -1397,21 +1407,29 @@ private fun ComicVerticalList(
         { pos -> tapZoneAction(pos, tapAreaSize()) }
     }
 
-    // 无缝滚动像素级进度（第 6 条：按累计像素高度而非页数）：
-    // fraction = (首可见项索引 + 项内像素偏移比例) / (总项数-1)，
-    // 项内偏移在相邻项之间连续插值，滚动全程单调无跳变
-    if (onScrollFraction != null && strategy.pixelProgress) {
-        LaunchedEffect(listState, layout) {
-            snapshotFlow {
-                val info = listState.layoutInfo
-                val first = info.visibleItemsInfo.firstOrNull()
-                if (first == null || info.totalItemsCount <= 1) 0f
-                else {
-                    val within = (-first.offset).toFloat() / first.size.coerceAtLeast(1)
-                    ((first.index + within.coerceIn(0f, 1f)) / (info.totalItemsCount - 1)).coerceIn(0f, 1f)
-                }
-            }.collect { onScrollFraction(it) }
+    // 每次项内像素偏移变化都上报；单张长图也有进度，末图滚到底才到 100%。
+    LaunchedEffect(listState, layout.spreads, strategy.spacingDp) {
+        snapshotFlow { listState.layoutInfo }.collect { info ->
+            if (info.visibleItemsInfo.isEmpty()) return@collect
+            info.visibleItemsInfo.forEach { measuredHeights[it.index] = it.size.coerceAtLeast(1) }
+            val estimatedHeight = measuredHeights.values.average().toInt().coerceAtLeast(1)
+            val metrics = ComicScrollMetrics(
+                itemSizes = List(info.totalItemsCount) { measuredHeights[it] ?: estimatedHeight },
+                itemSpacing = info.mainAxisItemSpacing,
+                viewportSize = info.viewportEndOffset - info.viewportStartOffset,
+                firstVisibleItemIndex = listState.firstVisibleItemIndex,
+                firstVisibleItemScrollOffset = listState.firstVisibleItemScrollOffset,
+                canScrollBackward = listState.canScrollBackward,
+                canScrollForward = listState.canScrollForward,
+            )
+            latestMetrics = metrics
+            latestScrollMetrics(metrics)
         }
+    }
+    LaunchedEffect(scrollJump) {
+        val request = scrollJump ?: return@LaunchedEffect
+        val target = latestMetrics?.target(request.second) ?: return@LaunchedEffect
+        listState.scrollToItem(target.index, target.offset)
     }
 
     // 条漫磁吸（第 6/7 条）：SnapFlingBehavior 官方 item-snap——松手连续衰减滚动

@@ -83,16 +83,16 @@ object SearchVariantBuilder {
     fun build(originalKeyword: String, matchedRawTitles: List<String>): List<String> {
         val seen = HashSet<String>()
         val out = ArrayList<String>(MAX_VARIANTS)
-        fun offer(candidate: String) {
+        fun offer(candidate: String, original: Boolean = false) {
             if (out.size >= MAX_VARIANTS) return
             val trimmed = candidate.trim()
             if (trimmed.isEmpty()) return
-            if (!TitleNormalizer.usableVariant(trimmed)) return
-            val key = TitleNormalizer.compact(trimmed)
+            if (!original && !TitleNormalizer.usableVariant(trimmed)) return
+            val key = com.example.source.keyword.KeywordKeys.query(trimmed)
             if (key.isEmpty() || !seen.add(key)) return
             out.add(trimmed)
         }
-        offer(originalKeyword)
+        offer(originalKeyword, original = true)
         // 原始关键词若自身过长截断保护（书源 URL 长度）
         matchedRawTitles.forEach { offer(it) }
         return out

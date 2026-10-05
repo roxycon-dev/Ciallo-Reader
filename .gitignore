@@ -41,3 +41,7 @@ docs/screenshots/*
 !docs/screenshots/shot*.jpg
 !docs/screenshots/demo*.gif
 
+
+# 本地构建、查词探针与验收交付（APK 仅上传 GitHub Release）
+/.*.log
+/artifacts/

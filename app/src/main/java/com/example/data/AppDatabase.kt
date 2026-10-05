@@ -207,6 +207,9 @@ interface AniListDao {
     )
     suspend fun getRawTitlesFor(mediaIds: List<Int>): List<String>
 
+    @Query("SELECT * FROM anilist_titles WHERE mediaId IN (:mediaIds)")
+    suspend fun getTitleRowsFor(mediaIds: List<Int>): List<AniListTitleEntity>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertTitles(rows: List<AniListTitleEntity>)
 

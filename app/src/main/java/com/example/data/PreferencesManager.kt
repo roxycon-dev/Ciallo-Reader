@@ -7,6 +7,11 @@ class PreferencesManager(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("novel_reader_prefs", Context.MODE_PRIVATE)
 
+    /** Structured keyword metadata only, separate from the reading translation engines. */
+    var multiLanguageOnlineLookup: Boolean
+        get() = prefs.getBoolean("multi_language_online_lookup", true)
+        set(value) = prefs.edit().putBoolean("multi_language_online_lookup", value).apply()
+
     var fontSize: Float
         get() = prefs.getFloat("font_size", 18f)
         set(value) = prefs.edit().putFloat("font_size", value).apply()

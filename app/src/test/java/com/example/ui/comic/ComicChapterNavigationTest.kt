@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.Density
@@ -36,9 +37,9 @@ import java.io.File
 class ComicChapterNavigationTest {
     @get:Rule val compose = createAndroidComposeRule<ComicReaderTestActivity>()
 
-    private fun pages() = (0..2).map { index ->
+    private fun pages(height: Int = 360, count: Int = 3) = (0 until count).map { index ->
         val file = File(compose.activity.cacheDir, "chapter-edge-$index.png")
-        val bitmap = Bitmap.createBitmap(240, 360, Bitmap.Config.ARGB_8888)
+        val bitmap = Bitmap.createBitmap(240, height, Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(android.graphics.Color.rgb(225 - index * 15, 222, 214))
         file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
@@ -153,6 +154,52 @@ class ComicChapterNavigationTest {
             down(1, Offset(250f, 250f)); up(1); up(0)
         }
         compose.runOnIdle { assertEquals(0, previous); assertEquals(0, next) }
+    }
+
+    @Test fun scrollProgressMovesWithinALongImageAndSliderSeeksToPixelOffsetsInBothModes() {
+        val refs = pages(height = 1800, count = 1)
+        val modes = listOf(ComicMode.WEBTOON, ComicMode.CONTINUOUS)
+        val store = ComicSettingsStore(compose.activity)
+        modes.forEach { mode -> store.saveBookConfig("long-progress-$mode",
+            ComicReaderConfig(mode = mode, webtoonSnap = false)) }
+        var active by mutableStateOf(0)
+        compose.setContent { key(active) {
+            MaterialTheme { ComicReaderCore(refs, "长图进度", "第 2 章", "long-progress-${modes[active]}",
+                initialPage = 0, modifier = Modifier.testTag("reader"), onExit = {}) }
+        } }
+        fun progress() = compose.onNodeWithContentDescription("阅读进度").fetchSemanticsNode()
+            .config[SemanticsProperties.ProgressBarRangeInfo].current
+        modes.forEachIndexed { index, _ ->
+            compose.runOnIdle { active = index }
+            compose.waitForIdle()
+            compose.waitUntil(5000) {
+                compose.onAllNodesWithContentDescription("第 1 页").fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.waitForIdle()
+            assertEquals(0f, progress(), 0.001f)
+            swipe(ComicDirection.TTB, true)
+            val down = progress()
+            assertTrue("同一页向下滚动也要更新进度", down > 0f && down < 1f)
+            swipe(ComicDirection.TTB, false)
+            assertTrue("反向滚动要回退进度", progress() < down)
+            compose.onNodeWithText("1 / 1").assertExists()
+            compose.onNodeWithContentDescription("阅读进度").performTouchInput {
+                click(percentOffset(0.75f, 0.5f))
+            }
+            compose.waitForIdle()
+            assertEquals(0.75f, progress(), 0.015f)
+            compose.onNodeWithContentDescription("阅读进度").performTouchInput {
+                click(percentOffset(0.99f, 0.5f))
+            }
+            compose.waitForIdle()
+            swipe(ComicDirection.TTB, true)
+            assertEquals(1f, progress(), 0.001f)
+            compose.onNodeWithContentDescription("阅读进度").performTouchInput {
+                click(percentOffset(0f, 0.5f))
+            }
+            compose.waitForIdle()
+            assertEquals(0f, progress(), 0.001f)
+        }
     }
 
     @Test

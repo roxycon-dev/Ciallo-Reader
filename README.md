@@ -10,7 +10,7 @@ Kotlin · Jetpack Compose (Material 3) · MVVM · 单 Activity
 
 <img src="./promo/output/Ciallo-promo-cover-v2.png" width="820" alt="Ciallo阅读 1.2.1 品牌封面"/>
 
-[下载 1.2.1 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.2.1/Ciallo-Reader-v1.2.1-debug.apk) ·
+[下载 1.2.2 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.2.2/Ciallo-Reader-v1.2.2.apk) ·
 [功能](#功能) ·
 [安装](#安装) ·
 [使用说明](#使用说明) ·
@@ -18,7 +18,7 @@ Kotlin · Jetpack Compose (Material 3) · MVVM · 单 Activity
 [提交 Issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
 
 ![Android](https://img.shields.io/badge/Android-API%2024%2B-green)
-![Release](https://img.shields.io/badge/Release-v1.2.1-orange)
+![Release](https://img.shields.io/badge/Release-v1.2.2-orange)
 ![Architecture](https://img.shields.io/badge/Architecture-MVVM-blue)
 ![UI](https://img.shields.io/badge/UI-Compose%20M3-8A2BE2)
 ![License](https://img.shields.io/badge/License-All%20Rights%20Reserved-lightgrey)
@@ -33,18 +33,20 @@ Android 端小说 / 漫画阅读器，内置多书源在线聚合搜索与下载
 
 | 项目                     | 内容                                                                  |
 | ---------------------- | ------------------------------------------------------------------- |
-| 当前版本                   | 1.2.1                                                               |
+| 当前版本                   | 1.2.2                                                               |
 | 开发状态                   | 个人项目 · 活跃开发中                                                        |
 | 最低系统                   | Android 7.0（API 24）                                                 |
 | compileSdk / targetSdk | 35                                                                  |
 | 技术栈                    | Kotlin 2.0 + Jetpack Compose（Material 3）+ MVVM + Room + WorkManager |
 | 架构                     | MVVM + StateFlow + Repository，单 Activity + Navigation Compose       |
-| 测试                     | 509 项（JVM / Robolectric）；95 项设备测试定义                                 |
-| APK 体积                 | 23,307,407 B（22.23 MiB；arm64-v8a，含 ONNX Runtime，OCR 模型按需下载）              |
+| 测试                     | 609 项定义（JVM / Robolectric）；98 项设备测试定义；专项执行见报告                  |
+| 正式安装包 | 1.2.2 / 203，arm64-v8a；见 [v1.2.2 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.2.2) |
 
 ***
 
 ## 功能
+
+多语言搜索支持常用词与作品 / 人物名称映射，本地优先，缺少时在线补充并缓存；结果顶部的书源管理同款关键词卡片可查看名称、来源、提交状态与在线失败原因，支持重新查词，随结果一起滚走。人物简称支持明确的人名分隔与唯一性检查，本地缺少时在线补全。分类 PIN 保护不会误关在线补词，全局无痕会显示暂停原因。[多语言搜索说明](docs/multilingual-keyword-search-v5-2026-10-05.md)。[1.2.2 更新检查与发布说明](docs/release-1.2.2-2026-10-05.md)。
 
 ### 文件格式
 
@@ -161,7 +163,7 @@ echo "sdk.dir=/你的/Android/Sdk/路径" > local.properties
 ./gradlew :app:assembleRelease
 ```
 
-1.2.1 Release APK 可从 [GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.2.1/Ciallo-Reader-v1.2.1-debug.apk) 下载；Gradle 原始输出在 `app/build/outputs/apk/debug/app-debug.apk`。本次构建环境未配置发布 keystore，因此 APK 使用仓库调试证书签名；它只能覆盖同一调试证书签名的安装，正式分发请配置发布签名后重新构建。
+1.2.2 APK 可从 [GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.2.2/Ciallo-Reader-v1.2.2.apk) 下载；使用 Release 构建、R8 混淆与资源精简，原始输出在 `app/build/outputs/apk/release/app-release.apk`。当前包沿用本地验收版签名，可覆盖此前本地 v5 验收版。GitHub 旧 1.2.1 包使用另一证书：若出现签名冲突，先在设置中导出备份，再安装新版并恢复；未备份前不要卸载旧版。
 
 ***
 
@@ -210,6 +212,9 @@ fi/harism/curl/ · eu/wewox/pagecurl/ · net/engawapg/lib/zoomable/   # 翻页�
 ***
 
 ## FAQ
+
+**Q：开了 VPN，检查更新仍失败？**
+1.2.2 已统一系统代理处理，并在 API 查询失败时使用 GitHub 官方发布页补查；失败时显示具体原因。VPN 分应用模式需要包含 Ciallo 阅读，检查更新不需要 GitHub 登录。
 
 **Q：搜索不到结果？**
 确认书源已启用、网络正常；Z-Library 首次搜索需要先过验证；漫画建议用「聚合漫画（全部）」；也可换节点或关键词。
@@ -279,6 +284,7 @@ Release 包只含 arm64 库，x86_64 模拟器转译运行会崩溃；Debug 包�
 
 | 版本    | 日期         | 主要内容                              |
 | ----- | ---------- | --------------------------------- |
+| 1.2.2 | 2026-10-05 | 常用词与专名多语言搜索、缺词在线补充与缓存、简称匹配、滚动用词卡片、Tab 动画、原生选字复制及更新检查修复 |
 | 1.2.1 | 2026-10-05 | 漫画作者与编号交互、编号搜索、底部导航对齐、禁漫天堂 404 备用域名与版本检查更新 |
 | 1.2.0 | 2026-10-03 | 多源搜索与漫画阅读体验升级；小说插图、书签神回、缓存清理及适配优化 |
 | 1.1.5 | 2026-10-02 | 聚合漫画搜索 8 路并发、原词优先；已有结果立即展示，后台补齐别名 |

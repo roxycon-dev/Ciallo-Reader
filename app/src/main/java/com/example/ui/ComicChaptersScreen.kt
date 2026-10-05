@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -160,10 +161,6 @@ fun ComicChaptersScreen(
     onSearchText: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
-    var textActions by remember(book?.sourceId, book?.id) { mutableStateOf<Pair<String, String>?>(null) }
-    textActions?.let { (label, text) ->
-        ComicTextActions(label, text, onDismiss = { textActions = null }, onSearch = onSearchText)
-    }
     val ordered = remember(chapters) { ComicReadingLogic.ordered(chapters) }
     // 纯逻辑层只认状态枚举，这里把实体降维成 state
     val stateOnly = remember(chapterStates) { chapterStates.mapValues { it.value.state } }
@@ -324,17 +321,15 @@ fun ComicChaptersScreen(
                             modifier = Modifier.size(22.dp),
                         )
                     }
-                    Text(
+                    SelectionContainer { Text(
                         text = book?.title ?: "漫画章节",
-                        modifier = Modifier.combinedClickable(onClick = {}, onLongClick = {
-                            book?.title?.takeIf { it.isNotBlank() }?.let { textActions = "漫画名" to it }
-                        }),
+                        modifier = Modifier.comicSearchActions("漫画名", book?.title.orEmpty(), onSearchText),
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onBackground,
-                    )
+                    ) }
                 }
             }
         },
@@ -495,9 +490,7 @@ fun ComicChaptersScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             // ── 头部：封面模糊背景 + 封面卡 + 标题 + 徽章 + 作者 + 简介（旧版样式） ──
-                            item(key = "hero") { ComicHeroHeader(book = book, textMode = textMode,
-                                onTextLongPress = { label, text -> textActions = label to text },
-                                onTextClick = onSearchText) }
+                            item(key = "hero") { ComicHeroHeader(book = book, textMode = textMode, onTextClick = onSearchText) }
 
                             // ── 信息行（13，secondary；「已读 N 话」accent） ──
                             item(key = "info") {
@@ -1284,8 +1277,7 @@ private fun CheckCircleSpec(checked: Boolean, uncheckedStroke: Color = MaterialT
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ComicHeroHeader(book: SearchBook?, textMode: Boolean, onTextLongPress: (String, String) -> Unit,
-    onTextClick: (String) -> Unit) {
+private fun ComicHeroHeader(book: SearchBook?, textMode: Boolean, onTextClick: (String) -> Unit) {
     if (book == null) return
     var descriptionExpanded by remember(book.sourceId, book.id) { mutableStateOf(false) }
     val scrimSurface = MaterialTheme.colorScheme.surface
@@ -1393,12 +1385,11 @@ private fun ComicHeroHeader(book: SearchBook?, textMode: Boolean, onTextLongPres
                     }
                 }
                 Spacer(Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = book.title,
-                            modifier = Modifier.combinedClickable(onClick = { onTextClick(book.title) }, onLongClick = {
-                            onTextLongPress(if (textMode) "书名" else "漫画名", book.title)
-                        }),
+                SelectionContainer(modifier = Modifier.weight(1f)) {
+                Column {
+                    Text(
+                        text = book.title,
+                        modifier = Modifier.comicSearchActions(if (textMode) "书名" else "漫画名", book.title, onTextClick),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
@@ -1419,9 +1410,7 @@ private fun ComicHeroHeader(book: SearchBook?, textMode: Boolean, onTextLongPres
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "作者：${book.author}",
-                            modifier = Modifier.combinedClickable(onClick = { onTextClick(book.author) }, onLongClick = {
-                                onTextLongPress("作者名", book.author)
-                            }),
+                            modifier = Modifier.comicSearchActions("作者名", book.author, onTextClick),
                             fontSize = 12.sp,
                             color = Color.White.copy(alpha = 0.75f),
                             maxLines = 2,
@@ -1436,30 +1425,28 @@ private fun ComicHeroHeader(book: SearchBook?, textMode: Boolean, onTextLongPres
                         Spacer(Modifier.height(4.dp))
                         Text(
                             text = "编号：$comicId",
-                            modifier = Modifier.combinedClickable(
-                                onClick = { onTextClick(comicId) },
-                                onLongClick = { onTextLongPress("作品编号", comicId) },
-                            ),
+                            modifier = Modifier.comicSearchActions("作品编号", comicId, onTextClick),
                             fontSize = 12.sp,
                             color = Color.White.copy(alpha = 0.75f),
                         )
                     }
                 }
+                }
             }
         }
 
-        if (!textMode) ComicMetadataBlock(book, onTextLongPress = onTextLongPress)
+        if (!textMode) ComicMetadataBlock(book, onSearch = onTextClick)
         // 简介：默认 3 行，可展开
         val desc = book.description?.takeIf { it.isNotBlank() }
         if (desc != null) {
             Spacer(Modifier.height(12.dp))
-            Text(
+            SelectionContainer { Text(
                 text = desc,
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = if (descriptionExpanded) Int.MAX_VALUE else 3,
                 overflow = TextOverflow.Ellipsis,
-            )
+            ) }
             if (desc.length > 60) {
                 TextButton(onClick = { descriptionExpanded = !descriptionExpanded }) {
                     Text(if (descriptionExpanded) "收起" else "展开")

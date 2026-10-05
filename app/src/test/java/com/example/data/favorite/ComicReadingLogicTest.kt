@@ -33,6 +33,40 @@ class ComicReadingLogicTest {
         assertEquals(listOf("a", "b"), seq.map { it.chapter.id })
     }
 
+    @Test fun readerNavigationFollowsSourceOrderIncludingZeroAndFractionalChapters() {
+        val sequence = listOf(ch("c0", "序章", 0f), ch("c1", "第1话", 1f),
+            ch("extra", "番外", 1.5f), ch("c4", "第4话", 4f))
+        for (sourceList in listOf(sequence, sequence.reversed(), listOf(sequence[2], sequence[3], sequence[0], sequence[1]))) {
+            sequence.forEachIndexed { index, chapter ->
+                val navigation = ComicReadingLogic.navigation(sourceList, chapter.id)
+                assertEquals(sequence, navigation.chapters)
+                assertEquals(index, navigation.currentIndex)
+                assertEquals(sequence.getOrNull(index - 1), navigation.previous)
+                assertEquals(sequence.getOrNull(index + 1), navigation.next)
+                assertEquals(navigation.chapters[index], chapter)
+            }
+        }
+    }
+
+    @Test fun readerNavigationCannotSwitchFromAnUnknownChapter() {
+        for (sourceList in listOf(emptyList(), listOf(ch("c1", "第1话", 1f)))) {
+            for (id in listOf(null, "missing")) {
+                val navigation = ComicReadingLogic.navigation(sourceList, id)
+                assertEquals(-1, navigation.currentIndex)
+                assertEquals(null, navigation.previous)
+                assertEquals(null, navigation.next)
+            }
+        }
+    }
+
+    @Test fun readerNavigationPreservesSourcesWithoutOrderMetadata() {
+        val chapters = listOf(ch("a", "序章"), ch("b", "第一话"), ch("c", "番外"))
+        val navigation = ComicReadingLogic.navigation(chapters, "b")
+        assertEquals(chapters, navigation.chapters)
+        assertEquals(chapters[0], navigation.previous)
+        assertEquals(chapters[2], navigation.next)
+    }
+
     @Test
     fun `缺章时下一话按源顺序索引计算`() {
         // order 1、2、5（中间 3、4 被删）——下一话必须是 5 而不是"下标+1"

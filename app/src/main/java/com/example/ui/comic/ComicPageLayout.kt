@@ -69,7 +69,7 @@ data class ComicLayout(
  * - [Webtoon]（条漫）：允许用户设置页面间距（页与页留白），支持磁吸到页边界
  *   （可关闭，官方 SnapFlingBehavior 同款 item-snap），预加载窗口常规；
  * - [Continuous]（无缝滚动）：强制页间距 0（连续拼接），无磁吸（自由滚动），
- *   更宽的预加载窗口保证"完全连续无停顿"的观感，进度按累计像素高度计。
+ *   预加载窗口保证"完全连续无停顿"的观感。两种列表均按滚动像素更新进度。
  */
 sealed class ComicScrollStrategy {
     /** 页与页间距（dp） */
@@ -78,7 +78,7 @@ sealed class ComicScrollStrategy {
     abstract val snapToPage: Boolean
     /** 视口外双向预加载页数（保证滚动连续性） */
     abstract val prefetchWindow: Int
-    /** 进度语义：条漫=页粒度；无缝=像素高度粒度 */
+    /** 进度语义：两种列表均跟随项内像素偏移，长图滚动时也更新 */
     abstract val pixelProgress: Boolean
 
     data class Webtoon(private val config: ComicReaderConfig) : ComicScrollStrategy() {
@@ -87,7 +87,7 @@ sealed class ComicScrollStrategy {
         // 在线阅读冷启动：窗口 2→4，提前两页取图/解码，滚动追图概率大降；
         // 驻留预算按优先级序自动丢尾部，不会无界涨内存
         override val prefetchWindow: Int get() = 4
-        override val pixelProgress: Boolean get() = false
+        override val pixelProgress: Boolean get() = true
     }
 
     data class Continuous(private val config: ComicReaderConfig) : ComicScrollStrategy() {

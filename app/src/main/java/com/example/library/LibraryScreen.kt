@@ -196,6 +196,14 @@ fun LibraryScreen(
     val aggregateKind by viewModel.aggregateKind.collectAsStateWithLifecycle()
     // 第十一轮第 6 条：多语言搜索开关状态（书源选择弹层内可控）
     val multiLangSearch by viewModel.multiLanguageSearch.collectAsStateWithLifecycle()
+    val onlineKeywordLookup by viewModel.onlineKeywordLookup.collectAsStateWithLifecycle()
+    val searchKeywords by viewModel.searchKeywords.collectAsStateWithLifecycle()
+    val keywordStatus by viewModel.keywordStatus.collectAsStateWithLifecycle()
+    val keywordOrigins by viewModel.keywordOrigins.collectAsStateWithLifecycle()
+    val keywordDispatches by viewModel.keywordDispatches.collectAsStateWithLifecycle()
+    val keywordProviders by viewModel.keywordProviders.collectAsStateWithLifecycle()
+    val keywordPreviewWords = if (multiLangSearch) searchKeywords else emptyList()
+    val keywordPreviewCount = if (keywordPreviewWords.isEmpty()) 0 else 1
     val context = androidx.compose.ui.platform.LocalContext.current
     val availableSources by viewModel.availableSources.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -385,6 +393,12 @@ fun LibraryScreen(
             }
         }
     }
+    val retryKeywordLookup: () -> Unit = {
+        searchKeywords.firstOrNull()?.let { keyword ->
+            if (aggregateMode) viewModel.aggregateSearch(keyword, forceKeywordRefresh = true)
+            else viewModel.search(keyword, forceKeywordRefresh = true)
+        }
+    }
 
     val hasSeenWelcome by viewModel.hasSeenWelcome.collectAsStateWithLifecycle()
     val isCurrentSourceLoggedIn by viewModel.isCurrentSourceLoggedIn.collectAsStateWithLifecycle()
@@ -462,12 +476,12 @@ fun LibraryScreen(
         }
         hadAggregateBooks = hasAggregateBooks
     }
-    val activeGroupIdx by remember(aggResults?.groups) {
+    val activeGroupIdx by remember(aggResults?.groups, keywordPreviewCount) {
         derivedStateOf {
             val groups = aggResults?.groups ?: return@derivedStateOf -1
             val first = staggeredGridState.firstVisibleItemIndex
-            var acc = 0
-            var result = groups.lastIndex
+            var acc = keywordPreviewCount
+            var result = if (groups.isEmpty()) -1 else 0
             groups.forEachIndexed { i, g ->
                 if (first >= acc) result = i
                 acc += 1 + aggregateGroupItemCount(g, expandedGroups[g.sourceId] == true)
@@ -477,7 +491,7 @@ fun LibraryScreen(
     }
 
     // 跳转后数据仍在流式刷新（加载组完成会改变 item 数）→ 数据一变就对准目标组头，直至该组加载完成
-    LaunchedEffect(aggResults?.groups) {
+    LaunchedEffect(aggResults?.groups, keywordPreviewCount) {
         val targetId = pendingJumpSourceId ?: return@LaunchedEffect
         val groups = aggResults?.groups ?: return@LaunchedEffect
         val idx = groups.indexOfFirst { it.sourceId == targetId }
@@ -485,7 +499,7 @@ fun LibraryScreen(
             pendingJumpSourceId = null
             return@LaunchedEffect
         }
-        staggeredGridState.scrollToItem(groupHeaderIndex(groups, idx, expandedGroups))
+        staggeredGridState.scrollToItem(groupHeaderIndex(groups, idx, expandedGroups, keywordPreviewCount))
         if (!groups[idx].loading) pendingJumpSourceId = null
     }
 
@@ -744,6 +758,7 @@ fun LibraryScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalItemSpacing = 10.dp
                     ) {
+                        keywordSearchPreviewItem(keywordPreviewWords, keywordStatus, keywordOrigins, keywordDispatches, keywordProviders, retryKeywordLookup)
                         agg.groups.forEach { group ->
                             item(
                                 key = "agg_group_header_${group.sourceId}",
@@ -888,77 +903,90 @@ fun LibraryScreen(
                                     } else {
                                         pendingJumpSourceId = agg.groups[idx].sourceId
                                         staggeredGridState.animateScrollToItem(
-                                            groupHeaderIndex(agg.groups, idx, expandedGroups)
+                                            groupHeaderIndex(agg.groups, idx, expandedGroups, keywordPreviewCount)
                                         )
                                     }
                                 }
                             }
                         )
                     }
-                } else if (isSearching) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
+                } else if (isSearching || uiState is LibraryUiState.Error || searchResults.isEmpty()) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        contentPadding = PaddingValues(start = DesignTokens.SpacePage, end = DesignTokens.SpacePage,
+                            bottom = DesignTokens.SpacePage + extraBottomPadding),
+                        verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm),
                     ) {
-                        ChasingDots(
-                            size = 52.dp,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    }
-                } else if (uiState is LibraryUiState.Error) {
-                    val error = (uiState as LibraryUiState.Error).error
-                    val (title, desc, action) = when (error) {
-                        is LibraryError.NetworkUnavailable -> Triple("无网络连接", "请检查网络设置后重试", "重试")
-                        // v1.0.1：网络失败展示真实原因（HTTP 状态码 / DNS / TLS / 超时），便于排查
-                        is LibraryError.NetworkDetail -> Triple("请求失败", error.message, "重试")
-                        is LibraryError.SourceUnavailable -> Triple("服务无响应", "当前书源站点暂无响应，请稍后重试或切换书源", "重试")
-                        is LibraryError.AuthenticationRequired -> Triple("需要登录", "当前书源需要账号身份验证", "去登录")
-                        is LibraryError.CloudflareBlocked -> Triple("安全验证拦截", "目标站点已启用安全防护，请稍后重试", "重试")
-                        is LibraryError.ParseFailed -> Triple("数据解析失败", "返回数据格式异常，无法解析内容", "重试")
-                        else -> Triple("请求超时", error.message ?: "网络请求超时，请重试", "重试")
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        com.example.ui.components.MascotEmptyState(
-                            mascotResId = com.example.ui.mascot.MascotSpriteSheet.sadDrawable,
-                            title = title,
-                            description = desc,
-                            actionLabel = action,
-                            onActionClick = {
-                                if (error is LibraryError.AuthenticationRequired) {
-                                    onOpenSourceManagement()
-                                } else {
-                                    performSearch(searchQuery)
+                        keywordSearchPreviewItem(keywordPreviewWords, keywordStatus, keywordOrigins, keywordDispatches, keywordProviders, retryKeywordLookup)
+                        item(key = "search_status", contentType = "search_status") {
+                            if (isSearching) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .fillParentMaxHeight(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    ChasingDots(
+                                        size = 52.dp,
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
                                 }
-                            },
-                            testTagPrefix = "search_error_state"
-                        )
-                    }
-                } else if (searchResults.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        com.example.ui.components.MascotEmptyState(
-                            mascotResId = com.example.ui.mascot.MascotSpriteSheet.sadDrawable,
-                            title = if (searchQuery.isBlank()) "检索图书" else "未找到结果",
-                            description = if (searchQuery.isBlank()) {
-                                "在上方输入书名、作者或关键词"
+                            } else if (uiState is LibraryUiState.Error) {
+                                val error = (uiState as LibraryUiState.Error).error
+                                val (title, desc, action) = when (error) {
+                                    is LibraryError.NetworkUnavailable -> Triple("无网络连接", "请检查网络设置后重试", "重试")
+                                    // v1.0.1：网络失败展示真实原因（HTTP 状态码 / DNS / TLS / 超时），便于排查
+                                    is LibraryError.NetworkDetail -> Triple("请求失败", error.message, "重试")
+                                    is LibraryError.SourceUnavailable -> Triple("服务无响应", "当前书源站点暂无响应，请稍后重试或切换书源", "重试")
+                                    is LibraryError.AuthenticationRequired -> Triple("需要登录", "当前书源需要账号身份验证", "去登录")
+                                    is LibraryError.CloudflareBlocked -> Triple("安全验证拦截", "目标站点已启用安全防护，请稍后重试", "重试")
+                                    is LibraryError.ParseFailed -> Triple("数据解析失败", "返回数据格式异常，无法解析内容", "重试")
+                                    else -> Triple("请求超时", error.message ?: "网络请求超时，请重试", "重试")
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .fillParentMaxHeight(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    com.example.ui.components.MascotEmptyState(
+                                        mascotResId = com.example.ui.mascot.MascotSpriteSheet.sadDrawable,
+                                        title = title,
+                                        description = desc,
+                                        actionLabel = action,
+                                        onActionClick = {
+                                            if (error is LibraryError.AuthenticationRequired) {
+                                                onOpenSourceManagement()
+                                            } else {
+                                                performSearch(searchQuery)
+                                            }
+                                        },
+                                        testTagPrefix = "search_error_state"
+                                    )
+                                }
                             } else {
-                                "未找到与“$searchQuery”匹配的内容，请尝试更换关键词或书源"
-                            },
-                            actionLabel = "管理与导入书源",
-                            onActionClick = onOpenSourceManagement,
-                            testTagPrefix = "search_empty_state"
-                        )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .fillParentMaxHeight(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    com.example.ui.components.MascotEmptyState(
+                                        mascotResId = com.example.ui.mascot.MascotSpriteSheet.sadDrawable,
+                                        title = if (searchQuery.isBlank()) "检索图书" else "未找到结果",
+                                        description = if (searchQuery.isBlank()) {
+                                            "在上方输入书名、作者或关键词"
+                                        } else {
+                                            "未找到与“$searchQuery”匹配的内容，请尝试更换关键词或书源"
+                                        },
+                                        actionLabel = "管理与导入书源",
+                                        onActionClick = onOpenSourceManagement,
+                                        testTagPrefix = "search_empty_state"
+                                    )
+                                }
+                            }
+                        }
                     }
                 } else {
                     LazyColumn(
@@ -969,6 +997,7 @@ fun LibraryScreen(
                         contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 16.dp + extraBottomPadding),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        keywordSearchPreviewItem(keywordPreviewWords, keywordStatus, keywordOrigins, keywordDispatches, keywordProviders, retryKeywordLookup)
                         columnItems(searchResults, key = { it.id }) { book ->
                             val st by remember(book.id) {
                                 derivedStateOf {
@@ -1163,6 +1192,15 @@ fun LibraryScreen(
                 novelSources = novelSources,
                 multiLanguageSearch = multiLangSearch,
                 onToggleMultiLanguageSearch = { viewModel.setMultiLanguageSearch(it) },
+                onlineKeywordLookup = onlineKeywordLookup,
+                onToggleOnlineKeywordLookup = { enabled ->
+                    if (enabled != onlineKeywordLookup) {
+                        viewModel.setOnlineKeywordLookup(enabled)
+                        // A finished preview belongs to the previous policy. Re-run the
+                        // submitted query when enabling, never an unfinished draft.
+                        if (enabled && searchKeywords.isNotEmpty()) performSearch(searchKeywords.first())
+                    }
+                },
                 onSelectAggregate = { kind ->
                     viewModel.setAggregateMode(true)
                     viewModel.setAggregateKind(kind)
@@ -1804,6 +1842,8 @@ private fun SourcePickerSheet(
     novelSources: List<BookSource>,
     multiLanguageSearch: Boolean,
     onToggleMultiLanguageSearch: (Boolean) -> Unit,
+    onlineKeywordLookup: Boolean,
+    onToggleOnlineKeywordLookup: (Boolean) -> Unit,
     onSelectAggregate: (String) -> Unit,
     onSelectSource: (String) -> Unit,
     onManageSources: () -> Unit,
@@ -2033,40 +2073,11 @@ private fun SourcePickerSheet(
                             SourceSheetDivider()
                         }
                         item {
-                            ListItem(
-                                // 规范：行高 56；**彻底清掉这一行的纯白底**（用户点名）
-                                modifier = Modifier.height(56.dp),
-                                colors = ListItemDefaults.colors(
-                                    containerColor = androidx.compose.ui.graphics.Color.Transparent
-                                ),
-                                headlineContent = {
-                                    Text(
-                                        text = "多语言搜索",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                },
-                                supportingContent = {
-                                    Text(
-                                        if (multiLanguageSearch) "开启：自动用各语言译名扩展搜索"
-                                        else "关闭：仅使用输入的原始关键词"
-                                    )
-                                },
-                                leadingContent = {
-                                    Icon(
-                                        imageVector = Icons.Default.Translate,
-                                        contentDescription = null,
-                                        tint = if (multiLanguageSearch) MaterialTheme.colorScheme.secondary
-                                        else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                },
-                                trailingContent = {
-                                    com.example.ui.components.AppSwitch(
-                                        checked = multiLanguageSearch,
-                                        onCheckedChange = onToggleMultiLanguageSearch
-                                    )
-                                }
-                                // 无独立底色：分区一律透明，唯一允许填充的是选中态（primary 12%）
+                            KeywordSearchOptions(
+                                enabled = multiLanguageSearch,
+                                onEnabledChange = onToggleMultiLanguageSearch,
+                                online = onlineKeywordLookup,
+                                onOnlineChange = onToggleOnlineKeywordLookup,
                             )
                         }
                         item {
@@ -3336,12 +3347,13 @@ internal fun aggregateGroupItemCount(
 }
 
 /** 目标源组组头的 item index（跳转定位用）。 */
-private fun groupHeaderIndex(
+internal fun groupHeaderIndex(
     groups: List<LibraryUiState.AggregateGroup>,
     target: Int,
-    expandedGroups: Map<String, Boolean> = emptyMap()
+    expandedGroups: Map<String, Boolean> = emptyMap(),
+    leadingItems: Int = 0,
 ): Int {
-    var index = 0
+    var index = leadingItems
     for (i in 0 until target.coerceIn(0, groups.lastIndex)) {
         index += 1 + aggregateGroupItemCount(groups[i], expandedGroups[groups[i].sourceId] == true)
     }

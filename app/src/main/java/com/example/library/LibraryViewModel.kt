@@ -27,6 +27,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.flow
+import com.example.source.keyword.KeywordRepository
+import com.example.source.keyword.KeywordKeys
+import com.example.source.keyword.KeywordVariants
+import com.example.source.keyword.KeywordProviderState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.sync.Semaphore
@@ -378,6 +383,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         cancelAggregateSearch()
         _uiState.value = LibraryUiState.Empty
         errorMessage.value = null
+        _searchKeywords.value = emptyList()
+        _keywordStatus.value = ""
+        _keywordOrigins.value = emptyMap()
+        _keywordDispatches.value = emptyMap()
+        _keywordProviders.value = emptyList()
     }
 
     /* ── 多语言搜索开关（第十一轮第 6 条）：UI 可见可控，驱动 expandVariants ── */
@@ -393,181 +403,93 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private var aggregateSearchJob: Job? = null
     private var singleSearchJob: Job? = null
     private val aggregateSearchSlots = Semaphore(4)
-    private val comicAggregateSearch = ComicAggregateSearch(searches = sourceSearches)
+    private val comicAggregateSearch = ComicAggregateSearch(searches = sourceSearches, onDispatched = ::recordKeywordDispatch)
     private var searchRequestSeq = 0L
 
-    /* ── 多语言标题变体扩展（第七轮第 7 条；第十一轮第 6 条修复）──
-     * 用户输入 → 归一化（含繁→简折叠）→ 查本地 AniList 标题库 → 命中作品的其它
-     * 语言标题 → 作为额外关键词一起发给各书源。AniList 只是"标题扩展器"：
-     * 离线 / 无数据 / 查询失败 / 用户关闭开关时安全退化为 [原始关键词] 单变体，
-     * 搜索链路永不报错。
-     *
-     * 第十一轮第 6 条根因修复：旧版只做归一化列的"精确等值"匹配，而用户输入常为
-     * 短名（"无职转生"）、库内存的是完整标题（"無職転生 ～異世界行ったら本気だす～"），
-     * 等值永远落空 → 多语言扩展从未真正生效。现改为：精确 → 前缀/子串包含匹配；
-     * 并叠加繁简折叠（"無職転生" ↔ "无职转生" 同一作品两种书写互匹配）。 */
-    private val titleVariantCache=java.util.concurrent.ConcurrentHashMap<String, Pair<Long,List<String>>>()
-    private suspend fun expandVariants(keyword: String): List<String> {
-        val fallback = listOf(keyword)
-        if (keyword.isBlank()) return fallback
-        // 第十一轮第 6 条：多语言搜索开关（UI 可控；关闭后只用原始关键词）
-        if (!prefs.multiLanguageSearch) return fallback
-        val now=android.os.SystemClock.elapsedRealtime()
-        titleVariantCache[keyword]?.takeIf { now-it.first<60_000 }?.let { return it.second }
-        val result = runCatching {
-            val normalized = com.example.source.anilist.TitleNormalizer.normalize(keyword)
-            val compact = com.example.source.anilist.TitleNormalizer.compact(keyword)
-            if (normalized.isEmpty()) return fallback
-            val dao = com.example.data.AppDatabase.getDatabase(getApplication()).anilistDao()
-            // 1) 精确等值（归一化/紧凑态任一命中）
-            var mediaIds = dao.findMediaIds(normalized, compact)
-            // 2) 子串包含兜底：短名（"无职转生"）命中完整标题（"無職転生 ～…～"）。
-            //    归一化后 ≥2 字符才走包含匹配，避免单字噪音命中上百部作品
-            if (mediaIds.isEmpty() && normalized.replace(" ", "").length >= 2) {
-                val escNorm = escapeLike(normalized)
-                val escComp = escapeLike(compact)
-                if (escNorm.isNotEmpty() && escComp.isNotEmpty()) {
-                    mediaIds = dao.findMediaIdsContaining(escNorm, escComp, 8)
-                }
-            }
-            if (mediaIds.isEmpty()) return@runCatching fallback
-            val rawTitles = dao.getRawTitlesFor(mediaIds)
-            com.example.source.anilist.SearchVariantBuilder.build(keyword, rawTitles)
-        }.getOrElse { error ->
-            if (error is CancellationException) throw error
-            fallback
-        }
-        if (titleVariantCache.size>=128) titleVariantCache.clear()
-        titleVariantCache[keyword]=now to result
-        return result
+    // Local keyword mappings are emitted first; structured online names supplement later.
+    private val keywordRepository by lazy { KeywordRepository(getApplication<Application>()) }
+    private val _searchKeywords = MutableStateFlow<List<String>>(emptyList())
+    val searchKeywords: StateFlow<List<String>> = _searchKeywords.asStateFlow()
+    private val _keywordStatus = MutableStateFlow("")
+    val keywordStatus: StateFlow<String> = _keywordStatus.asStateFlow()
+    private val _keywordOrigins = MutableStateFlow<Map<String, String>>(emptyMap())
+    val keywordOrigins: StateFlow<Map<String, String>> = _keywordOrigins.asStateFlow()
+    private val _keywordDispatches = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
+    val keywordDispatches: StateFlow<Map<String, Set<String>>> = _keywordDispatches.asStateFlow()
+    private val _keywordProviders = MutableStateFlow<List<KeywordProviderState>>(emptyList())
+    internal val keywordProviders: StateFlow<List<KeywordProviderState>> = _keywordProviders.asStateFlow()
+
+    private fun startKeywordPreview(keyword: String) {
+        _searchKeywords.value = listOf(keyword)
+        _keywordStatus.value = if (prefs.multiLanguageSearch) "正在查找本地名称" else ""
+        _keywordOrigins.value = mapOf(KeywordKeys.query(keyword) to "原词")
+        _keywordDispatches.value = emptyMap()
+        _keywordProviders.value = emptyList()
     }
 
-    /** SQLite LIKE 通配符转义（配套 DAO 里的 ESCAPE '\'） */
-    private fun escapeLike(s: String): String =
-        s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    private fun recordKeywordDispatch(source: BookSource, keyword: String) {
+        val key = KeywordKeys.query(keyword)
+        if (_searchKeywords.value.none { KeywordKeys.query(it) == key }) return
+        _keywordDispatches.update { rows -> rows + (key to (rows[key].orEmpty() + source.id)) }
+    }
+    private val _onlineKeywordLookup = MutableStateFlow(prefs.multiLanguageOnlineLookup)
+    val onlineKeywordLookup: StateFlow<Boolean> = _onlineKeywordLookup.asStateFlow()
 
-    fun aggregateSearch(keyword: String) {
+    fun setOnlineKeywordLookup(enabled: Boolean) {
+        prefs.multiLanguageOnlineLookup = enabled
+        _onlineKeywordLookup.value = enabled
+    }
+
+    private fun keywordExpansion(keyword: String, forceRefresh: Boolean = false, valid: () -> Boolean): Flow<List<String>> = flow {
+        if (!prefs.multiLanguageSearch) return@flow
+        keywordRepository.observe(keyword, forceRefresh).collect { update ->
+            val batch = update.added
+            if (valid() && prefs.multiLanguageSearch) {
+                _searchKeywords.update { words ->
+                    (words + batch).distinctBy(KeywordKeys::query).take(KeywordVariants.LIMIT)
+                }
+                _keywordStatus.value = update.status
+                _keywordProviders.value = update.providers
+                _keywordOrigins.update { it + update.origins }
+                if (batch.isNotEmpty()) emit(batch)
+            }
+        }
+    }
+
+    private val novelAggregateSearch = ComicAggregateSearch(
+        slots = aggregateSearchSlots, searches = sourceSearches, onDispatched = ::recordKeywordDispatch,
+        timeoutFor = { if (it.id == "zlibrary") 55_000L else 20_000L },
+    )
+    // Single-source transport already owns its timeout (EH cold connections can take >20s).
+    private val singleSourceSearch = ComicAggregateSearch(
+        searches = sourceSearches, requestTimeoutMs = Long.MAX_VALUE, onDispatched = ::recordKeywordDispatch,
+    )
+
+    fun aggregateSearch(keyword: String, forceKeywordRefresh: Boolean = false) {
         searchRequestSeq++
         cancelAggregateSearch()
         val seq = aggregateSearchSeq
-        // 聚合类别互斥过滤：novel=小说源（Z-Library/Legado 文字源）；comic=漫画源（且排除文字源）
         val novel = _aggregateKind.value == "novel"
         val sources = sourceManager.availableSources.value.filter {
             it.capabilities.supportSearch && !it.capabilities.environmentOnly &&
                 if (novel) it.isNovelSource else it.isComicSource
         }
-        Log.i("Aggregate", "aggregateSearch '$keyword' sources=${sources.map { it.name }}")
+        startKeywordPreview(keyword)
+        if (sources.isEmpty())
+            _keywordStatus.value = "没有可用的搜索书源"
         if (sources.isEmpty()) {
             _uiState.value = LibraryUiState.Error(LibraryError.SourceUnavailable)
             return
         }
         aggregateSearchJob = viewModelScope.launch {
             errorMessage.value = null
-            // 先展示所有源的“加载中”分组，哪个源先完成就先把哪个源的结果推给 UI
-            val initialGroups = sources.map { source ->
-                LibraryUiState.AggregateGroup(
-                    sourceId = source.id,
-                    sourceName = source.name,
-                    books = emptyList(),
-                    error = null,
-                    loading = true
-                )
-            }
-            _uiState.value = LibraryUiState.AggregateResults(initialGroups, running = true)
-            if (!novel) {
-                comicAggregateSearch.search(sources, keyword, ::expandVariants) { group ->
-                    if (seq == aggregateSearchSeq) {
-                        _uiState.update { current ->
-                            if (current is LibraryUiState.AggregateResults) current.withComicSearchGroup(group)
-                            else current
-                        }
-                    }
-                }
-                return@launch
-            }
-            // 第七轮第 7 条：多语言变体（本地 AniList 标题库扩展；离线安全退化）
-            val variants = expandVariants(keyword)
-            Log.i("Aggregate", "search variants: $variants")
-            sources.forEach { source ->
-                launch {
-                    // 每个源依次用全部变体搜索：不同语言、不同书源的结果全部保留
-                    // （跨源永不去重）；同一书源内同一资源 id 去重（多别名重复命中）
-                    val collected = ArrayList<SearchBook>(32)
-                    var lastError: String? = null
-                    var anySuccess = false
-                    variants.forEach { variant ->
-                        // Z-Library（1lib.sk）首次搜索要过 DiamWall 挑战：
-                        // OkHttp 503 PoW 解不了时 WebView 兜底全程约 30-40s，
-                        // 20s 超时会中途砍掉 WebView 导致"搜索超时"假错误；
-                        // 过挑战后验证 Cookie 同步进 OkHttp，后续搜索恢复秒级。
-                        val perSourceTimeoutMs = if (source.id == "zlibrary") 55000L else 20000L
-                        val result = aggregateSearchSlots.withPermit {
-                            try {
-                                withTimeoutOrNull(perSourceTimeoutMs) { sourceSearches.search(source, variant) }
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: Exception) {
-                                SourceResult.Error(SourceException.NetworkError(e.message ?: "搜索失败", e))
-                            }
-                        }
-                        if (seq != aggregateSearchSeq) return@launch
-                        when (result) {
-                            is SourceResult.Success -> {
-                                anySuccess = true
-                                collected.addAll(result.data.map { it.copy(sourceId = source.id) })
-                                // 变体粒度流式更新：先到的语言结果先展示
-                                _uiState.update { current ->
-                                    if (current !is LibraryUiState.AggregateResults) current
-                                    else {
-                                        val merged = collected.distinctBy { it.id }
-                                        LibraryUiState.AggregateResults(
-                                            groups = current.groups.map {
-                                                if (it.sourceId == source.id)
-                                                    it.copy(books = merged, loading = true)
-                                                else it
-                                            },
-                                            running = true
-                                        )
-                                    }
-                                }
-                            }
-                            is SourceResult.Error -> {
-                                lastError = result.exception.message
-                            }
-                            null -> lastError = "搜索超时"
-                        }
-                    }
-                    if (seq != aggregateSearchSeq) return@launch
-                    val group = if (anySuccess || collected.isNotEmpty()) {
-                        LibraryUiState.AggregateGroup(
-                            sourceId = source.id,
-                            sourceName = source.name,
-                            // 源内去重：仅去掉同一资源（同 id）的重复项；
-                            // 不同书源/不同语言标题的结果即使同作品也全部保留
-                            books = collected.distinctBy { it.id },
-                            error = null,
-                            loading = false
-                        )
-                    } else {
-                        Log.i("Aggregate", "${source.name}: ERROR $lastError")
-                        LibraryUiState.AggregateGroup(
-                            sourceId = source.id,
-                            sourceName = source.name,
-                            books = emptyList(),
-                            error = lastError,
-                            loading = false
-                        )
-                    }
-                    _uiState.update { current ->
-                        if (current !is LibraryUiState.AggregateResults) return@update current
-                        val newGroups = current.groups.map {
-                            if (it.sourceId == source.id) group else it
-                        }
-                        LibraryUiState.AggregateResults(
-                            groups = newGroups,
-                            running = newGroups.any { it.loading }
-                        )
-                    }
+            _uiState.value = LibraryUiState.AggregateResults(sources.map { source ->
+                LibraryUiState.AggregateGroup(source.id, source.name, emptyList(), null, loading = true)
+            }, running = true)
+            val runner = if (novel) novelAggregateSearch else comicAggregateSearch
+            runner.searchExpanded(sources, keyword, keywordExpansion(keyword, forceKeywordRefresh) { seq == aggregateSearchSeq }) { group ->
+                if (seq == aggregateSearchSeq) _uiState.update { current ->
+                    if (current is LibraryUiState.AggregateResults) current.withComicSearchGroup(group) else current
                 }
             }
         }
@@ -1070,7 +992,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     val allDownloadTasks: Flow<List<DownloadTaskEntity>> = downloadManager.allTasksFlow
     val errorMessage = MutableStateFlow<String?>(null)
 
-    fun search(keyword: String) {
+    fun search(keyword: String, forceKeywordRefresh: Boolean = false) {
         cancelAggregateSearch()
         val source = sourceManager.activeSource.value ?: return
         val requestSeq = ++searchRequestSeq
@@ -1078,23 +1000,21 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             if (requestSeq != searchRequestSeq) return@launch
             _uiState.value = LibraryUiState.Searching
             errorMessage.value = null
-            // 第七轮第 7 条：单源搜索同样走多语言变体（本地 AniList 标题库扩展）；
-            // 源内按资源 id 去重（多别名命中同一资源只显示一次）
-            val variants = expandVariants(keyword)
+            startKeywordPreview(keyword)
             val collected = ArrayList<SearchBook>(32)
             var firstError: SourceException? = null
-            variants.forEach { variant ->
-                if (requestSeq != searchRequestSeq) return@launch
-                val result = try {
-                    sourceSearches.search(source, variant)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    SourceResult.Error(SourceException.NetworkError(e.message ?: "搜索失败", e))
-                }
-                when (result) {
-                    is SourceResult.Success -> collected.addAll(result.data.map { it.copy(sourceId = source.id) })
-                    is SourceResult.Error -> if (firstError == null) firstError = result.exception
+            singleSourceSearch.searchExpanded(
+                listOf(source), keyword, keywordExpansion(keyword, forceKeywordRefresh) { requestSeq == searchRequestSeq },
+            ) { group ->
+                if (requestSeq == searchRequestSeq) {
+                    collected.clear()
+                    collected.addAll(group.books)
+                    if (group.error != null && firstError == null) {
+                        firstError = group.failure ?: SourceException.NetworkError(group.error)
+                    }
+                    if (group.books.isNotEmpty()) {
+                        _uiState.value = LibraryUiState.SearchResults(group.books, loading = group.loading)
+                    }
                 }
             }
             if (requestSeq != searchRequestSeq) return@launch

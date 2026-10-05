@@ -586,7 +586,7 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .then(
-                                        if (renderQuality.realtimeGlass && !tabBarCollapseState.scrolling) {
+                                        if (renderQuality.realtimeGlass) {
                                             Modifier.layerBackdrop(tabBackdrop)
                                         }
                                         else Modifier
@@ -974,12 +974,7 @@ class MainActivity : ComponentActivity() {
                                     selectedIndex = selectedTab,
                                     onTabSelected = { selectedTab = it },
                                     collapseState = tabBarCollapseState,
-                                    // Freeze the expensive backdrop capture during a gesture;
-                                    // the tab bar itself stays responsive and resumes glass sampling
-                                    // shortly after scrolling stops.
-                                    backdrop = tabBackdrop.takeIf {
-                                        renderQuality.realtimeGlass && !tabBarCollapseState.scrolling
-                                    },
+                                    backdrop = tabBackdrop.takeIf { renderQuality.realtimeGlass },
                                 )
                             }
                             }
@@ -1587,12 +1582,14 @@ class MainActivity : ComponentActivity() {
                             val imageHeaders by libraryViewModel.comicChapterHeaders.collectAsStateWithLifecycle()
                             val loading by libraryViewModel.comicChapterLoading.collectAsStateWithLifecycle()
                             val error by libraryViewModel.comicChapterError.collectAsStateWithLifecycle()
-                            val comicChaptersList by libraryViewModel.comicChapters.collectAsStateWithLifecycle()
-
-                            val activeChapterIdx = comicChaptersList.indexOfFirst { it.id == activeChapter?.id }
-                            val prevChapter = if (activeChapterIdx > 0) comicChaptersList[activeChapterIdx - 1] else null
-                            val nextChapter = if (activeChapterIdx in 0 until (comicChaptersList.size - 1))
-                                comicChaptersList[activeChapterIdx + 1] else null
+                            val sourceChapters by libraryViewModel.comicChapters.collectAsStateWithLifecycle()
+                            val chapterNavigation = remember(sourceChapters, activeChapter?.id) {
+                                com.example.data.favorite.ComicReadingLogic.navigation(sourceChapters, activeChapter?.id)
+                            }
+                            val comicChaptersList = chapterNavigation.chapters
+                            val activeChapterIdx = chapterNavigation.currentIndex
+                            val prevChapter = chapterNavigation.previous
+                            val nextChapter = chapterNavigation.next
 
                             OnlineComicReaderScreen(
                                 title = activeChapter?.title ?: comicBook?.title ?: "在线漫画",

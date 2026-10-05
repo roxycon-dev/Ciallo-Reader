@@ -5,6 +5,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.test.*
 import org.junit.Assert.*
@@ -12,6 +13,65 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ComicAggregateSearchTest {
+    @Test fun sourceJumpIncludesKeywordItemAndExpandedOrLoadingGroups() {
+        val groups = listOf(
+            LibraryUiState.AggregateGroup("a", "A", (1..9).map { book("$it", "book") }, null, false),
+            LibraryUiState.AggregateGroup("b", "B", emptyList(), null, true),
+            LibraryUiState.AggregateGroup("c", "C", emptyList(), "failed", false),
+        )
+        assertEquals(1, groupHeaderIndex(groups, 0, leadingItems = 1))
+        assertEquals(9, groupHeaderIndex(groups, 1, leadingItems = 1))
+        assertEquals(14, groupHeaderIndex(groups, 2, leadingItems = 1))
+        assertEquals(16, groupHeaderIndex(groups, 2, mapOf("a" to true), leadingItems = 1))
+        assertEquals(13, groupHeaderIndex(groups, 2, leadingItems = 0))
+    }
+
+    @Test
+    fun localBatchIsSearchedWithoutWaitingForOnlineBatchAndSlowSourcesReplayBoth() = runTest {
+        val starts = mutableListOf<Triple<Long, String, String>>()
+        val finals = mutableMapOf<String, LibraryUiState.AggregateGroup>()
+        val sources = listOf("fast", "slow").map { id -> FakeSource(id) { word ->
+            starts += Triple(currentTime, id, word)
+            delay(if (id == "slow" && word == "眼镜") 4_000 else 10)
+            // Deliberately unrelated title: it must still be honestly displayed.
+            SourceResult.Success(listOf(book(word, "A source-provided unrelated title")))
+        } }
+        runner().searchExpanded(sources, "眼镜", flow {
+            emit(listOf("glasses")); delay(3_000); emit(listOf("眼鏡", "glasses"))
+        }) { finals[it.sourceId] = it }
+        assertTrue(starts.contains(Triple(10, "fast", "glasses")))
+        for (id in listOf("fast", "slow")) {
+            assertEquals(listOf("眼镜", "glasses", "眼鏡"), finals.getValue(id).books.map { it.id })
+            assertFalse(finals.getValue(id).loading)
+        }
+    }
+
+    @Test
+    fun expansionFailureAfterFirstBatchRetainsOriginalAndQueuedHits() = runTest {
+        val calls = mutableListOf<String>()
+        var final: LibraryUiState.AggregateGroup? = null
+        val source = FakeSource("a") { word -> calls += word; SourceResult.Success(listOf(book(word))) }
+        runner().searchExpanded(listOf(source), "原词", flow {
+            emit(listOf("English")); error("metadata unavailable")
+        }) { final = it }
+        assertEquals(listOf("原词", "English"), calls)
+        assertEquals(2, final!!.books.size)
+        assertFalse(final!!.loading)
+    }
+
+    @Test
+    fun plainAliasesStayBoundedAndTypedAuthenticationFailureIsPreserved() = runTest {
+        val calls = mutableListOf<String>()
+        var final: LibraryUiState.AggregateGroup? = null
+        val source = FakeSource("a") { word ->
+            calls += word
+            SourceResult.Error(SourceException.LoginRequired)
+        }
+        runner().searchExpanded(listOf(source), "原词", flow { emit((1..20).map { "word$it" }) }) { final = it }
+        assertEquals(6, calls.size)
+        assertEquals(SourceException.LoginRequired, final!!.failure)
+    }
+
     private class FakeSource(
         override val id: String,
         private val searchBlock: suspend (String) -> SourceResult<List<SearchBook>>,
@@ -231,4 +291,26 @@ class ComicAggregateSearchTest {
         assertEquals(10, aggregateGroupItemCount(many, expanded = true))
         assertEquals(1, aggregateGroupItemCount(group("empty", loading = false)))
     }
+    @Test fun onlineSupplementIsSubmittedToEachSourceAndDispatchLedgerMatchesQueries() = runTest {
+        val calls = mutableListOf<Pair<String, String>>()
+        val submitted = mutableListOf<Pair<String, String>>()
+        val groups = mutableMapOf<String, LibraryUiState.AggregateGroup>()
+        val sources = listOf("eh", "other").map { id -> FakeSource(id) { word ->
+            calls += id to word
+            SourceResult.Success(listOf(book(word)))
+        } }
+        val runner = ComicAggregateSearch(StandardTestDispatcher(testScheduler),
+            searches = SourceSearchCoordinator(spacingMs = 0, now = { currentTime }),
+            onDispatched = { source, word -> submitted += source.id to word })
+        runner.searchExpanded(sources, "中文名字", flow {
+            delay(100)
+            emit(listOf("Japanese Name", "Romanized Name"))
+        }) { groups[it.sourceId] = it }
+        assertEquals(calls, submitted)
+        assertEquals(6, submitted.size)
+        assertEquals(setOf("中文名字", "Japanese Name", "Romanized Name"), calls.filter { it.first == "eh" }.map { it.second }.toSet())
+        assertEquals(3, groups.getValue("eh").books.size)
+        assertEquals(3, groups.getValue("other").books.size)
+    }
+
 }

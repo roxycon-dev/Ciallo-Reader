@@ -1,0 +1,17 @@
+中文关键词资料 / Keyword metadata
+
+EhTagTranslation 译文数据库
+作者：EhTagTranslation 全体编辑者
+来源：https://github.com/EhTagTranslation/Database
+发布资料：https://github.com/EhTagTranslation/DatabaseReleases
+许可：署名-非商业性使用-相同方式共享 3.0 中国大陆（CC BY-NC-SA 3.0 CN）
+许可全文：https://github.com/EhTagTranslation/Database/blob/master/LICENSE.md
+
+keyword_ehtag.tsv.gzip 为派生索引资料，仅保留命名空间、原始关键词、译名；
+移除了描述、图片、链接，转换为 gzip TSV 用于本地反向查询。
+派生资料继续遵循上述许可。此资料许可独立于应用代码及项目自有 keyword_seed.tsv。
+应用不表示获得上游项目的背书。
+
+在线补充可能使用 Wikidata 的 CC0 名称资料，以及 Bangumi 的作品元数据。
+来源：https://www.wikidata.org/wiki/Wikidata:Copyright
+来源：https://bangumi.github.io/api/

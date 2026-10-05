@@ -68,6 +68,10 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -144,6 +148,8 @@ fun ComicReaderChrome(
     autoRead: Boolean,
     onAutoReadToggle: () -> Unit,
     continuousFraction: Float = -1f,
+    onJumpToScrollFraction: ((Float) -> Unit)? = null,
+    spreadAtScrollFraction: (Float) -> Int = { 0 },
     toc: List<ComicTocEntry>,
     currentChapterIndex: Int,
     onJumpToChapter: ((Int) -> Unit)?,
@@ -162,6 +168,7 @@ fun ComicReaderChrome(
     val currentRaw = (currentPage - 1).coerceIn(0, (pages.size - 1).coerceAtLeast(0))
     // 进度条拖动中的缩略图预览目标页（-1 = 关闭）
     var thumbPreviewRaw by remember { mutableStateOf(-1) }
+    var thumbPreviewFraction by remember { mutableFloatStateOf(-1f) }
 
     // 面板打开时系统返回先关面板
     BackHandler(enabled = panel != ComicPanel.NONE) { onDismissPanel() }
@@ -204,7 +211,10 @@ fun ComicReaderChrome(
                 currentPage = currentPage, totalPages = totalPages,
                 spreadCount = spreadCount, currentSpread = currentSpread,
                 config = config,
-                onThumbPreview = { raw -> thumbPreviewRaw = raw },
+                onThumbPreview = { raw, fraction ->
+                    thumbPreviewRaw = raw
+                    thumbPreviewFraction = fraction
+                },
                 autoRead = autoRead, onAutoReadToggle = onAutoReadToggle,
                 onJumpToSpread = onJumpToSpread,
                 spreadFirstRaw = spreadFirstRaw,
@@ -212,14 +222,16 @@ fun ComicReaderChrome(
                 onPrevChapter = onPrevChapter, onNextChapter = onNextChapter,
                 chapterNavLabel = chapterNavLabel,
                 continuousFraction = continuousFraction,
+                onJumpToScrollFraction = onJumpToScrollFraction,
+                spreadAtScrollFraction = spreadAtScrollFraction,
             )
         }
         if (visible && panel == ComicPanel.NONE && config.showThumbPreview &&
             thumbPreviewRaw in pages.indices && spreadCount > 1
         ) {
             // 气泡水平位置跟随进度滑块拇指（±130dp 内偏移，避免贴边裁切）
-            val fraction = (thumbPreviewRaw.toFloat() / (pages.size - 1).coerceAtLeast(1))
-                .coerceIn(0f, 1f)
+            val fraction = if (thumbPreviewFraction in 0f..1f) thumbPreviewFraction
+                else (thumbPreviewRaw.toFloat() / (pages.size - 1).coerceAtLeast(1)).coerceIn(0f, 1f)
             val visualFraction = if (config.direction == ComicDirection.RTL &&
                 config.mode != ComicMode.WEBTOON && config.mode != ComicMode.CONTINUOUS) 1f - fraction else fraction
             ComicThumbPreview(
@@ -419,7 +431,7 @@ private fun ComicBottomBar(
     spreadCount: Int,
     currentSpread: Int,
     config: ComicReaderConfig,
-    onThumbPreview: (Int) -> Unit,
+    onThumbPreview: (Int, Float) -> Unit,
     spreadFirstRaw: (Int) -> Int,
     autoRead: Boolean,
     onAutoReadToggle: () -> Unit,
@@ -430,10 +442,15 @@ private fun ComicBottomBar(
     onNextChapter: (() -> Unit)?,
     chapterNavLabel: String,
     continuousFraction: Float = -1f,
+    onJumpToScrollFraction: ((Float) -> Unit)? = null,
+    spreadAtScrollFraction: (Float) -> Int = { 0 },
 ) {
     var dragging by remember { mutableStateOf(false) }
-    var dragTarget by remember { mutableFloatStateOf(currentSpread.toFloat()) }
-    val sliderEnabled = spreadCount > 1
+    val scrolling = continuousFraction in 0f..1f && onJumpToScrollFraction != null
+    val sliderRange = 0f..if (scrolling) 1f else (spreadCount - 1).coerceAtLeast(1).toFloat()
+    val sliderValue = if (scrolling) continuousFraction else currentSpread.toFloat()
+    var dragTarget by remember(scrolling) { mutableFloatStateOf(sliderValue) }
+    val sliderEnabled = spreadCount > 1 || scrolling
     val reverse = config.direction == ComicDirection.RTL &&
         config.mode !in setOf(ComicMode.WEBTOON, ComicMode.CONTINUOUS)
 
@@ -453,8 +470,7 @@ private fun ComicBottomBar(
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                // 无缝滚动（第 6 条）：百分比按累计像素高度（连续无跳变）；
-                // 其余模式按页数
+                // 垂直列表按滚动位置，其余模式按页数。
                 "· ${
                     if (continuousFraction in 0f..1f) (continuousFraction * 100).toInt()
                     else (currentPage.toFloat() / totalPages.coerceAtLeast(1) * 100).toInt()
@@ -479,21 +495,27 @@ private fun ComicBottomBar(
 
         // 第七轮第 3 条：底栏进度滑条同步迁移到面板统一滑条（同一套视觉语言）
         PanelSlider(
-            value = if (dragging) dragTarget else currentSpread.toFloat(),
+            value = if (dragging) dragTarget else sliderValue,
             onValueChange = {
                 dragging = true
                 dragTarget = it
-                val spreadIdx = it.toInt().coerceIn(0, (spreadCount - 1).coerceAtLeast(0))
-                onThumbPreview(spreadFirstRaw(spreadIdx))
+                val spreadIdx = (if (scrolling) spreadAtScrollFraction(it) else it.toInt())
+                    .coerceIn(0, (spreadCount - 1).coerceAtLeast(0))
+                onThumbPreview(spreadFirstRaw(spreadIdx), it / sliderRange.endInclusive)
             },
             onValueChangeFinished = {
-                onJumpToSpread(dragTarget.toInt())
+                if (scrolling) onJumpToScrollFraction?.invoke(dragTarget)
+                else onJumpToSpread(dragTarget.toInt())
                 dragging = false
-                onThumbPreview(-1)
+                onThumbPreview(-1, -1f)
             },
             enabled = sliderEnabled,
             reverse = reverse,
-            valueRange = 0f..(spreadCount - 1).coerceAtLeast(1).toFloat(),
+            valueRange = sliderRange,
+            modifier = Modifier.semantics {
+                contentDescription = "阅读进度"
+                progressBarRangeInfo = ProgressBarRangeInfo(sliderValue, sliderRange)
+            },
         )
 
         if (onPrevChapter != null || onNextChapter != null) {

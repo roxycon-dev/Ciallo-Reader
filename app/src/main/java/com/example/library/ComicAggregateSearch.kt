@@ -5,12 +5,18 @@ import com.example.source.SearchBook
 import com.example.source.SourceException
 import com.example.source.SourceResult
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import com.example.source.keyword.KeywordKeys
+import com.example.source.keyword.KeywordVariants
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -22,34 +28,50 @@ internal class ComicAggregateSearch(
     private val slots: Semaphore = Semaphore(8),
     private val requestTimeoutMs: Long = 20_000L,
     private val searches: SourceSearchCoordinator = SourceSearchCoordinator(),
+    private val timeoutFor: (BookSource) -> Long = { requestTimeoutMs },
+    private val onDispatched: (BookSource, String) -> Unit = { _, _ -> },
 ) {
     suspend fun search(
         sources: List<BookSource>,
         keyword: String,
         expandVariants: suspend (String) -> List<String>,
         onGroup: (LibraryUiState.AggregateGroup) -> Unit,
+    ) = searchExpanded(sources, keyword, flow { emit(expandVariants(keyword)) }, onGroup)
+
+    suspend fun searchExpanded(
+        sources: List<BookSource>,
+        keyword: String,
+        variants: Flow<List<String>>,
+        onGroup: (LibraryUiState.AggregateGroup) -> Unit,
     ) = coroutineScope {
-        // Title lookup must never delay the original keyword's first network request.
-        val variants = async(dispatcher) {
-            try {
-                expandVariants(keyword).filter { it.isNotBlank() && it != keyword }.distinct()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                emptyList()
-            }
-        }
+        if (sources.isEmpty()) return@coroutineScope
+        // Bounded, replayable per-source queues. A slow source cannot miss an earlier batch.
+        val queues = sources.map { Channel<String>(KeywordVariants.LIMIT) }
 
         // Enqueue EVERY original request before aliases can take a permit. UNDISPATCHED
         // only acquires/queues the permit; the source itself always runs on dispatcher.
         val originals = sources.map { source ->
             async(start = CoroutineStart.UNDISPATCHED) { request(source, keyword) }
         }
+        launch(dispatcher) {
+            val seen = mutableSetOf(KeywordKeys.query(keyword))
+            try {
+                variants.collect { batch ->
+                    for (query in batch) {
+                        if (query.isBlank() || seen.size >= KeywordVariants.LIMIT || !seen.add(KeywordKeys.query(query))) continue
+                        queues.forEach { it.send(query) }
+                    }
+                }
+            } catch (e: CancellationException) { throw e } catch (_: Exception) {
+                // Metadata failure must not cancel original searches or an already queued alias.
+            } finally { queues.forEach { it.close() } }
+        }
         sources.forEachIndexed { index, source ->
             launch {
                 val books = LinkedHashMap<String, SearchBook>()
                 var anySuccess = false
                 var lastError: String? = null
+                var lastFailure: SourceException? = null
 
                 fun publish(loading: Boolean) {
                     onGroup(
@@ -59,6 +81,7 @@ internal class ComicAggregateSearch(
                             books = books.values.toList(),
                             error = if (anySuccess) null else lastError,
                             loading = loading,
+                            failure = if (anySuccess) null else lastFailure,
                         )
                     )
                 }
@@ -73,14 +96,14 @@ internal class ComicAggregateSearch(
                             }
                             publish(loading = true)
                         }
-                        is SourceResult.Error -> lastError = result.exception.message
-                        null -> lastError = "搜索超时"
+                        is SourceResult.Error -> { lastError = result.exception.message; lastFailure = result.exception }
+                        null -> { lastError = "搜索超时"; lastFailure = SourceException.NetworkError("搜索超时") }
                     }
                 }
 
                 accept(originals[index].await())
                 // Aliases stay sequential WITHIN a source, respecting its runtime/session.
-                for (variant in variants.await()) accept(request(source, variant))
+                for (variant in queues[index]) accept(request(source, variant))
                 publish(loading = false)
             }
         }
@@ -88,11 +111,13 @@ internal class ComicAggregateSearch(
 
     private suspend fun request(source: BookSource, keyword: String): SourceResult<List<SearchBook>>? =
         try {
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            onDispatched(source, keyword)
             searches.search(source, keyword) {
                 // Cooling sites and cache hits must not occupy another site's network slot.
                 slots.withPermit {
                     withContext(dispatcher) {
-                        withTimeoutOrNull(requestTimeoutMs) { source.search(keyword) }
+                        withTimeoutOrNull(timeoutFor(source)) { source.search(keyword) }
                             ?: SourceResult.Error(SourceException.NetworkError("搜索超时"))
                     }
                 }

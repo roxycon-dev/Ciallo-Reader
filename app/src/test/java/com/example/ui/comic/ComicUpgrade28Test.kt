@@ -109,7 +109,7 @@ class ComicUpgrade28Test {
         val webtoon = ComicScrollStrategy.forConfig(cfg)
         assertEquals(24f, webtoon.spacingDp)
         assertTrue(webtoon.snapToPage)
-        assertTrue(webtoon.pixelProgress.not())
+        assertTrue(webtoon.pixelProgress)
 
         val cont = ComicScrollStrategy.forConfig(cfg.copy(mode = ComicMode.CONTINUOUS, webtoonSnap = true))
         // 无缝滚动：即便全局开着磁吸与间距，也强制 0 间距 + 自由滚动 + 像素进度

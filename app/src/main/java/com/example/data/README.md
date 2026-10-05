@@ -22,3 +22,5 @@ Room 数据模型、导入解析、备份、偏好设置和阅读记录。
 ## 维护提示
 
 随 APK 打包的生产代码和资源应通过 `:app:assembleRelease` 验证；测试 fixtures 放在对应测试源集。
+
+- `GithubUpdateChecker.kt`：公开 GitHub 更新检查，系统代理、API / 官方发布页回退、版本数字比较与具体失败提示。

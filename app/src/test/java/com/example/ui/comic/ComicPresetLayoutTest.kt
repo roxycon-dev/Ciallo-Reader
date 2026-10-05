@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -57,5 +60,19 @@ class ComicPresetLayoutTest {
         compose.runOnIdle { assertTrue(last > 8f); assertEquals(1, finished) }
         compose.onNodeWithTag("progress").performTouchInput { click(percentOffset(0.95f, 0.5f)) }
         compose.runOnIdle { assertTrue(last < 1f); assertEquals(2, finished) }
+    }
+
+    @Test fun progressSliderUsesCurrentCallbacksAfterRecomposition() {
+        var version by mutableIntStateOf(0)
+        var changed = -1
+        var finished = -1
+        compose.setContent { MaterialTheme {
+            val current = version
+            PanelSlider(0f, { changed = current }, 0f..1f, { finished = current },
+                modifier = Modifier.testTag("progress"))
+        } }
+        compose.runOnIdle { version = 1 }
+        compose.onNodeWithTag("progress").performTouchInput { click(percentOffset(0.75f, 0.5f)) }
+        compose.runOnIdle { assertEquals(1, changed); assertEquals(1, finished) }
     }
 }

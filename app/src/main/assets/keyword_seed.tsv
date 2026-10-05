@@ -1,0 +1,145 @@
+# v1; project-authored names, no third-party tag database. kind / zh aliases / en / ja / romaji
+common	眼镜|眼鏡|戴眼镜	glasses	眼鏡	
+common	太阳镜|墨镜	sunglasses	サングラス	
+common	帽子	hat	帽子	
+common	贝雷帽	beret	ベレー帽	
+common	兜帽	hood	フード	
+common	面具	mask	仮面	
+common	口罩	face mask	マスク	
+common	耳环	earrings	イヤリング	
+common	项链	necklace	ネックレス	
+common	手套	gloves	手袋	
+common	围巾	scarf	マフラー	
+common	领带	tie	ネクタイ	
+common	蝴蝶结	ribbon	リボン	
+common	制服	uniform	制服	
+common	军装	military uniform	軍服	
+common	西装	suit	スーツ	
+common	和服	kimono	着物	
+common	浴衣	yukata	浴衣	
+common	旗袍	cheongsam	チャイナドレス	
+common	连衣裙	dress	ワンピース	
+common	婚纱	wedding dress	ウェディングドレス	
+common	盔甲|铠甲	armor	鎧	
+common	外套	coat	コート	
+common	夹克	jacket	ジャケット	
+common	连帽衫	hoodie	パーカー	
+common	毛衣	sweater	セーター	
+common	衬衫	shirt	シャツ	
+common	短裤	shorts	ショートパンツ	
+common	牛仔裤	jeans	ジーンズ	
+common	裙子	skirt	スカート	
+common	百褶裙	pleated skirt	プリーツスカート	
+common	袜子	socks	靴下	
+common	长袜	stockings	ストッキング	
+common	靴子	boots	ブーツ	
+common	运动鞋	sneakers	スニーカー	
+common	高跟鞋	high heels	ハイヒール	
+common	长发	long hair	長髪	
+common	短发	short hair	短髪	
+common	马尾	ponytail	ポニーテール	
+common	双马尾	twintails	ツインテール	
+common	辫子	braid	三つ編み	
+common	卷发	curly hair	巻き髪	
+common	刘海	bangs	前髪	
+common	黑发	black hair	黒髪	
+common	白发	white hair	白髪	
+common	银发	silver hair	銀髪	
+common	金发	blonde hair	金髪	
+common	红发	red hair	赤髪	
+common	蓝发	blue hair	青髪	
+common	绿发	green hair	緑髪	
+common	紫发	purple hair	紫髪	
+common	粉发|粉色头发	pink hair	ピンク髪	
+common	黑色	black	黒	
+common	白色	white	白	
+common	红色	red	赤	
+common	蓝色	blue	青	
+common	绿色	green	緑	
+common	黄色	yellow	黄色	
+common	紫色	purple	紫	
+common	粉色	pink	ピンク	
+common	异色瞳	heterochromia	オッドアイ	
+common	蓝眼|蓝色眼睛	blue eyes	青い目	
+common	红眼|红色眼睛	red eyes	赤い目	
+common	绿眼|绿色眼睛	green eyes	緑の目	
+common	猫耳	cat ears	猫耳	
+common	狐耳	fox ears	狐耳	
+common	兽耳	animal ears	獣耳	
+common	翅膀	wings	翼	
+common	尾巴	tail	尻尾	
+common	角	horns	角	
+common	精灵	elf	エルフ	
+common	天使	angel	天使	
+common	恶魔	demon	悪魔	
+common	吸血鬼	vampire	吸血鬼	
+common	龙	dragon	ドラゴン	
+common	人鱼	mermaid	人魚	
+common	机器人	robot	ロボット	
+common	机甲	mecha	メカ	
+common	魔女	witch	魔女	
+common	巫女	shrine maiden	巫女	miko
+common	骑士	knight	騎士	
+common	忍者	ninja	忍者	
+common	武士	samurai	侍	
+common	侦探	detective	探偵	
+common	偶像	idol	アイドル	
+common	角色扮演|角色扮裝	cosplay	コスプレ	
+common	魔法	magic	魔法	
+common	奇幻	fantasy	ファンタジー	
+common	科幻	science fiction	SF	
+common	冒险	adventure	冒険	
+common	悬疑	mystery	ミステリー	
+common	恐怖	horror	ホラー	
+common	喜剧	comedy	コメディ	
+common	日常	slice of life	日常	
+common	音乐	music	音楽	
+common	运动	sports	スポーツ	
+common	异世界	isekai	異世界	
+common	转生	reincarnation	転生	
+common	时间旅行	time travel	タイムトラベル	
+common	插画	illustration	イラスト	
+common	画集	artbook	画集	
+common	全彩|彩色	full color	フルカラー	
+common	黑白	monochrome	モノクロ	
+common	漫画	manga	漫画	
+common	小说	novel	小説	
+common	轻小说	light novel	ライトノベル	
+common	四格漫画|四格	4koma	四コマ	
+common	同人志	doujinshi	同人誌	
+common	原创	original	オリジナル	
+common	合集	anthology	アンソロジー	
+work	东方|东方Project|东方计划	Touhou Project	東方Project	Touhou
+work	舰队收藏|舰娘	Kantai Collection	艦隊これくしょん	Kantai Collection
+work	碧蓝航线	Azur Lane	アズールレーン	
+work	原神	Genshin Impact	原神	Genshin
+work	崩坏星穹铁道|崩坏：星穹铁道	Honkai: Star Rail	崩壊：スターレイル	
+work	明日方舟	Arknights	アークナイツ	
+work	碧蓝档案|蔚蓝档案	Blue Archive	ブルーアーカイブ	
+work	尼尔机械纪元|尼尔：机械纪元	NieR: Automata	ニーア オートマタ	
+work	刀剑神域	Sword Art Online	ソードアート・オンライン	
+work	无职转生	Mushoku Tensei: Jobless Reincarnation	無職転生	Mushoku Tensei
+work	进击的巨人	Attack on Titan	進撃の巨人	Shingeki no Kyojin
+work	海贼王|航海王	One Piece	ワンピース	
+work	火影忍者	Naruto	ナルト	
+work	死神|境界	Bleach	ブリーチ	
+work	龙珠	Dragon Ball	ドラゴンボール	
+work	间谍过家家	Spy x Family	スパイファミリー	
+work	电锯人	Chainsaw Man	チェンソーマン	
+work	葬送的芙莉莲	Frieren: Beyond Journey's End	葬送のフリーレン	Sousou no Frieren
+work	孤独摇滚	Bocchi the Rock!	ぼっち・ざ・ろっく！	
+work	新世纪福音战士|EVA	Neon Genesis Evangelion	新世紀エヴァンゲリオン	
+character	博丽灵梦|灵梦	Reimu Hakurei	博麗霊夢	Hakurei Reimu
+character	雾雨魔理沙|魔理沙	Marisa Kirisame	霧雨魔理沙	Kirisame Marisa
+character	十六夜咲夜|咲夜	Sakuya Izayoi	十六夜咲夜	Izayoi Sakuya
+character	八云紫	Yukari Yakumo	八雲紫	Yakumo Yukari
+character	阿尔托莉雅|阿尔托莉亚	Artoria Pendragon|Altria Pendragon	アルトリア・ペンドラゴン	
+character	初音未来|初音	Hatsune Miku	初音ミク	
+character	巡音流歌|巡音	Megurine Luka	巡音ルカ	
+character	芙莉莲	Frieren	フリーレン	
+creator	鸟山明	Akira Toriyama	鳥山明	Toriyama Akira
+creator	尾田荣一郎	Eiichiro Oda	尾田栄一郎	Oda Eiichiro
+creator	岸本齐史	Masashi Kishimoto	岸本斉史	Kishimoto Masashi
+creator	宫崎骏	Hayao Miyazaki	宮崎駿	Miyazaki Hayao
+creator	新海诚	Makoto Shinkai	新海誠	Shinkai Makoto
+creator	高桥留美子	Rumiko Takahashi	高橋留美子	Takahashi Rumiko

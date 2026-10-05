@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -182,6 +183,8 @@ internal fun PanelSlider(
         ((value - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
     } else 0f
     val density = LocalDensity.current
+    val latestOnValueChange by rememberUpdatedState(onValueChange)
+    val latestOnValueChangeFinished by rememberUpdatedState(onValueChangeFinished)
 
     fun snap(f: Float): Float = if (steps > 0) {
         val st = 1f / (steps + 1)
@@ -210,10 +213,10 @@ internal fun PanelSlider(
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
                         if (!change.pressed) {
                             if (!dragging && abs(totalX) < slop) {
-                                onValueChange(posToValue(down.position.x))
-                                onValueChangeFinished()
+                                latestOnValueChange(posToValue(down.position.x))
+                                latestOnValueChangeFinished()
                             } else if (dragging) {
-                                onValueChangeFinished()
+                                latestOnValueChangeFinished()
                             }
                             break
                         }
@@ -225,7 +228,7 @@ internal fun PanelSlider(
                             dragging = true
                         }
                         if (dragging) {
-                            onValueChange(posToValue(change.position.x))
+                            latestOnValueChange(posToValue(change.position.x))
                             change.consume()
                         }
                     }

@@ -3,6 +3,7 @@ package com.example.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -58,6 +59,8 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.testTag
 import com.example.ui.theme.onColor
 import com.kashif_e.backdrop.Backdrop
 import me.trishiraj.shadowglow.consistentShadow
@@ -73,7 +76,7 @@ import me.trishiraj.shadowglow.consistentShadow
  * 的单色，把玻璃的层次全盖掉了。本次分层为：
  *   ① 竖向渐变（顶部高光 → 主色淡染 → 底部略深）替代单层均色；
  *   ② 顶部 1dp 内高光 + 外圈细描边（与虹彩描边叠加，不冲突）；
- *   ③ 选中指示器从「顶部 3dp 细线」升级为「选中项背后浮起的药丸高亮」；
+ *   ③ 顶部 3dp 指示线按等宽槽位弹簧移动，收缩时保持对齐；
  *   ④ Badge 加与栏体同色的描边、排版更圆润。
  * 功能与弹簧手感（DampingRatioMediumBouncy + StiffnessLow）全部保留。
  */
@@ -89,12 +92,11 @@ private val TabBarLowOutlineColor: Color = Color.White.copy(alpha = 0.15f)
 /** 中性细描边：替代原来的主色虹彩描边（去绿）。 */
 private val TabBarNeutralOutlineColor: Color = Color.White.copy(alpha = 0.22f)
 
-/** 选中指示器的弹簧：与旧实现逐参数一致（保留手感）。 */
 /** 未选中项文字/图标的透明度：0.55 → 0.48，让选中项更突出。 */
 private const val TAB_UNSELECTED_ALPHA = 0.48f
 
 /**
- * 滚动收缩弹簧（栏高 68↔52、左右边距 16↔48）。
+ * 滚动收缩弹簧（栏高 68↔52；横向框架固定，保证图标与指示条对齐）。
  *
  * 原来是 `DampingRatioMediumBouncy`(0.55) + `StiffnessLow`(200) —— 阻尼比 0.55 的过冲约
  * **12.6%**，配合最软的刚度，一上下滑整条栏就大幅摆动，设置页那种长列表里尤其明显。
@@ -117,19 +119,11 @@ data class AppTabItem(
 class TabBarCollapseState {
     var collapsed by mutableStateOf(false)
         private set
-    var scrolling by mutableStateOf(false)
-        private set
-    private val scrollHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private val stopScrolling = Runnable { scrolling = false }
-
     fun connection(): NestedScrollConnection = object : NestedScrollConnection {
         override fun onPreScroll(
             available: Offset,
             source: NestedScrollSource
         ): Offset {
-            scrolling = true
-            scrollHandler.removeCallbacks(stopScrolling)
-            scrollHandler.postDelayed(stopScrolling, 120L)
             if (available.y < -4f) collapsed = true
             if (available.y > 4f) collapsed = false
             return Offset.Zero
@@ -213,22 +207,25 @@ fun AppBottomTabBar(
         Modifier.tabBarGlassTint(primary = animatedPrimary)
     }
 
-    // ② 选中指示：Tab 项顶部那条 3dp 小黑条（宽度 = 所在项宽度的 40%，水平居中）。
-    // ⚠️ 这是用户明确认可、要求还原的**原始形态** —— 不要再改成背景高亮 / 药丸气泡。
-    // 仍走 Animatable + 绘制期读 `.value`（不触发组合期重组），弹簧用 TabIndicatorSpring。
+    // Animate in slot units rather than measured pixels: a resize or collapse
+    // cannot detach the line from its equal-width icon slot. Read only in drawing.
+    val indicatorSlot = remember { Animatable(selectedIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0)).toFloat()) }
+    LaunchedEffect(selectedIndex, items.size) {
+        indicatorSlot.animateTo(selectedIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0)).toFloat(),
+            spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow))
+    }
     val selectionIndicator = Modifier.drawWithCache {
         val barTopPx = 2.dp.toPx()
         val barHeightPx = 3.dp.toPx()
         val barRadius = CornerRadius(barHeightPx / 2f)
         val slotWidth = size.width / items.size.coerceAtLeast(1)
         val barWidth = slotWidth * 0.40f
-        val barLeft = selectedIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0)) * slotWidth +
-            (slotWidth - barWidth) / 2f
         onDrawWithContent {
-            val a = 1f
-            if (a > 0.01f) {
+            if (items.isNotEmpty()) {
+                val slot = if (layoutDirection == LayoutDirection.Rtl) items.lastIndex - indicatorSlot.value else indicatorSlot.value
+                val barLeft = slot * slotWidth + (slotWidth - barWidth) / 2f
                 drawRoundRect(
-                    color = contrast.copy(alpha = a),
+                    color = contrast,
                     topLeft = Offset(barLeft, barTopPx),
                     size = Size(barWidth, barHeightPx),
                     cornerRadius = barRadius
@@ -325,8 +322,8 @@ fun AppBottomTabBar(
                             Modifier.border(1.dp, TabBarLowOutlineColor, shape)
                         }
                     )
-                    // ② 选中项背后的药丸高亮：画在栏体之上、图标之下
-                    .then(selectionIndicator),
+                    .then(selectionIndicator)
+                    .testTag("app_tab_bar_surface"),
                 horizontalArrangement = Arrangement.Start,
                 verticalAlignment = Alignment.CenterVertically
             ) {

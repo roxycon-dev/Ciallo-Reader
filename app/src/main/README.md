@@ -23,4 +23,6 @@
 
 ## 维护提示
 
+`assets/keyword_seed.tsv` 是项目自有关键词与名称种子；`keyword_ehtag.tsv.gzip` 是标签译文数据库的压缩反向查询资料，许可及转换说明在 `keyword_dictionary_notice.txt`，版本在 `keyword_dictionary_version.txt`。运行时导入独立的可重建词库索引，不修改用户书架数据库。
+
 Android 资源目录和 assets 会被 Gradle / Android 资源工具直接扫描，因此不在其子目录放 Markdown：否则会造成资源合并失败，或把说明文档打进 APK。目录说明集中在本文件和 `res/README.md`；其余源码子目录保留各自的 `README.md`。随 APK 打包的生产代码和资源应通过 `:app:assembleRelease` 验证；测试 fixtures 放在对应测试源集。

@@ -9,13 +9,14 @@ sealed class LibraryUiState {
     object Empty : LibraryUiState()
     object Ready : LibraryUiState()
     object Searching : LibraryUiState()
-    data class SearchResults(val results: List<SearchBook>) : LibraryUiState()
+    data class SearchResults(val results: List<SearchBook>, val loading: Boolean = false) : LibraryUiState()
     data class AggregateGroup(
         val sourceId: String,
         val sourceName: String,
         val books: List<SearchBook>,
         val error: String?,
-        val loading: Boolean = false
+        val loading: Boolean = false,
+        val failure: com.example.source.SourceException? = null,
     )
     data class AggregateResults(
         val groups: List<AggregateGroup>,

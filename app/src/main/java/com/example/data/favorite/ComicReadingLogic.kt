@@ -28,16 +28,17 @@ object ComicReadingLogic {
 
     /**
      * 章节排序键：源给的 [ComicChapter.order] 优先（它能表达缺章与乱序）；
-     * 源没给（恒为 0）时退化为列表下标，保证正序/倒序列表都能排。
+     * 整个列表都没给 order（恒为 0）时退化为列表下标；有顺序时 0 也是合法章节序号。
      */
-    fun orderKey(chapter: ComicChapter, rawIndex: Int): Float =
-        if (chapter.order.isFinite() && chapter.order != 0f) chapter.order else rawIndex.toFloat()
+    fun orderKey(chapter: ComicChapter, rawIndex: Int, hasSourceOrder: Boolean = chapter.order != 0f): Float =
+        if (hasSourceOrder && chapter.order.isFinite()) chapter.order else rawIndex.toFloat()
 
     /** 把源返回的任意顺序列表归一化成阅读顺序（升序）。 */
     fun ordered(chapters: List<ComicChapter>): List<OrderedChapter> {
+        val hasSourceOrder = chapters.any { it.order.isFinite() && it.order != 0f }
         val decorated = chapters.mapIndexed { index, chapter -> index to chapter }
         val sorted = decorated.sortedWith(
-            compareBy<Pair<Int, ComicChapter>> { orderKey(it.second, it.first) }
+            compareBy<Pair<Int, ComicChapter>> { orderKey(it.second, it.first, hasSourceOrder) }
                 .thenBy { it.first }
         )
         return sorted.mapIndexed { order, (rawIndex, chapter) ->
@@ -45,10 +46,21 @@ object ComicReadingLogic {
                 rawIndex = rawIndex,
                 order = order,
                 chapter = chapter,
-                orderKey = orderKey(chapter, rawIndex),
+                orderKey = orderKey(chapter, rawIndex, hasSourceOrder),
                 displayNumber = chapterNumber(chapter.title) ?: (order + 1),
             )
         }
+    }
+
+    /** 目录、前后章、预取和进度写入共用同一套阅读顺序下标。 */
+    data class ChapterNavigation(val chapters: List<ComicChapter>, val currentIndex: Int) {
+        val previous: ComicChapter? get() = if (currentIndex > 0) chapters.getOrNull(currentIndex - 1) else null
+        val next: ComicChapter? get() = if (currentIndex >= 0) chapters.getOrNull(currentIndex + 1) else null
+    }
+
+    fun navigation(chapters: List<ComicChapter>, currentChapterId: String?): ChapterNavigation {
+        val sequence = ordered(chapters).map { it.chapter }
+        return ChapterNavigation(sequence, sequence.indexOfFirst { it.id == currentChapterId })
     }
 
     /** 从「第 12 话 / 第12话 / 12話 / Chapter 12」等标题里取话数。 */

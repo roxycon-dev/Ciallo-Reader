@@ -79,11 +79,8 @@ import kotlinx.coroutines.ensureActive
 import androidx.compose.foundation.layout.widthIn
 import com.example.ui.adaptive.AdaptiveSpec
 import com.example.ui.components.AppToast
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
+import com.example.BuildConfig
+import com.example.data.GithubUpdateChecker
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -136,6 +133,8 @@ fun SettingsTabScreen(
     val scope = rememberCoroutineScope()
     var updateChecking by remember { mutableStateOf(false) }
     var updateMessage by remember { mutableStateOf<String?>(null) }
+    var updateReleaseUrl by remember { mutableStateOf<String?>(null) }
+    val updateChecker = remember(context.applicationContext) { GithubUpdateChecker(context.applicationContext) }
     var backupBusy by remember { mutableStateOf(false) }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     val exportBackupLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
@@ -1355,8 +1354,8 @@ LazyColumn(
                             Spacer(modifier = Modifier.height(4.dp))
                             val versionName = remember {
                                 try {
-                                    context.packageManager.getPackageInfo(context.packageName, 0)?.versionName ?: "1.2.0"
-                                } catch (_: Exception) { "1.2.0" }
+                                    context.packageManager.getPackageInfo(context.packageName, 0)?.versionName ?: BuildConfig.VERSION_NAME
+                                } catch (_: Exception) { BuildConfig.VERSION_NAME }
                             }
                             Text(
                                 "版本 $versionName",
@@ -1371,26 +1370,13 @@ LazyColumn(
                                 onClick = {
                                     updateChecking = true
                                     updateMessage = null
+                                    updateReleaseUrl = null
                                     scope.launch {
-                                        val result = withContext(Dispatchers.IO) {
-                                            runCatching {
-                                                val connection = (URL("https://api.github.com/repos/roxycon-dev/Ciallo-Reader/releases/latest").openConnection() as HttpURLConnection).apply {
-                                                    connectTimeout = 8_000
-                                                    readTimeout = 8_000
-                                                    requestMethod = "GET"
-                                                    setRequestProperty("Accept", "application/vnd.github+json")
-                                                    setRequestProperty("User-Agent", "Ciallo-Reader")
-                                                }
-                                                connection.inputStream.bufferedReader().use { JSONObject(it.readText()).optString("tag_name") }
-                                            }
-                                        }
-                                        updateChecking = false
-                                        val latest = result.getOrNull()?.removePrefix("v")
-                                        updateMessage = when {
-                                            latest.isNullOrBlank() -> "暂时无法检查更新；国内访问 GitHub 可能不稳定，请稍后重试。"
-                                            latest == versionName -> "当前已是最新版本。"
-                                            else -> "发现新版本 $latest，点击下方 GitHub 链接下载。"
-                                        }
+                                        try {
+                                            val result = updateChecker.check(versionName)
+                                            updateMessage = result.message
+                                            updateReleaseUrl = result.releaseUrl
+                                        } finally { updateChecking = false }
                                     }
                                 }
                             )
@@ -1398,7 +1384,15 @@ LazyColumn(
                                 Spacer(Modifier.height(6.dp))
                                 Text(message, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Text("更新信息来自 GitHub；国内网络可能导致检查或下载失败。", fontSize = 10.sp,
+                            val updateUriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                            updateReleaseUrl?.let { url ->
+                                TextButton(onClick = {
+                                    runCatching { updateUriHandler.openUri(url) }.onFailure {
+                                        AppToast.makeText(context, "无法打开发布页，请检查浏览器。", Toast.LENGTH_SHORT).show()
+                                    }
+                                }) { Text("查看新版本") }
+                            }
+                            Text("检查最新正式版本，下载前可查看更新说明。", fontSize = 10.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f))
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(

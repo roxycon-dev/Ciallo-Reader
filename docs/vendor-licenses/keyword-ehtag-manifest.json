@@ -1,0 +1,13 @@
+{
+  "provider": "EhTagTranslation/Database",
+  "license": "CC BY-NC-SA 3.0 CN",
+  "licenseUrl": "https://github.com/EhTagTranslation/Database/blob/master/LICENSE.md",
+  "sourceUrl": "https://github.com/EhTagTranslation/DatabaseReleases",
+  "dataVersion": 7,
+  "head": {
+    "sha": "bb0560ea091d620bdffb0eea518d1007af8ff7c9",
+    "timestamp": "2026-10-04T16:54:55.000Z"
+  },
+  "rows": 44530,
+  "transformation": "Only namespace, original keyword and translated name; descriptions, images and links omitted; TSV gzip for reverse lookup. Derived data retains upstream license. Display-name emoji are omitted when building the lookup index; original external query keywords remain unchanged."
+}

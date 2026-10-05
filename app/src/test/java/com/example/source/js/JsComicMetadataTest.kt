@@ -10,6 +10,16 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class JsComicMetadataTest {
+    @Test fun `object author aliases survive the upstream metadata update`() {
+        val data = JSONObject("""{"title":"作品","author":{"nick":"甲"},
+            "authors":[{"username":"乙"},{"title":"丙"},{"name":"甲","nick":"甲"}],
+            "artist":{"nick":"丁"}}""")
+        val book = JsComicMetadata.book(data, "goda", "123")
+        assertEquals("甲、乙、丙", book.author)
+        assertEquals(listOf("丁"), book.comicInfo?.artists)
+        assertEquals("作品", book.title)
+    }
+
     @Test fun `subtitle update counts are not authors`() {
         val data = JSONObject("""{"title":"作品","subtitle":"最新第12话","tags":["冒险"]}""")
         assertEquals("", JsComicMetadata.book(data, "source", "id").author)
