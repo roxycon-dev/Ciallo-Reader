@@ -14,7 +14,33 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-internal data class UpdateCheckResult(val message: String, val releaseUrl: String? = null)
+internal data class UpdateCheckResult(
+    val message: String,
+    val releaseUrl: String? = null,
+    val release: UpdateRelease? = null,
+)
+
+internal data class UpdateApkAsset(val name: String, val url: String, val size: Long? = null, val sha256: String? = null)
+
+internal data class UpdateRelease(val tag: String, val releaseUrl: String, val notes: String = "", val apk: UpdateApkAsset? = null) {
+    val version: String get() = tag.removePrefix("v").removePrefix("V")
+}
+
+internal const val UPDATE_REPOSITORY = "https://github.com/roxycon-dev/Ciallo-Reader"
+internal const val MAX_UPDATE_BYTES = 192L * 1024 * 1024
+
+/** Only an APK belonging to this exact official release can enter the download path. */
+internal fun officialUpdateAsset(tag: String, name: String, url: String): Boolean {
+    if (!Regex("[vV]?\\d+(?:\\.\\d+){1,3}").matches(tag) || name.length !in 5..200 || !name.endsWith(".apk", true)) return false
+    val expected = "$UPDATE_REPOSITORY/releases/download/$tag/$name"
+    return runCatching {
+        val parsed = url.toHttpUrl()
+            parsed == expected.toHttpUrl() && parsed.pathSegments == listOf("roxycon-dev", "Ciallo-Reader", "releases", "download", tag, name) &&
+            parsed.username.isEmpty() && parsed.password.isEmpty() &&
+            parsed.query == null && parsed.fragment == null && name.none { it == '/' || it == '\\' } &&
+            !name.contains("..")
+    }.getOrDefault(false)
+}
 
 /** Public GitHub metadata only; no account token or third-party update mirror. */
 internal class GithubUpdateChecker(
@@ -30,22 +56,29 @@ internal class GithubUpdateChecker(
     suspend fun check(currentVersion: String): UpdateCheckResult = withContext(Dispatchers.IO) {
         val proxy = SystemProxyResolver.resolve(context?.applicationContext)
         val transport = client.newBuilder().apply { if (proxy != null) proxy(proxy) }.build()
-        val tag = try { apiTag(transport) }
+        val release = try { apiRelease(transport) }
         catch (e: CancellationException) { throw e }
         catch (e: Exception) {
             val apiFailure = failureReason(e)
-            try { webTag(transport) }
+            try {
+                val tag = webTag(transport)
+                // Our release publishing convention is stable. Archive identity and signing
+                // certificates are still verified before installation when API metadata is absent.
+                val name = "Ciallo-Reader-$tag.apk"
+                UpdateRelease(tag, releaseUrl(tag), apk = UpdateApkAsset(name, "$UPDATE_REPOSITORY/releases/download/$tag/$name"))
+            }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (webFailure: Exception) {
                 val reasons = listOf(apiFailure, failureReason(webFailure)).distinct().joinToString("；")
                 return@withContext UpdateCheckResult("检查更新失败：$reasons。可稍后重试或打开 GitHub 发布页。")
             }
         }
+        val tag = release.tag
         val latest = versionParts(tag) ?: return@withContext UpdateCheckResult("无法识别 GitHub 发布版本，请打开发布页查看。")
         val current = versionParts(currentVersion) ?: return@withContext UpdateCheckResult("无法识别当前版本，请打开 GitHub 发布页查看。")
         val newer = latest.zip(current).firstOrNull { (a, b) -> a != b }?.let { (a, b) -> a > b } == true
         val display = tag.removePrefix("v").removePrefix("V")
-        if (newer) UpdateCheckResult("发现新版本 $display，可查看更新说明并下载。", releaseUrl(tag))
+        if (newer) UpdateCheckResult("发现新版本 $display，可下载并安装。", releaseUrl(tag), release)
         else UpdateCheckResult("当前已是最新版本（GitHub 正式版 $display）。")
     }
 
@@ -53,7 +86,7 @@ internal class GithubUpdateChecker(
         .header("User-Agent", "Ciallo-Reader/${BuildConfig.VERSION_NAME} (https://github.com/roxycon-dev/Ciallo-Reader)")
         .header("Accept", "application/vnd.github+json").build()
 
-    private suspend fun apiTag(transport: OkHttpClient): String {
+    private suspend fun apiRelease(transport: OkHttpClient): UpdateRelease {
         transport.newCall(request(apiUrl)).executeCancellable().use { response ->
             if (!response.isSuccessful) throw CheckFailure(httpFailure(response.code))
             val text = response.body?.byteStream()?.use { it.readImportBytes(512 * 1024).toString(Charsets.UTF_8) }
@@ -62,7 +95,21 @@ internal class GithubUpdateChecker(
             val tag = data.optString("tag_name")
             if (data.optBoolean("draft") || data.optBoolean("prerelease") || stableTag(tag) == null)
                 throw CheckFailure("GitHub 返回的正式版本资料不完整")
-            return tag
+            val assets = data.optJSONArray("assets")
+            val candidates = (0 until (assets?.length() ?: 0)).mapNotNull { index ->
+                val asset = assets?.optJSONObject(index) ?: return@mapNotNull null
+                val name = asset.optString("name")
+                val url = asset.optString("browser_download_url")
+                val size = asset.optLong("size", -1)
+                if (!officialUpdateAsset(tag, name, url) || size !in 1..MAX_UPDATE_BYTES ||
+                    asset.optString("state", "uploaded") != "uploaded") return@mapNotNull null
+                val digest = asset.optString("digest").takeIf { it.isNotEmpty() && it != "null" }
+                if (digest != null && !Regex("sha256:[0-9a-fA-F]{64}").matches(digest)) return@mapNotNull null
+                UpdateApkAsset(name, url, size, digest?.substringAfter(':')?.lowercase())
+            }
+            val apk = candidates.singleOrNull { it.name == "Ciallo-Reader-$tag.apk" }
+                ?: candidates.singleOrNull()
+            return UpdateRelease(tag, releaseUrl(tag), if (data.isNull("body")) "" else data.optString("body").take(24_000), apk)
         }
     }
 

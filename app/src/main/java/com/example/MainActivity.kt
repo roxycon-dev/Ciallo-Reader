@@ -112,6 +112,7 @@ class MainActivity : ComponentActivity() {
         // Theme.MyApplication.Splash，底色与开屏页一致，交接无色差）。
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        com.example.data.AppUpdateManager.get(applicationContext)
         com.example.source.js.JsActivityTracker.register(this)
         // 启动看门狗：若"极致"画质在 20 秒内连续两次发生崩溃，自动降回"高"，
         // 防止实验性着色器效果导致"一崩就再也打不开"的死循环变砖。
@@ -245,6 +246,7 @@ class MainActivity : ComponentActivity() {
                     LocalLiquidGlassState provides liquidGlass,
                     com.example.ui.components.LocalScrollTilt provides scrollTilt
                 ) {
+                    AppUpdateDialogHost()
                     Surface(
                         modifier = Modifier
                             .fillMaxSize()

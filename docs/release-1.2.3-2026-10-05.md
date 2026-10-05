@@ -12,4 +12,12 @@
 
 发布地址：[Ciallo Reader 1.2.3](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.2.3)。
 
-最终专项验证：41 项回归与 68 项书架检查通过，Release 构建成功且输入稳定。APK 24,005,868 B，SHA-256 `0aa92167395ba2d9072d201fbc0118285c6770765f3d730f30987c2a69ddfba9`。签名 / 身份 / 应用名称 / arm64 / 16KB 对齐 / CRC / 捆绑词库校验通过。
+首次发布专项验证：41 项回归与 68 项书架检查通过，Release 构建成功且输入稳定。APK 24,005,868 B，SHA-256 `0aa92167395ba2d9072d201fbc0118285c6770765f3d730f30987c2a69ddfba9`。签名 / 身份 / 应用名称 / arm64 / 16KB 对齐 / CRC / 捆绑词库校验通过。
+
+## 同版本安装包替换
+
+2026-10-05 增加应用内更新确认、下载进度、完整性与签名校验、自动打开系统安装页和升级后的应用内包清理；未允许安装未知应用时，可前往授权、导出安装包或使用浏览器下载。功能与验收见 [应用内更新报告](in-app-update-2026-10-05.md)。
+
+37 项 JVM、4 项 Compose Native、1 项真实下载共 42 项测试通过，androidTest 编译与 Release 构建通过。替换包 24,023,980 B，SHA-256 `a6aa00b874a4bca6e73169efc0fa083d52e19b75a1956c7bd2e8096cae48c361`，沿用原签名；版本仍为 `1.2.3 / 204`。现有 1.2.3 用户可从同一 Release 下载覆盖安装。源码与 v1.2.3 标签对应本次构建；README 保持原文。
+
+原始发布记录保留于本地 `artifacts/update-flow-2026-10-05/original-release-1.2.3/`，替换发布的签名、构建与上传回执位于 `artifacts/update-flow-2026-10-05/`。

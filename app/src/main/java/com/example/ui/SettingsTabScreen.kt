@@ -81,6 +81,8 @@ import com.example.ui.adaptive.AdaptiveSpec
 import com.example.ui.components.AppToast
 import com.example.BuildConfig
 import com.example.data.GithubUpdateChecker
+import com.example.data.AppUpdateManager
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -133,8 +135,9 @@ fun SettingsTabScreen(
     val scope = rememberCoroutineScope()
     var updateChecking by remember { mutableStateOf(false) }
     var updateMessage by remember { mutableStateOf<String?>(null) }
-    var updateReleaseUrl by remember { mutableStateOf<String?>(null) }
     val updateChecker = remember(context.applicationContext) { GithubUpdateChecker(context.applicationContext) }
+    val appUpdate = remember(context.applicationContext) { AppUpdateManager.get(context) }
+    val appUpdateState by appUpdate.state.collectAsStateWithLifecycle()
     var backupBusy by remember { mutableStateOf(false) }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     val exportBackupLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
@@ -1370,12 +1373,11 @@ LazyColumn(
                                 onClick = {
                                     updateChecking = true
                                     updateMessage = null
-                                    updateReleaseUrl = null
                                     scope.launch {
                                         try {
                                             val result = updateChecker.check(versionName)
                                             updateMessage = result.message
-                                            updateReleaseUrl = result.releaseUrl
+                                            result.release?.let { appUpdate.offer(it) }
                                         } finally { updateChecking = false }
                                     }
                                 }
@@ -1385,14 +1387,19 @@ LazyColumn(
                                 Text(message, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             val updateUriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-                            updateReleaseUrl?.let { url ->
+                            if (updateMessage != null && appUpdateState.release == null && !updateMessage!!.contains("最新版本")) {
                                 TextButton(onClick = {
-                                    runCatching { updateUriHandler.openUri(url) }.onFailure {
+                                    runCatching { updateUriHandler.openUri(com.example.data.UPDATE_REPOSITORY + "/releases/latest") }.onFailure {
                                         AppToast.makeText(context, "无法打开发布页，请检查浏览器。", Toast.LENGTH_SHORT).show()
                                     }
-                                }) { Text("查看新版本") }
+                                }) { Text("GitHub 发布页") }
                             }
-                            Text("检查最新正式版本，下载前可查看更新说明。", fontSize = 10.sp,
+                            if (appUpdateState.release != null) {
+                                TextButton(onClick = appUpdate::show) {
+                                    Text(if (appUpdateState.transferring) "查看下载进度" else if (appUpdateState.hasPackage) "继续安装更新" else "查看更新")
+                                }
+                            }
+                            Text("检查正式版本，确认后下载并打开系统安装页面。", fontSize = 10.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f))
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(

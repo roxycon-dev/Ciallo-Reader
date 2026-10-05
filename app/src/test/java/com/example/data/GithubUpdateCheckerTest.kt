@@ -100,4 +100,45 @@ class GithubUpdateCheckerTest {
             fail("Cancellation must propagate")
         } catch (_:CancellationException) { assertEquals(1,calls) }
     }
+
+    private fun assetJson(url: String = "https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.2.4/Ciallo-Reader-v1.2.4.apk", size: Long = 24_000_000, digest: String = "sha256:${"a".repeat(64)}") =
+        """{"name":"Ciallo-Reader-v1.2.4.apk","browser_download_url":"$url","size":$size,"digest":"$digest","state":"uploaded"}"""
+
+    @Test fun includesReleaseNotesSizeAndVerifiedOfficialAsset() = runBlocking {
+        val result = checker { 200 to """{"tag_name":"v1.2.4","body":"Faster updates","assets":[${assetJson()}]}""" }.check("1.2.3")
+        assertEquals("Faster updates", result.release!!.notes)
+        assertEquals(24_000_000L, result.release!!.apk!!.size)
+        assertEquals("a".repeat(64), result.release!!.apk!!.sha256)
+    }
+
+    @Test fun latestVersionNeverOffersInstallationEvenWhenAssetsExist() = runBlocking {
+        val result = checker { 200 to """{"tag_name":"v1.2.4","assets":[${assetJson()}]}""" }.check("1.2.4")
+        assertNull(result.release)
+    }
+
+    @Test fun rejectsOtherRepositoriesWrongTagsAndInvalidDigestsWithoutBreakingVersionCheck() = runBlocking {
+        for (json in listOf(assetJson(url = "https://evil.example/update.apk"),
+            assetJson(url = "https://github.com/other/repo/releases/download/v1.2.4/Ciallo-Reader-v1.2.4.apk"),
+            assetJson(url = "https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.2.3/Ciallo-Reader-v1.2.4.apk"),
+            assetJson(size = MAX_UPDATE_BYTES + 1), assetJson(digest = "sha256:broken"))) {
+            val result = checker { 200 to """{"tag_name":"v1.2.4","assets":[$json]}""" }.check("1.2.3")
+            assertNotNull(result.release)
+            assertNull(result.release!!.apk)
+        }
+    }
+
+    @Test fun ambiguousApksFallBackToReleasePageInsteadOfGuessing() = runBlocking {
+        val alternate = assetJson().replace("Ciallo-Reader-v1.2.4.apk", "Ciallo-other.apk")
+        val second = alternate.replace("Ciallo-other.apk", "Ciallo-third.apk")
+        val result = checker { 200 to """{"tag_name":"v1.2.4","assets":[$alternate,$second]}""" }.check("1.2.3")
+        assertNull(result.release!!.apk)
+    }
+
+    @Test fun apiUnavailableStillOffersOurOfficialReleaseFilename() = runBlocking {
+        val result = checker { request -> if (request.url.host == "api.github.com") 403 to "{}"
+            else 302 to "/roxycon-dev/Ciallo-Reader/releases/tag/v1.2.4" }.check("1.2.3")
+        assertEquals("Ciallo-Reader-v1.2.4.apk", result.release!!.apk!!.name)
+        assertNull(result.release!!.apk!!.sha256)
+        assertTrue(officialUpdateAsset(result.release!!.tag, result.release!!.apk!!.name, result.release!!.apk!!.url))
+    }
 }
