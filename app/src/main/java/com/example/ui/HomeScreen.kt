@@ -2286,7 +2286,7 @@ private fun favKeyOf(book: Book): String? =
 private fun shareTitles(context: android.content.Context, titles: List<String>) {
     if (titles.isEmpty()) return
     val text = buildString {
-        append("我在 Ciallo 阅读里看：\n")
+        append("我在 Ciallo Reader里看：\n")
         titles.forEach { append("《$it》\n") }
     }
     val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {

@@ -175,11 +175,11 @@ fun SplashScreen(
                         .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // 手绘风格 LOGO（任务三）：替换原"Ciallo阅读"文字标题；
+                    // 手绘风格 LOGO（任务三）：替换原"Ciallo Reader"文字标题；
                     // 原图为透明底浅色手绘（均亮 ~225），在海报渐变压暗区上对比清晰
                     Image(
                         painter = painterResource(R.drawable.splash_ciallo_logo),
-                        contentDescription = "Ciallo阅读",
+                        contentDescription = "Ciallo Reader",
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .width(168.dp)
@@ -292,10 +292,10 @@ private fun ProceduralArtisticPoster(randomQuote: String, styleIndex: Int) {
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 手绘风格 LOGO（任务三）：替换原 AutoStories 图标 + "Ciallo阅读"文字
+                // 手绘风格 LOGO（任务三）：替换原 AutoStories 图标 + "Ciallo Reader"文字
                 Image(
                     painter = painterResource(R.drawable.splash_ciallo_logo),
-                    contentDescription = "Ciallo阅读",
+                    contentDescription = "Ciallo Reader",
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.width(144.dp)
                 )

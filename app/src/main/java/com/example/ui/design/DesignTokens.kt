@@ -5,7 +5,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Ciallo 阅读 设计规范（全局统一，后续新页面一律按此执行）。
+ * Ciallo Reader 设计规范（全局统一，后续新页面一律按此执行）。
  *
  * 圆角（Corner Radius）
  *  - XS 8dp   小标签、热力格、微型图标容器

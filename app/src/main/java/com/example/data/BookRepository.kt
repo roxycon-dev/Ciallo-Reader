@@ -883,15 +883,15 @@ class BookRepository(
             android.util.Log.e("BookRepository", "Error cleaning old test books", e)
         }
 
-        // 2. Seed 《Ciallo阅读使用指南》 as default book
+        // 2. Seed 《Ciallo Reader使用指南》 as default book
         val guideFilePath = "ciallo_guide_novel"
         val existingGuideCount = bookDao.getBookCountByFilePath(guideFilePath)
 
         if (existingGuideCount == 0) {
-            val guideTitle = "《Ciallo阅读使用指南》"
+            val guideTitle = "《Ciallo Reader使用指南》"
             val guideBook = Book(
                 title = guideTitle,
-                author = "Ciallo阅读器团队",
+                author = "Ciallo Reader团队",
                 filePath = guideFilePath,
                 totalChapters = 7,
                 contentType = "NOVEL"
@@ -901,8 +901,8 @@ class BookRepository(
                 Chapter(
                     bookId = bookId,
                     chapterOrder = 0,
-                    title = "第一章：欢迎使用 Ciallo 阅读器",
-                    content = "欢迎使用 Ciallo 阅读器！\n\nCiallo 阅读器是一款专为二次元与小说/漫画爱好者打造的极简、流畅且充满陪伴感的高品质阅读应用。\n\n无论你是喜爱阅读长篇网络小说、经典文学著作，还是习惯追更日漫与条漫，Ciallo 阅读器都能为你提供极佳的阅读排版体验与智能贴心的辅助功能。\n\n本指南将带你快速了解 Ciallo 阅读器的各项核心功能与使用技巧，帮助你开启一段惬意的阅读之旅。"
+                    title = "第一章：欢迎使用 Ciallo Reader",
+                    content = "欢迎使用 Ciallo Reader！\n\nCiallo Reader是一款专为二次元与小说/漫画爱好者打造的极简、流畅且充满陪伴感的高品质阅读应用。\n\n无论你是喜爱阅读长篇网络小说、经典文学著作，还是习惯追更日漫与条漫，Ciallo Reader都能为你提供极佳的阅读排版体验与智能贴心的辅助功能。\n\n本指南将带你快速了解 Ciallo Reader的各项核心功能与使用技巧，帮助你开启一段惬意的阅读之旅。"
                 ),
                 Chapter(
                     bookId = bookId,
@@ -914,7 +914,7 @@ class BookRepository(
                     bookId = bookId,
                     chapterOrder = 2,
                     title = "第三章：小说阅读与个性化排版",
-                    content = "【精确排版引擎】\nCiallo 阅读器采用了基于真实控件高度与逐行测量的动态排版算法。无论在竖屏还是横屏下切换，文字都不会出现被半截切断或丢失漏行的现象，同时会自动保持位置锚点衔接。\n\n【版式与主题定制】\n• 点击屏幕中央区域唤出阅读控制栏，点击「设置」图标即可调整：\n  - 字号大小与行间距\n  - 首行缩进与段落边距\n  - 阅读背景主题：包含羊皮纸、夜间深色、护眼绿、极简白等多款精心调配的色彩组合\n  - 字体切换：支持自定义系统字体与优雅衬线/无衬线体选择。"
+                    content = "【精确排版引擎】\nCiallo Reader采用了基于真实控件高度与逐行测量的动态排版算法。无论在竖屏还是横屏下切换，文字都不会出现被半截切断或丢失漏行的现象，同时会自动保持位置锚点衔接。\n\n【版式与主题定制】\n• 点击屏幕中央区域唤出阅读控制栏，点击「设置」图标即可调整：\n  - 字号大小与行间距\n  - 首行缩进与段落边距\n  - 阅读背景主题：包含羊皮纸、夜间深色、护眼绿、极简白等多款精心调配的色彩组合\n  - 字体切换：支持自定义系统字体与优雅衬线/无衬线体选择。"
                 ),
                 Chapter(
                     bookId = bookId,
@@ -926,13 +926,13 @@ class BookRepository(
                     bookId = bookId,
                     chapterOrder = 4,
                     title = "第五章：漫画阅读器使用技巧",
-                    content = "【漫画专享优化】\n当你打开 CBZ / ZIP / PDF 漫画或图集时，Ciallo 阅读器会自动切换至专属漫画引擎：\n1. 支持双指自由缩放与双击快速放大图像，细节一览无余。\n2. 支持切换「横向翻页」与「纵向条漫」模式，满足不同漫画排版需求。\n3. 支持调整读向：可切换日漫（右至左）或欧美漫（左至右）阅读顺序。"
+                    content = "【漫画专享优化】\n当你打开 CBZ / ZIP / PDF 漫画或图集时，Ciallo Reader会自动切换至专属漫画引擎：\n1. 支持双指自由缩放与双击快速放大图像，细节一览无余。\n2. 支持切换「横向翻页」与「纵向条漫」模式，满足不同漫画排版需求。\n3. 支持调整读向：可切换日漫（右至左）或欧美漫（左至右）阅读顺序。"
                 ),
                 Chapter(
                     bookId = bookId,
                     chapterOrder = 5,
                     title = "第六章：Roxy 助手与阅读统计",
-                    content = "【看板娘 Roxy 动态陪伴】\n在阅读界面与应用主页中，可爱贴心的魔法少女 Roxy 会静静陪伴着你：\n• 添加书签或完成阅读目标时，Roxy 会展示萌趣的交互与魔法动画。\n• 互动响应流畅，并在连续触发时具备打断重播平滑过渡。\n\n【阅读统计与成就】\n进入「统计」标签页，可以直观查看你的总阅读时长、阅读天数、章节进度分布以及每日阅读趋势图表，记录你读过的点点滴滴。\n\n祝你阅读愉快！—— Ciallo 阅读器团队"
+                    content = "【看板娘 Roxy 动态陪伴】\n在阅读界面与应用主页中，可爱贴心的魔法少女 Roxy 会静静陪伴着你：\n• 添加书签或完成阅读目标时，Roxy 会展示萌趣的交互与魔法动画。\n• 互动响应流畅，并在连续触发时具备打断重播平滑过渡。\n\n【阅读统计与成就】\n进入「统计」标签页，可以直观查看你的总阅读时长、阅读天数、章节进度分布以及每日阅读趋势图表，记录你读过的点点滴滴。\n\n祝你阅读愉快！—— Ciallo Reader团队"
                 )
             )
             bookDao.insertChapters(guideChapters)

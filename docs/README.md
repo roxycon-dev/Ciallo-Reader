@@ -8,6 +8,8 @@
 
 ## 内容
 
+- [Ciallo Reader 1.2.3 发布验证](release-1.2.3-2026-10-05.md)
+- [神回窗口封面加载与图片跑位修复](god-cover-loading-2026-10-05.md)
 - [1.2.2 更新检查修复与发布验证](release-1.2.2-2026-10-05.md)
 
 - [中文关键词跨语言聚合搜索方案（2026-10-05，含实施校准）](multilingual-keyword-search-plan-2026-10-05.md)

@@ -13,7 +13,17 @@ import android.net.Uri
 import androidx.core.graphics.drawable.toBitmap
 import coil.ImageLoader
 import coil.request.ImageRequest
+import coil.request.CachePolicy
+import coil.request.SuccessResult
+import com.example.ui.comic.ComicLoadLocks
+import com.example.ui.comic.ComicStreamPreview
+import com.example.ui.comic.comicRemoteCacheKey
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -96,11 +106,16 @@ object GodCoverEngine {
         ref: GodPageRef,
         maxEdge: Int = DECODE_MAX_EDGE,
         remoteLoader: ImageLoader? = null,
+        onPreview: ((Bitmap) -> Unit)? = null,
     ): Bitmap? = withContext(Dispatchers.Default) {
-        runCatching {
-            if (ref.remote) decodeRemote(context, ref, maxEdge, remoteLoader)
+        try {
+            if (ref.remote) decodeRemote(context, ref, maxEdge, remoteLoader, onPreview)
             else decodeLocal(ref.source, maxEdge)
-        }.getOrNull()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /** 相册（Photo Picker Uri）解码 */
@@ -138,31 +153,83 @@ object GodCoverEngine {
         }.getOrDefault(decoded)
     }
 
+    @OptIn(coil.annotation.ExperimentalCoilApi::class)
     private suspend fun decodeRemote(
         context: Context,
         ref: GodPageRef,
         maxEdge: Int,
         remoteLoader: ImageLoader?,
+        onPreview: ((Bitmap) -> Unit)?,
     ): Bitmap? {
         val loader = remoteLoader ?: coil.Coil.imageLoader(context)
+        val cacheKey = comicRemoteCacheKey(ref.source, ref.headers)
         val builder = ImageRequest.Builder(context)
             .data(ref.source)
+            .memoryCacheKey(cacheKey)
+            .diskCacheKey(cacheKey)
             .size(maxEdge)
+            .scale(coil.size.Scale.FIT)
+            .precision(coil.size.Precision.INEXACT)
             .allowHardware(false)
         ref.headers.forEach { (k, v) -> builder.addHeader(k, v) }
-        // 并发闸：页面选择条一屏 7+ 张缩略图同时发起整图下载，图床（MangaDex 等）
-        // 会直接限流（429）→ 一批缩略图集体失败（"很多图片加载不出来"）。
-        // 排队上限 4，配合阅读器 loader 的磁盘缓存，已看过基本秒出。
-        return remoteGate.withPermit {
-            val drawable = loader.execute(builder.build()).drawable ?: return null
-            runCatching {
+        val request = builder.build()
+        suspend fun cached(): Bitmap? {
+            // 冷缓存直接跳过探测：only-if-cached 的 504 会触发书源网络拦截器重试。
+            val hasMemory = loader.memoryCache?.get(coil.memory.MemoryCache.Key(cacheKey)) != null
+            val hasDisk = loader.diskCache?.openSnapshot(cacheKey)?.use { true } ?: false
+            if (!hasMemory && !hasDisk) return null
+            return (loader.execute(
+                request.newBuilder().networkCachePolicy(CachePolicy.DISABLED).build(),
+            ) as? SuccessResult)?.drawable?.let { drawable ->
                 (drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: drawable.toBitmap()
-            }.getOrNull()
+            }
+        }
+        // 缓存命中不排网络队列；同一页的缩略图与大封面只下载一次。
+        cached()?.let { return it }
+        val lock = remoteLoads.acquire(cacheKey)
+        try {
+            return lock.withLock {
+                cached()?.let { return@withLock it }
+                val gate = if (maxEdge <= THUMB_MAX_EDGE) thumbnailGate else coverGate
+                gate.withPermit {
+                    val stream = onPreview?.let { ComicStreamPreview(CoroutineScope(currentCoroutineContext()), it) }
+                    val result = try {
+                        loader.execute(request.newBuilder().tag(ComicStreamPreview::class.java, stream).build())
+                    } finally { stream?.close() }
+                    currentCoroutineContext().ensureActive()
+                    (result as? SuccessResult)?.drawable?.let { drawable ->
+                        (drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: drawable.toBitmap()
+                    }
+                }
+            }
+        } finally {
+            remoteLoads.release(cacheKey)
         }
     }
 
-    /** 远程页加载并发上限（缩略图 + 封面预览共用一条队列） */
-    private val remoteGate = kotlinx.coroutines.sync.Semaphore(4)
+    /** 神回窗口专用：给可见缩略图留 3 个名额，大封面不会挤占它们。 */
+    private val thumbnailGate = kotlinx.coroutines.sync.Semaphore(3)
+    private val coverGate = kotlinx.coroutines.sync.Semaphore(1)
+    private val remoteLoads = ComicLoadLocks()
+    internal const val THUMB_MAX_EDGE = 320
+
+    internal fun pageCacheKey(ref: GodPageRef): String =
+        if (ref.remote) "remote:${comicRemoteCacheKey(ref.source, ref.headers)}" else "local:${ref.source}"
+
+    /** 阅读器的缓存可能是大图，缩略图缓存只留小图；长条漫取中段。 */
+    internal fun thumbnailOf(raw: Bitmap): Bitmap {
+        val segment = if (raw.height.toFloat() / raw.width > 3f) {
+            val height = (raw.width * 1.6f).roundToInt().coerceIn(1, raw.height)
+            Bitmap.createBitmap(raw, 0, (raw.height - height) / 2, raw.width, height)
+        } else raw
+        val edge = max(segment.width, segment.height)
+        return if (edge <= THUMB_MAX_EDGE) segment else Bitmap.createScaledBitmap(
+            segment,
+            (segment.width.toFloat() * THUMB_MAX_EDGE / edge).roundToInt().coerceAtLeast(1),
+            (segment.height.toFloat() * THUMB_MAX_EDGE / edge).roundToInt().coerceAtLeast(1),
+            true,
+        )
+    }
 
     /** EXIF 方向归一化（相册照片常见 90°/270°） */
     private fun exifMatrix(path: String): Matrix? = runCatching {

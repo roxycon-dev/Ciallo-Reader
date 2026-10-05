@@ -508,7 +508,7 @@ private fun PeriodOverviewCard(
                 Surface(
                     onClick = {
                         val shareText = buildString {
-                            appendLine("📚 我的阅读${shareLabel}报 · Ciallo 阅读")
+                            appendLine("📚 我的阅读${shareLabel}报 · Ciallo Reader")
                             appendLine("────────────────────")
                             if (periodTotal > 0) {
                                 appendLine("⏱ ${periodName}阅读 ${formatReadDuration(periodTotal)}（日均 ${if (avgDaily in 1..59) "不足1分钟" else formatShortDuration(avgDaily)}）")
@@ -519,7 +519,7 @@ private fun PeriodOverviewCard(
                             if (streak > 0) appendLine("🔥 连续阅读 $streak 天")
                             if (daysRead > 0) appendLine("📖 ${periodName}阅读 $daysRead 天 · 读完 $finishedCount 本")
                             appendLine("━━━━━━━━━━━━━━━━")
-                            appendLine("Ciallo 阅读 · Roxy 陪伴 ✨")
+                            appendLine("Ciallo Reader · Roxy 陪伴 ✨")
                         }
                         val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                             type = "text/plain"

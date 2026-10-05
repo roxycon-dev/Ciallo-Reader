@@ -183,18 +183,18 @@ private fun saveNovelImageToGallery(context: Context, path: String): String {
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
             put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Ciallo阅读")
+            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Ciallo Reader")
         }
         val uri: Uri? = context.contentResolver.insert(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values
         )
         if (uri == null) return "保存失败"
         context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
-        "已保存到相册 Pictures/Ciallo阅读"
+        "已保存到相册 Pictures/Ciallo Reader"
     } else {
         val dir = File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
-            "Ciallo阅读"
+            "Ciallo Reader"
         )
         if (!dir.exists()) dir.mkdirs()
         val target = File(dir, fileName)

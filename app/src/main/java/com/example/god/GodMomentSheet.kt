@@ -91,6 +91,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -271,9 +274,11 @@ fun GodMomentSheet(
     val defaultTitle = "${request.bookTitle} 第${request.chapterNumber}话"
     val shownTitle = if (titleCustom && titleText.isNotBlank()) titleText else defaultTitle
 
-    var sourceBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var preview by remember { mutableStateOf<Bitmap?>(null) }
-    var loadingCover by remember { mutableStateOf(false) }
+    // 来源变化的同一帧就换掉状态容器，旧请求/旧合成结果不能冒充新页。
+    var coverRetry by remember(coverSourceTag) { mutableIntStateOf(0) }
+    var sourceBitmap by remember(coverSourceTag, coverRetry, request.pages, existing?.coverPath) { mutableStateOf<Bitmap?>(null) }
+    var preview by remember(coverSourceTag, sourceBitmap, crop) { mutableStateOf<Bitmap?>(null) }
+    var loadingCover by remember(coverSourceTag, coverRetry, request.pages, existing?.coverPath) { mutableStateOf(true) }
     var showCrop by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var burst by remember { mutableStateOf(false) }
@@ -282,15 +287,15 @@ fun GodMomentSheet(
     /* ── 载入当前封面来源（后台线程解码） ──
        从详情页编辑时没有页列表（图片未加载）→ 退化为直接以已合成封面作为底图，
        仍可"从相册选择"与裁剪（裁剪的是已合成封面，尺寸恒定不会错）。 */
-    LaunchedEffect(coverSource, request.pages, existing?.coverPath) {
+    LaunchedEffect(coverSource, coverRetry, request.pages, existing?.coverPath, remoteLoader) {
         loadingCover = true
         val bmp = withContext(Dispatchers.Default) {
             when (val s = coverSource) {
                 is CoverSource.ComicPage -> {
                     val ref = request.pages.getOrNull(s.pageIndex)
                         ?: request.pages.firstOrNull()
-                    ref?.let { GodCoverEngine.loadPage(context, it, GodCoverEngine.DECODE_MAX_EDGE, remoteLoader) }
-                        ?: existing?.coverPath?.let { android.graphics.BitmapFactory.decodeFile(it) }
+                    if (ref != null) GodCoverEngine.loadPage(context, ref, GodCoverEngine.DECODE_MAX_EDGE, remoteLoader)
+                    else existing?.coverPath?.let { android.graphics.BitmapFactory.decodeFile(it) }
                 }
                 is CoverSource.Album -> runCatching {
                     GodCoverEngine.loadUri(context, android.net.Uri.parse(s.uri))
@@ -342,7 +347,7 @@ fun GodMomentSheet(
 
     /* ── 保存（防抖：saving 期间忽略重复点击） ── */
     fun doSave() {
-        if (saving) return
+        if (saving || loadingCover || sourceBitmap == null) return
         saving = true
         scope.launch {
             val cropped = withContext(Dispatchers.Default) {
@@ -468,7 +473,6 @@ fun GodMomentSheet(
                 GodSheetBlock(index = 1, reduce = reduce) {
                     GodCoverSection(
                         preview = preview,
-                        selectedBitmap = sourceBitmap,
                         loading = loadingCover,
                         pages = request.pages,
                         selected = (coverSource as? CoverSource.ComicPage)?.pageIndex ?: -1,
@@ -477,6 +481,7 @@ fun GodMomentSheet(
                         remoteLoader = remoteLoader,
                         reduce = reduce,
                         onPickPage = { idx ->
+                            if (coverSource == CoverSource.ComicPage(idx) && !loadingCover && sourceBitmap == null) coverRetry++
                             setCoverSource(CoverSource.ComicPage(idx))
                             setCrop(CropParams.DEFAULT)
                         },
@@ -551,6 +556,7 @@ fun GodMomentSheet(
                 editing = editing,
                 saving = saving,
                 enabled = !saving,
+                coverReady = !loadingCover && sourceBitmap != null,
                 reduce = reduce,
                 dark = dark,
                 title = shownTitle,
@@ -726,9 +732,8 @@ private fun GodSheetBlock(
 /* ══════════════ ② 封面区 ══════════════ */
 
 @Composable
-private fun GodCoverSection(
+internal fun GodCoverSection(
     preview: Bitmap?,
-    selectedBitmap: Bitmap?,
     loading: Boolean,
     pages: List<GodPageRef>,
     selected: Int,
@@ -740,12 +745,9 @@ private fun GodCoverSection(
     onPickAlbum: () -> Unit,
     onCrop: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val listState = rememberLazyListState()
-    LaunchedEffect(pages.size, selected) {
-        val idx = selected.takeIf { it >= 0 } ?: initialPage
-        if (idx in pages.indices) runCatching { listState.animateScrollToItem(idx) }
-    }
+    // 只在打开时定位，点按可见候选不会把整排图片横向推走。
+    val initialIndex = (selected.takeIf { it >= 0 } ?: initialPage).coerceIn(0, (pages.size - 1).coerceAtLeast(0))
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         // 封面预览（3D 倾斜）
@@ -774,11 +776,10 @@ private fun GodCoverSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                itemsIndexed(pages) { index, ref ->
+                itemsIndexed(pages, key = { index, ref -> "$index:${ref.id}" }) { index, ref ->
                     GodPageThumb(
                         ref = ref,
                         selected = !albumSelected && index == selected,
-                        selectedBitmap = selectedBitmap,
                         remoteLoader = remoteLoader,
                         indexLabel = "${index + 1}",
                         onClick = { onPickPage(index) },
@@ -895,29 +896,36 @@ private object GodThumbCache {
 private fun GodPageThumb(
     ref: GodPageRef,
     selected: Boolean,
-    selectedBitmap: Bitmap?,
     remoteLoader: ImageLoader?,
     indexLabel: String,
     onClick: () -> Unit,
 ) {
     val context = LocalContext.current
-    val cacheKey = remember(ref.source, ref.headers) { "${ref.source}|${ref.headers.hashCode()}" }
+    val cacheKey = remember(ref) { GodCoverEngine.pageCacheKey(ref) }
     var bmp by remember(cacheKey) { mutableStateOf(GodThumbCache.get(cacheKey)) }
-    LaunchedEffect(cacheKey, selected) {
-        if (selected || bmp != null) return@LaunchedEffect
-        bmp = withContext(Dispatchers.Default) {
-            val raw = GodCoverEngine.loadPage(context, ref, 320, remoteLoader) ?: return@withContext null
-            val aspect = raw.height.toFloat() / raw.width.toFloat()
-            if (aspect > 3f) {
-                // 条漫超长图：按可视比例取一段（默认中段）
-                val segH = (raw.width * 1.6f).roundToInt().coerceAtMost(raw.height)
-                val top = ((raw.height - segH) / 2f).roundToInt().coerceIn(0, (raw.height - segH).coerceAtLeast(0))
-                runCatching { Bitmap.createBitmap(raw, 0, top, raw.width, segH) }.getOrDefault(raw)
-            } else raw
+    var failed by remember(cacheKey) { mutableStateOf(false) }
+    var retry by remember(cacheKey) { mutableIntStateOf(0) }
+    LaunchedEffect(cacheKey, remoteLoader, retry) {
+        GodThumbCache.get(cacheKey)?.let { bmp = it; return@LaunchedEffect }
+        failed = false
+        val effectScope = this
+        var complete = false
+        val finished = withContext(Dispatchers.Default) {
+            val raw = GodCoverEngine.loadPage(context, ref, GodCoverEngine.THUMB_MAX_EDGE, remoteLoader) { partial ->
+                // 渐进预览只属于这一个格子，完整图片到达前不写永久缓存。
+                val thumbnail = GodCoverEngine.thumbnailOf(partial)
+                effectScope.launch(Dispatchers.Main.immediate) {
+                    if (!complete) bmp = thumbnail
+                }
+            } ?: return@withContext null
+            GodCoverEngine.thumbnailOf(raw)
         }
-        bmp?.let { GodThumbCache.put(cacheKey, it) }
+        complete = true
+        failed = finished == null
+        bmp = finished
+        finished?.let { GodThumbCache.put(cacheKey, it) }
     }
-    val displayBitmap = if (selected) selectedBitmap ?: bmp else bmp
+    val displayBitmap = bmp
     val dark = godIsDark()
     val borderColor = if (selected) GodGold.LightMid else MaterialTheme.colorScheme.outline.copy(alpha = 0.28f)
     Box(
@@ -930,7 +938,18 @@ private fun GodPageThumb(
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (dark) 0.45f else 0.85f),
             )
             .border(if (selected) 2.dp else 1.dp, borderColor, RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick),
+            .semantics {
+                contentDescription = "第${indexLabel}页封面"
+                stateDescription = when {
+                    displayBitmap != null -> "已加载"
+                    failed -> "加载失败，点按重试"
+                    else -> "加载中"
+                }
+            }
+            .clickable {
+                if (failed) retry++
+                onClick()
+            },
         contentAlignment = Alignment.BottomEnd,
     ) {
         if (displayBitmap != null) {
@@ -1112,6 +1131,7 @@ private fun GodActionBar(
     editing: Boolean,
     saving: Boolean,
     enabled: Boolean,
+    coverReady: Boolean,
     reduce: Boolean,
     dark: Boolean,
     title: String,
@@ -1141,7 +1161,7 @@ private fun GodActionBar(
         GodShineButton(
             text = if (editing) "保存" else "添加到神回排行榜",
             loading = saving,
-            enabled = enabled,
+            enabled = enabled && coverReady,
             reduce = reduce,
             dark = dark,
             onClick = onConfirm,

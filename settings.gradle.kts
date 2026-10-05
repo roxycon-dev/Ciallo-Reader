@@ -13,7 +13,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Ciallo阅读"
+rootProject.name = "Ciallo Reader"
 include(":app")
 include(":backdrop")
 include(":liquidglass-core")

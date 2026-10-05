@@ -1346,7 +1346,7 @@ LazyColumn(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                "Ciallo 阅读",
+                                "Ciallo Reader",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp,
                                 color = MaterialTheme.colorScheme.primary

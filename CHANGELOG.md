@@ -1,6 +1,14 @@
 # Changelog
 
-All notable changes to Ciallo 阅读 are documented in this file.
+All notable changes to Ciallo Reader are documented in this file.
+
+## [1.2.3] — 2026-10-05（神回封面加载与选图修复）
+
+- 神回添加 / 编辑窗口优先复用阅读器内存与磁盘缓存；可见缩略图使用独立并发名额，同页大小图合并下载，支持渐进 JPEG 提前显示。
+- 修复只有一张图加载完成时，点选其它未加载页面导致图片跑位；每个格子固定绑定对应页面，选择不再取消下载或自动推动整排缩略图。
+- 缩略图加载失败后可点按重试，长条漫保留中段；切换大封面清除旧来源，封面就绪后允许保存。
+- 应用与发布名称统一为 **Ciallo Reader**，版本更新为 `1.2.3 / 204`。
+
 
 ## [1.2.2] — 2026-10-05（智能多语言搜索与更新检查修复）
 
