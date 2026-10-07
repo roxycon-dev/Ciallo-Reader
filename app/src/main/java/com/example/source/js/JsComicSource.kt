@@ -58,6 +58,29 @@ class JsComicSource(
 
     override val id: String get() = "js_$sourceKey"
 
+    private val shareLinks by lazy {
+        context.getSharedPreferences("work_detail_share_links", Context.MODE_PRIVATE)
+    }
+    private fun shareLinkKey(bookId: String) = org.json.JSONArray(listOf(id, bookId)).toString()
+    private fun rememberShareUrl(bookId: String, data: JSONObject) {
+        DetailLink.valid(data.optString("url"))?.let {
+            shareLinks.edit().putString(shareLinkKey(bookId), it).apply()
+        }
+    }
+    override suspend fun getShareUrl(bookId: String): String? {
+        DetailLink.valid(bookId)?.let { return it }
+        DetailLink.valid(shareLinks.getString(shareLinkKey(bookId), null))?.let { return it }
+        // Fetch metadata only. Whole-gallery chapter loading may fetch every page just to count them.
+        withContext(Dispatchers.IO) {
+            chapterLoadMutex.withLock {
+                DetailLink.valid(shareLinks.getString(shareLinkKey(bookId), null))?.let { return@withLock }
+                val result = callJs("src.comic.loadInfo.call(src, ${q(bookId)})")
+                if (result?.optBoolean("ok") == true) result.optJSONObject("data")?.let { rememberShareUrl(bookId, it) }
+            }
+        }
+        return DetailLink.valid(shareLinks.getString(shareLinkKey(bookId), null))
+    }
+
     override suspend fun getRegistrationUrl(): String? {
         // Literal links (e.g. Picacg) need no JS bootstrap or network request.
         val literal = Regex("""registerWebsite\s*:\s*(["'])([^"'\r\n]+)\1""")
@@ -258,6 +281,7 @@ class JsComicSource(
             val data = obj.optJSONObject("data") ?: return null
             val title = data.optString("title").trim()
             if (title.isBlank()) return null
+            rememberShareUrl(numericId, data)
             Log.i("JsComic[$sourceKey]", "号码牌直达命中: $numericId → $title")
             SearchBook(
                 id = numericId,
@@ -319,6 +343,7 @@ class JsComicSource(
                 val data = obj.optJSONObject("data") ?: return@withContext SourceResult.Error(
                     SourceException.ParseError("JS 源无数据")
                 )
+                rememberShareUrl(bookId, data)
                 synchronized(chapterCacheMonitor) {
                     if (detailEpoch == chapterCacheEpoch) {
                         detailCache[bookId] = android.os.SystemClock.elapsedRealtime() to JsComicMetadata.book(data, id, bookId)

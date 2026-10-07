@@ -31,10 +31,24 @@ object ComicParser {
                 val extension = fileName.substringAfterLast('.').lowercase()
                 require(extension in setOf("pdf", "cbz", "zip")) { "请转换为CBZ、ZIP或PDF格式后导入。" }
                 check(comicDir.mkdirs()) { "无法创建漫画目录" }
+                // Own the original alongside extracted pages. Sharing PDF/CBZ must retain its bytes.
+                val original = File(comicDir, "original/${File(fileName).name.replace(Regex("[\\\\/:*?\"<>|]"), "_")}")
+                check(original.parentFile!!.mkdirs()) { "无法保存漫画源文件" }
+                val input = context.contentResolver.openInputStream(uri) ?: error("无法读取漫画源文件")
+                input.use { src -> original.outputStream().use { out ->
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        coroutineContext.ensureActive()
+                        val count = src.read(buffer)
+                        if (count < 0) break
+                        require(comicDir.usableSpace >= count + 16L * 1024 * 1024) { "存储空间不足" }
+                        out.write(buffer, 0, count)
+                    }
+                } }
                 // Sort original paths, not generated names that encode extraction order.
                 val pages = mutableListOf<Pair<String, File>>()
                 if (extension == "pdf") {
-                    val descriptor = context.contentResolver.openFileDescriptor(uri, "r")
+                    val descriptor = context.contentResolver.openFileDescriptor(Uri.fromFile(original), "r")
                         ?: error("无法打开PDF文件")
                     descriptor.use { pfd ->
                         PdfRenderer(pfd).use { renderer ->
@@ -65,11 +79,11 @@ object ComicParser {
                     var extracted = false
                     var lastFailure: Exception? = null
                     for (charset in listOf(Charsets.UTF_8, Charset.forName("GBK"))) {
-                        comicDir.listFiles()?.forEach { it.delete() }
+                        comicDir.listFiles()?.filter { it.isFile }?.forEach { it.delete() }
                         pages.clear()
                         try {
                             val budget = ArchiveBudget()
-                            val input = context.contentResolver.openInputStream(uri) ?: error("无法打开漫画文件")
+                            val input = original.inputStream()
                             input.use { stream ->
                                 ZipInputStream(stream, charset).use { zip ->
                                     while (true) {

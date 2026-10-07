@@ -26,6 +26,7 @@ class IxdzsSource(
 ) : UpdatableNovelSource {
     override val id = "ixdzs8"
     override val name = "爱下电子书"
+    override suspend fun getShareUrl(bookId: String): String = bookUrl(bookId).toString()
     override val capabilities = SourceCapabilities(supportEbook = true)
     private val http = client ?: JsSourceProxy.failoverClient(context.applicationContext,
         SharedHttpTransport.builder().connectTimeout(10, TimeUnit.SECONDS)

@@ -152,6 +152,7 @@ fun HomeScreen(
     favoriteKeys: Set<String> = emptySet(),
     /** 点击「我喜欢的」卡片 → 直接进漫画主页面（在线阅读，不走下载） */
     onOpenFavorite: (com.example.data.favorite.FavoriteItem) -> Unit = {},
+    favoriteShareSource: (String) -> com.example.source.BookSource? = { null },
     onCheckFavoriteUpdates: () -> Unit = {},
     /** 拖拽/操作栏：把收藏移动到分类 */
     onMoveFavoritesToCategory: (List<String>, String) -> Unit = { _, _ -> },
@@ -274,6 +275,17 @@ fun HomeScreen(
     var bulkCategoryTarget by remember { mutableIntStateOf(-1) }
     var showMoreSheet by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val shareScope = (context as? androidx.activity.ComponentActivity)?.lifecycleScope ?: refreshScope
+    var preparingShare by remember { mutableStateOf(false) }
+    fun prepareShare(action: suspend () -> String?) {
+        if (preparingShare) return
+        preparingShare = true
+        shareScope.launch {
+            try {
+                action()?.let { AppToast.makeText(context, it, Toast.LENGTH_LONG).show() }
+            } finally { preparingShare = false }
+        }
+    }
 
     // 新建分类后（拖拽落到「＋新建分类」或操作栏新建），把此前待放入的那批放进去。
     // ⚠️ 这批 key **可能是收藏**（fav:: 前缀）：以前只按 book.id 匹配，
@@ -2000,7 +2012,6 @@ fun HomeScreen(
                                 val selectedFavs = favSorted.filter {
                                     com.example.ui.shelf.favShelfKey(it.key) in shelfSelection.selected
                                 }
-                                val ctx = androidx.compose.ui.platform.LocalContext.current
                                 // 收藏板块的 4 项**恒定存在**，不再用「selectedFavs 是否为空」决定整条栏。
                                 // 原写法 `if (selectedFavs.isEmpty()) null else listOf(...)` + 后面的 `?:`
                                 // 会在匹配为空时**静默回退成书架动作** ⇒ 用户看到「我喜欢的」里冒出
@@ -2017,7 +2028,7 @@ fun HomeScreen(
                                     ),
                                     // 「我喜欢的」以前只有 打开/取消喜欢 两个，比书架少一大截
                                     // （用户：没有分享移动等等）。移动 = 归到收藏分类，
-                                    // 分享 = 把选中的标题拼成文本发出去。
+                                    // 分享收藏的作品详情链接，与书架的文件分享独立。
                                     com.example.ui.shelf.ShelfAction(
                                         label = "移动",
                                         icon = androidx.compose.material.icons.Icons.Filled.Folder,
@@ -2025,11 +2036,12 @@ fun HomeScreen(
                                         onClick = { bulkCategoryTarget = 1 },
                                     ),
                                     com.example.ui.shelf.ShelfAction(
-                                        label = "分享",
+                                        label = if (preparingShare) "准备中…" else "分享",
                                         icon = androidx.compose.material.icons.Icons.Filled.Share,
-                                        enabled = true,
+                                        enabled = selectedFavs.isNotEmpty() && !preparingShare,
                                         onClick = {
-                                            shareTitles(ctx, selectedFavs.map { it.favorite.title })
+                                            val favorites = selectedFavs.map { it.favorite }
+                                            prepareShare { com.example.library.FavoriteShareHelper.shareFavorites(context, favorites, favoriteShareSource) }
                                         },
                                     ),
                                     com.example.ui.shelf.ShelfAction(
@@ -2063,10 +2075,10 @@ fun HomeScreen(
                                         // 书架多选栏不再提供加入/取消「我喜欢的」（用户判定为无用）。
                                         // 需要收藏请走单本书内的 ♡。
                                         com.example.ui.shelf.ShelfAction(
-                                            label = "分享",
+                                            label = if (preparingShare) "准备中…" else "分享",
                                             icon = androidx.compose.material.icons.Icons.Filled.Share,
-                                            enabled = selectedBooks.isNotEmpty(),
-                                            onClick = { shareTitles(ctx, selectedBooks.map { it.title }) },
+                                            enabled = selectedBooks.isNotEmpty() && !preparingShare,
+                                            onClick = { prepareShare { com.example.library.BookShareHelper.shareBooks(context, selectedBooks) } },
                                         ),
                                         com.example.ui.shelf.ShelfAction(
                                             label = "删除下载",
@@ -2281,21 +2293,6 @@ private fun favKeyOf(book: Book): String? =
     if (!book.sourceId.isNullOrBlank() && !book.comicId.isNullOrBlank()) {
         "${book.sourceId}::${book.comicId}"
     } else null
-
-/** 分享：多本合并成一段文本（书名 + 来源链接）。 */
-private fun shareTitles(context: android.content.Context, titles: List<String>) {
-    if (titles.isEmpty()) return
-    val text = buildString {
-        append("我在 Ciallo Reader里看：\n")
-        titles.forEach { append("《$it》\n") }
-    }
-    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(android.content.Intent.EXTRA_TEXT, text)
-        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    runCatching { context.startActivity(android.content.Intent.createChooser(intent, "分享")) }
-}
 
 @Composable
 private fun TodayReadTimeText(todaySecondsFlow: kotlinx.coroutines.flow.StateFlow<Long>) {

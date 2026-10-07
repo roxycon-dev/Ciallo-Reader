@@ -37,6 +37,14 @@ class JsonBookSource(
     private val client: OkHttpClient = defaultClient
 ) : ComicSource {
 
+    override suspend fun getShareUrl(bookId: String): String? {
+        DetailLink.valid(bookId)?.let { return it }
+        val base = config.baseUrl.ifBlank { config.htmlSearch?.url ?: config.search.url }
+        if (config.htmlSearch != null) return DetailLink.resolve(bookId, base)
+        val rule = config.detail?.takeIf { it.method.equals("GET", true) } ?: return null
+        return DetailLink.resolve(rule.url.replace("{id}", URLEncoder.encode(bookId, "UTF-8")), base)
+    }
+
     /** 搜索结果缓存：让 getDownloadInfo 直接复用列表里的下载链接/标题，避免必须配置 detail。 */
     private val searchItemCache = java.util.concurrent.ConcurrentHashMap<String, SearchBook>()
     private val searchRawCache = java.util.concurrent.ConcurrentHashMap<String, JSONObject>()

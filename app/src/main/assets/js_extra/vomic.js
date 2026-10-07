@@ -272,6 +272,7 @@ class VomicSource extends ComicSource {
                 throw "未解析到章节列表";
             }
             return new ComicDetails({
+                url: url,
                 title: title,
                 cover: cover,
                 description: intro,

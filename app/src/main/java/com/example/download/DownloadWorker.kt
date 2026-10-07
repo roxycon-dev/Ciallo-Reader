@@ -257,6 +257,18 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
             }
             throw e
         } catch (e: Exception) {
+            // Cancelling a blocking socket can throw IOException before the next suspension.
+            // Preserve the resumable file and record PAUSED before any cancellable DAO read.
+            if (!currentCoroutineContext().isActive) {
+                withContext(NonCancellable) {
+                    val latest = dao.getTaskById(taskId)
+                    if (latest != null && latest.status in setOf(DownloadStatus.DOWNLOADING, DownloadStatus.PAUSED)) {
+                        dao.updateProgressAndStatus(taskId, DownloadStatus.PAUSED, temp.length(), total, null)
+                        DownloadProgressBroadcaster.updateState(taskId, DownloadState.Paused(temp.length(), total))
+                    }
+                }
+                currentCoroutineContext().ensureActive()
+            }
             val message = if (e.message?.contains("ENOSPC", true) == true) "存储空间不足，请清理后重试" else e.message ?: "下载或入库失败"
             if (dao.getTaskById(taskId) != null) {
                 dao.updateProgressAndStatus(taskId, DownloadStatus.FAILED, temp.length(), total, message)

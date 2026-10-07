@@ -26,6 +26,10 @@ class AutoNovelSource(
 ) : ComicSource, UpdatableNovelSource {
     override val id = "auto_novel"
     override val name = "轻小说机翻机器人"
+    override suspend fun getShareUrl(bookId: String): String {
+        path(bookId) // Reuse the source's identity validation.
+        return baseUrl.newBuilder().addPathSegments("novel/$bookId").build().toString()
+    }
     override val capabilities = SourceCapabilities(supportOnlineText = true)
     private val http = client ?: JsSourceProxy.failoverClient(context.applicationContext,
         SharedHttpTransport.builder().connectTimeout(10, TimeUnit.SECONDS)

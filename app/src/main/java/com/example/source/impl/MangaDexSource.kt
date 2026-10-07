@@ -1,6 +1,7 @@
 package com.example.source.impl
 
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import com.example.source.AuthenticationState
 import com.example.source.ComicChapter
@@ -46,6 +47,9 @@ class MangaDexSource(
 
     override val id: String = "mangadex"
     override val name: String = "MangaDex 漫画"
+    override suspend fun getShareUrl(bookId: String): String = officialUuid(bookId)?.let {
+        "https://mangadex.org/title/${Uri.encode(it)}"
+    } ?: "$BASE/manga/${Uri.encode(bookId)}"
     override val capabilities: SourceCapabilities = SourceCapabilities(
         supportSearch = true,
         supportDownload = false,

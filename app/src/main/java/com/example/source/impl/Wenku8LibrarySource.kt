@@ -26,6 +26,10 @@ class Wenku8LibrarySource(
 ) : UpdatableNovelSource {
     override val id = "wenku8_library"
     override val name = "轻小说中文文库"
+    override suspend fun getShareUrl(bookId: String): String {
+        bookUrl(bookId)
+        return baseUrl.newBuilder().addPathSegment("books").addPathSegment(bookId).build().toString()
+    }
     override val capabilities = SourceCapabilities(supportEbook = true)
     private val http = client ?: JsSourceProxy.failoverClient(context.applicationContext,
         SharedHttpTransport.builder().connectTimeout(10, TimeUnit.SECONDS)

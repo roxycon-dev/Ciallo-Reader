@@ -3,6 +3,7 @@ package com.example.library
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
@@ -16,6 +17,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
@@ -25,14 +29,13 @@ import java.util.zip.ZipOutputStream
  * 书架长按"分享"：把书籍原文件通过系统分享面板发给微信/QQ 等。
  *
  * 策略（按格式区分）：
- * - content://（本地导入的 SAF 文件）：原 URI 直接分享，零拷贝；
+ * - content://：原文件字节复制到临时目录，避免第三方提供器不允许二次授权；
  * - file:// 且文件仍在（EPUB / MOBI / PDF / AZW3 / 本地 TXT）：FileProvider 直接包装原文件，零拷贝；
  * - 漫画（filePath 是解压目录）：优先找回下载任务里保留的原始归档（cbz/zip/pdf），
  *   找不到则把解压页重新打成 cbz 放进 share_temp（用完即焚缓存）；
  * - TXT（下载后原文件已被清理）：从数据库章节内容重建 txt 到 share_temp（用完即焚缓存）。
  *
- * 临时文件清理：每次分享前清空 share_temp/ 旧文件，App 冷启动时也兜底清一次，
- * 保证该目录最多只保留"最近一次分享"的文件，不会无限增长。
+ * 临时文件保留 24 小时；新分享不会删除其他接收应用尚未读取的文件。
  */
 object BookShareHelper {
 
@@ -53,7 +56,7 @@ object BookShareHelper {
 
     private fun authority(context: Context): String = "${context.packageName}.fileprovider"
 
-    /** 冷启动兜底清理：清空分享临时目录。 */
+    /** 冷启动及分享前清理过期临时文件。 */
     fun cleanupTempShareDir(context: Context) {
         runCatching {
             val dir = File(context.cacheDir, SHARE_TEMP_DIR)
@@ -68,44 +71,79 @@ object BookShareHelper {
      * 分享书籍。返回 null 表示已成功拉起分享面板，否则返回错误文案。
      * 内部在 IO 线程定位/生成文件，在主线程拉起 Intent。
      */
-    suspend fun shareBook(context: Context, book: Book): String? = withContext(Dispatchers.IO) {
+    suspend fun shareBook(context: Context, book: Book): String? = shareBooks(context, listOf(book))
+
+    suspend fun shareBooks(context: Context, books: List<Book>): String? = withContext(Dispatchers.IO) {
         try {
-            // 用前清空旧的分享临时文件（用完即焚：目录里永远只有最近一份）
-            cleanupTempShareDir(context)
-
-            val target = resolveShareTarget(context, book)
-
+            val intent = prepareShareIntent(context, books)
             withContext(Dispatchers.Main) {
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = target.mime
-                    putExtra(Intent.EXTRA_STREAM, target.uri)
-                    putExtra(Intent.EXTRA_SUBJECT, book.title)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                val chooser = Intent.createChooser(intent, "分享「${book.title}」")
+                val chooser = Intent.createChooser(intent, if (books.size == 1) "分享「${books.first().title}」" else "分享 ${books.size} 本原文件")
                 if (context !is Activity) {
                     chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(chooser)
             }
 
-            // 用完即焚：分享拉起来后延时删除本次临时文件。
-            // 不立即删——分享面板关闭不代表目标应用已经读完文件。
-            if (target.tempFiles.isNotEmpty()) {
-                scope.launch {
-                    delay(SHARE_TEMP_RETENTION_MS)
-                    target.tempFiles.forEach { file ->
-                        runCatching { file.delete() }
-                    }
-                }
-            }
             null
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: ActivityNotFoundException) {
             "没有找到可分享的应用"
         } catch (e: Exception) {
-            Log.w(TAG, "shareBook failed: ${book.title}", e)
+            Log.w(TAG, "Unable to prepare book share", e)
             e.message ?: "分享失败"
         }
+    }
+
+    internal suspend fun prepareShareIntent(context: Context, books: List<Book>): Intent = withContext(Dispatchers.IO) {
+        require(books.isNotEmpty()) { "请先选择要分享的书籍" }
+        cleanupTempShareDir(context)
+        val targets = mutableListOf<ShareTarget>()
+        try {
+            books.distinctBy { it.id }.forEach { book ->
+                currentCoroutineContext().ensureActive()
+                try { targets += resolveShareTarget(context, book) }
+                catch (e: CancellationException) { throw e }
+                catch (e: Exception) { throw IllegalStateException("《${book.title}》：${e.message ?: "无法读取源文件"}", e) }
+            }
+            val types = targets.map { it.mime }.distinct()
+            val mime = if (types.size == 1) types.first() else {
+                val families = types.map { it.substringBefore('/') }.distinct()
+                if (families.size == 1) "${families.first()}/*" else "*/*"
+            }
+            val clip = ClipData.newUri(context.contentResolver, "书籍原文件", targets.first().uri)
+            targets.drop(1).forEach { clip.addItem(ClipData.Item(it.uri)) }
+            Intent(if (targets.size == 1) Intent.ACTION_SEND else Intent.ACTION_SEND_MULTIPLE).apply {
+                type = mime
+                if (targets.size == 1) putExtra(Intent.EXTRA_STREAM, targets.first().uri)
+                else putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(targets.map { it.uri }))
+                putExtra(Intent.EXTRA_SUBJECT, books.joinToString("、") { it.title })
+                clipData = clip
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }.also {
+                val temporary = targets.flatMap { it.tempFiles }
+                if (temporary.isNotEmpty()) scope.launch {
+                    delay(SHARE_TEMP_RETENTION_MS)
+                    temporary.forEach { file -> runCatching { file.delete() } }
+                }
+            }
+        } catch (e: Exception) {
+            targets.flatMap { it.tempFiles }.forEach { it.delete() }
+            throw e
+        }
+    }
+
+    private fun localFile(raw: String): File = File(if (raw.startsWith("file:")) Uri.parse(raw).path.orEmpty() else raw)
+
+    private suspend fun originalFileTarget(context: Context, file: File, book: Book): ShareTarget {
+        require(file.canRead() && file.length() > 0) { "源文件为空或无法读取" }
+        val mime = mimeForPath(file.name, book)
+        val uri = try { FileProvider.getUriForFile(context, authority(context), file) }
+        catch (_: IllegalArgumentException) {
+            // Files outside configured provider roots stay private. Copy their original bytes only.
+            return copyContentUriToTemp(context, Uri.fromFile(file), book, mime)
+        }
+        return ShareTarget(uri, mime)
     }
 
     /** 定位分享目标：返回 (content URI, MIME)。 */
@@ -117,28 +155,22 @@ object BookShareHelper {
             val uri = Uri.parse(raw)
             val mime = runCatching { context.contentResolver.getType(uri) }
                 .getOrNull()
-                ?.takeIf { it.isNotBlank() }
-                ?: mimeForPath(raw, book)
-            // 零拷贝格式（EPUB / 漫画归档）：原 URI 直接分享，系统授权给目标应用读取
-            if (isZeroCopyFormat(raw, mime, book)) {
-                return ShareTarget(uri, mime)
-            }
+                ?.takeIf { it.isNotBlank() && it != "application/octet-stream" }
+                ?: mimeForPath(displayName(context, uri) ?: raw, book)
             // MOBI / PDF / AZW3 / FB2 / DJVU 等：把源文件字节原样复制到 share_temp
             // 再分享，保证微信/QQ 拿到的就是完整的原始文件（用完即焚缓存）
             return copyContentUriToTemp(context, uri, book, mime)
         }
 
-        val path = raw.removePrefix("file://")
-        val file = File(path)
+        val file = localFile(raw)
 
         // 2) 原文件还在：FileProvider 直接包装，零拷贝
         if (file.isFile && file.exists()) {
-            val uri = FileProvider.getUriForFile(context, authority(context), file)
-            return ShareTarget(uri, mimeForPath(raw, book))
+            return originalFileTarget(context, file, book)
         }
 
         // 3) 漫画：filePath 是解压目录（comics_xxx），原归档要么在下载任务里，要么重新打包
-        if (file.isDirectory) {
+        if (file.isDirectory && book.isComic) {
             return resolveComicArchive(context, book, file)
         }
 
@@ -146,8 +178,7 @@ object BookShareHelper {
         if (!file.exists()) {
             val taskFile = findCompletedTaskFile(context, book)
             if (taskFile != null) {
-                val uri = FileProvider.getUriForFile(context, authority(context), taskFile)
-                return ShareTarget(uri, mimeForPath(taskFile.absolutePath, book))
+                return originalFileTarget(context, taskFile, book)
             }
         }
 
@@ -161,61 +192,57 @@ object BookShareHelper {
 
     /** 漫画：优先用下载任务里保留的原始归档；找不到则把解压页重新打成 CBZ。 */
     private suspend fun resolveComicArchive(context: Context, book: Book, dir: File): ShareTarget {
+        val original = File(dir, "original").listFiles()?.singleOrNull { it.isFile }
+        if (original != null) return originalFileTarget(context, original, book)
         // 3a) 下载的漫画：DownloadTask 记录里保留着原始 cbz/zip/pdf 文件
         val archive = findCompletedTaskFile(context, book)
         if (archive != null) {
-            val uri = FileProvider.getUriForFile(context, authority(context), archive)
-            return ShareTarget(uri, mimeForPath(archive.absolutePath, book))
+            return originalFileTarget(context, archive, book)
         }
 
         // 3b) 本地导入的漫画：原归档没保留，把解压页重新打包成 CBZ（用完即焚缓存）
         val pages = runCatching {
             AppDatabase.getDatabase(context).bookDao().getChaptersListForBook(book.id)
         }.getOrDefault(emptyList())
-            .mapNotNull { ch -> ch.content.takeIf { it.isNotBlank() }?.let { File(it) } }
-            .filter { it.isFile }
+            .map { ch ->
+                require(ch.content.isNotBlank()) { "部分漫画页面缺失，请重新下载后分享" }
+                localFile(ch.content)
+            }
         if (pages.isEmpty()) {
             throw IllegalStateException("漫画页面文件缺失，无法分享")
         }
+        require(pages.all { it.isFile && it.canRead() }) { "部分漫画页面缺失，请重新下载后分享" }
 
         val out = File(context.cacheDir, "$SHARE_TEMP_DIR/${java.util.UUID.randomUUID()}_${sanitizeFileName(book.title)}.cbz")
         out.parentFile?.mkdirs()
-        ZipOutputStream(FileOutputStream(out)).use { zip ->
+        try { ZipOutputStream(FileOutputStream(out)).use { zip ->
             pages.forEachIndexed { index, page ->
+                currentCoroutineContext().ensureActive()
                 zip.putNextEntry(ZipEntry(String.format("%04d_%s", index, page.name)))
-                page.inputStream().use { it.copyTo(zip) }
+                page.inputStream().use { copyOriginalBytes(it, zip) }
                 zip.closeEntry()
             }
-        }
+        } } catch (e: Exception) { out.delete(); throw e }
         val uri = FileProvider.getUriForFile(context, authority(context), out)
         return ShareTarget(uri, "application/vnd.comicbook+zip", tempFiles = listOf(out))
     }
 
-    /** 从下载任务记录里找回这本书的原始文件（按书名 + 已完成 + 文件仍存在匹配）。 */
+    /** Match exact path or source + resource identity; same titles can be different books. */
     private suspend fun findCompletedTaskFile(context: Context, book: Book): File? {
         val tasks = runCatching {
             AppDatabase.getDatabase(context).downloadTaskDao().getAllTasksSync()
         }.getOrDefault(emptyList())
         return tasks.firstOrNull {
             it.status == DownloadStatus.COMPLETED &&
-                (it.filePath.removePrefix("file://") == book.filePath.removePrefix("file://") ||
-                    (book.sourceId == it.sourceId && book.comicId == com.example.download.DownloadManager.originalBookId(it.id, it.sourceId))) &&
+                (localFile(it.filePath) == localFile(book.filePath) ||
+                    (!book.sourceId.isNullOrBlank() && !book.comicId.isNullOrBlank() && book.sourceId == it.sourceId && book.comicId == com.example.download.DownloadManager.originalBookId(it.id, it.sourceId))) &&
                 it.filePath.isNotBlank() &&
-                File(it.filePath).isFile
-        }?.let { File(it.filePath) }
-    }
-
-    /** 零拷贝格式：EPUB 和漫画归档直接分享原 URI；其余二进制格式走临时副本。 */
-    private fun isZeroCopyFormat(rawPath: String, mime: String, book: Book): Boolean {
-        if (book.isComic) return true
-        val ext = rawPath.substringAfterLast('.', "").lowercase()
-        return ext == "epub" || mime == "application/epub+zip" ||
-            ext == "cbz" || ext == "zip" ||
-            mime == "application/vnd.comicbook+zip"
+                localFile(it.filePath).isFile
+        }?.let { localFile(it.filePath) }
     }
 
     /** content:// 源文件字节原样复制到 share_temp（用完即焚），保证目标应用拿到完整原始文件。 */
-    private fun copyContentUriToTemp(
+    private suspend fun copyContentUriToTemp(
         context: Context,
         uri: Uri,
         book: Book,
@@ -226,11 +253,34 @@ object BookShareHelper {
         out.parentFile?.mkdirs()
         val input = context.contentResolver.openInputStream(uri)
             ?: throw IllegalStateException("无法读取源文件，可能已被移动或删除")
-        input.use { src ->
-            FileOutputStream(out).use { dst -> src.copyTo(dst) }
+        try { input.use { src ->
+            FileOutputStream(out).use { dst -> copyOriginalBytes(src, dst) }
         }
-        val fileUri = FileProvider.getUriForFile(context, authority(context), out)
+            require(out.length() > 0) { "源文件为空，无法分享" }
+        } catch (e: Exception) { out.delete(); throw e }
+        val name = displayName(context, uri)?.let { "${sanitizeFileName(it.substringBeforeLast('.'))}.$ext" }
+            ?: "${sanitizeFileName(book.title)}.$ext"
+        val fileUri = FileProvider.getUriForFile(context, authority(context), out, name)
         return ShareTarget(fileUri, mime, tempFiles = listOf(out))
+    }
+
+    private fun displayName(context: Context, uri: Uri): String? {
+        if (uri.scheme == "file") return uri.lastPathSegment
+        return runCatching { context.contentResolver.query(uri,
+            arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0)?.takeIf { it.isNotBlank() } else null
+            }
+        }.getOrNull()
+    }
+
+    private suspend fun copyOriginalBytes(input: java.io.InputStream, output: java.io.OutputStream) {
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            val count = input.read(buffer)
+            if (count < 0) break
+            output.write(buffer, 0, count)
+        }
     }
 
     private fun resolveExtension(context: Context, uri: Uri, book: Book, mime: String): String {
@@ -241,7 +291,7 @@ object BookShareHelper {
                 if (cursor.moveToFirst() && idx >= 0) {
                     val name = cursor.getString(idx)
                     val ext = name?.substringAfterLast('.', "")?.lowercase()
-                    if (!ext.isNullOrBlank() && ext.length in 1..6) return ext
+                    if (!ext.isNullOrBlank() && ext.length in 1..6 && ext.all(Char::isLetterOrDigit)) return ext
                 }
             }
         }
@@ -270,18 +320,17 @@ object BookShareHelper {
         if (chapters.isEmpty()) {
             throw IllegalStateException("书籍内容为空，无法分享")
         }
-        val sb = StringBuilder()
-        chapters.forEach { ch ->
-            if (ch.title.isNotBlank()) {
-                sb.append(ch.title).append("\n\n")
-            }
-            sb.append(ch.content)
-            if (!ch.content.endsWith("\n")) sb.append("\n")
-            sb.append("\n")
-        }
         val out = File(context.cacheDir, "$SHARE_TEMP_DIR/${java.util.UUID.randomUUID()}_${sanitizeFileName(book.title)}.txt")
         out.parentFile?.mkdirs()
-        out.writeText(sb.toString(), Charsets.UTF_8)
+        try { out.bufferedWriter(Charsets.UTF_8).use { writer ->
+            chapters.forEach { ch ->
+                currentCoroutineContext().ensureActive()
+                if (ch.title.isNotBlank()) writer.append(ch.title).append("\n\n")
+                writer.append(ch.content)
+                if (!ch.content.endsWith("\n")) writer.append("\n")
+                writer.append("\n")
+            }
+        } } catch (e: Exception) { out.delete(); throw e }
         val uri = FileProvider.getUriForFile(context, authority(context), out)
         return ShareTarget(uri, "text/plain", tempFiles = listOf(out))
     }

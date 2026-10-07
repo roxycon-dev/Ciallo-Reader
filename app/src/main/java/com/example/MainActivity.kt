@@ -732,6 +732,7 @@ class MainActivity : ComponentActivity() {
                                                 /* ── 「我喜欢的」栏 ── */
                                                 favoriteItems = favoriteItems,
                                                 favoriteKeys = favoriteKeys,
+                                                favoriteShareSource = { libraryViewModel.sourceManager.getSource(it) },
                                                 onOpenFavorite = { item ->
                                                     libraryViewModel.openComic(
                                                         com.example.source.SearchBook(

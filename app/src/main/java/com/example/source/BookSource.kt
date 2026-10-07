@@ -8,6 +8,8 @@ interface BookSource {
 
     suspend fun search(keyword: String): SourceResult<List<SearchBook>>
     suspend fun getDetail(bookId: String): SourceResult<SearchBook>
+    /** Public work detail page; never a chapter, image, or download endpoint. */
+    suspend fun getShareUrl(bookId: String): String? = DetailLink.valid(bookId)
     suspend fun getDownloadInfo(bookId: String): SourceResult<DownloadInfo>
     suspend fun login(credential: LoginCredential): SourceResult<Boolean>
     suspend fun logout()

@@ -29,6 +29,10 @@ class ZLibrarySource(
 
     override val id: String = "zlibrary"
     override val name: String = "Z-Library"
+    override suspend fun getShareUrl(bookId: String): String? =
+        com.example.source.DetailLink.valid(bookId) ?: com.example.source.DetailLink.resolve(
+            bookId.trimStart('/'), "https://${credentialStorage.getDomain()}/"
+        )
     override suspend fun getRegistrationUrl(): String = "https://${ZLibraryNodeConfig.domain}/registration"
     override val capabilities: SourceCapabilities = SourceCapabilities(
         supportSearch = true,
