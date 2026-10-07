@@ -408,14 +408,20 @@ class FavoriteRepository(
         try {
             val now = System.currentTimeMillis()
             val targets = dao.allFavoritesSync().filter {
-                force || now - it.lastCheckedAt > UPDATE_CHECK_INTERVAL_MS
+                force || !it.sourceAlive || now - it.lastCheckedAt > UPDATE_CHECK_INTERVAL_MS
             }
             targets.forEach { fav ->
                 repoScope.launch {
                     updateGate.withPermit {
-                        runCatching {
+                        var resolvedSource: ComicSource? = null
+                        try {
                             throttle(fav.sourceId)
-                            val source = comicSourceOf(fav.sourceId) ?: return@runCatching
+                            val source = comicSourceOf(fav.sourceId)
+                            resolvedSource = source
+                            if (source == null) {
+                                dao.recordSourceCheck(fav.sourceId, fav.comicId, false, System.currentTimeMillis())
+                                return@withPermit
+                            }
                             val chapters = when (val r = source.getChapters(fav.comicId)) {
                                 is com.example.source.SourceResult.Success -> r.data
                                 is com.example.source.SourceResult.Error -> throw IllegalStateException(
@@ -427,7 +433,7 @@ class FavoriteRepository(
                             // 用户可能取消收藏 / 移动分类 —— 拿快照整行 REPLACE 会把
                             // 已删除的收藏"复活"、把分类跳回旧值。
                             val fresh = dao.favorite(fav.sourceId, fav.comicId)
-                                ?: return@runCatching
+                                ?: return@withPermit
                             // ⚠️ 「是否真的有新话」要走话数归一化判定（isNewChapterObserved）：
                             // 裸 id 比较在 id 不稳定的源上会把同一话反复判成新话。
                             val changed = ComicReadingLogic.isNewChapterObserved(
@@ -449,18 +455,14 @@ class FavoriteRepository(
                                     sourceAlive = true,
                                 )
                             )
-                        }.onFailure {
-                            // 单本失败只标记这一本：保留缓存信息与已读状态，UI 显示灰色警示。
-                            // 同样重读当前行，避免复活竞态
-                            val fresh = dao.favorite(fav.sourceId, fav.comicId)
-                            if (fresh != null) {
-                                dao.insertFavorite(
-                                    fresh.copy(
-                                        lastCheckedAt = System.currentTimeMillis(),
-                                        sourceAlive = false,
-                                    )
-                                )
-                            }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (_: Exception) {
+                            // A timeout/login/parse failure is not proof the source was removed.
+                            // Also repair false warning flags written by earlier versions.
+                            if (resolvedSource != null) dao.recordSourceCheck(
+                                fav.sourceId, fav.comicId, true, System.currentTimeMillis(),
+                            )
                         }
                     }
                 }

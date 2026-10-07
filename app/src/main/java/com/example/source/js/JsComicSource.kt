@@ -62,14 +62,27 @@ class JsComicSource(
         context.getSharedPreferences("work_detail_share_links", Context.MODE_PRIVATE)
     }
     private fun shareLinkKey(bookId: String) = org.json.JSONArray(listOf(id, bookId)).toString()
-    private fun rememberShareUrl(bookId: String, data: JSONObject) {
-        DetailLink.valid(data.optString("url"))?.let {
+    private suspend fun rememberShareUrl(bookId: String, data: JSONObject) {
+        val raw = data.optString("url")
+        val url = DetailLink.valid(raw) ?: if (raw.isNotBlank()) {
+            val base = callJs("src.baseUrl || null")?.optString("data").orEmpty()
+            DetailLink.resolve(raw, base)
+        } else null
+        url?.let {
             shareLinks.edit().putString(shareLinkKey(bookId), it).apply()
         }
     }
     override suspend fun getShareUrl(bookId: String): String? {
         DetailLink.valid(bookId)?.let { return it }
+        // Upstream uses path_word as the book ID; its public site uses /comic/{path_word}.
+        // The API host is deliberately not used as a website address.
+        if (sourceKey == "copy_manga" && bookId.matches(Regex("[A-Za-z0-9_-]{1,256}"))) {
+            return "https://www.copy20.com/comic/$bookId"
+        }
         DetailLink.valid(shareLinks.getString(shareLinkKey(bookId), null))?.let { return it }
+        // These upstream API sources do not supply public ComicDetails.url.
+        // Use the app detail link rather than making a redundant logged-in request.
+        if (sourceKey in setOf("jm", "picacg")) return null
         // Fetch metadata only. Whole-gallery chapter loading may fetch every page just to count them.
         withContext(Dispatchers.IO) {
             chapterLoadMutex.withLock {

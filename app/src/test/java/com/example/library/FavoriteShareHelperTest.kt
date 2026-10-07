@@ -53,11 +53,13 @@ class FavoriteShareHelperTest {
             source(it) { "https://user:secret@source.test/download/42" }
         } }.isFailure)
     }
-    @Test fun missingLinkAbortsBatchInsteadOfSendingTitlesOnly() = runBlocking {
-        val result = runCatching { FavoriteShareHelper.prepareShareIntent(app,listOf(
-            favorite("a","https://a.test/42"),favorite("missing","42","缺失作品"))) { null } }
-        assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull()!!.message!!.contains("缺失作品"))
+    @Test fun missingPublicPageSharesAnExplicitAppDetailLink() = runBlocking {
+        val intent = FavoriteShareHelper.prepareShareIntent(app,listOf(
+            favorite("a","https://a.test/42"),favorite("missing","42","缺失作品"))) { null }
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT)!!
+        assertTrue(text.contains("https://a.test/42"))
+        assertTrue(text.contains("ciallo://detail?source=missing&id=42"))
+        assertTrue(text.contains("需启用相同书源"))
     }
     @Test fun invalidSchemesAndControlCharactersAreRejected() {
         listOf("file:///sdcard/book","content://provider/book","javascript:alert(1)","https://source.test/42\nleak").forEach { assertNull(DetailLink.valid(it)) }
@@ -95,5 +97,44 @@ class FavoriteShareHelperTest {
             FavoriteShareHelper.shareFavorites(app,listOf(favorite("a","42"))) { source(it) { delay(10_000); null } }
         } }
         assertTrue(result.exceptionOrNull() is CancellationException)
+    }
+    @Test fun apiOnlySourcesShareImmediatelyWithoutBootingJs() = runBlocking {
+        for (key in listOf("jm", "picacg")) {
+            val s = JsComicSource(app, key, key, "1", "invalid script")
+            val intent = FavoriteShareHelper.prepareShareIntent(app, listOf(favorite(s.id, "42"))) { s }
+            assertTrue(intent.getStringExtra(Intent.EXTRA_TEXT)!!.contains("ciallo://detail?source=js_$key&id=42"))
+        }
+    }
+    @Test fun copyMangaAndManhuarenWithTheSameTitleKeepTheirOwnPublicLinks() = runBlocking {
+        val copy = JsComicSource(app, "copy_manga", "拷贝漫画", "1", "invalid script")
+        val other = JsComicSource(app, "manhuaren", "漫画人", "1", "invalid script")
+        val intent = FavoriteShareHelper.prepareShareIntent(app, listOf(
+            favorite(copy.id, "baihetianxin", "百合甜心"),
+            favorite(other.id, "https://www.manhuaren.com/manhua-baihetianxin/", "百合甜心"),
+        )) { if (it == copy.id) copy else other }
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT)!!
+        assertTrue(text.contains("https://www.copy20.com/comic/baihetianxin"))
+        assertTrue(text.contains("https://www.manhuaren.com/manhua-baihetianxin/"))
+        assertEquals(2, text.lineSequence().count { it.startsWith("《") })
+        assertFalse(text.contains("ciallo:"))
+    }
+    @Test fun networkFailureStillProvidesAnOpenableDetailLink() = runBlocking {
+        val intent = FavoriteShareHelper.prepareShareIntent(app, listOf(favorite("offline", "42"))) {
+            source(it) { throw java.io.IOException("offline") }
+        }
+        val url = intent.getStringExtra(Intent.EXTRA_TEXT)!!.lineSequence().first { it.startsWith("ciallo:") }
+        assertEquals("42", SharedWorkLink.parse(android.net.Uri.parse(url))!!.bookId)
+    }
+    @Test fun appLinksRoundTripOpaqueIdsAndDoNotMixSources() {
+        val id = "作品/42?chapter=5&name=甲#fragment"
+        val target = SharedWorkLink.parse(android.net.Uri.parse(SharedWorkLink.create("js_a", id, "甲 & 乙")))!!
+        assertEquals(SharedWorkLink.Target("js_a", id, "甲 & 乙"), target)
+        assertNotEquals(SharedWorkLink.create("js_a", "42", "标题"), SharedWorkLink.create("js_b", "42", "标题"))
+    }
+    @Test fun malformedAppLinksAndCredentialIdsAreRejected() {
+        listOf("ciallo://detail?source=a&id=42", "ciallo://detail?source=a&id=42&title=t&id=43",
+            "ciallo://user@detail?source=a&id=42&title=t", "https://detail?source=a&id=42&title=t",
+            "ciallo://detail?source=a&id=%0A&title=t").forEach { assertNull(SharedWorkLink.parse(android.net.Uri.parse(it))) }
+        assertTrue(runCatching { SharedWorkLink.create("a", "https://user:secret@test/42", "标题") }.isFailure)
     }
 }

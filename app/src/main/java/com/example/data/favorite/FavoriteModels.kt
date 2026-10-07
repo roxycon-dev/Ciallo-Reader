@@ -62,7 +62,7 @@ data class FavoriteEntity(
     val latestChapterUpdateAt: Long = 0L,
     /** 上次真正联网检查更新的时刻（用于 >30 分钟才检查的限流） */
     val lastCheckedAt: Long = 0L,
-    /** 上次检查时源是否可用（false → 卡片显示灰色警示，但不删除、可看缓存） */
+    /** 来源是否仍安装且启用；瞬时联网失败不代表来源失效。false 不删除收藏或缓存。 */
     val sourceAlive: Boolean = true,
     val categoryName: String = FAV_DEFAULT_CATEGORY,
     val favoritedAt: Long = System.currentTimeMillis(),

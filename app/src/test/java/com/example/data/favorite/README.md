@@ -10,6 +10,7 @@
 - `ComicCatalogOrderReconciliationTest.kt`
 - `ComicChapterMatchingTest.kt`
 - `ComicFavoriteMatchingTest.kt`
+- `FavoriteSourceHealthTest.kt`
 - `ComicReadingLogicTest.kt`
 - `README.md`
 

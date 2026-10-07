@@ -2,6 +2,7 @@ package com.example
 
 import android.net.Uri
 import android.os.Bundle
+import kotlinx.coroutines.flow.first
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -84,6 +85,13 @@ val LocalNavAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope
 @OptIn(ExperimentalSharedTransitionApi::class)
 class MainActivity : ComponentActivity() {
     private var mainViewModel: MainViewModel? = null
+    private var sharedDetail by mutableStateOf<com.example.library.SharedWorkLink.Target?>(null)
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        sharedDetail = com.example.library.SharedWorkLink.parse(intent.data)
+    }
 
     /**
      * 音量键翻页拦截（第 28 条）：仅在漫画阅读器存活且开关开启时消费音量键
@@ -112,6 +120,7 @@ class MainActivity : ComponentActivity() {
         // Theme.MyApplication.Splash，底色与开屏页一致，交接无色差）。
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        sharedDetail = com.example.library.SharedWorkLink.parse(intent.data)
         com.example.data.AppUpdateManager.get(applicationContext)
         com.example.source.js.JsActivityTracker.register(this)
         // 启动看门狗：若"极致"画质在 20 秒内连续两次发生崩溃，自动降回"高"，
@@ -356,6 +365,27 @@ class MainActivity : ComponentActivity() {
                                     else com.example.ui.feedback.MutingHapticFeedback),
                             ) {
                         val navController = rememberNavController()
+                        val sharedEntry by navController.currentBackStackEntryAsState()
+                        val sharedSources by libraryViewModel.sourceManager.availableSources.collectAsStateWithLifecycle()
+                        val sharedSourcesReady by libraryViewModel.sourcesReady.collectAsStateWithLifecycle()
+                        LaunchedEffect(sharedDetail, sharedSources, sharedSourcesReady, sharedEntry) {
+                            val target = sharedDetail ?: return@LaunchedEffect
+                            val route = sharedEntry?.destination?.route
+                            if (!sharedSourcesReady || route == null || route == "splash" || route == "onboarding") return@LaunchedEffect
+                            val source = sharedSources.firstOrNull { it.id == target.sourceId }
+                            if (source is com.example.source.ComicSource) {
+                                libraryViewModel.openComic(com.example.source.SearchBook(
+                                    id = target.bookId, sourceId = target.sourceId,
+                                    title = target.title.ifBlank { "分享的作品" },
+                                    author = "",
+                                ))
+                                navController.navigate("comic_chapters") { launchSingleTop = true }
+                            } else {
+                                android.widget.Toast.makeText(this@MainActivity,
+                                    "请在书源管理中安装并启用对应书源，再打开此链接", android.widget.Toast.LENGTH_LONG).show()
+                            }
+                            sharedDetail = null
+                        }
                         // 启动时用持久化配置初始化背景（设置页改动会通过 AppBackgroundController 实时更新）
                         LaunchedEffect(Unit) {
                             AppBackgroundController.update(
@@ -515,6 +545,9 @@ class MainActivity : ComponentActivity() {
                             /* ── 「我喜欢的」：书源注入 + 收藏数据 ── */
                             LaunchedEffect(Unit) {
                                 viewModel.comicSourceProvider = { id ->
+                                    kotlinx.coroutines.withTimeout(60_000) {
+                                        libraryViewModel.sourcesReady.first { it }
+                                    }
                                     libraryViewModel.sourceManager.availableSources.value
                                         .firstOrNull { it.id == id } as? com.example.source.ComicSource
                                 }

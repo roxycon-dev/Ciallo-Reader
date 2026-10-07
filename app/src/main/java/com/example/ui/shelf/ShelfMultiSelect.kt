@@ -547,6 +547,9 @@ internal fun Modifier.shelfGestures(
     awaitEachGesture {
         if (!sink.enabled()) return@awaitEachGesture
         val down = awaitFirstDown(requireUnconsumed = false)
+        // Interactive overlays/children own their downs. The grid's scrolling still
+        // does not consume the initial down, so long press remains available.
+        if (down.isConsumed) return@awaitEachGesture
         val start = down.position
         // down 的瞬间就做命中：按压视觉要用，短按/长按都复用这个 key
         val rootStart = start + sink.hostOffset()
@@ -565,9 +568,13 @@ internal fun Modifier.shelfGestures(
                 while (true) {
                     val event = awaitPointerEvent(PointerEventPass.Main)
                     val change = event.changes.firstOrNull() ?: break
-                    // 让位条件只有两个：手指抬起（→ 点击）或移动超过 slop（→ 滚动）。
-                    // 不再看 isConsumed：条目已经不抢手势了，
-                    // 而网格滚动的 consume 也不能打断长按计时。
+                    if (change.isConsumed) {
+                        aborted = true
+                        moved = true
+                        break
+                    }
+                    // 未被其他控件接管时：抬起判点击，越过 slop 交还滚动。
+                    // 卡片自身不设 clickable，静止长按不会预先消费事件。
                     if (!change.pressed) {
                         aborted = true
                         break

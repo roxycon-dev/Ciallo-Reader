@@ -421,6 +421,9 @@ fun Modifier.comicZoomable(
                 var holdZoomConsuming = false
                 var panelLongPressed = false
                 var transformMode = false
+                var pinchChangedScale = false
+                var trackedPointers = 1
+                var panPosition = Offset.Zero
                 var pinchCloseFired = false
                 var edgeSwipeFired = false
                 var edgeSwipeAccum = 0f
@@ -439,7 +442,7 @@ fun Modifier.comicZoomable(
                     state.pendingTapJob?.cancel()
                 }
                 val velocityTracker = VelocityTracker()
-                velocityTracker.addPosition(down.uptimeMillis, down.position)
+                velocityTracker.addPosition(down.uptimeMillis, panPosition)
                 // All tap timing uses pointer event timestamps, including injected/queued events.
                 val downTime = down.uptimeMillis
                 var gestureEndTime = downTime
@@ -472,6 +475,14 @@ fun Modifier.comicZoomable(
                             event.changes.firstOrNull()?.let { lastPos = it.position }
                             break
                         }
+                        // Track translation, never a finger's radial motion during pinch.
+                        // Adding/removing a finger must not introduce a centroid jump either.
+                        if (pointers != trackedPointers) {
+                            velocityTracker.resetTracking()
+                            trackedPointers = pointers
+                        }
+                        panPosition += event.calculatePan()
+                        velocityTracker.addPosition(gestureEndTime, panPosition)
 
                         if (pointers >= 2) {
                             state.lastTapTime = 0L
@@ -481,9 +492,7 @@ fun Modifier.comicZoomable(
                             longPressJob?.cancel()
                             val zoomChange = event.calculateZoom()
                             val panChange = event.calculatePan()
-                            event.changes.firstOrNull { it.id == down.id }?.let {
-                                velocityTracker.addPosition(it.uptimeMillis, it.position)
-                            }
+                            if (zoomChange != 1f) pinchChangedScale = true
                             if (zoomChange != 1f || panChange != Offset.Zero) {
                                 val focal = event.calculateCentroid(true)
                                 state.updateTransform(zoomChange, panChange, focal)
@@ -500,7 +509,6 @@ fun Modifier.comicZoomable(
                         }
 
                         val change = event.changes.firstOrNull { it.pressed } ?: break
-                        velocityTracker.addPosition(change.uptimeMillis, change.position)
 
                         // 首末页外翻等父层已接管拖动：positionChange() 会变成 0，
                         // 仍须取消长按计时，避免拖了 380ms 后误开长按放大。
@@ -660,7 +668,7 @@ fun Modifier.comicZoomable(
                         // QuickZoom / 双指结束：越界回弹；双指平移带速度松手同样给惯性
                         // （此前 transform 结束直接 settle，双指拖动的惯性被丢弃）
                         launchRelease {
-                            if (wasTransform && state.isZoomed) {
+                            if (wasTransform && !pinchChangedScale && state.isZoomed) {
                                 val flew = state.fling(panVelocity, this@pointerInput)
                                 if (!flew) state.settle()
                             } else {

@@ -57,6 +57,8 @@ internal fun filterReadableFormats(formats: List<BookFormat>): List<BookFormat> 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
 
     val sourceManager = SourceManager(SharedPreferencesSourceStorage(application))
+    private val _sourcesReady = MutableStateFlow(false)
+    val sourcesReady = _sourcesReady.asStateFlow()
     val downloadManager = DownloadManager(application)
     val downloadedNovelKeys = AppDatabase.getDatabase(application).bookDao().getAllBooks().map { books ->
         books.filter { !it.isComic && it.sourceId != null && it.comicId != null }
@@ -254,6 +256,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             jsSources.forEach { source ->
                 sourceManager.registerSource(source, defaultEnabled = true)
             }
+            _sourcesReady.value = true
             Log.i(
                 "JsRepo",
                 "JS sources ready: ${jsSources.size} (${jsSources.joinToString { it.name }})"
@@ -513,6 +516,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 when (result) {
                     is SourceResult.Success -> {
                         _comicChapters.value = result.data
+                        database.favoriteDao().updateSourceHealth(book.sourceId, book.id, true)
                         if (result.data.isEmpty()) _comicChaptersError.value = "暂无可用章节"
                     }
                     is SourceResult.Error -> {

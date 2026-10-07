@@ -168,9 +168,13 @@ public class ZoomState(
     }
 
     private val velocityTracker = VelocityTracker()
+    private var gesturePan = Offset.Zero
+    private var gestureChangedScale = false
 
     internal fun startGesture() {
         velocityTracker.resetTracking()
+        gesturePan = Offset.Zero
+        gestureChangedScale = false
     }
 
     internal fun activateGesture() {
@@ -233,8 +237,10 @@ public class ZoomState(
         }
 
         if (zoom == 1f) {
-            velocityTracker.addPosition(timeMillis, position)
+            gesturePan += pan
+            velocityTracker.addPosition(timeMillis, gesturePan)
         } else {
+            gestureChangedScale = true
             velocityTracker.resetTracking()
         }
     }
@@ -318,6 +324,8 @@ public class ZoomState(
     }
 
     internal suspend fun startFling() = coroutineScope {
+        // A pinch changes the focal point and pointer set; none of that is a pan flick.
+        if (gestureChangedScale) return@coroutineScope
         val velocity = velocityTracker.calculateVelocity()
         if (velocity.x != 0f) {
             launch {

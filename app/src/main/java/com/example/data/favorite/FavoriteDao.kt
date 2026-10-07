@@ -35,6 +35,13 @@ interface FavoriteDao {
     @Update
     suspend fun updateFavorite(entity: FavoriteEntity)
 
+    /** Targeted update: never resurrect a removed favorite or overwrite its category. */
+    @Query("UPDATE favorites SET sourceAlive = :alive WHERE sourceId = :source AND comicId = :comic")
+    suspend fun updateSourceHealth(source: String, comic: String, alive: Boolean)
+
+    @Query("UPDATE favorites SET sourceAlive = :alive, lastCheckedAt = :checkedAt WHERE sourceId = :source AND comicId = :comic")
+    suspend fun recordSourceCheck(source: String, comic: String, alive: Boolean, checkedAt: Long)
+
     @Query("DELETE FROM favorites WHERE sourceId = :sourceId AND comicId = :comicId")
     suspend fun deleteFavorite(sourceId: String, comicId: String)
 

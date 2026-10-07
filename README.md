@@ -8,7 +8,7 @@
 
 Kotlin · Jetpack Compose (Material 3) · MVVM · 单 Activity
 
-[下载 1.2.6 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.2.6/Ciallo-Reader-v1.2.6.apk) ·
+[下载 1.2.7 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.2.7/Ciallo-Reader-v1.2.7.apk) ·
 [功能](#功能) ·
 [安装](#安装) ·
 [使用说明](#使用说明) ·
@@ -16,7 +16,7 @@ Kotlin · Jetpack Compose (Material 3) · MVVM · 单 Activity
 [提交 Issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
 
 ![Android](https://img.shields.io/badge/Android-API%2024%2B-green)
-![Release](https://img.shields.io/badge/Release-v1.2.6-orange)
+![Release](https://img.shields.io/badge/Release-v1.2.7-orange)
 ![Architecture](https://img.shields.io/badge/Architecture-MVVM-blue)
 ![UI](https://img.shields.io/badge/UI-Compose%20M3-8A2BE2)
 ![License](https://img.shields.io/badge/License-All%20Rights%20Reserved-lightgrey)
@@ -31,18 +31,20 @@ Android 端小说 / 漫画阅读器，内置多书源在线聚合搜索与下载
 
 | 项目                     | 内容                                                                  |
 | ---------------------- | ------------------------------------------------------------------- |
-| 当前版本                   | 1.2.6                                                               |
+| 当前版本                   | 1.2.7                                                               |
 | 开发状态                   | 个人项目 · 活跃开发中                                                        |
 | 最低系统                   | Android 7.0（API 24）                                                 |
 | compileSdk / targetSdk | 35                                                                  |
 | 技术栈                    | Kotlin 2.0 + Jetpack Compose（Material 3）+ MVVM + Room + WorkManager |
 | 架构                     | MVVM + StateFlow + Repository，单 Activity + Navigation Compose       |
-| 测试 | 738 项 JVM / Robolectric、118 项 Android 设备测试定义；1.2.6 专项结果见 [分享验证记录](docs/sharing-1.2.6-2026-10-07.md) |
-| 正式安装包 | 1.2.6 / 207，arm64-v8a；见 [v1.2.6 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.2.6) |
+| 测试 | 747 项 JVM / Robolectric、128 项 Android 设备测试定义；1.2.7 专项结果见 [阅读与收藏修复验证](docs/reader-fixes-1.2.7-2026-10-07.md) |
+| 正式安装包 | 1.2.7 / 208，arm64-v8a；见 [v1.2.7 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.2.7) |
 
 ***
 
 ## 功能
+
+1.2.7 修复漫画双指缩放后的异常惯性、书架与收藏多选底栏触摸穿透、收藏来源警告误判，并补齐拷贝漫画公开详情分享链接；同名跨来源收藏保持独立。[修复与验证说明](docs/reader-fixes-1.2.7-2026-10-07.md)。
 
 多语言搜索支持常用词与作品 / 人物名称映射，本地优先，缺少时在线补充并缓存；结果顶部的书源管理同款关键词卡片可查看名称、来源、提交状态与在线失败原因，支持重新查词，随结果一起滚走。人物简称支持明确的人名分隔与唯一性检查，本地缺少时在线补全。分类 PIN 保护不会误关在线补词，全局无痕会显示暂停原因。[多语言搜索说明](docs/multilingual-keyword-search-v5-2026-10-05.md)。[1.2.3 神回封面与发布说明](docs/release-1.2.3-2026-10-05.md)。
 

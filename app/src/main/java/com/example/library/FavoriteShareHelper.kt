@@ -49,13 +49,22 @@ object FavoriteShareHelper {
                             val key = JSONArray(listOf(favorite.sourceId, favorite.comicId)).toString()
                             val url = DetailLink.valid(favorite.comicId)
                                 ?: DetailLink.valid(prefs.getString(key, null))
-                                ?: try { withTimeout(12_000) { DetailLink.valid(source(favorite.sourceId)?.getShareUrl(favorite.comicId)) } }
-                                   catch (_: TimeoutCancellationException) { throw IllegalStateException("《${favorite.title}》：获取详情链接超时，请重试") }
+                                ?: try { withTimeout(4_000) {
+                                    val raw = source(favorite.sourceId)?.getShareUrl(favorite.comicId)
+                                    require(raw == null || DetailLink.valid(raw) != null) { "书源详情链接无效" }
+                                    DetailLink.valid(raw)
+                                } }
+                                   catch (_: TimeoutCancellationException) { null }
                                    catch (e: CancellationException) { throw e }
-                                   catch (_: Exception) { throw IllegalStateException("《${favorite.title}》：无法获取详情链接，请检查书源与网络") }
-                                ?: throw IllegalStateException("《${favorite.title}》：书源未提供可分享的详情链接，请先打开详情或恢复书源")
-                            prefs.edit().putString(key, url).apply()
-                            "《${favorite.title}》\n$url"
+                                   catch (e: IllegalArgumentException) { throw IllegalStateException("《${favorite.title}》：书源详情链接无效", e) }
+                                   catch (_: Exception) { null }
+                            if (url != null) {
+                                prefs.edit().putString(key, url).apply()
+                                "《${favorite.title}》\n$url"
+                            } else {
+                                val link = SharedWorkLink.create(favorite.sourceId, favorite.comicId, favorite.title)
+                                "《${favorite.title}》\n$link\n（用 Ciallo Reader 打开，需启用相同书源）"
+                            }
                         }
                     } }.awaitAll()
                 }

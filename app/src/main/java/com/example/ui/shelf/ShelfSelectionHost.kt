@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -481,6 +482,8 @@ fun MultiSelectActionBar(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                // Include padding, gaps and disabled actions in the input surface.
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
                 .padding(horizontal = 12.dp)
                 // 多选态下悬浮 Tab 栏已被藏起来，这里只能让开系统导航栏。
                 // 继续用 LocalAppBottomInset 会让操作栏在底部凭空悬高 92dp。
@@ -508,10 +511,9 @@ fun MultiSelectActionBar(
                     val alpha = if (action.enabled) 1f else 0.35f
                     Column(
                         modifier = Modifier
+                            .weight(1f)
                             .clip(RoundedCornerShape(16.dp))
-                            .then(
-                                if (action.enabled) Modifier.clickable { action.onClick() } else Modifier
-                            )
+                            .clickable(enabled = action.enabled) { action.onClick() }
                             .graphicsLayer { this.alpha = alpha }
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,

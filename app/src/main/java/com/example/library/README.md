@@ -8,6 +8,8 @@
 
 ## 内容
 - `BookShareHelper.kt`
+- `FavoriteShareHelper.kt`：收藏公开详情链接与离线链接缓存。
+- `SharedWorkLink.kt`：无公开网页来源的 Ciallo 详情链接编码与验证。
 - `ComicAggregateSearch.kt`
 - `ComicDownloadManager.kt`
 - `ComicDownloadWorker.kt`
