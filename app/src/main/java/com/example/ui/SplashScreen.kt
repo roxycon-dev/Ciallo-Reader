@@ -35,6 +35,7 @@ import com.example.R
 import com.example.data.PreferencesManager
 import com.example.ui.theme.clickableWithFeedback
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -78,12 +79,13 @@ fun SplashScreen(
     }
 
     var isFinishedCalled by remember { mutableStateOf(false) }
+    val latestOnSplashFinished by rememberUpdatedState(onSplashFinished)
     val safeOnSplashFinished = remember {
         {
             if (!isFinishedCalled) {
                 isFinishedCalled = true
                 Log.d(TAG, "Navigating away from splash screen")
-                onSplashFinished()
+                latestOnSplashFinished()
             }
         }
     }
@@ -94,6 +96,8 @@ fun SplashScreen(
                 targetValue = 1.0f,
                 animationSpec = tween(durationMillis = 800)
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Scale animation interrupted or failed", e)
         }
@@ -116,11 +120,13 @@ fun SplashScreen(
                 targetValue = 0f,
                 animationSpec = tween(durationMillis = 350)
             )
+        } catch (e: CancellationException) {
+            // Leaving the route must not navigate from a disposed back-stack entry.
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Alpha animation interrupted or failed", e)
-        } finally {
-            safeOnSplashFinished()
         }
+        safeOnSplashFinished()
     }
 
     Box(

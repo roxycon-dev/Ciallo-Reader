@@ -122,6 +122,20 @@ class ComicCurlGestureArbitrationTest {
         ).forEach { event -> v.onTouch(v, event); event.recycle() }
     }
 
+    @Test fun verticalDragNeverTurnsIntoAnEdgeTap() {
+        var taps = 0
+        v.doubleTapZoomEnabled = false
+        v.onQuickTap = { _, _ -> taps++ }
+        val t = SystemClock.uptimeMillis()
+        listOf(
+            MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, 80f, 500f, 0),
+            MotionEvent.obtain(t, t + 50, MotionEvent.ACTION_MOVE, 85f, 650f, 0),
+            MotionEvent.obtain(t, t + 100, MotionEvent.ACTION_UP, 85f, 650f, 0),
+        ).forEach { event -> v.onTouch(v, event); event.recycle() }
+        assertEquals(0, taps)
+        assertTrue(!v.isDraggingPage)
+    }
+
     @Test fun curlChapterEdgesWorkInBothReadingDirections() {
         val opened = mutableListOf<Boolean>()
         v.onChapterEdge = { opened += it }

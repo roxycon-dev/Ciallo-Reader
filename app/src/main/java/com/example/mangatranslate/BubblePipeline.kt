@@ -109,16 +109,43 @@ object BubblePipeline {
             for ((region, translated) in regions) {
                 val text = translated.trim()
                 if (text.isEmpty()) continue
+                if (region.lines.isNotEmpty()) {
+                    drawAnchoredLines(canvas, sampling, region, text, textScale)
+                    continue
+                }
                 if (region.maskContour != null && region.maskContour.size >= 6) {
                     drawBubbleShape(canvas, sampling, region, text, textScale)
                 } else {
-                    drawFreeBlock(canvas, region, text, textScale)
+                    drawFreeBlock(canvas, sampling, region, text, textScale)
                 }
             }
         } finally {
             sampling.recycle()
         }
         return out
+    }
+
+    /** A coarse segmentation mask must never repaint a frame or the balloon outline. */
+    private fun drawAnchoredLines(canvas: Canvas, sampling: Bitmap, region: Region, text: String, textScale: Float) {
+        var background: Int? = null
+        val imageBounds = RectF(0f, 0f, sampling.width.toFloat(), sampling.height.toFloat())
+        for (line in region.lines) {
+            val erase = RectF(line)
+            val padding = (min(line.width(), line.height()) * 0.06f).coerceIn(1f, 4f)
+            erase.inset(-padding, -padding)
+            if (!erase.intersect(imageBounds)) continue
+            val local = sampleBackgroundColor(sampling, erase) ?: Color.WHITE
+            if (background == null) background = local
+            canvas.drawRect(erase, Paint().apply { color = local })
+        }
+        val safe = RectF(region.rect)
+        if (!safe.intersect(imageBounds)) return
+        // A coarse region must not expand the translation past the original text.
+        val anchor = RectF(region.lines.first())
+        for (line in region.lines.drop(1)) anchor.union(line)
+        if (!anchor.intersect(safe)) return
+        drawTextHorizontal(canvas, text, anchor, textScale,
+            contrastingTextColor(background ?: Color.WHITE), medianLineHeight(region.lines))
     }
 
     /**
@@ -178,24 +205,25 @@ object BubblePipeline {
     }
 
     /** 游离文字块：圆角矩形覆盖（第十五轮行为）+ 译文字号锚定原文行高。 */
-    private fun drawFreeBlock(canvas: Canvas, region: Region, text: String, textScale: Float) {
+    private fun drawFreeBlock(canvas: Canvas, sampling: Bitmap, region: Region, text: String, textScale: Float) {
         val rect = region.rect
         if (rect.width() < 6f || rect.height() < 6f) return
         val pad = min(rect.width(), rect.height()) * 0.06f
         val inner = RectF(rect.left + pad, rect.top + pad, rect.right - pad, rect.bottom - pad)
         if (inner.width() < 4f || inner.height() < 4f) return
         val corner = min(10f, min(rect.width(), rect.height()) * 0.14f)
-        canvas.drawRoundRect(rect, corner, corner, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFDFBF7.toInt() })
+        val background = sampleBackgroundColor(sampling, rect) ?: Color.WHITE
+        canvas.drawRoundRect(rect, corner, corner, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = background })
         canvas.drawRoundRect(rect, corner, corner, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE; strokeWidth = 1f; color = 0x14262626
         })
-        drawTextHorizontal(canvas, text, inner, textScale, DEFAULT_TEXT_COLOR, medianLineHeight(region.lines))
+        drawTextHorizontal(canvas, text, inner, textScale, contrastingTextColor(background), medianLineHeight(region.lines))
     }
 
     /** 原文行高中位数（第十九轮）：译文字号的锚——译文不得比原文显眼得多。 */
     internal fun medianLineHeight(lines: List<RectF>): Float {
         if (lines.isEmpty()) return 0f
-        val heights = lines.map { it.height() }.sorted()
+        val heights = lines.map { if (it.height() > it.width() * 1.5f) it.width() else it.height() }.sorted()
         return heights[heights.size / 2]
     }
 
@@ -361,7 +389,7 @@ object BubblePipeline {
         }
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = textColor; typeface = Typeface.DEFAULT_BOLD }
         fun layoutAt(size: Float): StaticLayout {
-            paint.textSize = size * textScale
+            paint.textSize = size
             return StaticLayout.Builder.obtain(text, 0, text.length, paint, maxW)
                 .setAlignment(Layout.Alignment.ALIGN_CENTER)
                 .setIncludePad(false)
@@ -377,7 +405,7 @@ object BubblePipeline {
         var low = MIN_TEXT_SIZE_PX
         // 字号锚定原文（第十九轮核心修复）：上限 = 原文中位行高 × 1.15，
         // 译文与原文视觉重量一致、位置一致；放不下才按二分缩到可读下限。
-        var high = max(maxW.toFloat(), maxH)
+        var high = max(maxW.toFloat(), maxH) * textScale.coerceIn(0.5f, 2f)
         if (refLineHeight > 4f) {
             high = (refLineHeight * 1.15f * textScale).coerceIn(MIN_ANCHORED_SIZE_PX, high)
         }
@@ -404,7 +432,7 @@ object BubblePipeline {
         val chars = text.replace(Regex("\\s+"), "").toCharArray()
         if (chars.isEmpty()) return
         val maxW = rect.width(); val maxH = rect.height()
-        var size = (maxW * 0.9f).coerceAtMost(maxH * 0.5f)
+        var size = (maxW * 0.9f * textScale.coerceIn(0.5f, 2f)).coerceAtMost(maxH * 0.5f)
         val minSize = 7f
         var chosenSize = 0f; var perCol = 1; var step = 0f
         while (size >= minSize) {
@@ -416,14 +444,18 @@ object BubblePipeline {
         }
         if (chosenSize <= 0f) return
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            textSize = chosenSize * textScale; color = textColor
+            textSize = chosenSize; color = textColor
             typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER
         }
         val startX = rect.right - step / 2f
+        canvas.save()
+        canvas.clipRect(rect)
         var idx = 0; var col = 0
         while (idx < chars.size) {
             val x = startX - col * step
-            var y = rect.top + chosenSize
+            val fm = paint.fontMetrics
+            val totalHeight = min(perCol, chars.size - idx) * step
+            var y = rect.top + (maxH - totalHeight) / 2f + (step - (fm.descent - fm.ascent)) / 2f - fm.ascent
             var inCol = 0
             while (idx < chars.size && inCol < perCol) {
                 canvas.drawText(chars, idx, 1, x, y, paint)
@@ -431,6 +463,7 @@ object BubblePipeline {
             }
             col++
         }
+        canvas.restore()
     }
 
     /* ── 几何工具 ── */

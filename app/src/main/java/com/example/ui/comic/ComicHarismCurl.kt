@@ -9,6 +9,7 @@ import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.VelocityTracker
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -122,6 +123,20 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
     private var downX = 0f
     private var downY = 0f
     private var dragForwarded = false
+    private var dragFromLeft = false
+    private var curlStartX = 0f
+    private var dragScale = 1f
+    private var touchTravel = 0f
+    private var velocityTracker: VelocityTracker? = null
+    val pageGeometryValid: Boolean get() = getCurlRenderer().hasExplicitPageRect()
+    val isDraggingPage: Boolean get() = dragForwarded
+    private var bookLeft = 0f
+    private var bookRight = 0f
+    fun setBookTouchBounds(left: Float, right: Float) { bookLeft = left; bookRight = right }
+    private fun bookX(fraction: Float): Float {
+        val span = bookRight - bookLeft
+        return if (span > 1f && pageGeometryValid) bookLeft + span * fraction else width * fraction
+    }
     private var chapterEdgeActive = false
     private var longPressFired = false
 
@@ -143,9 +158,29 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
     private val slopPx = ViewConfiguration.get(context).scaledTouchSlop
     private val doubleTapWindowMs = 320L
     private var pendingQuickTap: Runnable? = null
+    private var flipAnimator: android.animation.ValueAnimator? = null
+    private var flipCompletion: Runnable? = null
+    private fun cancelAutoFlip() {
+        flipAnimator?.removeAllListeners()
+        flipAnimator?.cancel()
+        flipAnimator = null
+        flipCompletion?.let { removeCallbacks(it) }
+        flipCompletion = null
+        if (autoFlipping) setCurrentIndex(currentIndex)
+        autoFlipping = false
+        syntheticDrag = false
+        syntheticDownTime = 0L
+    }
+    override fun onPause() {
+        cancelAutoFlip()
+        super.onPause()
+    }
     override fun onDetachedFromWindow() {
+        cancelAutoFlip()
         pendingQuickTap?.let { removeCallbacks(it) }
         removeCallbacks(longPressRunnable)
+        velocityTracker?.recycle()
+        velocityTracker = null
         super.onDetachedFromWindow()
     }
     private val longPressRunnable = Runnable {
@@ -259,6 +294,9 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                 downTime = me.downTime
                 downX = me.x
                 downY = me.y
+                touchTravel = 0f
+                velocityTracker?.recycle()
+                velocityTracker = VelocityTracker.obtain().apply { addMovement(me) }
                 dragForwarded = false
                 chapterEdgeActive = false
                 startedAtForwardEdge = !isAnimating() && isAtForwardEdge?.invoke() == true
@@ -294,7 +332,7 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                     }
                     view.removeCallbacks(longPressRunnable)
                     if (dragForwarded) {
-                        dispatchSynthetic(MotionEvent.ACTION_CANCEL, me.x, me.y, downTime)
+                        dispatchSynthetic(MotionEvent.ACTION_CANCEL, curlStartX, downY, downTime)
                         dragForwarded = false
                     }
                     chapterEdgeActive = false
@@ -305,6 +343,8 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
+                velocityTracker?.addMovement(me)
+                touchTravel = max(touchTravel, hypot(me.x - downX, me.y - downY))
                 if (doubleTapActive) return true
                 if (chapterEdgeActive) {
                     return true
@@ -317,6 +357,7 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                     view.removeCallbacks(longPressRunnable)
                     val dx = me.x - downX
                     val dy = me.y - downY
+                    if (abs(dx) <= slopPx || abs(dx) < abs(dy) * 1.2f) return true
                     val forward = dx * forwardSign
                     if (swipeEnabled && onChapterEdge != null && abs(dx) >= abs(dy) &&
                         (startedAtForwardEdge && forward > 0f || startedAtBackwardEdge && forward < 0f)
@@ -329,12 +370,23 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                     if (com.example.BuildConfig.DEBUG) {
                         android.util.Log.d("CURLDBG", "drag start -> forward to harism (moved=$moved anim=${isAnimating()} idx=${currentIndex})")
                     }
-                    dispatchSynthetic(MotionEvent.ACTION_DOWN, downX, downY, downTime)
+                    // Direction follows the swipe, regardless of which side was touched.
+                    dragFromLeft = dx > 0f
+                    curlStartX = bookX(if (dragFromLeft) 0.03f else 0.97f)
+                    dragScale = abs(bookX(1f) - bookX(0f)) * 0.58f / comicTurnTravel(width.toFloat(), resources.displayMetrics.density)
+                    dispatchSynthetic(MotionEvent.ACTION_DOWN, curlStartX, downY, downTime)
                     dragForwarded = true
                 }
-                return super.onTouch(view, me)
+                dispatchSynthetic(MotionEvent.ACTION_MOVE, curlStartX + (me.x - downX) * dragScale,
+                    downY + (me.y - downY), downTime)
+                return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                velocityTracker?.addMovement(me)
+                velocityTracker?.computeCurrentVelocity(1000)
+                val releaseVelocity = velocityTracker?.xVelocity ?: 0f
+                velocityTracker?.recycle()
+                velocityTracker = null
                 view.removeCallbacks(longPressRunnable)
                 if (chapterEdgeActive) {
                     chapterEdgeActive = false
@@ -357,7 +409,8 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                 }
                 if (!dragForwarded) {
                     val quick = me.actionMasked == MotionEvent.ACTION_UP &&
-                        me.eventTime - downTime < 250
+                        me.eventTime - downTime < 250 && touchTravel < slopPx &&
+                        hypot(me.x - downX, me.y - downY) < slopPx && !longPressFired
                     if (quick) {
                         lastQuickTapAt = SystemClock.uptimeMillis()
                         lastQuickTapX = me.x
@@ -372,7 +425,13 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                     }
                     return true
                 }
-                return super.onTouch(view, me)
+                val intent = if (me.actionMasked == MotionEvent.ACTION_UP)
+                    comicTurnIntent(me.x - downX, releaseVelocity, width.toFloat(), resources.displayMetrics.density) else 0
+                val commit = intent == if (dragFromLeft) 1 else -1
+                val releaseX = if (commit) bookX(if (dragFromLeft) 0.80f else 0.20f) else curlStartX
+                dispatchSynthetic(MotionEvent.ACTION_UP, releaseX, downY + (me.y - downY), downTime)
+                dragForwarded = false
+                return true
             }
         }
         return super.onTouch(view, me)
@@ -391,7 +450,7 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
      * 的松手动画完成翻页并触发 onSettledIndex。
      */
     fun startAutoFlip(fromLeft: Boolean, done: () -> Unit) {
-        if (autoFlipping) return
+        if (autoFlipping || isAnimating() || dragForwarded) return
         autoFlipping = true
         syntheticDrag = true
         val w = width.toFloat()
@@ -403,27 +462,29 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
             return
         }
         val y = h * 0.5f
-        val fromX = if (fromLeft) w * 0.03f else w * 0.97f
-        val toX = if (fromLeft) w * 0.65f else w * 0.35f
+        val fromX = bookX(if (fromLeft) 0.03f else 0.97f)
+        val toX = bookX(if (fromLeft) 0.80f else 0.20f)
         val t0 = SystemClock.uptimeMillis()
         syntheticDownTime = t0
-        dispatchTouchEvent(MotionEvent.obtain(t0, t0, MotionEvent.ACTION_DOWN, fromX, y, 0))
-        val steps = 12
-        for (i in 1..steps) {
-            val x = fromX + (toX - fromX) * i / steps
-            // 事件时间必须单调不减，与真实触摸一致
-            val t = max(t0 + 360L * i / steps, SystemClock.uptimeMillis())
-            dispatchTouchEvent(MotionEvent.obtain(t0, t, MotionEvent.ACTION_MOVE, x, y, 0))
+        dispatchSynthetic(MotionEvent.ACTION_DOWN, fromX, y, t0)
+        // Schedule real frames. Dispatching all MOVE events in a loop skipped the lift animation.
+        val animator = android.animation.ValueAnimator.ofFloat(fromX, toX).apply {
+            duration = 260L
+            interpolator = android.view.animation.AccelerateDecelerateInterpolator()
+            addUpdateListener { dispatchSynthetic(MotionEvent.ACTION_MOVE, it.animatedValue as Float, y, t0) }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    dispatchSynthetic(MotionEvent.ACTION_UP, toX, y, t0)
+                    flipCompletion = Runnable {
+                        autoFlipping = false; syntheticDrag = false; syntheticDownTime = 0L; done()
+                        flipAnimator = null; flipCompletion = null
+                    }
+                    postDelayed(flipCompletion, 340L)
+                }
+            })
         }
-        val t1 = SystemClock.uptimeMillis() + 20
-        dispatchTouchEvent(MotionEvent.obtain(t0, t1, MotionEvent.ACTION_UP, toX, y, 0))
-        // harism 松手动画 ~300ms + 落定回调余量
-        postDelayed({
-            autoFlipping = false
-            syntheticDrag = false
-            syntheticDownTime = 0L
-            done()
-        }, 700)
+        flipAnimator = animator
+        animator.start()
     }
 }
 
@@ -496,32 +557,56 @@ internal class ComicHarismController {
             intrinsicOf = { slot ->
                 (getCache(slotCacheKey(slot, config, state)) ?: getCacheAnyVariant(slot.ref.id))
                     ?.let { Size(it.width.toFloat(), it.height.toFloat()) }
+                    ?: knownSize(slotCacheKey(slot, config, state))
             },
         )
         val last = lastAppliedRects
         if (rects != null) {
-            if (last != null && last.first == rects.first && last.second == rects.second) return
+            if (v.isAnimating() || v.isDraggingPage || v.autoFlipping) return
+            if (last != null && last.first == rects.first && last.second == rects.second && v.pageGeometryValid) return
             lastAppliedRects = rects
             v.setPageRect(rects.first, rects.second)
-        } else if (last != null) {
-            lastAppliedRects = null
-            v.setPageRect(null, null)
-        }
+            v.setBookTouchBounds(if (twoPage) min(rects.first.left, rects.second.left) else rects.second.left,
+                if (twoPage) max(rects.first.right, rects.second.right) else rects.second.right)
+        } // A temporary cache miss must never replace book geometry with the entire backdrop.
     }
 
     /** LRU 预加载缓存：条数 ≤8 且字节 ≤64MB（防强引用绕过 loader LruCache 字节预算） */
     private val slotCache = LinkedHashMap<String, Bitmap>(16, 0.75f, true)
+    private val knownSizes = LinkedHashMap<String, Size>()
     private var cacheBytes = 0L
 
     @Synchronized
     fun putCache(key: String, bmp: Bitmap) {
         val old = slotCache.put(key, bmp)
+        knownSizes[key] = Size(bmp.width.toFloat(), bmp.height.toFloat())
+        while (knownSizes.size > 512) knownSizes.remove(knownSizes.keys.first())
         cacheBytes += bmp.byteCount.toLong() - (old?.byteCount?.toLong() ?: 0L)
         trim()
     }
 
     @Synchronized
     fun getCache(key: String): Bitmap? = slotCache[key]
+
+    @Synchronized
+    private fun knownSize(key: String): Size? = knownSizes[key]
+
+    private var pendingRefresh: Runnable? = null
+    fun refreshDisplay(spread: Int) {
+        val v = view ?: return
+        pendingRefresh?.let { v.removeCallbacks(it) }
+        if (spread != currentSpreadHint) return
+        if (v.isAnimating() || v.isDraggingPage || v.autoFlipping) {
+            pendingRefresh = Runnable { if (view === v) refreshDisplay(spread) }
+            v.postDelayed(pendingRefresh, 80L)
+            return
+        }
+        val cfg = config ?: return
+        val lay = layout ?: return
+        applyPageRects(spread, cfg, bookState, lay)
+        v.setCurrentIndex(toHarism(spread))
+        pendingRefresh = null
+    }
 
     /**
      * 同一原始页（refId）任意管线变体的最近缓存位图。
@@ -539,7 +624,10 @@ internal class ComicHarismController {
 
     @Synchronized
     fun clearCache() {
+        view?.let { v -> pendingRefresh?.let { v.removeCallbacks(it) } }
+        pendingRefresh = null
         slotCache.clear()
+        knownSizes.clear()
         cacheBytes = 0L
     }
 
@@ -586,7 +674,7 @@ internal class ComicHarismController {
         val bh = max(8, (h * scale).toInt())
         val bmp = Bitmap.createBitmap(bw, bh, Bitmap.Config.RGB_565)
         val canvas = Canvas(bmp)
-        canvas.drawColor(fillInt(cfg))
+        canvas.drawColor(0xFFFAFAF7.toInt())
         if (reversed && mirrorForRenderer) canvas.scale(-1f, 1f, bw / 2f, bh / 2f)
         val slots = spread.slots.take(2).let { if (cfg.direction == ComicDirection.RTL) it.reversed() else it }
         val st = bookState
@@ -661,7 +749,7 @@ internal class ComicHarismController {
         val bh = max(8, (h * scale).toInt())
         val bmp = Bitmap.createBitmap(bw, bh, Bitmap.Config.RGB_565)
         val canvas = Canvas(bmp)
-        canvas.drawColor(fillInt(cfg))
+        canvas.drawColor(0xFFFAFAF7.toInt())
         if (reversed && mirrorForRenderer) canvas.scale(-1f, 1f, bw / 2f, bh / 2f)
         val exact = getCache(slotCacheKey(slot, cfg, bookState))
         if (exact == null) {
@@ -695,7 +783,7 @@ internal class ComicHarismController {
      */
     fun composeBackTexture(front: Bitmap?, w: Int, h: Int): Bitmap {
         val cfg = config
-        val paper = if (cfg != null) (bgFillOverride ?: pagePaperInt(cfg)) else 0xFF1D1D21.toInt()
+        val paper = 0xFFFAFAF7.toInt()
         val scale = min(1f, min(1024f / w, 1800f / h))
         val bw = max(8, (w * scale).toInt())
         val bh = max(8, (h * scale).toInt())
@@ -1111,12 +1199,25 @@ internal fun ComicHarismCurlReader(
           · generation 校验：提交前代未变才执行，旧流的新值不覆盖新状态 ── */
     LaunchedEffect(Unit) {
         var lastSynced = -1
-        snapshotFlow { currentSpread }.collectLatest { sp ->
+        snapshotFlow { latestCurrent }.collectLatest { sp ->
             val gen = controller.displayGeneration
             val target = controller.toHarism(sp)
             val v = controller.view
+            val step = if (controller.twoPage) 2 else 1
+            if (v != null && !v.autoFlipping && !v.isAnimating() && !v.isDraggingPage &&
+                abs(target - v.currentIndex) == step) {
+                val forward = target > v.currentIndex
+                v.startAutoFlip(fromLeft = if (forward) controller.reversed else !controller.reversed) {
+                    controller.refreshDisplay(latestCurrent)
+                }
+                lastSynced = sp
+                return@collectLatest
+            }
             when (curlSyncPlan(sp, lastSynced, v?.currentIndex ?: target, target)) {
-                CurlSyncPlan.NOOP -> { lastSynced = sp; return@collectLatest }
+                CurlSyncPlan.NOOP -> {
+                    controller.applyPageRects(sp, latestConfig, latestBookState, latestLayout)
+                    lastSynced = sp; return@collectLatest
+                }
                 CurlSyncPlan.IMMEDIATE_PRELOAD -> {
                     // 大跨度跳转：目标 spread 纹理尽量就绪后再切换，但等待上限 ~170ms
                     // （第 1 条 200ms 预算内）——冷缓存慢解码（如增强引擎开启）时超时也
@@ -1155,7 +1256,7 @@ internal fun ComicHarismCurlReader(
             if (gen == controller.displayGeneration) {
                 controller.view?.let { vv ->
                     if (com.example.BuildConfig.DEBUG) android.util.Log.d("CURLDBG", "sync commit sp=$sp target=$target viewIdxBefore=${vv.currentIndex}")
-                    if (vv.currentIndex != target) vv.setCurrentIndex(target)
+                    if (vv.currentIndex != target) controller.refreshDisplay(sp)
                 }
                 lastSynced = sp
             }
@@ -1204,7 +1305,7 @@ internal fun ComicHarismCurlReader(
                 }
                 if (changed) {
                     controller.applyPageRects(currentSpread, config, bookState, layout)
-                    controller.view?.setCurrentIndex(controller.toHarism(currentSpread))
+                    controller.refreshDisplay(currentSpread)
                     curlPageLoading = false
                 }
             }
@@ -1240,7 +1341,7 @@ internal fun ComicHarismCurlReader(
                 if (si == currentSpread) withContext(Dispatchers.Main) {
                     if (gen == controller.displayGeneration) {
                         controller.applyPageRects(currentSpread, config, bookState, layout)
-                        if (currentShown) controller.view?.setCurrentIndex(controller.toHarism(currentSpread))
+                        if (currentShown) controller.refreshDisplay(currentSpread)
                         layout.spreads.getOrNull(currentSpread)?.slots?.firstOrNull()?.let { slot ->
                             controller.getCache(slotCacheKey(slot, config, bookState))?.let { onBitmapShown(it) }
                         }

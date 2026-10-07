@@ -8,6 +8,10 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
+import androidx.compose.ui.geometry.Offset
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
@@ -116,4 +120,42 @@ class ComicReaderScreenshotTest {
         composeRule.waitForIdle()
         composeRule.onRoot().captureRoboImage("reader_settings_panel.png")
     }
+
+    private fun settingsShot(name: String, fontScale: Float = 1f) {
+        val context = composeRule.activity
+        val refs = pages(context, 6)
+        composeRule.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides
+                androidx.compose.ui.unit.Density(androidx.compose.ui.platform.LocalDensity.current.density, fontScale)) {
+            com.example.ui.theme.MyApplicationTheme(darkTheme = false, colorPrimaryIndex = 4) {
+                ComicReaderCore(pages = refs, title = "秋日来信 · 漫画", chapterTitle = "第一话", bookKey = name, initialPage = 0, onExit = {})
+            }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription("阅读设置").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription("关闭阅读设置").assertExists()
+        composeRule.onRoot().performTouchInput { click(Offset(3f, 3f)) }
+        composeRule.onNodeWithContentDescription("关闭阅读设置").assertExists()
+        composeRule.onRoot().captureRoboImage("${name}_turn.png")
+        composeRule.onNodeWithText("图像").performClick()
+        composeRule.waitForIdle()
+        composeRule.onRoot().captureRoboImage("${name}_image.png")
+        composeRule.onNodeWithContentDescription("关闭阅读设置").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription("关闭阅读设置").assertDoesNotExist()
+    }
+
+    @Test @Config(qualifiers = "zh-rCN-w411dp-h891dp-420dpi")
+    fun phoneSettingsAreReadableAndOutsideTapDoesNotDismiss() = settingsShot("reader125_phone")
+
+    @Test @Config(qualifiers = "zh-rCN-w1280dp-h800dp-160dpi")
+    fun tabletLandscapeHasRailAndStableSettings() = settingsShot("reader125_tablet")
+
+    @Test @Config(qualifiers = "zh-rCN-w780dp-h360dp-160dpi")
+    fun shortLandscapeKeepsContentAndCloseButtonVisible() = settingsShot("reader125_landscape")
+
+    @Test @Config(qualifiers = "zh-rCN-w411dp-h891dp-420dpi")
+    fun largeTypePhoneKeepsNavigationAndCloseAvailable() = settingsShot("reader125_large_type", 1.5f)
 }

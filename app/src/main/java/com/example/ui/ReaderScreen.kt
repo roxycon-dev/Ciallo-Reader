@@ -114,6 +114,7 @@ import com.ramotion.fluidslider.FluidSlider
 
 import androidx.compose.runtime.*
 
+import com.kashif_e.backdrop.backdrops.layerBackdrop
 import androidx.compose.ui.Alignment
 
 import androidx.compose.ui.Modifier
@@ -1127,6 +1128,8 @@ fun ReaderScreen(
 
     )
 
+    val readerSettingsBackdrop = com.kashif_e.backdrop.backdrops.rememberLayerBackdrop()
+
     val bgAlpha by androidx.compose.animation.core.animateFloatAsState(
 
         targetValue = if (transitionStarted) 1f else 0f,
@@ -1145,6 +1148,7 @@ fun ReaderScreen(
 
             .fillMaxSize()
 
+            .then(if (showSettingsSheet) Modifier.layerBackdrop(readerSettingsBackdrop) else Modifier)
             .background(bgColor.copy(alpha = bgAlpha))
 
     ) {
@@ -3149,7 +3153,7 @@ fun ReaderScreen(
 
         AnimatedVisibility(
 
-            visible = showBars,
+            visible = showBars && !showSettingsSheet,
 
             enter = fadeIn(tween(300)),
 
@@ -3201,7 +3205,7 @@ fun ReaderScreen(
 
                 AnimatedVisibility(
 
-                                    visible = showBars,
+                                    visible = showBars && !showSettingsSheet,
 
                                     enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
 
@@ -3400,7 +3404,7 @@ fun ReaderScreen(
 
                 AnimatedVisibility(
 
-                                    visible = showBars && chapters.isNotEmpty(),
+                                    visible = showBars && !showSettingsSheet && chapters.isNotEmpty(),
 
                                     enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
 
@@ -3801,14 +3805,15 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
 
     if (showSettingsSheet) {
-
-        ModalBottomSheet(
-
-            onDismissRequest = { showSettingsSheet = false },
-
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.93f)
-
-        ) {
+        val themeColor = bgColor
+        val accentColor = MintPrimary
+        val cardTint = androidx.compose.ui.graphics.lerp(themeColor, if (readerTheme in listOf(3, 5)) Color(0xFF303136) else Color.White, 0.70f).copy(alpha = 0.38f)
+        com.example.ui.reader.ReadingSettingsPanel(
+            themeColor = themeColor,
+            contentColor = textColor,
+            backdrop = readerSettingsBackdrop,
+            onDismiss = { showSettingsSheet = false },
+        ) { closePanel ->
 
                         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
 Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp).verticalScroll(rememberScrollState())) {
@@ -3821,13 +3826,12 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                     Icon(
                         Icons.Filled.Tune,
                         contentDescription = null,
-                        tint = MintPrimary,
-                        modifier = Modifier.size(22.dp)
+                        tint = accentColor,
+                        modifier = Modifier.clip(CircleShape).background(accentColor.copy(alpha = 0.10f)).padding(9.dp).size(22.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("阅读排版", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-
-                    Spacer(modifier = Modifier.weight(1f))
+                    Text("阅读排版", fontSize = 25.sp, fontWeight = FontWeight.SemiBold, color = textColor,
+                        modifier = Modifier.weight(1f))
                     TextButton(onClick = {
                         fontSize = 18f
                         lineHeight = 28f
@@ -3839,7 +3843,10 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                         prefs.readerBrightness = readerBrightness
                         AppToast.makeText(context, "排版参数已重置", Toast.LENGTH_SHORT).show()
                     }) {
-                        Text("重置", fontWeight = FontWeight.Bold)
+                        Text("重置", fontWeight = FontWeight.SemiBold, color = accentColor)
+                    }
+                    IconButton(onClick = closePanel) {
+                        Icon(Icons.Filled.Close, "关闭阅读排版", tint = textColor.copy(alpha = 0.65f))
                     }
                 }
 
@@ -3849,12 +3856,14 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.5.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = textColor.copy(alpha = 0.65f)
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    shape = RoundedCornerShape(24.dp),
+                    color = cardTint,
+                    contentColor = textColor,
+                    border = BorderStroke(1.dp, textColor.copy(alpha = 0.07f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
@@ -3862,21 +3871,22 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                             Icon(
                                 Icons.Filled.WbSunny,
                                 contentDescription = null,
-                                tint = MintGold,
+                                tint = accentColor,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("亮度", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                             Spacer(modifier = Modifier.weight(1f))
-                            Text("${(readerBrightness * 100).toInt()}%", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MintGold)
+                            Text("${(readerBrightness * 100).toInt()}%", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = accentColor,
+                                modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(accentColor.copy(alpha = 0.08f)).padding(horizontal = 8.dp, vertical = 4.dp))
                         }
                         Slider(
                             value = ((readerBrightness - 0.2f) / 0.8f).coerceIn(0f, 1f),
                             onValueChange = { readerBrightness = 0.2f + it * 0.8f; prefs.readerBrightness = readerBrightness },
                             colors = SliderDefaults.colors(
-                                thumbColor = MintGold,
-                                activeTrackColor = MintGold,
-                                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                                thumbColor = accentColor,
+                                activeTrackColor = accentColor,
+                                inactiveTrackColor = textColor.copy(alpha = 0.10f)
                             )
                         )
                         Row(
@@ -3888,7 +3898,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                 Text(
                                     "段落首行自动空两格",
                                     fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                                    color = textColor.copy(alpha = 0.65f).copy(alpha = 0.75f)
                                 )
                             }
                             AppSwitch(
@@ -3906,12 +3916,14 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.5.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = textColor.copy(alpha = 0.65f)
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    shape = RoundedCornerShape(24.dp),
+                    color = cardTint,
+                    contentColor = textColor,
+                    border = BorderStroke(1.dp, textColor.copy(alpha = 0.07f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
@@ -3921,7 +3933,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                             Spacer(modifier = Modifier.weight(1f))
                             Surface(
                                 shape = RoundedCornerShape(10.dp),
-                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                                color = cardTint, contentColor = textColor
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     TextButton(
@@ -3931,7 +3943,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                         },
                                         enabled = fontSize > 12f,
                                         contentPadding = PaddingValues(horizontal = 8.dp),
-                                        modifier = Modifier.height(34.dp)
+                                        modifier = Modifier.heightIn(min = 44.dp)
                                     ) { Text("A−", fontSize = 14.sp, fontWeight = FontWeight.Bold) }
                                     Box(
                                         modifier = Modifier.widthIn(min = 30.dp),
@@ -3941,7 +3953,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                             "${fontSize.toInt()}",
                                             fontSize = 15.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = MintPrimary,
+                                            color = textColor,
                                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                         )
                                     }
@@ -3952,7 +3964,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                         },
                                         enabled = fontSize < 36f,
                                         contentPadding = PaddingValues(horizontal = 8.dp),
-                                        modifier = Modifier.height(34.dp)
+                                        modifier = Modifier.heightIn(min = 44.dp)
                                     ) { Text("A+", fontSize = 14.sp, fontWeight = FontWeight.Bold) }
                                 }
                             }
@@ -3982,7 +3994,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                 currentFontName,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MintPrimary,
+                                color = accentColor,
                                 fontFamily = selectedFontFamily,
                                 modifier = Modifier.weight(1f),
                                 maxLines = 1
@@ -3990,7 +4002,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                             Icon(
                                 if (fontPanelOpen) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                                 contentDescription = if (fontPanelOpen) "收起字体列表" else "展开字体列表",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                tint = textColor.copy(alpha = 0.65f).copy(alpha = 0.6f),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -4035,7 +4047,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                                 if (customLoaded) "换字体" else "+导入",
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = MintPrimary
+                                                color = accentColor
                                             )
                                         }
                                     }
@@ -4051,29 +4063,31 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text("行间距", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                             Spacer(modifier = Modifier.weight(1f))
-                            Text("${lineHeight.toInt()} sp", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MintPrimary)
+                            Text("${lineHeight.toInt()} sp", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = accentColor,
+                                modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(accentColor.copy(alpha = 0.08f)).padding(horizontal = 8.dp, vertical = 4.dp))
                         }
                         Slider(
                             value = ((lineHeight - 20f) / 28f).coerceIn(0f, 1f),
                             onValueChange = { lineHeight = 20f + it * 28f; prefs.lineHeight = lineHeight },
                             colors = SliderDefaults.colors(
-                                thumbColor = MintPrimary,
-                                activeTrackColor = MintPrimary,
-                                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                                thumbColor = accentColor,
+                                activeTrackColor = accentColor,
+                                inactiveTrackColor = textColor.copy(alpha = 0.10f)
                             )
                         )
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text("页边距", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                             Spacer(modifier = Modifier.weight(1f))
-                            Text("${marginHorizontal} dp", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MintPrimary)
+                            Text("${marginHorizontal} dp", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = accentColor,
+                                modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(accentColor.copy(alpha = 0.08f)).padding(horizontal = 8.dp, vertical = 4.dp))
                         }
                         Slider(
                             value = ((marginHorizontal - 8f) / 40f).coerceIn(0f, 1f),
                             onValueChange = { marginHorizontal = Math.round(8f + it * 40f); prefs.marginHorizontal = marginHorizontal },
                             colors = SliderDefaults.colors(
-                                thumbColor = MintPrimary,
-                                activeTrackColor = MintPrimary,
-                                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                                thumbColor = accentColor,
+                                activeTrackColor = accentColor,
+                                inactiveTrackColor = textColor.copy(alpha = 0.10f)
                             )
                         )
                     }
@@ -4086,7 +4100,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.5.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = textColor.copy(alpha = 0.65f)
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 // 与阅读区 when(readerTheme) 的真实配色一一对应，选中态用描边+角标
@@ -4127,7 +4141,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.5.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = textColor.copy(alpha = 0.65f)
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -5074,14 +5088,16 @@ private fun ReaderPageModeChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val accentColor = MintPrimary
+    val contentColor = LocalContentColor.current
+    val selectedTint by androidx.compose.animation.animateColorAsState(
+        if (selected) accentColor.copy(alpha = 0.12f) else contentColor.copy(alpha = 0.04f),
+        label = "readerModeTint"
+    )
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
-        color = if (selected) {
-            MintPrimary.copy(alpha = 0.14f)
-        } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-        },
+        color = selectedTint,
         border = if (selected) BorderStroke(1.dp, MintPrimary.copy(alpha = 0.8f)) else null,
         modifier = modifier.heightIn(min = 40.dp)
     ) {
@@ -5103,7 +5119,7 @@ private fun ReaderPageModeChip(
                 label,
                 fontSize = 13.sp,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (selected) MintPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                color = if (selected) accentColor else contentColor.copy(alpha = 0.85f)
             )
         }
     }
@@ -5122,6 +5138,7 @@ private fun ReaderFontOptionRow(
     onClick: () -> Unit,
     trailing: (@Composable () -> Unit)? = null
 ) {
+    val contentColor = LocalContentColor.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -5144,7 +5161,7 @@ private fun ReaderFontOptionRow(
             Text(
                 sample,
                 fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                color = contentColor.copy(alpha = 0.65f),
                 fontFamily = family,
                 maxLines = 1
             )

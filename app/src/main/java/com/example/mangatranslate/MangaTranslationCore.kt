@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -598,7 +599,10 @@ class MangaPageTranslator(
             val out = ArrayList<TranslatedRegion>(regions.size)
             for (region in regions) {
                 val sb = StringBuilder()
-                for (line in region.lines) {
+                val orderedLines = if (region.vertical)
+                    region.lines.sortedWith(compareByDescending<RectF> { it.centerX() }.thenBy { it.top })
+                    else region.lines.sortedWith(compareBy<RectF> { it.top }.thenBy { it.left })
+                for (line in orderedLines) {
                     val crop = cropRect(bitmap, line) ?: continue
                     val oriented = if (region.vertical) rotateCcw(crop) else null
                     val target = oriented ?: crop
@@ -700,9 +704,9 @@ class MangaPageTranslator(
         }
         for ((lang, idxs) in byLang) {
             val batch = idxs.map { ocr[it].original }
-            val results = (textTranslator as? OnlineFallbackTranslator)
-                ?.translateBatch(batch, lang)
-                ?: batch.map { textTranslator.translate(it, lang) }
+            val results = if (textTranslator is OnlineFallbackTranslator)
+                textTranslator.translateBatch(batch, lang) ?: List(batch.size) { "" }
+                else batch.map { textTranslator.translate(it, lang) }
             idxs.forEachIndexed { j, regionIdx ->
                 val t = results.getOrNull(j)
                 if (!t.isNullOrBlank()) out[regionIdx] = out[regionIdx].copy(translated = t.trim())
@@ -760,6 +764,7 @@ class TranslationCoordinator(
     val epoch = MutableStateFlow(0)
     /** 正在翻译的 cacheKey 集合（UI 显示"翻译中"角标）。 */
     val busyKeys = MutableStateFlow<Set<String>>(emptySet())
+    val failedKeys = MutableStateFlow<Set<String>>(emptySet())
 
     val ocrReady: Boolean get() = translator.ocrReady
 
@@ -777,16 +782,16 @@ class TranslationCoordinator(
         publishBaked: suspend (Bitmap) -> Unit,
     ) {
         if (!translator.ocrReady) return
-        if (bakedKeys.contains(cacheKey) || jobs.containsKey(cacheKey)) return
+        if (bakedKeys.contains(cacheKey) || jobs.containsKey(cacheKey) || failedKeys.value.contains(cacheKey)) return
         releasePending = false // 新任务到达：翻译重新启用，作废挂起的会话关闭
         // 第十七轮：缓存 key 带引擎+源语言标识——切换引擎或"页面文字"语言后同页自动重译
         val engine = selectedEngine
-        val modelTag = if(engine == "ai") llmTranslator.cacheFingerprint() else "online-v1"
+        val modelTag = if(engine == "ai") llmTranslator.cacheFingerprint() else "transmart-v2"
         val enginePrefix = "$translationKey@$engine-${forcedLang ?: "auto"}-$modelTag-v2"
         jobs[cacheKey] = scope.launch {
             val t0 = android.os.SystemClock.elapsedRealtime()
             try {
-                busyKeys.value = busyKeys.value + cacheKey
+                busyKeys.update { it + cacheKey }
                 val base = loadBase() ?: return@launch
                 if (bakedKeys.contains(cacheKey)) return@launch
                 PageMemoryBudget.check(base)
@@ -798,12 +803,14 @@ class TranslationCoordinator(
                     TranslationCache.read(appContext, engineKey, base.width, base.height)
                         ?: (if (engine == "ai") translator.translatePage(base, forcedLang)
                             else translator.translatePageOnline(base, forcedLang)).also {
-                            if (it.hasUsableText) TranslationCache.write(appContext, engineKey, it)
+                            if (it.hasUsableText && it.regions.all { region -> region.translated.isNotBlank() })
+                                TranslationCache.write(appContext, engineKey, it)
                         }
                 }
                 val t2 = android.os.SystemClock.elapsedRealtime()
                 if (!translation.hasUsableText) {
-                    bakedKeys.add(cacheKey)     // 空结果也标记，避免反复重试
+                    if (translation.regions.isEmpty()) bakedKeys.add(cacheKey)
+                    else failedKeys.update { it + cacheKey }
                     android.util.Log.w("MTPerf", "page=${cacheKey.take(40)} engine=$selectedEngine NO-USABLE-TEXT total=${t2 - t0}ms regions=${translation.regions.size}")
                     return@launch
                 }
@@ -816,8 +823,9 @@ class TranslationCoordinator(
                 )
                 val t3 = android.os.SystemClock.elapsedRealtime()
                 bakedKeys.add(cacheKey)
+                if (translation.regions.any { it.translated.isBlank() }) failedKeys.update { it + cacheKey }
                 publishBaked(baked)
-                epoch.value = epoch.value + 1
+                epoch.update { it + 1 }
                 android.util.Log.d(
                     "MTPerf",
                     "page=${cacheKey.take(40)} engine=$selectedEngine cached=${cached != null} " +
@@ -829,10 +837,11 @@ class TranslationCoordinator(
                 // 翻页/换章导致的正常取消：静默重抛让协程正常结束（不是失败）
                 throw e
             } catch (e: Throwable) {
+                failedKeys.update { it + cacheKey }
                 // 单页失败静默（保留原文）；下次进入该页会重试
                 android.util.Log.w("MTPerf", "page=${cacheKey.take(40)} engine=$selectedEngine FAIL ${e.javaClass.simpleName}: ${e.message?.take(120)} elapsed=${android.os.SystemClock.elapsedRealtime() - t0}ms")
             } finally {
-                busyKeys.value = busyKeys.value - cacheKey
+                busyKeys.update { it - cacheKey }
                 jobs.remove(cacheKey)
             }
         }
@@ -849,6 +858,7 @@ class TranslationCoordinator(
     /** 清空烘焙标记（配合 evictProcessed 使用）。 */
     fun resetMarks() {
         bakedKeys.clear()
+        failedKeys.value = emptySet()
     }
 
     /** 手动触发 UI 重播种（缓存替换/失效后）。 */

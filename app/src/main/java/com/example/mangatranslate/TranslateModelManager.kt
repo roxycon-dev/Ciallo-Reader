@@ -168,6 +168,7 @@ object TranslateModelManager {
         onProgress: (Float) -> Unit = {},
     ): String? = withContext(Dispatchers.IO) {
         mutex.withLock {
+            try {
             val appContext = context.applicationContext
             if (isReady(appContext)) {
                 _state.value = DownloadState.Ready
@@ -191,8 +192,19 @@ object TranslateModelManager {
                 doneBytes += target.length()
                 onProgress((doneBytes / totalMin).coerceIn(0f, 1f))
             }
+            // The .tmp hash entry does not apply after rename. Populate final-file verification
+            // before emitting Ready, so the UI's first schedule cannot see an unverified model.
+            if (!isReady(appContext)) {
+                val error = "模型完整性验证失败，请重新下载"
+                _state.value = DownloadState.Failed(error)
+                return@withContext error
+            }
             _state.value = DownloadState.Ready
             null
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                _state.value = DownloadState.NotDownloaded
+                throw cancelled
+            }
         }
     }
 

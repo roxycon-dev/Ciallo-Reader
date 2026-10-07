@@ -1,8 +1,15 @@
 package com.example.ui.comic
 
+import com.example.ui.components.overlayTouchShield
+
 import android.graphics.Bitmap
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.Role
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -18,6 +25,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -43,6 +52,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.StarOutline
 import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
@@ -111,7 +121,7 @@ internal fun Modifier.comicPanelGlass(backdrop: Backdrop?, shape: Shape): Modifi
         shape = { shape },
         effects = {
             colorControls(saturation = 1.18f)
-            blur(radius = 26.dp.toPx())
+            blur(radius = 10.dp.toPx())
         },
     ).background(PanelBgGlass)
 
@@ -245,6 +255,8 @@ fun ComicReaderChrome(
         }
     }
 
+    var displayedPanel by remember { mutableStateOf(panel) }
+    if (panel != ComicPanel.NONE) displayedPanel = panel
     // 面板遮罩（与面板同节奏淡入淡出）
     AnimatedVisibility(
         visible = panel != ComicPanel.NONE,
@@ -255,7 +267,7 @@ fun ComicReaderChrome(
             Modifier
                 .fillMaxSize()
                 .background(Color(0x66000000))
-                .clickableNoRipple(onDismissPanel)
+                .clickableNoRipple { if (panel != ComicPanel.SETTINGS) onDismissPanel() }
         )
     }
 
@@ -266,7 +278,7 @@ fun ComicReaderChrome(
         modifier = Modifier.fillMaxSize(),
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            when (panel) {
+            when (displayedPanel) {
                 ComicPanel.SETTINGS -> ComicSettingsSheet(
                     config = config, store = store, perBookConfig = perBookConfig,
                     onPerBookConfigChange = onPerBookConfigChange,
@@ -632,22 +644,25 @@ internal fun SegmentRow(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
                 .background(PanelChipBg)
+                .selectableGroup()
                 .padding(3.dp),
             horizontalArrangement = Arrangement.spacedBy(3.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             options.forEach { (id, label) ->
                 val active = id == selected
+                val animatedTint by animateColorAsState(if (active) panelSelectedBg() else Color.Transparent, label = "comicOptionTint")
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(9.dp))
-                        .background(if (active) panelSelectedBg() else Color.Transparent)
+                        .background(animatedTint)
                         .border(
                             0.5.dp,
                             if (active) panelSelectedStroke() else Color.Transparent,
                             RoundedCornerShape(9.dp)
                         )
-                        .clickableNoRipple { onSelect(id) }
+                        .selectable(active, role = Role.RadioButton) { onSelect(id) }
+                        .heightIn(min = 44.dp)
                         .padding(vertical = 8.dp, horizontal = 10.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -656,8 +671,7 @@ internal fun SegmentRow(
                         color = if (active) MintPrimary else Color(0xAAFFFFFF),
                         fontSize = 12.sp,
                         fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                        maxLines = 1,
-                        softWrap = false
+                        softWrap = true
                     )
                 }
             }
@@ -719,17 +733,22 @@ internal fun ComicSheetContainer(
     glassBackdrop: LayerBackdrop? = null,
     content: @Composable () -> Unit,
 ) {
-    val sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
+    val wide = maxWidth >= 600.dp || maxWidth > maxHeight
+    val sheetShape = RoundedCornerShape(28.dp)
     Column(
         Modifier
             // adaptiveSheetWidth = widthIn 必须在 fillMaxWidth 之前：先钳制最大宽度再填充——
             // 反序会让 fillMaxWidth 先撑满屏宽，560dp 背景钉在左侧留出无背景空区。
             // 横屏放宽到 840dp，与阅读设置面板（第 11 条）同一套自适应规范
-            .adaptiveSheetWidth()
-            .fillMaxHeight(heightFraction)
+            .align(if (wide) Alignment.CenterEnd else Alignment.BottomCenter)
+            .padding(horizontal = if (wide) 16.dp else 8.dp, vertical = 8.dp)
+            .widthIn(max = 620.dp).fillMaxWidth()
+            .fillMaxHeight(if (wide) 0.94f else heightFraction)
             .clip(sheetShape)
             .comicPanelGlass(glassBackdrop, sheetShape)
             .border(0.5.dp, StrokeColor, sheetShape)
+            .overlayTouchShield()
     ) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             Box(
@@ -740,11 +759,12 @@ internal fun ComicSheetContainer(
                     .background(Color(0x2EFFFFFF))
             )
         }
-        Text(
-            title,
-            color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-        )
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, color = TextPrimary, fontSize = 21.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            androidx.compose.material3.IconButton(onClick = onDismiss) {
+                Icon(androidx.compose.material.icons.Icons.Filled.Close, "关闭$title", tint = TextSecondary)
+            }
+        }
         Box(
             Modifier
                 .fillMaxWidth()
@@ -755,6 +775,7 @@ internal fun ComicSheetContainer(
         ) {
             content()
         }
+    }
     }
 }
 

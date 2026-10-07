@@ -30,6 +30,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Text
@@ -84,6 +85,7 @@ import com.example.mangatranslate.LlmBubbleTranslator
 import com.example.mangatranslate.OnlineFallbackTranslator
 import com.example.mangatranslate.OrtSessions
 import com.example.mangatranslate.TranslationCoordinator
+import com.example.mangatranslate.TranslateModelManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -268,8 +270,14 @@ fun ComicReaderCore(
     // 用户显式选择的引擎（第十八轮）随配置同步；换引擎同页自动重译（缓存 key 含引擎标识）
     translationCoordinator.selectedEngine = config.translationEngine
     val translationScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
+    LaunchedEffect(config.translationEnabled) {
+        if (config.translationEnabled && !TranslateModelManager.isReady(context)) {
+            TranslateModelManager.ensureDownloaded(context) { }
+        }
+    }
     val translationEpoch by translationCoordinator.epoch.collectAsStateWithLifecycle()
     val translatingPages by translationCoordinator.busyKeys.collectAsStateWithLifecycle()
+    val translationFailures by translationCoordinator.failedKeys.collectAsStateWithLifecycle()
     DisposableEffect(translationCoordinator) {
         onDispose {
             // release = 取消任务 + 归还 ONNX 会话内存（det/rec/yolo 约 60-100MB 常驻）
@@ -517,7 +525,7 @@ fun ComicReaderCore(
      *  下一跨最后槽位真正预载、后退几乎从不预载）+ 主 LRU 上限装不下窗口
      *  字节（增强页 ~29MB×6 槽）→ 翻页时重新解码 = 偶现加载圈。 */
     val translationModelState by com.example.mangatranslate.TranslateModelManager.state.collectAsStateWithLifecycle()
-    LaunchedEffect(currentSpread, layout, displayConfig, translationModelState) {
+    LaunchedEffect(currentSpread, layout, displayConfig, translationModelState, translationEpoch) {
         if (!verticalMode) {
             val entries = ArrayList<ComicPageLoader.WindowEntry>(6)
             // 驻留优先级序：当前 → 下一 → 上一（预算不足时当前/下一页优先保活）。
@@ -672,6 +680,20 @@ fun ComicReaderCore(
             ) {
                 Text("正在翻译…", color = Color(0xE6FFFFFF), fontSize = 12.sp)
             }
+        }
+        val currentTranslationFailed = currentSpreadData?.slots?.any { slot ->
+            val rot = ((config.bookRotation + (bookState.pageRotations[slot.ref.id] ?: 0)) % 360 + 360) % 360
+            "${slot.ref.id}|${slot.half}|${config.imagePipelineFingerprint()}|r$rot" in translationFailures
+        } == true
+        if (config.translationEnabled && currentTranslationFailed && translatingPages.isEmpty() && panel == ComicPanel.NONE) {
+            Text("翻译未完成 · 点按重试", color = Color.White, fontSize = 12.sp,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(50)).background(PanelBg)
+                    .clickableNoRipple {
+                        translationCoordinator.takeBakedKeys().forEach { loader.evictProcessed(it) }
+                        translationCoordinator.resetMarks()
+                        translationCoordinator.bumpEpoch()
+                    }.padding(horizontal = 16.dp, vertical = 14.dp))
         }
     }
     }   // CompositionLocalProvider(LocalComicTranslationEpoch)
@@ -1055,12 +1077,16 @@ private fun ComicPagedReader(
     if (ttb) {
         VerticalPager(
             state = pagerState,
+            flingBehavior = PagerDefaults.flingBehavior(pagerState,
+                snapPositionalThreshold = comicPagerThreshold(true)),
             userScrollEnabled = config.gestureSwipe,
             modifier = Modifier.fillMaxSize().then(chapterEdgeModifier),
         ) { idx -> cell(idx) }
     } else {
         HorizontalPager(
             state = pagerState,
+            flingBehavior = PagerDefaults.flingBehavior(pagerState,
+                snapPositionalThreshold = comicPagerThreshold(false)),
             reverseLayout = rtl,
             userScrollEnabled = config.gestureSwipe,
             modifier = Modifier.fillMaxSize().then(chapterEdgeModifier),
@@ -1177,7 +1203,6 @@ private fun ComicMagneticPager(
                 val h = size.height.toFloat()
                 val span = if (ttb) h else w
                 val slop = viewConfiguration.touchSlop
-                val vTh = 400.dp.toPx()
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     var total = 0f
@@ -1205,7 +1230,7 @@ private fun ComicMagneticPager(
                         if (dragging) {
                             // 拖拽期间复查子层状态：双指捏合/长按放大接管（或其事件被消费）
                             // 时中止磁吸并回弹——对照卷页引擎的每事件复查
-                            if (childZoomed.value || event.changes.any { it.isConsumed && it.id != down.id }) {
+                            if (childZoomed.value || event.changes.count { it.pressed } > 1 || event.changes.any { it.isConsumed && it.id != down.id }) {
                                 scope.launch {
                                     drag.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = 420f))
                                 }
@@ -1222,7 +1247,7 @@ private fun ComicMagneticPager(
                         magDragActive.value = false
                         val v = runCatching { tracker.calculateVelocity() }.getOrNull()
                         val vAxis = if (ttb) (v?.y ?: 0f) else (v?.x ?: 0f)
-                        val targetShift = magneticTargetShift(drag.value, vAxis, span, dirSign, vTh)
+                        val targetShift = (-comicTurnIntent(drag.value, vAxis, span, density) * dirSign).toInt()
                             // 边界页快速回甩：目标夹到合法页范围（越界 → 回弹到当前页）
                             .coerceIn(-latestCurrentSpread, layout.spreadCount - 1 - latestCurrentSpread)
                         val targetPage = latestCurrentSpread + targetShift
@@ -1349,7 +1374,8 @@ private fun ComicVerticalList(
     // 前瞻预载差异化（第 6 条 prefetchWindow 真正接线）：无缝滚动（窗口 4）比条漫
     // （窗口 2）更远地提前解码+处理，滚动进入前纹理已在缓存——"完全连续无停顿"
     // 的预加载策略腿；LazyColumn 自身组合窗口只覆盖可见±少量，两者叠加生效
-    LaunchedEffect(currentSpread, strategy, layout, config, translationModelState) {
+    val translationEpoch = LocalComicTranslationEpoch.current
+    LaunchedEffect(currentSpread, strategy, layout, config, translationModelState, translationEpoch) {
         // 5.5 修复：整窗一次提交（旧逐槽调用会互相取消预载任务，见水平路径注释）。
         // verticalPreloadIndices 已返回驻留优先级序（当前 → 前瞻近→远 → 上一页）。
         // config（=防抖 displayConfig）入 key：指纹落定自动重预载并重建驻留。

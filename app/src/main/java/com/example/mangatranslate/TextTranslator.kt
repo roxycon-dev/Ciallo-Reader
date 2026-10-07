@@ -1,5 +1,11 @@
 package com.example.mangatranslate
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.Dispatchers
 import com.example.source.executeCancellable
 import com.example.data.readImportBytes
@@ -53,96 +59,87 @@ object ScriptDetector {
     }
 }
 
-/**
- * 在线兜底翻译（第十七轮）：腾讯交互翻译 transmart（国内直连免费，批量多句）。
- * 旧 Google gtx 仅作备源（国内网络通常不可达）。
- */
-class OnlineFallbackTranslator(private val context:android.content.Context?=null) : TextTranslator {
-
+/** Tencent's public web translator. Bounded batches, cancellation and repeated-dialogue caching. */
+class OnlineFallbackTranslator(
+    private val context: android.content.Context? = null,
+    private val clientOverride: OkHttpClient? = null,
+) : TextTranslator {
     private val client by lazy {
-        com.example.source.SharedHttpTransport.builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
+        clientOverride ?: com.example.source.SharedHttpTransport.builder()
+            .connectTimeout(4, TimeUnit.SECONDS)
+            .readTimeout(6, TimeUnit.SECONDS)
+            .callTimeout(8, TimeUnit.SECONDS)
             .build()
     }
+    private val sentences = android.util.LruCache<String, String>(512)
+    private val requests = Semaphore(2)
 
-    override suspend fun prepare(source: String): String? = null
+    override suspend fun prepare(sourceLang: String): String? = null
+    override suspend fun translate(text: String, sourceLang: String): String? =
+        translateBatch(listOf(text), sourceLang)?.firstOrNull()?.takeIf { it.isNotBlank() }
 
-    override suspend fun translate(text: String, sourceLang: String): String? {
-        val out = translateBatch(listOf(text), sourceLang)
-        return out?.firstOrNull()
+    suspend fun translateBatch(texts: List<String>, sourceLang: String): List<String>? = withContext(Dispatchers.IO) {
+        if (texts.isEmpty()) return@withContext emptyList()
+        if (context != null && !TranslationPrivacy.allowed(context)) return@withContext null
+        require(texts.size <= 500 && texts.sumOf { it.length } <= 128_000) { "翻译请求过大" }
+        if (sourceLang == "zh") return@withContext texts
+        val normalized = texts.map { it.trim() }
+        val unique = normalized.filter { it.isNotBlank() }.distinct()
+        val missing = unique.filter { sentences.get("$sourceLang|$it") == null }
+        // Chunk by both count and character budget. A failure never fans out into N single requests.
+        val chunks = mutableListOf<MutableList<String>>()
+        for (text in missing) {
+            if (text.length > 6000) continue
+            if (chunks.isEmpty() || chunks.last().size >= 24 || chunks.last().sumOf { it.length } + text.length > 6000)
+                chunks.add(mutableListOf())
+            chunks.last().add(text)
+        }
+        withTimeoutOrNull(10_000L) {
+            coroutineScope {
+                chunks.map { batch -> async {
+                    requests.withPermit {
+                        requestBatch(batch, sourceLang)?.forEachIndexed { i, translated ->
+                            sentences.put("$sourceLang|${batch[i]}", translated)
+                        }
+                    }
+                } }.awaitAll()
+            }
+        }
+        val out = normalized.map { if (it.isBlank()) "" else sentences.get("$sourceLang|$it") ?: "" }
+        out.takeIf { it.any(String::isNotBlank) }
     }
 
-    /**
-     * 批量翻译（腾讯 transmart /api/imt 一次请求多句，保持顺序）。
-     * 返回与输入等长的译文列表（失败元素为 null→整体 null）。
-     */
-    suspend fun translateBatch(texts: List<String>, sourceLang: String): List<String>? =
-        withContext(Dispatchers.IO) {
-            if (texts.isEmpty()) return@withContext emptyList()
-            if(context!=null && !TranslationPrivacy.allowed(context)) return@withContext null
-            require(texts.size<=500 && texts.sumOf { it.length }<=128_000) { "翻译请求过大" }
-            val srcLang = when (sourceLang) {
-                "ja" -> "ja"; "en" -> "en"; "zh" -> "zh"
-                else -> "auto"
+    private suspend fun requestBatch(texts: List<String>, sourceLang: String): List<String>? {
+        val lang = sourceLang.takeIf { it in setOf("ja", "en", "ko", "zh") } ?: "auto"
+        val body = JSONObject()
+            .put("header", JSONObject().put("fn", "auto_translation").put("session", "")
+                .put("client_key", "browser-chromium-131.0.0.0"))
+            .put("source", JSONObject().put("text_list", JSONArray(texts)).put("lang", lang))
+            .put("target", JSONObject().put("lang", "zh"))
+        val request = Request.Builder().url("https://transmart.qq.com/api/imt")
+            .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
+            .header("Referer", "https://transmart.qq.com/")
+            .post(body.toString().toRequestBody("application/json".toMediaType())).build()
+        return runCatching {
+            client.newCall(request).executeCancellable().use { response ->
+                if (!response.isSuccessful) return@runCatching null
+                val raw = response.body?.byteStream()?.use { it.readImportBytes(2 * 1024 * 1024).toString(Charsets.UTF_8) }
+                    ?: return@runCatching null
+                parseTransmart(raw, texts.size)
             }
-            val body = JSONObject()
-                .put(
-                    "header",
-                    JSONObject()
-                        .put("fn", "auto_translation")
-                        .put("session", "")
-                        .put("client_key", "browser-chromium-131.0.0.0")
-                )
-                .put("source", JSONObject().put("text_list", JSONArray(texts)).put("lang", srcLang))
-                .put("target", JSONObject().put("lang", "zh"))
-            val request = Request.Builder()
-                .url("https://transmart.qq.com/api/imt")
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                .header("Content-Type", "application/json")
-                .header("Referer", "https://transmart.qq.com/")
-                .post(body.toString().toRequestBody("application/json".toMediaType()))
-                .build()
-            runCatching {
-                client.newCall(request).executeCancellable().use { resp ->
-                    if (!resp.isSuccessful) return@runCatching null
-                    val raw = resp.body?.byteStream()?.use { it.readImportBytes(2*1024*1024).toString(Charsets.UTF_8) } ?: return@runCatching null
-                    parseTransmart(raw, texts.size)
-                }
-            }.getOrElse { kotlinx.coroutines.currentCoroutineContext().ensureActive(); null } ?: gtxFallback(texts, sourceLang)
-        }
+        }.getOrElse { kotlinx.coroutines.currentCoroutineContext().ensureActive(); null }
+    }
 
-    /** 腾讯响应解析：{"auto_translation":["译1","译2",...]}。长度必须与请求一致。 */
     internal fun parseTransmart(raw: String, expectCount: Int): List<String>? = runCatching {
         val obj = JSONObject(raw)
         if (obj.optJSONObject("header")?.optString("ret_code") != "succ") return@runCatching null
         val arr = obj.optJSONArray("auto_translation") ?: return@runCatching null
-        if (arr.length() != expectCount) return@runCatching null
-        List(expectCount) { i -> arr.optString(i) }
+        if (arr.length() != expectCount || (0 until arr.length()).any { arr.opt(it) !is String || arr.optString(it).isBlank() })
+            return@runCatching null
+        List(expectCount) { arr.getString(it).trim() }
     }.getOrNull()
 
-    /** 备源：Google gtx（逐句；国内网络一般不可达，仅海外/代理兜底）。 */
-    private suspend fun gtxFallback(texts: List<String>, sourceLang: String): List<String>? =
-        withContext(Dispatchers.IO) {
-            val results = texts.map { text ->
-                runCatching {
-                    val sl = if (sourceLang == "zh") "auto" else sourceLang
-                    val url = "https://translate.googleapis.com/translate_a/single?client=gtx" +
-                        "&sl=$sl&tl=zh-CN&dt=t&q=" + java.net.URLEncoder.encode(text, "UTF-8")
-                    val request = Request.Builder().url(url)
-                        .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
-                        .build()
-                    client.newCall(request).executeCancellable().use { resp ->
-                        if (!resp.isSuccessful) return@runCatching null
-                        val body = resp.body?.byteStream()?.use { it.readImportBytes(2*1024*1024).toString(Charsets.UTF_8) } ?: return@runCatching null
-                        parseGtx(body)
-                    }
-                }.getOrElse { kotlinx.coroutines.currentCoroutineContext().ensureActive(); null }
-            }
-            @Suppress("UNCHECKED_CAST")
-            if (results.any { it == null }) null else results as List<String>
-        }
-
+    // Legacy response parser retained for old cache/import compatibility; no Google requests.
     internal fun parseGtx(body: String): String? = runCatching {
         val root = JSONArray(body)
         val segments = root.optJSONArray(0) ?: return@runCatching null
@@ -155,9 +152,5 @@ class OnlineFallbackTranslator(private val context:android.content.Context?=null
         sb.toString().ifBlank { null }
     }.getOrNull()
 
-    override fun close() {}
-
-    companion object {
-        private const val TIMEOUT_MS = 20_000L
-    }
+    override fun close() { sentences.evictAll() }
 }

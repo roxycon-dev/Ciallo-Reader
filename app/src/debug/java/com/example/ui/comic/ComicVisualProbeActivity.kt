@@ -118,6 +118,7 @@ class ComicVisualProbeActivity : ComponentActivity() {
         } else pages
 
         setContent {
+            com.example.ui.theme.MyApplicationTheme(darkTheme = false, colorPrimaryIndex = intent.getIntExtra("accent", 4)) {
             ComicReaderCore(
                 pages = effectivePages,
                 title = "视觉探针",
@@ -127,6 +128,7 @@ class ComicVisualProbeActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxSize(),
                 onExit = { finish() },
             )
+            }
         }
     }
 

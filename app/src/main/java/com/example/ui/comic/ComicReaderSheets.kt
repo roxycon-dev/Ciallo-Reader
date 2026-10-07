@@ -2,6 +2,17 @@
 
 package com.example.ui.comic
 
+import com.example.ui.components.overlayTouchShield
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.paneTitle
 import android.graphics.Bitmap
 import com.example.mangatranslate.LlmBubbleTranslator
 import com.example.mangatranslate.TranslationCache
@@ -104,6 +115,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -168,71 +180,80 @@ internal fun ComicSettingsSheet(
     var tab by remember { mutableIntStateOf(0) }
     val update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit = { onConfigChange(it(config)) }
 
-    // 第 11 条：横屏响应式——高度占满更多（横屏纵向空间小）、放宽最大宽度，
-    // 六个 Tab 行 + 底部预设管理固定可见，内容区独立滚动不被裁切
-    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
-        val landscape = maxWidth > maxHeight
-        val sheetHeight = if (landscape) 0.94f else 0.72f
-        val sheetMaxWidth = if (landscape) 840.dp else 560.dp
-        val sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-
-        // 面板三段结构：Tab 固定 + 内容滚动 + 配置区固定（不随内容滚走）；
-        // 宽度与 ComicSheetContainer 一致钳到 sheetMaxWidth（宽屏居中，父容器 BottomCenter）
+    val scrollStates = SettingsTabs.map { rememberScrollState() }
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
+        val wide = maxWidth >= 600.dp || maxWidth > maxHeight
+        val rail = wide
+        val compact = maxHeight < 480.dp
+        val sheetShape = RoundedCornerShape(28.dp)
         Column(
             Modifier
-                .widthIn(max = sheetMaxWidth)
+                .align(if (wide) Alignment.CenterEnd else Alignment.BottomCenter)
+                .padding(horizontal = if (wide) 16.dp else 8.dp, vertical = 8.dp)
+                .widthIn(max = if (rail) 620.dp else 560.dp)
                 .fillMaxWidth()
-                .fillMaxHeight(sheetHeight)
+                .fillMaxHeight(if (wide) 0.96f else 0.82f)
                 .clip(sheetShape)
                 .comicPanelGlass(glassBackdrop, sheetShape)
-                .border(0.5.dp, StrokeColor, sheetShape)
+                .border(1.dp, StrokeColor, sheetShape)
+                .overlayTouchShield()
+                .semantics { paneTitle = "漫画阅读设置" }
         ) {
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            Box(
-                Modifier
-                    .padding(top = 10.dp)
-                    .size(width = 40.dp, height = 4.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x2EFFFFFF))
-            )
-        }
-        Text(
-            "阅读设置",
-            color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-        )
-        // 分组 Tab（固定）——第七轮第 3 条：图标 Tab 导航（完整导航区域，
-        // 选中 = 半透明品牌填充 + 细边框，不再只靠文字变色）
-        PanelTabRow(
-            tabs = SettingsTabs,
-            selected = tab,
-            onSelect = { tab = it },
-            modifier = Modifier.padding(horizontal = 20.dp),
-        )
-        Spacer(Modifier.height(6.dp))
-        // 分组内容（滚动）。必须用 Column：各 Tab 的 composable 直接 emits 多个根级
-        // item（PanelSectionCard/SegmentRow/SwitchRow...），Box 会把它们全部堆叠在同一原点
-        // ——这正是用户实机"全部选项都混在一行"的根因（六 Tab 重构时引入）
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-        ) {
-            when (tab) {
-                0 -> ModeTab(config, update)
-                1 -> PageTab(config, update, store)
-                2 -> ImageTab(config, update, onOpenCrop, pages, loader, currentRawPage, bookState, onBookStateChange)
-                3 -> TranslationTab(config, update)
-                4 -> EffectTab(config, update)
-                5 -> AutoTab(config, update)
-                6 -> GestureTab(config, update)
+            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 10.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Tune, null, tint = MintPrimary,
+                    modifier = Modifier.clip(CircleShape).background(PanelChipBg).padding(10.dp).size(20.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("阅读设置", color = TextPrimary, fontSize = 23.sp, fontWeight = FontWeight.SemiBold)
+                    Text("${config.mode.label} · ${config.direction.label}", color = TextSecondary, fontSize = 12.sp)
+                }
+                IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, "关闭阅读设置", tint = TextSecondary) }
             }
-            Spacer(Modifier.height(12.dp))
-        }
+            Row(Modifier.fillMaxWidth().weight(1f)) {
+                if (rail) PanelTabRail(SettingsTabs, tab, { tab = it }, Modifier.padding(start = 12.dp, top = 8.dp))
+                Column(Modifier.weight(1f)) {
+                    if (!rail) PanelTabRow(SettingsTabs, tab, { tab = it }, Modifier.padding(horizontal = 12.dp))
+                    AnimatedContent(
+                        targetState = tab,
+                        transitionSpec = { fadeIn(tween(200, delayMillis = 50)) togetherWith fadeOut(tween(120)) },
+                        label = "comicSettingsTab",
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                    ) { selectedTab ->
+                        Column(Modifier.fillMaxSize().verticalScroll(scrollStates[selectedTab])
+                            .padding(horizontal = 14.dp, vertical = 8.dp)) {
+                            when (selectedTab) {
+                                0 -> ModeTab(config, update)
+                                1 -> PageTab(config, update, store)
+                                2 -> ImageTab(config, update, onOpenCrop, pages, loader, currentRawPage, bookState, onBookStateChange)
+                                3 -> TranslationTab(config, update)
+                                4 -> EffectTab(config, update)
+                                5 -> AutoTab(config, update)
+                                6 -> GestureTab(config, update)
+                            }
+                            Spacer(Modifier.height(12.dp))
+                        }
+                    }
+                }
+            }
+        if (compact) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.weight(0.8f).clip(RoundedCornerShape(14.dp)).background(PanelChipBg)
+                    .clickableNoRipple(onOpenPreset).padding(horizontal = 12.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Tune, null, tint = MintPrimary, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("预设管理", color = TextPrimary, fontSize = 13.sp)
+                }
+                Box(Modifier.weight(1f)) {
+                    SwitchRow("独立设置", if (perBookConfig) "仅当前漫画生效" else "跟随全局设置",
+                        perBookConfig, onPerBookConfigChange)
+                }
+            }
+        } else {
         // 配置区（固定在底部；与滚动区分隔的细线增强层级）
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).navigationBarsPadding()) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -274,6 +295,7 @@ internal fun ComicSettingsSheet(
             Spacer(Modifier.height(6.dp))
         }
         }
+        }
     }
 }
 
@@ -286,11 +308,23 @@ private fun TranslationTab(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+    val modelState by TranslateModelManager.state.collectAsStateWithLifecycle()
     var modelsReady by remember { mutableStateOf(TranslateModelManager.isReady(context)) }
     var downloading by remember { mutableFloatStateOf(-1f) }   // -1=空闲，0..1=进度
     var downloadError by remember { mutableStateOf<String?>(null) }
-    var cacheBytes by remember { mutableStateOf(TranslationCache.totalBytes(context)) }
+    LaunchedEffect(modelState) {
+        when (val state = modelState) {
+            TranslateModelManager.DownloadState.Ready -> { modelsReady = true; downloading = -1f; downloadError = null }
+            is TranslateModelManager.DownloadState.Downloading -> { downloading = state.progress; downloadError = null }
+            is TranslateModelManager.DownloadState.Failed -> { downloading = -1f; downloadError = state.reason }
+            TranslateModelManager.DownloadState.NotDownloaded -> { downloading = -1f }
+        }
+    }
+    var cacheBytes by remember { mutableStateOf(0L) }
+    LaunchedEffect(Unit) { cacheBytes = withContext(Dispatchers.IO) { TranslationCache.totalBytes(context) } }
     val onlineFallback = remember { OnlineFallbackTranslator(context.applicationContext) }
+    var onlineTesting by remember { mutableStateOf(false) }
+    var onlineTestResult by remember { mutableStateOf<String?>(null) }
 
     fun startDownload() {
         if (downloading >= 0f) return
@@ -307,10 +341,7 @@ private fun TranslationTab(
         }
     }
 
-    // 打开开关即自动补齐模型（已就绪则跳过）
-    LaunchedEffect(config.translationEnabled) {
-        if (config.translationEnabled && !TranslateModelManager.isReady(context)) startDownload()
-    }
+    // Automatic downloads belong to the reader, so changing categories never cancels OCR setup.
 
     val llmTranslator = remember { LlmBubbleTranslator(context) }
     var llmUrl by remember { mutableStateOf(llmTranslator.loadConfig().apiUrl) }
@@ -363,6 +394,21 @@ private fun TranslationTab(
                 val lang = when (i) { 1 -> "ja"; 2 -> "en"; else -> "auto" }
                 update { it.copy(translationLang = lang) }
             }
+            Spacer(Modifier.height(8.dp))
+            Text("对白识别后批量发送至腾讯交互翻译，成功结果自动缓存。", color = TextSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+            TextButton(enabled = !onlineTesting, onClick = {
+                onlineTesting = true
+                onlineTestResult = null
+                scope.launch {
+                    try {
+                        val start = android.os.SystemClock.elapsedRealtime()
+                        val result = onlineFallback.translate("Hello, how are you?", "en")
+                        onlineTestResult = if (result.isNullOrBlank()) "暂时无法连接，请检查网络后重试"
+                            else "连接成功 · ${android.os.SystemClock.elapsedRealtime() - start} ms · $result"
+                    } finally { onlineTesting = false }
+                }
+            }) { Text(if (onlineTesting) "正在检查…" else "测试在线翻译", color = MintPrimary) }
+            onlineTestResult?.let { Text(it, color = TextSecondary, fontSize = 12.sp, lineHeight = 18.sp) }
         }
     } else {
         /* ── 一级页：引擎选择卡片 ── */
@@ -489,8 +535,10 @@ private fun TranslationTab(
                 .clip(RoundedCornerShape(14.dp))
                 .background(PanelChipBg)
                 .clickableNoRipple {
-                    TranslationCache.clear(context)
-                    cacheBytes = 0
+                    scope.launch {
+                        withContext(Dispatchers.IO) { TranslationCache.clear(context) }
+                        cacheBytes = 0
+                    }
                 }
                 .padding(horizontal = 14.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically
