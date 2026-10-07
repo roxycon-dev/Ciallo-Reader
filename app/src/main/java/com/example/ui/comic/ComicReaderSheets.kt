@@ -2,6 +2,9 @@
 
 package com.example.ui.comic
 
+import com.example.ui.design.DesignTokens
+import com.example.ui.design.ReadingPalette
+
 import com.example.ui.components.overlayTouchShield
 
 import androidx.compose.animation.AnimatedContent
@@ -28,6 +31,8 @@ import com.example.mangatranslate.LlmBubbleTranslator
 import com.example.mangatranslate.TranslationCache
 import com.example.mangatranslate.TranslateModelManager
 import com.example.mangatranslate.OnlineFallbackTranslator
+import kotlinx.coroutines.ensureActive
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -154,7 +159,7 @@ import kotlinx.coroutines.launch
 
 /* ══════════════ 设置面板（第二层：分组展示） ══════════════ */
 
-private val AccentColor = Color(0xFFF0D9C0)
+private val AccentColor = ReadingPalette.WarmAccent
 
 // Tab 命名对齐规范第 1 节词汇：翻页（模式/方向/动画）、显示（缩放/间距）、
 // 主题（背景/场景/沉浸式）；图像 Tab 内含"画质增强"与"滤镜"两个规范名段落，
@@ -189,8 +194,9 @@ internal fun ComicSettingsSheet(
     glassBackdrop: LayerBackdrop? = null,
     onDownloadTranslationModels: () -> Unit = {},
     onTranslationRefresh: (Boolean) -> Unit = {},
+    initialTab: Int = 0,
 ) {
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by remember { mutableIntStateOf(initialTab.coerceIn(SettingsTabs.indices)) }
     val update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit = { onConfigChange(it(config)) }
 
     val scrollStates = SettingsTabs.map { rememberScrollState() }
@@ -198,11 +204,11 @@ internal fun ComicSettingsSheet(
         val wide = maxWidth >= 600.dp || maxWidth > maxHeight
         val rail = wide
         val compact = maxHeight < 480.dp
-        val sheetShape = RoundedCornerShape(28.dp)
+        val sheetShape = RoundedCornerShape(DesignTokens.RadiusOverlay)
         Column(
             Modifier
                 .align(if (wide) Alignment.CenterEnd else Alignment.BottomCenter)
-                .padding(horizontal = if (wide) 16.dp else 8.dp, vertical = 8.dp)
+                .padding(horizontal = if (wide) DesignTokens.SpaceLg else DesignTokens.SpaceSm, vertical = DesignTokens.SpaceSm)
                 .widthIn(max = if (rail) 620.dp else 560.dp)
                 .fillMaxWidth()
                 .fillMaxHeight(if (wide) 0.96f else 0.82f)
@@ -212,21 +218,21 @@ internal fun ComicSettingsSheet(
                 .overlayTouchShield()
                 .semantics { paneTitle = "漫画阅读设置" }
         ) {
-            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 10.dp, bottom = 6.dp),
+            Row(Modifier.fillMaxWidth().padding(start = DesignTokens.SpaceXl, end = DesignTokens.SpaceSm, top = DesignTokens.SpaceTight, bottom = DesignTokens.SpaceCompact),
                 verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.Tune, null, tint = MintPrimary,
-                    modifier = Modifier.clip(CircleShape).background(PanelChipBg).padding(10.dp).size(20.dp))
-                Spacer(Modifier.width(12.dp))
+                    modifier = Modifier.clip(CircleShape).background(PanelChipBg).padding(DesignTokens.SpaceTight).size(DesignTokens.SpaceXl))
+                Spacer(Modifier.width(DesignTokens.SpaceMd))
                 Column(Modifier.weight(1f)) {
-                    Text("阅读设置", color = TextPrimary, fontSize = 23.sp, fontWeight = FontWeight.SemiBold)
-                    Text("${config.mode.label} · ${config.direction.label}", color = TextSecondary, fontSize = 12.sp)
+                    Text("阅读设置", color = TextPrimary, fontSize = DesignTokens.TypeTitle, fontWeight = FontWeight.SemiBold)
+                    Text("${config.mode.label} · ${config.direction.label}", color = TextSecondary, fontSize = DesignTokens.TypeCaption)
                 }
                 IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, "关闭阅读设置", tint = TextSecondary) }
             }
             Row(Modifier.fillMaxWidth().weight(1f)) {
-                if (rail) PanelTabRail(SettingsTabs, tab, { tab = it }, Modifier.padding(start = 12.dp, top = 8.dp))
+                if (rail) PanelTabRail(SettingsTabs, tab, { tab = it }, Modifier.padding(start = DesignTokens.SpaceMd, top = DesignTokens.SpaceSm))
                 Column(Modifier.weight(1f)) {
-                    if (!rail) PanelTabRow(SettingsTabs, tab, { tab = it }, Modifier.padding(horizontal = 12.dp))
+                    if (!rail) PanelTabRow(SettingsTabs, tab, { tab = it }, Modifier.padding(horizontal = DesignTokens.SpaceMd))
                     AnimatedContent(
                         targetState = tab,
                         transitionSpec = { fadeIn(tween(200, delayMillis = 50)) togetherWith fadeOut(tween(120)) },
@@ -234,7 +240,7 @@ internal fun ComicSettingsSheet(
                         modifier = Modifier.fillMaxWidth().weight(1f),
                     ) { selectedTab ->
                         Column(Modifier.fillMaxSize().verticalScroll(scrollStates[selectedTab])
-                            .padding(horizontal = 14.dp, vertical = 8.dp)) {
+                            .padding(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceSm)) {
                             when (selectedTab) {
                                 0 -> ModeTab(config, update)
                                 1 -> PageTab(config, update, store)
@@ -244,20 +250,20 @@ internal fun ComicSettingsSheet(
                                 5 -> AutoTab(config, update)
                                 6 -> GestureTab(config, update)
                             }
-                            Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(DesignTokens.SpaceMd))
                         }
                     }
                 }
             }
         if (compact) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(Modifier.weight(0.8f).clip(RoundedCornerShape(14.dp)).background(PanelChipBg)
-                    .clickableNoRipple(onOpenPreset).padding(horizontal = 12.dp, vertical = 14.dp),
+            Row(Modifier.fillMaxWidth().padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceCompact),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceMd)) {
+                Row(Modifier.weight(0.8f).clip(RoundedCornerShape(DesignTokens.RadiusControl)).background(PanelChipBg)
+                    .clickableNoRipple(onOpenPreset).padding(horizontal = DesignTokens.SpaceMd, vertical = DesignTokens.SpaceComfortable),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Tune, null, tint = MintPrimary, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("预设管理", color = TextPrimary, fontSize = 13.sp)
+                    Icon(Icons.Filled.Tune, null, tint = MintPrimary, modifier = Modifier.size(DesignTokens.SpaceLoose))
+                    Spacer(Modifier.width(DesignTokens.SpaceSm))
+                    Text("预设管理", color = TextPrimary, fontSize = DesignTokens.TypeLabel)
                 }
                 Box(Modifier.weight(1f)) {
                     SwitchRow("独立设置", if (perBookConfig) "仅当前漫画生效" else "跟随全局设置",
@@ -266,46 +272,44 @@ internal fun ComicSettingsSheet(
             }
         } else {
         // 配置区（固定在底部；与滚动区分隔的细线增强层级）
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = DesignTokens.SpaceLg)) {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 8.dp)
+                    .padding(bottom = DesignTokens.SpaceSm)
                     .height(0.5.dp)
                     .background(StrokeColor)
             )
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(DesignTokens.RadiusControl))
                     .background(PanelChipBg)
                     .clickableNoRipple(onOpenPreset)
-                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                    .padding(horizontal = DesignTokens.SpaceComfortable, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
+                PanelDecorativeIcon(
                     Icons.Filled.Tune,
-                    contentDescription = null,
                     tint = MintPrimary.copy(alpha = 0.9f),
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(DesignTokens.SpaceLg)
                 )
-                Spacer(Modifier.width(8.dp))
-                Text("预设管理", color = TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                Icon(
+                Spacer(Modifier.width(DesignTokens.SpaceSm))
+                Text("预设管理", color = TextPrimary, fontSize = DesignTokens.TypeLabel, modifier = Modifier.weight(1f))
+                PanelDecorativeIcon(
                     Icons.Filled.ChevronRight,
-                    contentDescription = null,
                     tint = TextSecondary,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(DesignTokens.SpaceLg)
                 )
             }
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(DesignTokens.SpaceXs))
             SwitchRow(
                 title = "本漫画独立设置",
                 subtitle = if (perBookConfig) "仅当前漫画生效" else "跟随全局设置",
                 checked = perBookConfig,
                 onChange = onPerBookConfigChange
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(DesignTokens.SpaceCompact))
         }
         }
         }
@@ -315,6 +319,7 @@ internal fun ComicSettingsSheet(
 /* ── Tab 3：翻译（第十五轮：离线 OCR + 离线/兜底机翻 + 逐页缓存） ── */
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun TranslationTab(
     config: ComicReaderConfig,
     update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit,
@@ -369,13 +374,22 @@ private fun TranslationTab(
         llmUrl = url; llmKey = key; llmModel = model; llmGemini = gemini
         aiTestResult = null
     }
+    fun useProvider(url: String, model: String) {
+        val sameHost = llmUrl.toHttpUrlOrNull()?.host == url.toHttpUrlOrNull()?.host
+        saveLlm(url, if (sameHost) llmKey else "", model, false)
+    }
     // Keep keystore writes and page invalidation out of the per-keystroke path.
     LaunchedEffect(llmUrl, llmKey, llmModel, llmGemini) {
         kotlinx.coroutines.delay(500)
         val next = LlmBubbleTranslator.LlmConfig(llmUrl, llmKey, llmModel, llmGemini)
         if (next != llmTranslator.loadConfig()) {
-            withContext(Dispatchers.IO) { llmTranslator.saveConfig(next) }
-            onRefresh(false)
+            try {
+                withContext(Dispatchers.IO) { llmTranslator.saveConfig(next) }
+                onRefresh(false)
+            } catch (e: Exception) {
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                aiTestResult = "配置未保存：系统安全存储不可用，请重新打开应用后再试"
+            }
         }
     }
     DisposableEffect(Unit) { onDispose {
@@ -392,8 +406,14 @@ private fun TranslationTab(
         /* ── 二级页：自定义 AI 配置 ── */
         PanelSectionCard("自定义 AI 接口", Icons.Filled.Cloud) {
             PanelRow("返回引擎列表", Icons.AutoMirrored.Filled.ArrowBack) { engineSubPage = null }
-            Spacer(Modifier.height(6.dp))
-            PanelTextField("API 地址（如 https://api.deepseek.com）", llmUrl) {
+            Spacer(Modifier.height(DesignTokens.SpaceCompact))
+            PanelHint("手机 OCR 识别对白，仅文字发送给云端大模型。无需视觉模型；免费额度是否可用取决于你的账户。")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceCompact)) {
+                TextButton(onClick = { useProvider("https://api.siliconflow.cn/v1", "Qwen/Qwen2.5-7B-Instruct") }) { Text("硅基流动", color = MintPrimary) }
+                TextButton(onClick = { useProvider("https://api.deepseek.com/v1", "deepseek-chat") }) { Text("DeepSeek", color = MintPrimary) }
+                TextButton(onClick = { useProvider("https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus") }) { Text("阿里百炼", color = MintPrimary) }
+            }
+            PanelTextField("API 地址（支持完整 chat/completions 地址）", llmUrl) {
                 saveLlm(it, llmKey, llmModel, llmGemini)
             }
             PanelTextField("API Key", llmKey, obscured = !showKey) {
@@ -414,8 +434,11 @@ private fun TranslationTab(
                     try {
                         withContext(Dispatchers.IO) { llmTranslator.saveConfig(LlmBubbleTranslator.LlmConfig(llmUrl, llmKey, llmModel, llmGemini)) }
                         val result = llmTranslator.testConnection()
-                        aiTestResult = result ?: "未获得有效译文，请检查地址、模型和密钥"
+                        aiTestResult = result ?: llmTranslator.lastFailure?.description ?: "请求超时，请检查网络和接口设置"
                         onRefresh(false)
+                    } catch (e: Exception) {
+                        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                        aiTestResult = "配置未保存：系统安全存储不可用，请重新打开应用后再试"
                     } finally { aiTesting = false }
                 }
             }) { Text(if (aiTesting) "正在检查…" else "测试 AI 翻译", color = MintPrimary) }
@@ -423,9 +446,9 @@ private fun TranslationTab(
         }
     } else if (engineSubPage == "online") {
         /* ── 二级页：在线翻译设置 ── */
-        PanelSectionCard("在线翻译", Icons.Filled.Public) {
+        PanelSectionCard("免费免 Key 在线机翻", Icons.Filled.Public) {
             PanelRow("返回引擎列表", Icons.AutoMirrored.Filled.ArrowBack) { engineSubPage = null }
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(DesignTokens.SpaceCompact))
             val langIdx = when (config.translationLang) { "ja" -> 1; "en" -> 2; "ko" -> 3; else -> 0 }
             SegmentRow(
                 "页面文字",
@@ -435,8 +458,8 @@ private fun TranslationTab(
                 val lang = when (i) { 1 -> "ja"; 2 -> "en"; 3 -> "ko"; else -> "auto" }
                 update { it.copy(translationLang = lang) }
             }
-            Spacer(Modifier.height(8.dp))
-            Text("对白识别后批量发送至腾讯交互翻译，成功结果自动缓存。", color = TextSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+            Spacer(Modifier.height(DesignTokens.SpaceSm))
+            Text("使用手机端 OCR，批量发送对白至腾讯交互翻译，无需填写 Key。此入口是机器翻译；大模型翻译请配置自定义 API。公共网页服务的可用性可能变化。", color = TextSecondary, fontSize = DesignTokens.TypeCaption, lineHeight = DesignTokens.TypeCaptionLineHeight)
             TextButton(enabled = !onlineTesting, onClick = {
                 onlineTesting = true
                 onlineTestResult = null
@@ -445,12 +468,12 @@ private fun TranslationTab(
                         val start = android.os.SystemClock.elapsedRealtime()
                         onlineFallback.close() // Connectivity tests must reach the service, not the sentence cache.
                         val result = onlineFallback.translate("Hello, how are you?", "en")
-                        onlineTestResult = if (result.isNullOrBlank()) "暂时无法连接，请检查网络后重试"
+                        onlineTestResult = if (result.isNullOrBlank()) onlineFallback.lastFailure?.description ?: "未获得有效译文，请检查网络"
                             else "连接成功 · ${android.os.SystemClock.elapsedRealtime() - start} ms · $result"
                     } finally { onlineTesting = false }
                 }
             }) { Text(if (onlineTesting) "正在检查…" else "测试在线翻译", color = MintPrimary) }
-            onlineTestResult?.let { Text(it, color = TextSecondary, fontSize = 12.sp, lineHeight = 18.sp) }
+            onlineTestResult?.let { Text(it, color = TextSecondary, fontSize = DesignTokens.TypeCaption, lineHeight = DesignTokens.TypeCaptionLineHeight) }
         }
     } else {
         /* ── 一级页：引擎选择卡片 ── */
@@ -458,7 +481,7 @@ private fun TranslationTab(
             val aiConfigured = llmUrl.isNotBlank() && llmModel.isNotBlank()
             EngineCard(
                 title = "自定义 AI 接口",
-                desc = "DeepSeek / GLM / Kimi 等 OpenAI 兼容接口",
+                desc = "云端大模型 · 整页对白上下文与统一译名",
                 state = when {
                     config.translationEngine == "ai" && aiConfigured -> "当前使用 · 已配置"
                     aiConfigured -> "已配置 · 点击选用并配置"
@@ -469,10 +492,10 @@ private fun TranslationTab(
                 update { it.copy(translationEngine = "ai") }
                 engineSubPage = "ai"
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(DesignTokens.SpaceSm))
             EngineCard(
-                title = "在线翻译",
-                desc = "腾讯交互翻译，国内直连",
+                title = "免费免 Key 在线机翻",
+                desc = "腾讯交互翻译 · 国内服务 · 无需配置",
                 state = if (config.translationEngine == "online") "当前使用" else "点击选用",
                 selected = config.translationEngine == "online",
             ) {
@@ -502,15 +525,15 @@ private fun TranslationTab(
         if (modelsReady) {
             PanelHint("OCR 与气泡识别模型已就绪 · 约 34 MB")
         } else if (downloading >= 0f) {
-            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                Text("正在下载模型 ${(downloading * 100).toInt()}%", color = TextPrimary, fontSize = 13.sp)
-                Spacer(Modifier.height(6.dp))
+            Column(Modifier.fillMaxWidth().padding(vertical = DesignTokens.SpaceSm)) {
+                Text("正在下载模型 ${(downloading * 100).toInt()}%", color = TextPrimary, fontSize = DesignTokens.TypeLabel)
+                Spacer(Modifier.height(DesignTokens.SpaceCompact))
                 Box(
                     Modifier
                         .fillMaxWidth()
                         .height(5.dp)
                         .clip(CircleShape)
-                        .background(Color(0x1FFFFFFF))
+                        .background(ReadingPalette.GlassStroke)
                 ) {
                     Box(
                         Modifier
@@ -522,31 +545,31 @@ private fun TranslationTab(
                 }
             }
         } else {
-            Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            Column(Modifier.fillMaxWidth().padding(vertical = DesignTokens.SpaceXs)) {
                 Text(
                     "需要下载 OCR 与气泡识别模型（约 34 MB，仅一次）",
-                    color = TextSecondary, fontSize = 12.sp
+                    color = TextSecondary, fontSize = DesignTokens.TypeCaption
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(DesignTokens.SpaceSm))
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(DesignTokens.RadiusControl))
                         .background(PanelChipBg)
                         .clickableNoRipple { startDownload() }
-                        .padding(horizontal = 14.dp, vertical = 11.dp),
+                        .padding(horizontal = DesignTokens.SpaceComfortable, vertical = 11.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Filled.Download, contentDescription = null, tint = MintPrimary, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
+                    PanelDecorativeIcon(Icons.Filled.Download, tint = MintPrimary, modifier = Modifier.size(DesignTokens.SpaceLg))
+                    Spacer(Modifier.width(DesignTokens.SpaceSm))
                     Text(
                         if (downloadError == null) "下载模型" else "重试下载",
-                        color = TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f)
+                        color = TextPrimary, fontSize = DesignTokens.TypeLabel, modifier = Modifier.weight(1f)
                     )
                 }
                 downloadError?.let {
-                    Spacer(Modifier.height(6.dp))
-                    Text("下载失败：$it（可切换网络后重试）", color = Color(0xFFE58B8B), fontSize = 11.sp)
+                    Spacer(Modifier.height(DesignTokens.SpaceCompact))
+                    Text("下载失败：$it（可切换网络后重试）", color = ReadingPalette.ErrorMuted, fontSize = DesignTokens.TypeCaptionSmall)
                 }
             }
         }
@@ -567,7 +590,7 @@ private fun TranslationTab(
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(DesignTokens.RadiusControl))
                 .background(PanelChipBg)
                 .clickableNoRipple {
                     scope.launch {
@@ -575,12 +598,12 @@ private fun TranslationTab(
                         cacheBytes = 0
                     }
                 }
-                .padding(horizontal = 14.dp, vertical = 11.dp),
+                .padding(horizontal = DesignTokens.SpaceComfortable, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Filled.Delete, contentDescription = null, tint = Color(0xFFE58B8B), modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("清空全部已翻译页面", color = TextPrimary, fontSize = 13.sp)
+            PanelDecorativeIcon(Icons.Filled.Delete, tint = ReadingPalette.ErrorMuted, modifier = Modifier.size(DesignTokens.SpaceLg))
+            Spacer(Modifier.width(DesignTokens.SpaceSm))
+            Text("清空全部已翻译页面", color = TextPrimary, fontSize = DesignTokens.TypeLabel)
         }
     }
 }
@@ -637,9 +660,9 @@ private fun ModeTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> C
 private fun ModeGrid(selected: ComicMode, onSelect: (ComicMode) -> Unit) {
     // FlowRow：3 个一行网格；大字体下放不下的项自动换行，文字永不被压缩截断
     FlowRow(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp).selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        Modifier.fillMaxWidth().padding(vertical = DesignTokens.SpaceXs).selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceCompact),
+        verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceCompact),
         maxItemsInEachRow = 3
     ) {
         ComicMode.entries.forEach { m ->
@@ -648,21 +671,21 @@ private fun ModeGrid(selected: ComicMode, onSelect: (ComicMode) -> Unit) {
             Box(
                 Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(DesignTokens.RadiusSm))
                     .background(tint)
                     .border(
                         0.5.dp,
                         if (active) MintPrimary.copy(alpha = 0.6f) else Color.Transparent,
-                        RoundedCornerShape(12.dp)
+                        RoundedCornerShape(DesignTokens.RadiusSm)
                     )
                     .selectable(active, role = Role.RadioButton) { onSelect(m) }
-                    .heightIn(min = 48.dp).padding(vertical = 10.dp, horizontal = 4.dp),
+                    .heightIn(min = 48.dp).padding(vertical = DesignTokens.SpaceTight, horizontal = DesignTokens.SpaceXs),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     m.label,
-                    color = if (active) MintPrimary else Color(0xAAFFFFFF),
-                    fontSize = 12.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (active) MintPrimary else ReadingPalette.OnGlassMuted,
+                    fontSize = DesignTokens.TypeCaption, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                     // 极端 fontScale 下放不下时换行而非截断（weight 定宽 + 换行 = 任何缩放零截断）
                     maxLines = 2, softWrap = true,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -676,9 +699,9 @@ private fun ModeGrid(selected: ComicMode, onSelect: (ComicMode) -> Unit) {
 @Composable
 private fun DirectionGrid(selected: ComicDirection, onSelect: (ComicDirection) -> Unit) {
     FlowRow(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp).selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        Modifier.fillMaxWidth().padding(vertical = DesignTokens.SpaceXs).selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceCompact),
+        verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceCompact),
         maxItemsInEachRow = 3
     ) {
         ComicDirection.entries.forEach { d ->
@@ -687,17 +710,17 @@ private fun DirectionGrid(selected: ComicDirection, onSelect: (ComicDirection) -
             Box(
                 Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(DesignTokens.RadiusSm))
                     .background(tint)
                     .selectable(active, role = Role.RadioButton) { onSelect(d) }
                     .heightIn(min = 48.dp)
-                    .padding(vertical = 10.dp, horizontal = 4.dp),
+                    .padding(vertical = DesignTokens.SpaceTight, horizontal = DesignTokens.SpaceXs),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     d.label,
-                    color = if (active) MintPrimary else Color(0xAAFFFFFF),
-                    fontSize = 12.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (active) MintPrimary else ReadingPalette.OnGlassMuted,
+                    fontSize = DesignTokens.TypeCaption, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 2, softWrap = true,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
@@ -765,8 +788,8 @@ private fun PageTab(
                 var presets by remember { mutableStateOf(store.loadCustomFitPresets()) }
                 var nameDialog by remember { mutableStateOf(false) }
                 Row(
-                    Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    Modifier.fillMaxWidth().padding(vertical = DesignTokens.SpaceXs),
+                    horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm),
                 ) {
                     ActionChip("保存当前组合", Modifier.weight(1f)) { nameDialog = true }
                 }
@@ -779,10 +802,10 @@ private fun PageTab(
                     ) {
                         Text(
                             "${p.name}（${fitLabel(p.base)} × ${p.scalePct}%）",
-                            color = TextPrimary, fontSize = 12.sp,
+                            color = TextPrimary, fontSize = DesignTokens.TypeCaption,
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(DesignTokens.RadiusXs))
                                 .background(PanelChipBg)
                                 .clickableNoRipple {
                                     update {
@@ -793,13 +816,13 @@ private fun PageTab(
                                         )
                                     }
                                 }
-                                .heightIn(min = 48.dp).padding(horizontal = 10.dp, vertical = 12.dp),
+                                .heightIn(min = 48.dp).padding(horizontal = DesignTokens.SpaceTight, vertical = DesignTokens.SpaceMd),
                             maxLines = 2, overflow = TextOverflow.Ellipsis,
                         )
                         TextButton(onClick = {
                             store.deleteCustomFitPreset(p.id)
                             presets = store.loadCustomFitPresets()
-                        }) { Text("删除", color = TextSecondary, fontSize = 11.sp) }
+                        }) { Text("删除", color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall) }
                     }
                 }
                 if (nameDialog) {
@@ -903,23 +926,22 @@ private fun ImageTab(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(top = 6.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .padding(top = DesignTokens.SpaceCompact)
+                .clip(RoundedCornerShape(DesignTokens.RadiusSm))
                 .background(PanelChipBg)
                 .clickableNoRipple(onOpenCrop)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceTight),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 if (config.manualCrop != null) "手动裁边 · 已设置" else "手动裁边",
-                color = TextPrimary, fontSize = 13.sp,
+                color = TextPrimary, fontSize = DesignTokens.TypeLabel,
                 modifier = Modifier.weight(1f)
             )
-            Icon(
+            PanelDecorativeIcon(
                 Icons.Filled.ChevronRight,
-                contentDescription = null,
                 tint = TextSecondary,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(DesignTokens.SpaceLg)
             )
         }
         if (config.manualCrop != null) {
@@ -962,7 +984,7 @@ private fun ImageTab(
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().padding(vertical = DesignTokens.SpaceXs), horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
             ActionChip("旋转本页 +90°", Modifier.weight(1f)) {
                 if (pageRef != null) {
                     val cur = bookState.pageRotations[pageRef.id] ?: 0
@@ -988,7 +1010,7 @@ private fun ImageTab(
         ) { i -> update { it.copy(enhanceMode = ComicEnhanceMode.entries[i]) } }
         val enh = ComicEnhanceMode.entries[config.enhanceMode.ordinal]
         if (enh != ComicEnhanceMode.OFF) {
-            Text(enh.desc, color = TextSecondary, fontSize = 11.sp)
+            Text(enh.desc, color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall)
             SliderRow(
                 "增强强度", config.enhanceStrength.toFloat(), 0f..100f, steps = 99,
                 format = { "${it.toInt()}" },
@@ -1036,13 +1058,13 @@ private fun ImageTab(
 private fun ActionChip(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
         modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(DesignTokens.RadiusSm))
             .background(PanelChipBg)
             .then(if (enabled) Modifier.clickableNoRipple(onClick) else Modifier.semantics { disabled() })
-            .heightIn(min = 48.dp).padding(vertical = 10.dp, horizontal = 12.dp),
+            .heightIn(min = 48.dp).padding(vertical = DesignTokens.SpaceTight, horizontal = DesignTokens.SpaceMd),
         contentAlignment = Alignment.Center
     ) {
-        Text(text, color = if (enabled) TextPrimary else TextSecondary, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Text(text, color = if (enabled) TextPrimary else TextSecondary, fontSize = DesignTokens.TypeCaption, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }
 
@@ -1079,23 +1101,23 @@ private fun FilterPreview(page: ComicPageRef?, loader: ComicPageLoader, config: 
         }
     }
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        Modifier.fillMaxWidth().padding(vertical = DesignTokens.SpaceCompact),
+        horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceTight)
     ) {
         listOf("原图" to original, "当前效果" to bitmap).forEach { (label, preview) ->
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             Modifier
                 .fillMaxWidth().height(144.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0x22FFFFFF)),
+                .clip(RoundedCornerShape(DesignTokens.RadiusXs))
+                .background(ReadingPalette.InputStroke),
             contentAlignment = Alignment.Center
         ) {
             preview?.let {
             Image(it.asImageBitmap(), label, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-            } ?: com.example.ui.components.ChasingDots(size = 18.dp, color = MintPrimary)
+            } ?: com.example.ui.components.ChasingDots(size = DesignTokens.SpaceLoose, color = MintPrimary)
         }
-        Text(label, color = TextSecondary, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+        Text(label, color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall, modifier = Modifier.padding(top = DesignTokens.SpaceXs))
         }
         }
     }
@@ -1121,9 +1143,9 @@ private fun BgSwatchRow(selected: ComicBgType, onSelect: (ComicBgType) -> Unit) 
             val active = type == selected
             val ring by animateColorAsState(if (active) MintPrimary else Color(0x40FFFFFF), label = "backgroundRing")
             Column(
-                Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
+                Modifier.weight(1f).clip(RoundedCornerShape(DesignTokens.RadiusSm))
                     .selectable(active, role = Role.RadioButton) { onSelect(type) }
-                    .heightIn(min = 64.dp).padding(vertical = 6.dp),
+                    .heightIn(min = 64.dp).padding(vertical = DesignTokens.SpaceCompact),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Box(
@@ -1140,29 +1162,27 @@ private fun BgSwatchRow(selected: ComicBgType, onSelect: (ComicBgType) -> Unit) 
                     contentAlignment = Alignment.Center
                 ) {
                     if (active) {
-                        Icon(
+                        PanelDecorativeIcon(
                             Icons.Filled.Check,
-                            contentDescription = null,
                             tint = if (type == ComicBgType.BLACK || type == ComicBgType.GRAY || type == ComicBgType.DYNAMIC) {
                                 MintPrimary
                             } else Color(0xFF44403A),
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(DesignTokens.SpaceLg)
                         )
                     } else if (type == ComicBgType.DYNAMIC) {
                         // 沉浸式：小渐变示意（背景取自当前页主色调）
-                        Icon(
+                        PanelDecorativeIcon(
                             Icons.Filled.AutoAwesome,
-                            contentDescription = null,
-                            tint = Color(0xCCFFFFFF),
-                            modifier = Modifier.size(14.dp)
+                            tint = ReadingPalette.OnGlassStrong,
+                            modifier = Modifier.size(DesignTokens.SpaceComfortable)
                         )
                     }
                 }
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(DesignTokens.SpaceXs))
                 Text(
                     label,
                     color = if (active) MintPrimary else TextSecondary,
-                    fontSize = 11.sp,
+                    fontSize = DesignTokens.TypeCaptionSmall,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal
                 )
@@ -1187,8 +1207,8 @@ private fun SceneOptionFlow(selected: ComicScene, onSelect: (ComicScene) -> Unit
     )
     FlowRow(
         Modifier.fillMaxWidth().selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceCompact),
+        verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceCompact),
         maxItemsInEachRow = 4
     ) {
         scenes.forEach { (s, label, icon) ->
@@ -1197,29 +1217,28 @@ private fun SceneOptionFlow(selected: ComicScene, onSelect: (ComicScene) -> Unit
             Column(
                 Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(DesignTokens.RadiusSm))
                     .background(tint)
                     .border(
                         0.5.dp,
                         if (active) panelSelectedStroke() else Color.Transparent,
-                        RoundedCornerShape(12.dp)
+                        RoundedCornerShape(DesignTokens.RadiusSm)
                     )
                     .selectable(active, role = Role.RadioButton) { onSelect(s) }
                     .heightIn(min = 64.dp)
                     .padding(vertical = 9.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(
+                PanelDecorativeIcon(
                     icon,
-                    contentDescription = null,
                     tint = if (active) MintPrimary else Color(0x99FFFFFF),
                     modifier = Modifier.size(17.dp)
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(DesignTokens.SpaceXs))
                 Text(
                     label,
-                    color = if (active) MintPrimary else Color(0xAAFFFFFF),
-                    fontSize = 11.sp,
+                    color = if (active) MintPrimary else ReadingPalette.OnGlassMuted,
+                    fontSize = DesignTokens.TypeCaptionSmall,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 2,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -1242,33 +1261,32 @@ internal fun EngineCard(
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(DesignTokens.RadiusControl))
             .background(tint)
             .border(
                 1.dp,
                 if (selected) MintPrimary.copy(alpha = 0.6f) else Color.Transparent,
-                RoundedCornerShape(14.dp)
+                RoundedCornerShape(DesignTokens.RadiusControl)
             )
             .selectable(selected, role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceMd),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(title, color = TextPrimary, fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(2.dp))
-            Text(desc, color = TextSecondary, fontSize = 11.sp)
-            Spacer(Modifier.height(4.dp))
+            Text(desc, color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall)
+            Spacer(Modifier.height(DesignTokens.SpaceXs))
             Text(
                 state,
                 color = if (selected) MintPrimary else TextSecondary,
-                fontSize = 11.sp,
+                fontSize = DesignTokens.TypeCaptionSmall,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
             )
         }
         if (selected) {
-            Icon(
-                Icons.Filled.Check, contentDescription = null,
-                tint = MintPrimary, modifier = Modifier.size(20.dp)
+            PanelDecorativeIcon(
+                Icons.Filled.Check, tint = MintPrimary, modifier = Modifier.size(DesignTokens.SpaceXl)
             )
         }
     }
@@ -1280,15 +1298,15 @@ internal fun PanelRow(label: String, icon: androidx.compose.ui.graphics.vector.I
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(DesignTokens.RadiusSm))
             .background(PanelChipBg)
             .clickableNoRipple(onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = DesignTokens.SpaceMd, vertical = DesignTokens.SpaceTight),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, tint = MintPrimary, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(label, color = TextPrimary, fontSize = 13.sp)
+        PanelDecorativeIcon(icon, tint = MintPrimary, modifier = Modifier.size(DesignTokens.SpaceLg))
+        Spacer(Modifier.width(DesignTokens.SpaceSm))
+        Text(label, color = TextPrimary, fontSize = DesignTokens.TypeLabel)
     }
 }
 
@@ -1303,19 +1321,19 @@ internal fun PanelTextField(
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = DesignTokens.SpaceXs)
     ) {
-        Text(label, color = TextSecondary, fontSize = 10.sp)
+        Text(label, color = TextSecondary, fontSize = DesignTokens.TypeMicro)
         Spacer(Modifier.height(2.dp))
         androidx.compose.material3.OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             singleLine = true,
             visualTransformation = if (obscured) PasswordVisualTransformation() else VisualTransformation.None,
-            textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 13.sp),
+            textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = DesignTokens.TypeLabel),
             colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MintPrimary.copy(alpha = 0.6f),
-                unfocusedBorderColor = Color(0x22FFFFFF),
+                unfocusedBorderColor = ReadingPalette.InputStroke,
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
             ),
@@ -1329,7 +1347,7 @@ private fun EffectTab(config: ComicReaderConfig, update: ((ComicReaderConfig) ->
     PanelSectionCard("阅读背景", Icons.Filled.Palette) {
         BgSwatchRow(config.bgType) { t -> update { it.copy(bgType = t) } }
         if (config.bgType == ComicBgType.PAPER) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(DesignTokens.SpaceSm))
             SliderRow(
                 "纸纹强度", config.paperIntensity.toFloat(), 0f..100f,
                 format = { "${it.toInt()}" }
@@ -1340,7 +1358,7 @@ private fun EffectTab(config: ComicReaderConfig, update: ((ComicReaderConfig) ->
     PanelSectionCard("场景", Icons.Filled.MusicNote) {
         SceneOptionFlow(config.scene) { s -> update { it.copy(scene = s) } }
         if (config.scene != ComicScene.NONE) {
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(DesignTokens.SpaceCompact))
             SwitchRow("环境声音", null, config.sceneSound) { v -> update { it.copy(sceneSound = v) } }
             if (config.sceneSound) {
                 SliderRow(
@@ -1458,23 +1476,23 @@ internal fun ComicTocSheet(
                         Modifier
                             .animateItemPlacement()
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(DesignTokens.RadiusInner))
                             .background(if (active) PanelChipActiveBg else Color.Transparent)
                             .clickableNoRipple { onJumpToChapter?.invoke(i) }
-                            .padding(horizontal = 12.dp, vertical = 11.dp),
+                            .padding(horizontal = DesignTokens.SpaceMd, vertical = 11.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             Modifier
-                                .size(width = 3.dp, height = 18.dp)
+                                .size(width = 3.dp, height = DesignTokens.SpaceLoose)
                                 .clip(CircleShape)
                                 .background(if (active) MintPrimary else Color.Transparent)
                         )
-                        Spacer(Modifier.width(10.dp))
+                        Spacer(Modifier.width(DesignTokens.SpaceTight))
                         Text(
                             entry.title,
-                            color = if (active) MintPrimary else Color(0xCCFFFFFF),
-                            fontSize = 13.sp,
+                            color = if (active) MintPrimary else ReadingPalette.OnGlassStrong,
+                            fontSize = DesignTokens.TypeLabel,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
@@ -1488,8 +1506,8 @@ internal fun ComicTocSheet(
             // 本地漫画：页缩略图网格
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(72.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm),
+                horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm),
             ) {
                 gridItemsIndexed(pages) { i, page ->
                     PageThumbCell(page, i, loader, i == currentPage - 1) { onJumpToRawPage(i) }
@@ -1512,15 +1530,15 @@ private fun PageThumbCell(
     }
     Column(
         Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (active) PanelChipActiveBg else Color(0x14FFFFFF))
+            .clip(RoundedCornerShape(DesignTokens.RadiusInner))
+            .background(if (active) PanelChipActiveBg else ReadingPalette.SubtleFill)
             .border(
                 0.5.dp,
                 if (active) MintPrimary.copy(alpha = 0.7f) else Color.Transparent,
-                RoundedCornerShape(10.dp)
+                RoundedCornerShape(DesignTokens.RadiusInner)
             )
             .clickableNoRipple(onClick)
-            .padding(4.dp),
+            .padding(DesignTokens.SpaceXs),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
@@ -1528,16 +1546,16 @@ private fun PageThumbCell(
                 .fillMaxWidth()
                 .aspectRatio(0.72f)
                 .clip(RoundedCornerShape(7.dp))
-                .background(Color(0x1FFFFFFF)),
+                .background(ReadingPalette.GlassStroke),
             contentAlignment = Alignment.Center
         ) {
             bitmap?.let {
                 Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            } ?: com.example.ui.components.ChasingDots(size = 14.dp, color = MintPrimary, circleRatio = 0.3f)
+            } ?: com.example.ui.components.ChasingDots(size = DesignTokens.SpaceComfortable, color = MintPrimary, circleRatio = 0.3f)
         }
         Spacer(Modifier.height(3.dp))
         Text(
-            "${index + 1}", color = if (active) MintPrimary else TextSecondary, fontSize = 11.sp
+            "${index + 1}", color = if (active) MintPrimary else TextSecondary, fontSize = DesignTokens.TypeCaptionSmall
         )
     }
 }
@@ -1575,68 +1593,68 @@ internal fun ComicPresetSheet(
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(DesignTokens.RadiusSm))
                         .background(if (preset.favorite) PanelChipActiveBg else PanelChipBg)
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .padding(horizontal = DesignTokens.SpaceMd, vertical = DesignTokens.SpaceSm)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         // 图标
                         Box(
                             Modifier
                                 .size(48.dp)
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(DesignTokens.RadiusInner))
                                 .background(Color(0x2AF0D9C0)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(preset.emoji, color = MintPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(preset.emoji, color = MintPrimary, fontSize = DesignTokens.TypeLabel, fontWeight = FontWeight.Bold)
                         }
-                        Spacer(Modifier.width(10.dp))
+                        Spacer(Modifier.width(DesignTokens.SpaceTight))
                         Column(Modifier.weight(1f)) {
                             FlowRow(verticalArrangement = Arrangement.Center) {
                                 Text(
-                                    preset.name, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                                    preset.name, color = TextPrimary, fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 if (preset.favorite) {
-                                    Spacer(Modifier.width(6.dp))
+                                    Spacer(Modifier.width(DesignTokens.SpaceCompact))
                                     // 收藏标记（区别于"默认预设"）：实心星 + 强调色
-                                    Icon(Icons.Filled.Star, "已收藏", tint = Color(0xFFFFD27D), modifier = Modifier.size(13.dp))
+                                    Icon(Icons.Filled.Star, "已收藏", tint = ReadingPalette.Favorite, modifier = Modifier.size(13.dp))
                                 }
                                 if (preset.id == defaultId) {
-                                    Spacer(Modifier.width(6.dp))
+                                    Spacer(Modifier.width(DesignTokens.SpaceCompact))
                                     Text(
-                                        "默认", color = MintPrimary, fontSize = 10.sp,
+                                        "默认", color = MintPrimary, fontSize = DesignTokens.TypeMicro,
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(Color(0x1FFFFFFF))
-                                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                                            .clip(RoundedCornerShape(DesignTokens.SpaceXs))
+                                            .background(ReadingPalette.GlassStroke)
+                                            .padding(horizontal = DesignTokens.SpaceXs, vertical = 1.dp)
                                     )
                                 }
                                 if (preset.builtIn) {
-                                    Spacer(Modifier.width(6.dp))
+                                    Spacer(Modifier.width(DesignTokens.SpaceCompact))
                                     Text(
-                                        "内置", color = TextSecondary, fontSize = 10.sp,
+                                        "内置", color = TextSecondary, fontSize = DesignTokens.TypeMicro,
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(Color(0x1FFFFFFF))
-                                            .padding(horizontal = 4.dp, vertical = 1.dp))
+                                            .clip(RoundedCornerShape(DesignTokens.SpaceXs))
+                                            .background(ReadingPalette.GlassStroke)
+                                            .padding(horizontal = DesignTokens.SpaceXs, vertical = 1.dp))
                                 }
                             }
                             Text(
                                 "${preset.config.mode.label} · ${preset.config.direction.label} · ${preset.config.pageAnim.label}",
-                                color = TextSecondary, fontSize = 11.sp
+                                color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall
                             )
                         }
                         // 应用
                         Box(
                             Modifier
                                 .clip(RoundedCornerShape(9.dp))
-                                .background(Color(0xFFF0D9C0))
+                                .background(ReadingPalette.WarmAccent)
                                 .clickableNoRipple { onApply(preset.config) }
                                 .heightIn(min = 48.dp)
-                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                                .padding(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceSm),
                             contentAlignment = Alignment.Center
-                        ) { Text("应用", color = Color(0xFF0E1512), fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
+                        ) { Text("应用", color = Color(0xFF0E1512), fontSize = DesignTokens.TypeCaption, fontWeight = FontWeight.SemiBold) }
                     }
                     // Keep actions on their own wrapping row so names retain their width
                     // on small screens and when the system font size is increased.
@@ -1655,8 +1673,8 @@ internal fun ComicPresetSheet(
                             Icon(
                                 if (preset.favorite) Icons.Filled.Star else Icons.Filled.StarBorder,
                                 if (preset.favorite) "取消收藏" else "收藏",
-                                tint = if (preset.favorite) Color(0xFFFFD27D) else TextSecondary,
-                                modifier = Modifier.size(16.dp)
+                                tint = if (preset.favorite) ReadingPalette.Favorite else TextSecondary,
+                                modifier = Modifier.size(DesignTokens.SpaceLg)
                             )
                         }
                         // 设为默认
@@ -1674,7 +1692,7 @@ internal fun ComicPresetSheet(
                                 Icons.Outlined.PushPin,
                                 "设为默认",
                                 tint = if (preset.id == defaultId) MintPrimary else TextSecondary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(DesignTokens.SpaceLg)
                             )
                         }
                         Box(
@@ -1695,7 +1713,7 @@ internal fun ComicPresetSheet(
                                 refresh()
                                 android.widget.Toast.makeText(context,
                                     "已更新预设", android.widget.Toast.LENGTH_SHORT).show()
-                            }) { Icon(Icons.Filled.Save, "用当前设置更新预设", tint = TextSecondary, modifier = Modifier.size(16.dp)) }
+                            }) { Icon(Icons.Filled.Save, "用当前设置更新预设", tint = TextSecondary, modifier = Modifier.size(DesignTokens.SpaceLg)) }
                             Box(
                                 Modifier
                                     .size(48.dp)
@@ -1714,30 +1732,30 @@ internal fun ComicPresetSheet(
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Filled.Delete, "删除", tint = Color(0xFFFF9A9A), modifier = Modifier.size(15.dp))
+                                Icon(Icons.Filled.Delete, "删除", tint = ReadingPalette.Error, modifier = Modifier.size(15.dp))
                             }
                         }
                     }
                 }
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(DesignTokens.SpaceCompact))
             }
             item {
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(DesignTokens.RadiusSm))
                         .background(PanelChipActiveBg)
                         .clickableNoRipple { createDialog = true }
                         .heightIn(min = 48.dp)
-                        .padding(vertical = 12.dp),
+                        .padding(vertical = DesignTokens.SpaceMd),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(Icons.Filled.Add, null, tint = MintPrimary, modifier = Modifier.size(17.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("从当前设置新建预设", color = MintPrimary, fontSize = 13.sp)
+                    Spacer(Modifier.width(DesignTokens.SpaceCompact))
+                    Text("从当前设置新建预设", color = MintPrimary, fontSize = DesignTokens.TypeLabel)
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(DesignTokens.SpaceMd))
             }
         }
     }
@@ -1800,14 +1818,14 @@ private fun PresetNameDialog(
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary,
                     focusedBorderColor = MintPrimary,
-                    unfocusedBorderColor = Color(0x33FFFFFF),
+                    unfocusedBorderColor = ReadingPalette.SwitchTrack,
                     cursorColor = MintPrimary
                 )
             )
         },
         confirmButton = { TextButton(onClick = { onConfirm(name) }) { Text("确定", color = MintPrimary) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextSecondary) } },
-        containerColor = Color(0xFF232327)
+        containerColor = ReadingPalette.DialogSurface
     )
 }
 
@@ -1865,9 +1883,9 @@ internal fun ComicCropSheet(
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
-        Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Column(Modifier.fillMaxSize().padding(DesignTokens.SpaceLg)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("手动裁边", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("手动裁边", color = TextPrimary, fontSize = DesignTokens.TypeBody, fontWeight = FontWeight.SemiBold)
             }
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = {
@@ -1878,9 +1896,9 @@ internal fun ComicCropSheet(
                     Text("保存", color = MintPrimary, fontWeight = FontWeight.SemiBold)
                 }
             }
-            Text("拖动角与边调整范围，拖动框内移动选区。", color = TextSecondary, fontSize = 11.sp)
+            Text("拖动角与边调整范围，拖动框内移动选区。", color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall)
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(DesignTokens.SpaceMd))
             BoxWithImageLayout(
                 bitmap = bitmap,
                 modifier = Modifier.weight(1f),
@@ -1891,12 +1909,12 @@ internal fun ComicCropSheet(
                     onCropChange = onCropChangeWithHaptic(cropHapticView),
                 )
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(DesignTokens.SpaceSm))
             Text(
                 "L %.0f%% · T %.0f%% · R %.0f%% · B %.0f%%".format(
                     crop[0] * 100, crop[1] * 100, (1 - crop[2]) * 100, (1 - crop[3]) * 100
                 ),
-                color = TextSecondary, fontSize = 11.sp
+                color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall
             )
         }
     }
@@ -1949,7 +1967,7 @@ private fun CropCanvas(
     crop: FloatArray,
     onCropChange: (FloatArray) -> Unit,
 ) {
-    val handleR = 14.dp
+    val handleR = DesignTokens.SpaceComfortable
     var active by remember { mutableStateOf(-1) } // 0..3 角 4..7 边
     // 手势协程以 Unit 为 key 只启动一次——闭包内必须读最新 crop：
     // 直接捕获参数会把初始矩形固化进手势（第 18 条"移动左框再移右框，
@@ -2023,14 +2041,14 @@ private fun CropCanvas(
             val x0 = crop[0] * w; val y0 = crop[1] * h
             val x1 = crop[2] * w; val y1 = crop[3] * h
             // 外部半透明遮罩
-            val dim = Color(0x99000000)
+            val dim = ReadingPalette.ScrimStrong
             drawRect(dim, topLeft = Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(w, y0))
             drawRect(dim, topLeft = Offset(0f, y1), size = androidx.compose.ui.geometry.Size(w, h - y1))
             drawRect(dim, topLeft = Offset(0f, y0), size = androidx.compose.ui.geometry.Size(x0, y1 - y0))
             drawRect(dim, topLeft = Offset(x1, y0), size = androidx.compose.ui.geometry.Size(w - x1, y1 - y0))
             // 裁剪框
             drawRect(
-                Color(0xFFF0D9C0), topLeft = Offset(x0, y0),
+                ReadingPalette.WarmAccent, topLeft = Offset(x0, y0),
                 size = androidx.compose.ui.geometry.Size(x1 - x0, y1 - y0),
                 style = Stroke(width = 2.dp.toPx())
             )
@@ -2038,8 +2056,8 @@ private fun CropCanvas(
             for (i in 1..2) {
                 val gx = x0 + (x1 - x0) * i / 3
                 val gy = y0 + (y1 - y0) * i / 3
-                drawLine(Color(0x66FFFFFF), Offset(gx, y0), Offset(gx, y1), strokeWidth = 1f)
-                drawLine(Color(0x66FFFFFF), Offset(x0, gy), Offset(x1, gy), strokeWidth = 1f)
+                drawLine(ReadingPalette.CropGuide, Offset(gx, y0), Offset(gx, y1), strokeWidth = 1f)
+                drawLine(ReadingPalette.CropGuide, Offset(x0, gy), Offset(x1, gy), strokeWidth = 1f)
             }
             // 手柄
             listOf(

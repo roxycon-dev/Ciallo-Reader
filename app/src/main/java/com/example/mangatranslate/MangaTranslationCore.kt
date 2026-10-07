@@ -53,6 +53,7 @@ data class PageTranslation(
     val pageWidth: Int,
     val pageHeight: Int,
     val regions: List<TranslatedRegion>,
+    val fallbackReason: TranslationFailure? = null,
 ) {
     val hasUsableText: Boolean get() = regions.any { it.translated.isNotBlank() }
 }
@@ -541,8 +542,9 @@ class MangaPageTranslator(
 
     private suspend fun detectRegionsTracked(bitmap: Bitmap): List<BubblePipeline.Region> =
         withContext(Dispatchers.Default) {
-            val pageRegion = pageRegionDetector() ?: return@withContext emptyList()
-            val result = pageRegion.detect(bitmap) ?: return@withContext emptyList()
+            val pageRegion = pageRegionDetector() ?: throw (if (ocrReady) TranslationFailure.OcrEngine else TranslationFailure.Models).exception()
+            val result = pageRegion.detect(bitmap) ?: throw TranslationFailure.Ocr.exception()
+            if (!result.complete) throw TranslationFailure.Ocr.exception()
             if (result.textLines.isEmpty() && result.bubbles.isEmpty()) {
                 return@withContext emptyList()
             }
@@ -596,7 +598,7 @@ class MangaPageTranslator(
 
     private suspend fun ocrRegionsTracked(bitmap: Bitmap, regions: List<BubblePipeline.Region>, forcedLang: String?): List<TranslatedRegion> =
         withContext(Dispatchers.Default) {
-            val rec = recognizer() ?: return@withContext emptyList()
+            val rec = recognizer() ?: throw (if (ocrReady) TranslationFailure.OcrEngine else TranslationFailure.Models).exception()
             val out = ArrayList<TranslatedRegion>(regions.size)
             for (region in regions) {
                 val sb = StringBuilder()
@@ -607,9 +609,10 @@ class MangaPageTranslator(
                     val crop = cropRect(bitmap, line) ?: continue
                     val oriented = if (region.vertical) rotateCcw(crop) else null
                     val target = oriented ?: crop
-                    val result = rec.recognize(target)
-                    oriented?.recycle()
-                    if (oriented === null || oriented !== crop) crop.recycle()
+                    val result = try { rec.recognize(target) } finally {
+                        if (oriented !== crop) oriented?.recycle()
+                        if (crop !== bitmap) crop.recycle()
+                    }
                     val piece = result.text.trim()
                     // OCR 置信度过滤：低分识别（画面纹理/拟声词误读）不进译文
                     if (piece.isNotEmpty() && result.score >= 0.45f) {
@@ -645,54 +648,63 @@ class MangaPageTranslator(
      * 完整翻译一页（自定义 AI 链）：区域检测 → OCR → 整页一次请求。
      * AI 失败自动降级在线兜底。
      */
-    suspend fun translatePage(bitmap: Bitmap, forcedLang: String? = null): PageTranslation =
+    suspend fun translatePage(bitmap: Bitmap, forcedLang: String? = null, onStage: (String) -> Unit = {}): PageTranslation =
         withContext(Dispatchers.Default) {
             activeInference.incrementAndGet()
             try {
-                translatePageTracked(bitmap, forcedLang)
+                translatePageTracked(bitmap, forcedLang, onStage)
             } finally {
                 activeInference.decrementAndGet()
             }
         }
 
-    private suspend fun translatePageTracked(bitmap: Bitmap, forcedLang: String?): PageTranslation =
-        withContext(Dispatchers.Default) {
-            val ocr = detectAndOcr(bitmap, forcedLang)
-            if (ocr.isEmpty()) return@withContext PageTranslation(bitmap.width, bitmap.height, emptyList())
+    private suspend fun translatePageTracked(bitmap: Bitmap, forcedLang: String?, onStage: (String) -> Unit): PageTranslation =
+        translateRecognized(bitmap, recognizeForTranslation(bitmap, forcedLang), "ai", onStage)
 
+    internal suspend fun translateRecognized(bitmap: Bitmap, ocr: List<TranslatedRegion>, engine: String, onStage: (String) -> Unit): PageTranslation =
+        withContext(Dispatchers.IO) {
+            if (ocr.isEmpty()) return@withContext PageTranslation(bitmap.width, bitmap.height, emptyList())
+            if (engine != "ai") {
+                onStage("在线翻译对白…")
+                return@withContext PageTranslation(bitmap.width, bitmap.height, translateRegionsOnline(ocr))
+            }
+            onStage("大模型翻译对白…")
             val llmOut: Map<Int, String>? = llmTranslator.translateBuckets(ocr)
+            val fallback = if (llmOut == null) llmTranslator.lastFailure ?: TranslationFailure.Empty else null
             val translated: List<TranslatedRegion> = if (llmOut != null) {
                 ocr.mapIndexed { i, region ->
                     val t = llmOut[i]
                     if (t.isNullOrBlank()) region else region.copy(translated = t.trim())
                 }
             } else {
+                if (fallback?.retryable != true) throw fallback!!.exception()
+                onStage("大模型暂不可用 · 正在用免 Key 机翻…")
                 translateRegionsOnline(ocr)
             }
-            PageTranslation(bitmap.width, bitmap.height, translated)
+            PageTranslation(bitmap.width, bitmap.height, translated, fallback)
         }
 
     /** 在线兜底专用（用户显式选择 online 引擎）：跳过 AI，直接腾讯批量。 */
-    suspend fun translatePageOnline(bitmap: Bitmap, forcedLang: String? = null): PageTranslation =
+    suspend fun translatePageOnline(bitmap: Bitmap, forcedLang: String? = null, onStage: (String) -> Unit = {}): PageTranslation =
         withContext(Dispatchers.Default) {
             activeInference.incrementAndGet()
             try {
-                translatePageOnlineTracked(bitmap, forcedLang)
+                translatePageOnlineTracked(bitmap, forcedLang, onStage)
             } finally {
                 activeInference.decrementAndGet()
             }
         }
 
-    private suspend fun translatePageOnlineTracked(bitmap: Bitmap, forcedLang: String?): PageTranslation =
-        withContext(Dispatchers.Default) {
-            val ocr = detectAndOcr(bitmap, forcedLang)
-            if (ocr.isEmpty()) return@withContext PageTranslation(bitmap.width, bitmap.height, emptyList())
-            PageTranslation(bitmap.width, bitmap.height, translateRegionsOnline(ocr))
-        }
+    private suspend fun translatePageOnlineTracked(bitmap: Bitmap, forcedLang: String?, onStage: (String) -> Unit): PageTranslation =
+        translateRecognized(bitmap, recognizeForTranslation(bitmap, forcedLang), "online", onStage)
 
-    private suspend fun detectAndOcr(bitmap: Bitmap, forcedLang: String?): List<TranslatedRegion> {
+    internal suspend fun recognizeForTranslation(bitmap: Bitmap, forcedLang: String?): List<TranslatedRegion> {
         val regions = detectRegions(bitmap)
-        return ocrRegions(bitmap, regions, forcedLang)
+        val ocr = ocrRegions(bitmap, regions, forcedLang)
+        if (ocr.isEmpty() && regions.any { it.lines.isNotEmpty() }) throw TranslationFailure.Ocr.exception()
+        // Kanji-only speech bubbles on a Japanese page must not be discarded as Chinese.
+        val japanesePage = forcedLang == "ja" || (forcedLang == null && ocr.any { it.lang == "ja" })
+        return ocr.map { if (japanesePage && it.lang == "zh") it.copy(lang = "ja") else it }
             .filter { it.lang.isNotBlank() && it.lang != "zh" }
     }
 
@@ -713,6 +725,8 @@ class MangaPageTranslator(
                 if (!t.isNullOrBlank()) out[regionIdx] = out[regionIdx].copy(translated = t.trim())
             }
         }
+        if (out.none { it.translated.isNotBlank() })
+            throw ((textTranslator as? OnlineFallbackTranslator)?.lastFailure ?: TranslationFailure.Empty).exception()
         return out
     }
 
@@ -767,6 +781,9 @@ class TranslationCoordinator(
     /** 正在翻译的 cacheKey 集合（UI 显示"翻译中"角标）。 */
     val busyKeys = MutableStateFlow<Set<String>>(emptySet())
     val failedKeys = MutableStateFlow<Set<String>>(emptySet())
+    val failures = MutableStateFlow<Map<String, TranslationFailure>>(emptyMap())
+    val progress = MutableStateFlow<Map<String, String>>(emptyMap())
+    val notices = MutableStateFlow<Map<String, String>>(emptyMap())
 
     val ocrReady: Boolean get() = translator.ocrReady
 
@@ -783,40 +800,52 @@ class TranslationCoordinator(
         loadBase: suspend () -> Bitmap?,
         publishBaked: suspend (Bitmap) -> Unit,
     ) {
-        if (clearing || !translator.ocrReady) return
+        if (clearing) return
+        if (!translator.ocrReady) return // Model download UI owns this state and schedules again on Ready.
         if (bakedKeys.contains(cacheKey) || jobs.containsKey(cacheKey) || failedKeys.value.contains(cacheKey)) return
         releasePending = false // 新任务到达：翻译重新启用，作废挂起的会话关闭
         // 第十七轮：缓存 key 带引擎+源语言标识——切换引擎或"页面文字"语言后同页自动重译
         val engine = selectedEngine
-        val modelTag = if(engine == "ai") llmTranslator.cacheFingerprint() else "transmart-v2"
+        val modelTag = if(engine == "ai") llmTranslator.cacheFingerprint() else "transmart-v3"
         val enginePrefix = "$translationKey@$engine-${forcedLang ?: "auto"}-$modelTag-v2"
         val job = scope.launch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
             val t0 = android.os.SystemClock.elapsedRealtime()
             try {
                 busyKeys.update { it + cacheKey }
-                val base = loadBase() ?: return@launch
+                progress.update { it + (cacheKey to "等待识别…") }
+                if (!TranslationPrivacy.allowed(appContext)) throw TranslationFailure.Privacy.exception()
+                val base = loadBase() ?: throw TranslationFailure.Ocr.exception()
                 if (bakedKeys.contains(cacheKey)) return@launch
                 PageMemoryBudget.check(base)
                 val engineKey = "$enginePrefix@${PageMemoryBudget.fingerprint(base)}"
                 val t1 = android.os.SystemClock.elapsedRealtime()
                 val cached = TranslationCache.read(appContext, engineKey, base.width, base.height)
                 val translation = cached ?: translateMutex.withLock {
-                    // 串行 OCR（CPU 密集），缓存 JSON 仍可命中并发写
-                    TranslationCache.read(appContext, engineKey, base.width, base.height)
-                        ?: (if (engine == "ai") translator.translatePage(base, forcedLang)
-                            else translator.translatePageOnline(base, forcedLang)).also {
+                    progress.update { it + (cacheKey to "识别漫画文字…") }
+                    val cachedAgain = TranslationCache.read(appContext, engineKey, base.width, base.height)
+                    if (cachedAgain != null) cachedAgain else {
+                        // Recognition is independent of translation service and persists after a network failure.
+                        val ocrKey = "$translationKey@ocr-v4-${forcedLang ?: "auto"}@${PageMemoryBudget.fingerprint(base)}"
+                        val recognized = TranslationCache.read(appContext, ocrKey, base.width, base.height)
+                            ?: PageTranslation(base.width, base.height, translator.recognizeForTranslation(base, forcedLang)).also {
+                                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                                TranslationCache.write(appContext, ocrKey, it)
+                            }
+                        translator.translateRecognized(base, recognized.regions, engine) { stage -> progress.update { it + (cacheKey to stage) } }.also {
                             kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                            if (it.hasUsableText && it.regions.all { region -> region.translated.isNotBlank() })
+                            if (it.fallbackReason == null && it.hasUsableText && it.regions.all { region -> region.translated.isNotBlank() })
                                 TranslationCache.write(appContext, engineKey, it)
                         }
+                    }
                 }
                 val t2 = android.os.SystemClock.elapsedRealtime()
                 if (!translation.hasUsableText) {
                     if (translation.regions.isEmpty()) bakedKeys.add(cacheKey)
-                    else failedKeys.update { it + cacheKey }
+                    else throw TranslationFailure.Empty.exception()
                     android.util.Log.w("MTPerf", "page=${cacheKey.take(40)} engine=$selectedEngine NO-USABLE-TEXT total=${t2 - t0}ms regions=${translation.regions.size}")
                     return@launch
                 }
+                progress.update { it + (cacheKey to "排版译文…") }
                 val baked = BubblePipeline.bake(
                     base,
                     translation.regions.map { r ->
@@ -826,9 +855,14 @@ class TranslationCoordinator(
                 )
                 val t3 = android.os.SystemClock.elapsedRealtime()
                 kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                bakedKeys.add(cacheKey)
-                if (translation.regions.any { it.translated.isBlank() }) failedKeys.update { it + cacheKey }
+                if (translation.regions.any { it.translated.isBlank() }) {
+                    failedKeys.update { it + cacheKey }
+                    failures.update { it + (cacheKey to TranslationFailure("partial", "部分对白未获得译文", true)) }
+                }
+                translation.fallbackReason?.let { reason -> notices.update { it + (cacheKey to "已用免 Key 机翻 · ${reason.description}") } }
                 publishBaked(baked)
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                bakedKeys.add(cacheKey)
                 epoch.update { it + 1 }
                 android.util.Log.d(
                     "MTPerf",
@@ -842,11 +876,13 @@ class TranslationCoordinator(
                 throw e
             } catch (e: Throwable) {
                 failedKeys.update { it + cacheKey }
+                val failure = TranslationFailure.from(e)
+                failures.update { it + (cacheKey to failure) }
                 // 单页失败静默（保留原文）；下次进入该页会重试
-                android.util.Log.w("MTPerf", "page=${cacheKey.take(40)} engine=$selectedEngine FAIL ${e.javaClass.simpleName}: ${e.message?.take(120)} elapsed=${android.os.SystemClock.elapsedRealtime() - t0}ms")
+                android.util.Log.w("MTPerf", "engine=$engine failure=${failure.code} elapsed=${android.os.SystemClock.elapsedRealtime() - t0}ms")
             } finally {
                 if (jobs.remove(cacheKey, kotlinx.coroutines.currentCoroutineContext()[Job]))
-                    busyKeys.update { it - cacheKey }
+                    { busyKeys.update { it - cacheKey }; progress.update { it - cacheKey } }
             }
         }
         if (jobs.putIfAbsent(cacheKey, job) == null) job.start() else job.cancel()
@@ -864,6 +900,8 @@ class TranslationCoordinator(
     fun resetMarks() {
         bakedKeys.clear()
         failedKeys.value = emptySet()
+        failures.value = emptyMap()
+        notices.value = emptyMap()
     }
 
     /** 手动触发 UI 重播种（缓存替换/失效后）。 */
@@ -881,6 +919,24 @@ class TranslationCoordinator(
         jobs.values.forEach { it.cancel() }
         jobs.clear()
         busyKeys.value = emptySet()
+        progress.value = emptyMap()
+    }
+
+    fun retryPages(keys: List<String>) {
+        keys.forEach { key -> bakedKeys.remove(key); jobs.remove(key)?.cancel() }
+        busyKeys.update { it - keys.toSet() }
+        progress.update { it - keys.toSet() }
+        failedKeys.update { it - keys.toSet() }
+        failures.update { it - keys.toSet() }
+        notices.update { it - keys.toSet() }
+        bumpEpoch()
+    }
+
+    /** Stop obsolete prefetch before it occupies the OCR/network queue for the visible page. */
+    fun retainWindow(keys: Set<String>) {
+        jobs.forEach { (key, job) -> if (key !in keys && jobs.remove(key, job)) job.cancel() }
+        busyKeys.update { it.intersect(keys) }
+        progress.update { it.filterKeys { key -> key in keys } }
     }
 
     fun clearTextCache() { textTranslator.close() }

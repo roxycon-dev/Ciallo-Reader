@@ -67,15 +67,24 @@ class Reader125CurlDeviceTest {
             val before = copy(); save(before, "before")
             val t = SystemClock.uptimeMillis()
             val start = view.width * 0.35f // left half: the old implementation chose the previous page here.
-            val distance = 95f * view.resources.displayMetrics.density
+            // Exercise an intentional slow turn above the phone/tablet physical threshold.
+            // A fixed 95dp drag is below the tablet limit (104dp) and should roll back.
+            val distance = comicTurnTravel(view.width.toFloat(), view.resources.displayMetrics.density) +
+                16f * view.resources.displayMetrics.density
             send(t, t, MotionEvent.ACTION_DOWN, start)
-            send(t, t + 60, MotionEvent.ACTION_MOVE, start - distance)
+            send(t, t + 600, MotionEvent.ACTION_MOVE, start - distance)
             SystemClock.sleep(70)
             val state = CurlView::class.java.getDeclaredField("mCurlState").apply { isAccessible = true }
             assertEquals("A leftwards swipe from the left region must curl forward", 2, state.getInt(view))
+            val pointer = CurlView::class.java.getDeclaredField("mPointerPos").apply { isAccessible = true }.get(view)
+            val held = android.graphics.PointF(pointer.javaClass.getDeclaredField("mPos").apply { isAccessible = true }.get(pointer) as android.graphics.PointF)
             val fold = copy(); save(fold, "left-region-forward-fold")
             assertEquals("Reading backdrop must remain static", before.getPixel(8, 8), fold.getPixel(8, 8))
-            send(t, t + 80, MotionEvent.ACTION_UP, start - distance)
+            send(t, t + 650, MotionEvent.ACTION_UP, start - distance)
+            val source = CurlView::class.java.getDeclaredField("mAnimationSource").apply { isAccessible = true }.get(view) as android.graphics.PointF
+            assertEquals("Release cannot teleport ahead of the finger", held.x, source.x, 0.001f)
+            val target = CurlView::class.java.getDeclaredField("mAnimationTargetEvent").apply { isAccessible = true }
+            assertEquals("Intentional slow swipe must settle forward", 1, target.getInt(view))
             await { view.currentIndex == 1 && !view.isAnimating() }
             fun tapAndCheck(fraction: Float, target: Int, name: String) {
                 val down = SystemClock.uptimeMillis()

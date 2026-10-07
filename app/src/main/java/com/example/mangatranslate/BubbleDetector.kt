@@ -81,8 +81,7 @@ class BubbleDetector(private val modelProvider: () -> InputStream, private val m
             val yEnd = min(srcH, y + tileH)
             val tileHActual = yEnd - y
             val tile = Bitmap.createBitmap(bitmap, 0, y, srcW, tileHActual)
-            val piece = detectWhole(tile)
-            tile.recycle()
+            val piece = try { detectWhole(tile) } finally { if (tile !== bitmap) tile.recycle() }
             piece.forEach { d ->
                 val newRect = RectF(d.rect.left, d.rect.top + y, d.rect.right, d.rect.bottom + y)
                 val newContour = d.maskContour?.let { c ->
@@ -140,7 +139,7 @@ class BubbleDetector(private val modelProvider: () -> InputStream, private val m
                 }
             }
         } finally {
-            pre.bitmap.recycle()
+            if (pre.bitmap !== bitmap) pre.bitmap.recycle()
         }
     }
 
@@ -175,18 +174,20 @@ class BubbleDetector(private val modelProvider: () -> InputStream, private val m
         val padX = ((inputWidth - newW) / 2f).coerceAtLeast(0f)
         val padY = ((inputHeight - newH) / 2f).coerceAtLeast(0f)
         canvas.drawBitmap(resized, padX, padY, null)
-        resized.recycle()
+        if (resized !== bitmap) resized.recycle()
         return Letterbox(padded, gain, gain, padX, padY)
     }
 
-    private fun bitmapToRgbChw(bitmap: Bitmap): FloatArray {
+    internal fun bitmapToRgbChw(bitmap: Bitmap): FloatArray {
         val w = bitmap.width; val h = bitmap.height
         val plane = w * h
         val out = FloatArray(3 * plane)
+        val pixels = IntArray(plane)
+        bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
         var offset = 0
         for (y in 0 until h) {
             for (x in 0 until w) {
-                val p = bitmap[x, y]
+                val p = pixels[offset]
                 out[offset] = ((p shr 16) and 0xFF) / 255f
                 out[offset + plane] = ((p shr 8) and 0xFF) / 255f
                 out[offset + 2 * plane] = (p and 0xFF) / 255f

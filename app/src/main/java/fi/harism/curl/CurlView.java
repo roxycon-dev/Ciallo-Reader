@@ -55,6 +55,12 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 	private long mAnimationStartTime;
 	private PointF mAnimationTarget = new PointF();
 	private int mAnimationTargetEvent;
+	private Boolean mReleaseCommitOverride;
+
+	/** Choose the settle destination without moving the held corner on release. */
+	protected void setReleaseCommit(boolean commit) {
+		mReleaseCommitOverride = commit;
+	}
 
 	private PointF mCurlDir = new PointF();
 
@@ -297,6 +303,7 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 
 		switch (me.getAction()) {
 		case MotionEvent.ACTION_DOWN: {
+			mReleaseCommitOverride = null;
 
 			// Once we receive pointer down event its position is mapped to
 			// right or left edge of page and that'll be the position from where
@@ -379,9 +386,15 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 
 				// Given the explanation, here we decide whether to simulate
 				// drag to left or right end.
-				if ((mViewMode == SHOW_ONE_PAGE && mPointerPos.mPos.x > (rightRect.left + rightRect.right) / 2)
+				boolean settleRight = (mViewMode == SHOW_ONE_PAGE && mPointerPos.mPos.x > (rightRect.left + rightRect.right) / 2)
 						|| mViewMode == SHOW_TWO_PAGES
-						&& mPointerPos.mPos.x > rightRect.left) {
+						&& mPointerPos.mPos.x > rightRect.left;
+				if (mReleaseCommitOverride != null) {
+					settleRight = (mCurlState == CURL_LEFT) == mReleaseCommitOverride;
+				}
+				if (me.getAction() == MotionEvent.ACTION_CANCEL) settleRight = mCurlState == CURL_RIGHT;
+				mReleaseCommitOverride = null;
+				if (settleRight) {
 					// On right side target is always right page's right border.
 					mAnimationTarget.set(mDragStartPos);
 					mAnimationTarget.x = mRenderer

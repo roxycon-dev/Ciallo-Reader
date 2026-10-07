@@ -38,7 +38,7 @@ class OnlineTranslation125Test {
         }.build()
         val translator = OnlineFallbackTranslator(clientOverride = client)
         assertNull(translator.translateBatch(List(12) { "Dialogue $it" }, "en"))
-        assertEquals(1, calls.get())
+        assertEquals(2, calls.get()) // One bounded retry of the batch, never N single requests.
     }
     @Test fun parserRejectsEmptyNullAndMismatchedResponses() {
         val translator = OnlineFallbackTranslator()

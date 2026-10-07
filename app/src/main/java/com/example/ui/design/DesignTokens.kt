@@ -3,6 +3,8 @@ package com.example.ui.design
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 
 /**
  * Ciallo Reader 设计规范（全局统一，后续新页面一律按此执行）。
@@ -51,8 +53,59 @@ object DesignTokens {
     val SpaceXxl = 24.dp
     val SpacePage = 16.dp
 
+    // Compact reader controls retain their established spacing between the main scale steps.
+    val SpaceCompact = 6.dp
+    val SpaceTight = 10.dp
+    val SpaceComfortable = 14.dp
+    val SpaceLoose = 18.dp
+    val SpaceSection = 32.dp
+
+    val RadiusInner = 10.dp
+    val RadiusControl = 14.dp
+    val RadiusNavigation = 18.dp
+    val RadiusOverlay = 28.dp
+
+    // Reading chrome typography, shared by novel and comic settings. Body text remains user-controlled.
+    val TypeMicro = 10.sp
+    val TypeCaptionSmall = 11.sp
+    val TypeCaption = 12.sp
+    val TypeLabel = 13.sp
+    val TypeBodySmall = 14.sp
+    val TypeSection = 15.sp
+    val TypeBody = 16.sp
+    val TypeCaptionLineHeight = 18.sp
+    val TypeSectionLineHeight = 21.sp
+    val TypeTitle = 23.sp
+    val TypeDisplay = 25.sp
+
     val CardElevation = 2.dp
     val FloatingElevation = 8.dp
 
     fun shape(radius: Dp) = RoundedCornerShape(radius)
+}
+
+/** Fixed reading surfaces and glass overlays; theme accents still come from MaterialTheme. */
+object ReadingPalette {
+    val OnGlassMuted = Color(0xAAFFFFFF)
+    val GlassStroke = Color(0x1FFFFFFF)
+    val ControlTrack = Color(0x2EFFFFFF)
+    val WarmAccent = Color(0xFFF0D9C0)
+    val InputStroke = Color(0x22FFFFFF)
+    val DialogSurface = Color(0xFF232327)
+    val SwitchTrack = Color(0x33FFFFFF)
+    val ErrorMuted = Color(0xFFE58B8B)
+    val OnGlassStrong = Color(0xCCFFFFFF)
+    val SubtleFill = Color(0x14FFFFFF)
+    val Favorite = Color(0xFFFFD27D)
+    val ScrimStrong = Color(0x99000000)
+    val CropGuide = Color(0x66FFFFFF)
+    val ChromeSurface = Color(0xD9101012)
+    val NovelDarkSurface = Color(0xFF18191C)
+    val NovelPaperSurface = Color(0xFFFBF0D9)
+    val NovelPaperInk = Color(0xFF5F4B32)
+    val NovelDarkInk = Color(0xFFD4D4D4)
+    val NovelGreenSurface = Color(0xFFE8F5E9)
+    val NovelGreenInk = Color(0xFF1B5E20)
+    val NovelNeutralInk = Color(0xFFE0E0E0)
+    val Error = Color(0xFFFF9A9A)
 }

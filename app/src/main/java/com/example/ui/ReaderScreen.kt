@@ -2,6 +2,9 @@
 
 package com.example.ui
 
+import com.example.ui.design.DesignTokens
+import com.example.ui.design.ReadingPalette
+
 
 
 import android.app.Activity
@@ -306,7 +309,7 @@ fun ReaderScreen(
 
     val scope = rememberCoroutineScope()
 
-    val transitionSlidePx = with(LocalDensity.current) { 20.dp.toPx() }
+    val transitionSlidePx = with(LocalDensity.current) { DesignTokens.SpaceXl.toPx() }
 
 
 
@@ -952,19 +955,19 @@ fun ReaderScreen(
 
     val (bgColor, textColor) = when (readerTheme) {
 
-        0 -> Color.White to Color(0xFF18191C) // Pure Light
+        0 -> Color.White to ReadingPalette.NovelDarkSurface // Pure Light
 
-        1 -> Color.White to Color(0xFF18191C) // Default White
+        1 -> Color.White to ReadingPalette.NovelDarkSurface // Default White
 
-        2 -> Color(0xFFFBF0D9) to Color(0xFF5F4B32) // Sepia
+        2 -> ReadingPalette.NovelPaperSurface to ReadingPalette.NovelPaperInk // Sepia
 
-        3 -> Color(0xFF18191C) to Color(0xFFD4D4D4) // Dark
+        3 -> ReadingPalette.NovelDarkSurface to ReadingPalette.NovelDarkInk // Dark
 
-        4 -> Color(0xFFE8F5E9) to Color(0xFF1B5E20) // Eye Green
+        4 -> ReadingPalette.NovelGreenSurface to ReadingPalette.NovelGreenInk // Eye Green
 
-        5 -> Color.Black to Color(0xFFE0E0E0) // OLED Black
+        5 -> Color.Black to ReadingPalette.NovelNeutralInk // OLED Black
 
-        else -> Color.White to Color(0xFF18191C)
+        else -> Color.White to ReadingPalette.NovelDarkSurface
 
     }
 
@@ -1195,13 +1198,13 @@ fun ReaderScreen(
 
                                 RoundedCornerShape(
 
-                                    topStart = 4.dp,
+                                    topStart = DesignTokens.SpaceXs,
 
-                                    bottomStart = 4.dp,
+                                    bottomStart = DesignTokens.SpaceXs,
 
-                                    topEnd = 12.dp,
+                                    topEnd = DesignTokens.SpaceMd,
 
-                                    bottomEnd = 12.dp
+                                    bottomEnd = DesignTokens.SpaceMd
 
                                 )
 
@@ -1263,7 +1266,7 @@ fun ReaderScreen(
 
             val headerFooterPaddingPx = with(density) {
 
-                var pad = 24.dp.toPx().toInt()
+                var pad = DesignTokens.SpaceXxl.toPx().toInt()
 
                 if (prefs.showOverlayHeaderFooter) {
 
@@ -1816,12 +1819,12 @@ fun ReaderScreen(
 
             if (readerLoadError != null) {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(32.dp),
+                    modifier = Modifier.fillMaxSize().padding(DesignTokens.SpaceSection),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("章节加载失败：$readerLoadError", color = textColor)
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(DesignTokens.SpaceLg))
                     Button(onClick = onRetryLoad) { Text("重试加载") }
                 }
             } else if (readerLoading || chapters.isEmpty() ||
@@ -1849,9 +1852,9 @@ fun ReaderScreen(
 
                         color = textColor.copy(alpha = 0.75f),
 
-                        fontSize = 14.sp,
+                        fontSize = DesignTokens.TypeBodySmall,
 
-                        modifier = Modifier.padding(32.dp)
+                        modifier = Modifier.padding(DesignTokens.SpaceSection)
 
                     )
 
@@ -1893,7 +1896,7 @@ fun ReaderScreen(
 
                                         .fillMaxWidth()
 
-                                        .padding(horizontal = marginHorizontal.dp, vertical = 6.dp)
+                                        .padding(horizontal = marginHorizontal.dp, vertical = DesignTokens.SpaceCompact)
 
                                         // 此链禁止添加 clickable/pointerInput：
                                         // graphicsLayer alpha=0 不豁免 Compose 命中测试，会变成幽灵热区
@@ -1905,11 +1908,11 @@ fun ReaderScreen(
 
                                 ) {
 
-                                    Text(chapter.title, fontSize = 10.sp, color = textColor.copy(alpha = 0.5f), maxLines = 1)
+                                    Text(chapter.title, fontSize = DesignTokens.TypeMicro, color = textColor.copy(alpha = 0.5f), maxLines = 1)
 
                                     val timeStr = remember(showBars) { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()) }
 
-                                    Text(timeStr, fontSize = 10.sp, color = textColor.copy(alpha = 0.5f))
+                                    Text(timeStr, fontSize = DesignTokens.TypeMicro, color = textColor.copy(alpha = 0.5f))
 
                                 }
 
@@ -2075,7 +2078,7 @@ fun ReaderScreen(
 
                                                     .verticalScroll(scrollState)
 
-                                                    .padding(horizontal = marginHorizontal.dp, vertical = 16.dp)
+                                                    .padding(horizontal = marginHorizontal.dp, vertical = DesignTokens.SpaceLg)
 
                                             ) {
 
@@ -2085,7 +2088,7 @@ fun ReaderScreen(
 
                                                         text = "↓ 已到本章开头 · 继续下拉返回上一章",
 
-                                                        fontSize = 12.sp,
+                                                        fontSize = DesignTokens.TypeCaption,
 
                                                         color = textColor.copy(alpha = 0.45f),
 
@@ -2093,7 +2096,7 @@ fun ReaderScreen(
 
                                                             .fillMaxWidth()
 
-                                                            .padding(bottom = 12.dp)
+                                                            .padding(bottom = DesignTokens.SpaceMd)
 
                                                     )
 
@@ -2109,7 +2112,7 @@ fun ReaderScreen(
 
                                                     color = textColor,
 
-                                                    modifier = Modifier.padding(bottom = 20.dp, top = 12.dp)
+                                                    modifier = Modifier.padding(bottom = DesignTokens.SpaceXl, top = DesignTokens.SpaceMd)
 
                                                 )
 
@@ -2193,7 +2196,7 @@ fun ReaderScreen(
 
 
 
-                                                Spacer(modifier = Modifier.height(20.dp))
+                                                Spacer(modifier = Modifier.height(DesignTokens.SpaceXl))
 
                                                 Text(
 
@@ -2207,7 +2210,7 @@ fun ReaderScreen(
 
                                                     },
 
-                                                    fontSize = 13.sp,
+                                                    fontSize = DesignTokens.TypeLabel,
 
                                                     color = textColor.copy(alpha = 0.5f),
 
@@ -2670,14 +2673,14 @@ fun ReaderScreen(
 
                                     Surface(
 
-                                        shape = RoundedCornerShape(16.dp),
+                                        shape = RoundedCornerShape(DesignTokens.RadiusMd),
 
                                         color = MintPrimary.copy(alpha = 0.92f),
 
                                         shadowElevation = 0.dp,
 
-                                        modifier = Modifier.padding(16.dp)
-                                            .consistentShadow(6.dp, RoundedCornerShape(16.dp))
+                                        modifier = Modifier.padding(DesignTokens.SpaceLg)
+                                            .consistentShadow(DesignTokens.SpaceCompact, RoundedCornerShape(DesignTokens.RadiusMd))
 
                                     ) {
 
@@ -2685,7 +2688,7 @@ fun ReaderScreen(
 
                                             horizontalAlignment = Alignment.CenterHorizontally,
 
-                                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+                                            modifier = Modifier.padding(horizontal = DesignTokens.SpaceLoose, vertical = DesignTokens.SpaceTight)
 
                                         ) {
 
@@ -2699,11 +2702,11 @@ fun ReaderScreen(
 
                                                     tint = Color.White,
 
-                                                    modifier = Modifier.size(16.dp)
+                                                    modifier = Modifier.size(DesignTokens.SpaceLg)
 
                                                 )
 
-                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Spacer(modifier = Modifier.width(DesignTokens.SpaceCompact))
 
                                                 Text(
 
@@ -2721,7 +2724,7 @@ fun ReaderScreen(
 
                                                     color = Color.White,
 
-                                                    fontSize = 13.sp,
+                                                    fontSize = DesignTokens.TypeLabel,
 
                                                     fontWeight = FontWeight.Bold
 
@@ -2729,7 +2732,7 @@ fun ReaderScreen(
 
                                             }
 
-                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Spacer(modifier = Modifier.height(DesignTokens.SpaceCompact))
 
                                             // 拉取进度条：跟手填充，拉满 100% 后松手即切章
 
@@ -2783,7 +2786,7 @@ fun ReaderScreen(
 
                                         .align(Alignment.TopEnd)
 
-                                        .padding(end = 20.dp)
+                                        .padding(end = DesignTokens.SpaceXl)
 
                                 ) {
 
@@ -2807,7 +2810,7 @@ fun ReaderScreen(
 
                                         .fillMaxWidth()
 
-                                        .padding(horizontal = marginHorizontal.dp, vertical = 6.dp)
+                                        .padding(horizontal = marginHorizontal.dp, vertical = DesignTokens.SpaceCompact)
 
                                         // B5：原先 alpha 直接取 0/1，页眉页脚是"瞬间闪没"，
                                         // 与顶/底栏的 slideInVertically 完全不同步。改为透明度过渡。
@@ -2827,9 +2830,9 @@ fun ReaderScreen(
 
                                     }
 
-                                    Text(pageProgressText, fontSize = 10.sp, color = textColor.copy(alpha = 0.5f))
+                                    Text(pageProgressText, fontSize = DesignTokens.TypeMicro, color = textColor.copy(alpha = 0.5f))
 
-                                    Text("$pct%", fontSize = 10.sp, color = textColor.copy(alpha = 0.5f))
+                                    Text("$pct%", fontSize = DesignTokens.TypeMicro, color = textColor.copy(alpha = 0.5f))
 
                                 }
 
@@ -2852,13 +2855,13 @@ fun ReaderScreen(
 
                                 modifier = Modifier
 
-                                    .padding(16.dp)
+                                    .padding(DesignTokens.SpaceLg)
 
                                     .fillMaxWidth()
 
-                                    .consistentShadow(8.dp, RoundedCornerShape(20.dp)),
+                                    .consistentShadow(DesignTokens.SpaceSm, RoundedCornerShape(DesignTokens.RadiusLg)),
 
-                                shape = RoundedCornerShape(20.dp),
+                                shape = RoundedCornerShape(DesignTokens.RadiusLg),
 
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
 
@@ -2866,7 +2869,7 @@ fun ReaderScreen(
 
                             ) {
 
-                                Column(modifier = Modifier.padding(16.dp)) {
+                                Column(modifier = Modifier.padding(DesignTokens.SpaceLg)) {
 
                                     Row(
 
@@ -2878,7 +2881,7 @@ fun ReaderScreen(
 
                                     ) {
 
-                                        Text("朗读播放器", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("朗读播放器", fontWeight = FontWeight.Bold, fontSize = DesignTokens.TypeBodySmall)
 
                                         AppIconButton(onClick = { showTtsBar = false }) {
 
@@ -2993,18 +2996,18 @@ fun ReaderScreen(
                                     }
                                     showReturnChip = false
                                 }
-                                    .consistentShadow(6.dp, RoundedCornerShape(20.dp)),
-                                shape = RoundedCornerShape(20.dp),
+                                    .consistentShadow(DesignTokens.SpaceCompact, RoundedCornerShape(DesignTokens.RadiusLg)),
+                                shape = RoundedCornerShape(DesignTokens.RadiusLg),
                                 color = MintPrimary,
                                 shadowElevation = 0.dp
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    modifier = Modifier.padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceSm),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, tint = Color.White)
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("返回上次处", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.width(DesignTokens.SpaceCompact))
+                                    Text("返回上次处", color = Color.White, fontSize = DesignTokens.TypeCaption, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -3039,29 +3042,29 @@ fun ReaderScreen(
 
                 onClick = { isAutoScrolling = false },
 
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(DesignTokens.RadiusLg),
 
                 color = MintPrimary.copy(alpha = 0.9f),
 
                 shadowElevation = 0.dp,
 
-                modifier = Modifier.consistentShadow(4.dp, RoundedCornerShape(20.dp))
+                modifier = Modifier.consistentShadow(DesignTokens.SpaceXs, RoundedCornerShape(DesignTokens.RadiusLg))
 
             ) {
 
                 Row(
 
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceCompact),
 
                     verticalAlignment = Alignment.CenterVertically
 
                 ) {
 
-                    Icon(Icons.Filled.UnfoldMore, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Filled.UnfoldMore, contentDescription = null, tint = Color.White, modifier = Modifier.size(DesignTokens.SpaceLg))
 
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(DesignTokens.SpaceCompact))
 
-                    Text("自动滚屏中 · 点击停止", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Text("自动滚屏中 · 点击停止", color = Color.White, fontSize = DesignTokens.TypeCaption, fontWeight = FontWeight.Medium)
 
                 }
 
@@ -3081,7 +3084,7 @@ fun ReaderScreen(
 
             exit = fadeOut(tween(150)) + scaleOut(targetScale = 0.8f),
 
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 80.dp)
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = DesignTokens.SpaceXl, bottom = 80.dp)
 
         ) {
 
@@ -3098,7 +3101,7 @@ fun ReaderScreen(
                 shadowElevation = 0.dp,
 
                 modifier = Modifier.size(44.dp)
-                    .consistentShadow(4.dp, CircleShape)
+                    .consistentShadow(DesignTokens.SpaceXs, CircleShape)
 
             ) {
 
@@ -3245,7 +3248,7 @@ fun ReaderScreen(
 
                                         Row(
 
-                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = DesignTokens.SpaceXs, vertical = DesignTokens.SpaceSm),
 
                                             verticalAlignment = Alignment.CenterVertically
 
@@ -3257,7 +3260,7 @@ fun ReaderScreen(
 
                                             }
 
-                                            Column(modifier = Modifier.weight(1f).padding(horizontal = 6.dp)) {
+                                            Column(modifier = Modifier.weight(1f).padding(horizontal = DesignTokens.SpaceCompact)) {
 
                                                 Text(
 
@@ -3267,7 +3270,7 @@ fun ReaderScreen(
 
                                                     fontWeight = FontWeight.SemiBold,
 
-                                                    fontSize = 16.sp,
+                                                    fontSize = DesignTokens.TypeBody,
 
                                                     color = barContentColor,
 
@@ -3281,7 +3284,7 @@ fun ReaderScreen(
 
                                                     text = "${currentChapterIndex + 1}/${chapters.size} 章",
 
-                                                    fontSize = 11.sp,
+                                                    fontSize = DesignTokens.TypeCaptionSmall,
 
                                                     color = barContentColor.copy(alpha = 0.55f)
 
@@ -3307,7 +3310,7 @@ fun ReaderScreen(
 
                                                     tint = if (currentBookmarked) MintGold else barContentColor,
 
-                                                    modifier = Modifier.size(20.dp)
+                                                    modifier = Modifier.size(DesignTokens.SpaceXl)
 
                                                 )
 
@@ -3341,21 +3344,21 @@ fun ReaderScreen(
 
                                                     tint = if (isTtsPlaying) MintGold else barContentColor,
 
-                                                    modifier = Modifier.size(20.dp)
+                                                    modifier = Modifier.size(DesignTokens.SpaceXl)
 
                                                 )
 
                                             }
 
                                             AppIconButton(onClick = { showTocSheet = true }) {
-                                                Icon(Icons.Filled.Menu, "目录", tint = barContentColor, modifier = Modifier.size(20.dp))
+                                                Icon(Icons.Filled.Menu, "目录", tint = barContentColor, modifier = Modifier.size(DesignTokens.SpaceXl))
                                             }
 
                                             // ── 更多菜单：低频操作收纳，顶栏只留高频 4 键 ──
                                             var showReaderMoreMenu by remember { mutableStateOf(false) }
                                             Box {
                                                 AppIconButton(onClick = { showReaderMoreMenu = true }) {
-                                                    Icon(Icons.Filled.MoreVert, "更多", tint = barContentColor, modifier = Modifier.size(20.dp))
+                                                    Icon(Icons.Filled.MoreVert, "更多", tint = barContentColor, modifier = Modifier.size(DesignTokens.SpaceXl))
                                                 }
                                                 DropdownMenu(
                                                     expanded = showReaderMoreMenu,
@@ -3363,17 +3366,17 @@ fun ReaderScreen(
                                                 ) {
                                                     DropdownMenuItem(
                                                         text = { Text("全文搜索") },
-                                                        leadingIcon = { Icon(Icons.Filled.Search, null, modifier = Modifier.size(18.dp)) },
+                                                        leadingIcon = { Icon(Icons.Filled.Search, null, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
                                                         onClick = { showReaderMoreMenu = false; showSearchDialog = true }
                                                     )
                                                     DropdownMenuItem(
                                                         text = { Text("书签列表") },
-                                                        leadingIcon = { Icon(Icons.Filled.Bookmarks, null, tint = MintPrimary, modifier = Modifier.size(18.dp)) },
+                                                        leadingIcon = { Icon(Icons.Filled.Bookmarks, null, tint = MintPrimary, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
                                                         onClick = { showReaderMoreMenu = false; showAnnotationsSheet = true }
                                                     )
                                                     DropdownMenuItem(
                                                         text = { Text(if (isAutoScrolling) "停止自动滚屏" else "自动滚屏") },
-                                                        leadingIcon = { Icon(Icons.Filled.UnfoldMore, null, tint = if (isAutoScrolling) MintGold else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp)) },
+                                                        leadingIcon = { Icon(Icons.Filled.UnfoldMore, null, tint = if (isAutoScrolling) MintGold else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
                                                         onClick = {
                                                             showReaderMoreMenu = false
                                                             if (!isScrollMode) {
@@ -3386,7 +3389,7 @@ fun ReaderScreen(
                                                     )
                                                     DropdownMenuItem(
                                                         text = { Text("排版设置") },
-                                                        leadingIcon = { Icon(Icons.Filled.Settings, null, modifier = Modifier.size(18.dp)) },
+                                                        leadingIcon = { Icon(Icons.Filled.Settings, null, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
                                                         onClick = { showReaderMoreMenu = false; showSettingsSheet = true }
                                                     )
                                                 }
@@ -3442,7 +3445,7 @@ fun ReaderScreen(
 
                                     ) {
 
-                                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceXs)) {
 
                                             // 章节拖动预览：拖动中只更新显示，松手才真正切章
                                             var dragPos by remember { mutableStateOf<Float?>(null) }
@@ -3587,11 +3590,11 @@ fun ReaderScreen(
                                                     } else {
                                                         "第 ${currentChapterIndex + 1} / ${chapters.size} 章"
                                                     },
-                                                    fontSize = 12.sp,
+                                                    fontSize = DesignTokens.TypeCaption,
                                                     color = barContentColor,
                                                     maxLines = 1,
                                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                                    modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp)
+                                                    modifier = Modifier.weight(1f, fill = false).padding(end = DesignTokens.SpaceSm)
 
                                                 )
 
@@ -3627,9 +3630,9 @@ fun ReaderScreen(
 
                                                     ),
 
-                                                    shape = RoundedCornerShape(20.dp),
+                                                    shape = RoundedCornerShape(DesignTokens.RadiusLg),
 
-                                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                                                    contentPadding = PaddingValues(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceCompact)
 
                                                 ) {
 
@@ -3639,13 +3642,13 @@ fun ReaderScreen(
 
                                                         contentDescription = "听书模式",
 
-                                                        modifier = Modifier.size(18.dp)
+                                                        modifier = Modifier.size(DesignTokens.SpaceLoose)
 
                                                     )
 
-                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Spacer(modifier = Modifier.width(DesignTokens.SpaceCompact))
 
-                                                    Text(if (isTtsPlaying) "朗读中..." else "听书模式", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                                    Text(if (isTtsPlaying) "朗读中..." else "听书模式", fontSize = DesignTokens.TypeLabel, fontWeight = FontWeight.Bold)
 
                                                 }
 
@@ -3706,17 +3709,17 @@ fun ReaderScreen(
         ) {
 
                         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidth().padding(16.dp).padding(bottom = 32.dp)) {
+Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidth().padding(DesignTokens.SpaceLg).padding(bottom = DesignTokens.SpaceSection)) {
 
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("目录 (${chapters.size}章)", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     if (onCheckNovelUpdate != null) TextButton(onClick = { showTocSheet = false; onCheckNovelUpdate() }) {
-                        Icon(Icons.Filled.Refresh, null, Modifier.size(16.dp))
+                        Icon(Icons.Filled.Refresh, null, Modifier.size(DesignTokens.SpaceLg))
                         Spacer(Modifier.width(5.dp)); Text("检查更新")
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(DesignTokens.SpaceMd))
 
 
 
@@ -3738,7 +3741,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
 
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(DesignTokens.SpaceMd))
 
 
 
@@ -3816,11 +3819,11 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
         ) { closePanel ->
 
                         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp).verticalScroll(rememberScrollState())) {
+Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidth().padding(horizontal = DesignTokens.SpaceXl).padding(bottom = DesignTokens.SpaceSection).verticalScroll(rememberScrollState())) {
 
                 /* ── 头部 ── */
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 18.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = DesignTokens.SpaceCompact, bottom = DesignTokens.SpaceLoose),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -3829,8 +3832,8 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                         tint = accentColor,
                         modifier = Modifier.clip(CircleShape).background(accentColor.copy(alpha = 0.10f)).padding(9.dp).size(22.dp)
                     )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text("阅读排版", fontSize = 25.sp, fontWeight = FontWeight.SemiBold, color = textColor,
+                    Spacer(modifier = Modifier.width(DesignTokens.SpaceTight))
+                    Text("阅读排版", fontSize = DesignTokens.TypeDisplay, fontWeight = FontWeight.SemiBold, color = textColor,
                         modifier = Modifier.weight(1f))
                     TextButton(onClick = {
                         fontSize = 18f
@@ -3853,32 +3856,32 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                 /* ── 分组：显示（亮度 + 首行缩进）── */
                 Text(
                     "显 示",
-                    fontSize = 12.sp,
+                    fontSize = DesignTokens.TypeCaption,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.5.sp,
                     color = textColor.copy(alpha = 0.65f)
                 )
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(DesignTokens.SpaceTight))
                 Surface(
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(DesignTokens.RadiusXl),
                     color = cardTint,
                     contentColor = textColor,
                     border = BorderStroke(1.dp, textColor.copy(alpha = 0.07f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    Column(modifier = Modifier.padding(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceTight)) {
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 Icons.Filled.WbSunny,
                                 contentDescription = null,
                                 tint = accentColor,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(DesignTokens.SpaceLg)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("亮度", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Spacer(modifier = Modifier.width(DesignTokens.SpaceSm))
+                            Text("亮度", fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
                             Spacer(modifier = Modifier.weight(1f))
-                            Text("${(readerBrightness * 100).toInt()}%", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = accentColor,
-                                modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(accentColor.copy(alpha = 0.08f)).padding(horizontal = 8.dp, vertical = 4.dp))
+                            Text("${(readerBrightness * 100).toInt()}%", fontSize = DesignTokens.TypeLabel, fontWeight = FontWeight.SemiBold, color = accentColor,
+                                modifier = Modifier.clip(RoundedCornerShape(DesignTokens.RadiusXs)).background(accentColor.copy(alpha = 0.08f)).padding(horizontal = DesignTokens.SpaceSm, vertical = DesignTokens.SpaceXs))
                         }
                         Slider(
                             value = ((readerBrightness - 0.2f) / 0.8f).coerceIn(0f, 1f),
@@ -3894,10 +3897,10 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("首行缩进", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                Text("首行缩进", fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
                                 Text(
                                     "段落首行自动空两格",
-                                    fontSize = 11.sp,
+                                    fontSize = DesignTokens.TypeCaptionSmall,
                                     color = textColor.copy(alpha = 0.65f).copy(alpha = 0.75f)
                                 )
                             }
@@ -3910,29 +3913,29 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                 }
 
                 /* ── 分组：文字（字号 / 字体 / 行间距 / 页边距）── */
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(DesignTokens.SpaceLoose))
                 Text(
                     "文 字",
-                    fontSize = 12.sp,
+                    fontSize = DesignTokens.TypeCaption,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.5.sp,
                     color = textColor.copy(alpha = 0.65f)
                 )
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(DesignTokens.SpaceTight))
                 Surface(
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(DesignTokens.RadiusXl),
                     color = cardTint,
                     contentColor = textColor,
                     border = BorderStroke(1.dp, textColor.copy(alpha = 0.07f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    Column(modifier = Modifier.padding(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceTight)) {
                         // 字号：A− / 当前 / A+ 紧凑步进器
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text("字号", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Text("字号", fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
                             Spacer(modifier = Modifier.weight(1f))
                             Surface(
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(DesignTokens.RadiusInner),
                                 color = cardTint, contentColor = textColor
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -3942,16 +3945,16 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                             if (next != fontSize) { fontSize = next; prefs.fontSize = fontSize }
                                         },
                                         enabled = fontSize > 12f,
-                                        contentPadding = PaddingValues(horizontal = 8.dp),
+                                        contentPadding = PaddingValues(horizontal = DesignTokens.SpaceSm),
                                         modifier = Modifier.heightIn(min = 44.dp)
-                                    ) { Text("A−", fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+                                    ) { Text("A−", fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Bold) }
                                     Box(
                                         modifier = Modifier.widthIn(min = 30.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             "${fontSize.toInt()}",
-                                            fontSize = 15.sp,
+                                            fontSize = DesignTokens.TypeSection,
                                             fontWeight = FontWeight.Bold,
                                             color = textColor,
                                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -3963,14 +3966,14 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                             if (next != fontSize) { fontSize = next; prefs.fontSize = fontSize }
                                         },
                                         enabled = fontSize < 36f,
-                                        contentPadding = PaddingValues(horizontal = 8.dp),
+                                        contentPadding = PaddingValues(horizontal = DesignTokens.SpaceSm),
                                         modifier = Modifier.heightIn(min = 44.dp)
-                                    ) { Text("A+", fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+                                    ) { Text("A+", fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Bold) }
                                 }
                             }
                         }
                         HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 4.dp),
+                            modifier = Modifier.padding(vertical = DesignTokens.SpaceXs),
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
                         )
 
@@ -3988,11 +3991,11 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                 .clickable { fontPanelOpen = !fontPanelOpen },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("字体", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("字体", fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
+                            Spacer(modifier = Modifier.width(DesignTokens.SpaceTight))
                             Text(
                                 currentFontName,
-                                fontSize = 13.sp,
+                                fontSize = DesignTokens.TypeLabel,
                                 fontWeight = FontWeight.SemiBold,
                                 color = accentColor,
                                 fontFamily = selectedFontFamily,
@@ -4003,7 +4006,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                 if (fontPanelOpen) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                                 contentDescription = if (fontPanelOpen) "收起字体列表" else "展开字体列表",
                                 tint = textColor.copy(alpha = 0.65f).copy(alpha = 0.6f),
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(DesignTokens.SpaceXl)
                             )
                         }
                         AnimatedVisibility(
@@ -4040,12 +4043,12 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                     trailing = {
                                         TextButton(
                                             onClick = { fontFileLauncher.launch("font/ttf") },
-                                            contentPadding = PaddingValues(horizontal = 6.dp),
+                                            contentPadding = PaddingValues(horizontal = DesignTokens.SpaceCompact),
                                             modifier = Modifier.height(30.dp)
                                         ) {
                                             Text(
                                                 if (customLoaded) "换字体" else "+导入",
-                                                fontSize = 12.sp,
+                                                fontSize = DesignTokens.TypeCaption,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = accentColor
                                             )
@@ -4055,16 +4058,16 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                             }
                         }
                         HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 4.dp),
+                            modifier = Modifier.padding(vertical = DesignTokens.SpaceXs),
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
                         )
 
                         // 行间距 / 页边距：紧凑滑杆行
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text("行间距", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Text("行间距", fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
                             Spacer(modifier = Modifier.weight(1f))
-                            Text("${lineHeight.toInt()} sp", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = accentColor,
-                                modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(accentColor.copy(alpha = 0.08f)).padding(horizontal = 8.dp, vertical = 4.dp))
+                            Text("${lineHeight.toInt()} sp", fontSize = DesignTokens.TypeLabel, fontWeight = FontWeight.SemiBold, color = accentColor,
+                                modifier = Modifier.clip(RoundedCornerShape(DesignTokens.RadiusXs)).background(accentColor.copy(alpha = 0.08f)).padding(horizontal = DesignTokens.SpaceSm, vertical = DesignTokens.SpaceXs))
                         }
                         Slider(
                             value = ((lineHeight - 20f) / 28f).coerceIn(0f, 1f),
@@ -4076,10 +4079,10 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                             )
                         )
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text("页边距", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Text("页边距", fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
                             Spacer(modifier = Modifier.weight(1f))
-                            Text("${marginHorizontal} dp", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = accentColor,
-                                modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(accentColor.copy(alpha = 0.08f)).padding(horizontal = 8.dp, vertical = 4.dp))
+                            Text("${marginHorizontal} dp", fontSize = DesignTokens.TypeLabel, fontWeight = FontWeight.SemiBold, color = accentColor,
+                                modifier = Modifier.clip(RoundedCornerShape(DesignTokens.RadiusXs)).background(accentColor.copy(alpha = 0.08f)).padding(horizontal = DesignTokens.SpaceSm, vertical = DesignTokens.SpaceXs))
                         }
                         Slider(
                             value = ((marginHorizontal - 8f) / 40f).coerceIn(0f, 1f),
@@ -4094,25 +4097,25 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                 }
 
                 /* ── 分组：阅读主题（真实底色预览卡）── */
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(DesignTokens.SpaceLoose))
                 Text(
                     "阅读主题",
-                    fontSize = 12.sp,
+                    fontSize = DesignTokens.TypeCaption,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.5.sp,
                     color = textColor.copy(alpha = 0.65f)
                 )
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(DesignTokens.SpaceTight))
                 // 与阅读区 when(readerTheme) 的真实配色一一对应，选中态用描边+角标
                 val themePreviews = listOf(
-                    ReaderThemePreview(1, "白底", Color.White, Color(0xFF18191C)),
-                    ReaderThemePreview(2, "羊皮", Color(0xFFFBF0D9), Color(0xFF5F4B32)),
-                    ReaderThemePreview(3, "夜间", Color(0xFF18191C), Color(0xFFD4D4D4)),
-                    ReaderThemePreview(4, "护眼", Color(0xFFE8F5E9), Color(0xFF1B5E20)),
-                    ReaderThemePreview(5, "纯黑", Color.Black, Color(0xFFE0E0E0))
+                    ReaderThemePreview(1, "白底", Color.White, ReadingPalette.NovelDarkSurface),
+                    ReaderThemePreview(2, "羊皮", ReadingPalette.NovelPaperSurface, ReadingPalette.NovelPaperInk),
+                    ReaderThemePreview(3, "夜间", ReadingPalette.NovelDarkSurface, ReadingPalette.NovelDarkInk),
+                    ReaderThemePreview(4, "护眼", ReadingPalette.NovelGreenSurface, ReadingPalette.NovelGreenInk),
+                    ReaderThemePreview(5, "纯黑", Color.Black, ReadingPalette.NovelNeutralInk)
                 )
-                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
                         themePreviews.take(3).forEach { preview ->
                             ReaderThemePreviewCard(
                                 preview = preview,
@@ -4122,7 +4125,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                             )
                         }
                     }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
                         themePreviews.drop(3).forEach { preview ->
                             ReaderThemePreviewCard(
                                 preview = preview,
@@ -4135,17 +4138,17 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                 }
 
                 /* ── 分组：翻页（选中态明显的紧凑选择卡）── */
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(DesignTokens.SpaceLoose))
                 Text(
                     "翻 页",
-                    fontSize = 12.sp,
+                    fontSize = DesignTokens.TypeCaption,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.5.sp,
                     color = textColor.copy(alpha = 0.65f)
                 )
-                Spacer(modifier = Modifier.height(10.dp))
-                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spacer(modifier = Modifier.height(DesignTokens.SpaceTight))
+                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
                         PageTurnType.entries.take(3).forEach { modeType ->
                             ReaderPageModeChip(
                                 label = modeType.title.replace("翻页", "").replace("卷页", "").replace("渐变", ""),
@@ -4155,7 +4158,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                             )
                         }
                     }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
                         PageTurnType.entries.drop(3).forEach { modeType ->
                             ReaderPageModeChip(
                                 label = modeType.title.replace("翻页", "").replace("卷页", "").replace("渐变", ""),
@@ -4168,7 +4171,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(DesignTokens.SpaceSm))
             }
             }
 
@@ -4215,7 +4218,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
 
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(DesignTokens.SpaceMd))
 
 
 
@@ -4246,7 +4249,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                                         .fillMaxWidth()
 
-                                        .padding(vertical = 4.dp)
+                                        .padding(vertical = DesignTokens.SpaceXs)
 
                                         .clickableWithFeedback {
 
@@ -4270,9 +4273,9 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                                 ) {
 
-                                    Column(modifier = Modifier.padding(8.dp)) {
+                                    Column(modifier = Modifier.padding(DesignTokens.SpaceSm)) {
 
-                                        Text(item.chapterTitle, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MintPrimary)
+                                        Text(item.chapterTitle, fontWeight = FontWeight.Bold, fontSize = DesignTokens.TypeCaption, color = MintPrimary)
 
                                         // 预览里高亮关键词（大小写不敏感的首处匹配）；颜色在组合期取好再进 remember
                                         val accentColor = MintPrimary
@@ -4293,7 +4296,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                             }
                                         }
 
-                                        Text(highlightedSnippet, fontSize = 11.sp, maxLines = 2)
+                                        Text(highlightedSnippet, fontSize = DesignTokens.TypeCaptionSmall, maxLines = 2)
 
                                     }
 
@@ -4336,11 +4339,11 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
         ) {
 
                         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidth().padding(16.dp).padding(bottom = 32.dp)) {
+Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidth().padding(DesignTokens.SpaceLg).padding(bottom = DesignTokens.SpaceSection)) {
 
                 Text("书签记录 (${bookmarks.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(DesignTokens.SpaceMd))
 
 
 
@@ -4378,7 +4381,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                                     }
 
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = DesignTokens.SpaceSm),
 
                                 horizontalArrangement = Arrangement.SpaceBetween,
 
@@ -4388,9 +4391,9 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                                 Column(modifier = Modifier.weight(1f)) {
 
-                                    Text(bm.title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text(bm.title, fontWeight = FontWeight.Bold, fontSize = DesignTokens.TypeBodySmall)
 
-                                    Text(bm.snippet, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                    Text(bm.snippet, fontSize = DesignTokens.TypeCaption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
 
                                 }
 
@@ -4429,7 +4432,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
             .fillMaxWidth()
 
-            .padding(16.dp)
+            .padding(DesignTokens.SpaceLg)
 
             .statusBarsPadding()
 
@@ -4461,11 +4464,11 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                 .fillMaxWidth()
 
-                .consistentShadow(12.dp, RoundedCornerShape(16.dp))
+                .consistentShadow(DesignTokens.SpaceMd, RoundedCornerShape(DesignTokens.RadiusMd))
 
-                .border(2.dp, MintPrimary.copy(alpha = glowAlpha), RoundedCornerShape(16.dp)),
+                .border(2.dp, MintPrimary.copy(alpha = glowAlpha), RoundedCornerShape(DesignTokens.RadiusMd)),
 
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(DesignTokens.RadiusMd),
 
             color = MaterialTheme.colorScheme.surface
 
@@ -4473,7 +4476,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
             Row(
 
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(DesignTokens.SpaceLg),
 
                 verticalAlignment = Alignment.CenterVertically,
 
@@ -4495,7 +4498,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                     )
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(DesignTokens.SpaceMd))
 
                     Column {
 
@@ -4505,7 +4508,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                             fontWeight = FontWeight.Bold,
 
-                            fontSize = 15.sp,
+                            fontSize = DesignTokens.TypeSection,
 
                             color = MaterialTheme.colorScheme.onSurface
 
@@ -4517,7 +4520,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                             text = "已持续阅读 ${prefs.restReminderMinutes} 分钟，建议远眺片刻！",
 
-                            fontSize = 13.sp,
+                            fontSize = DesignTokens.TypeLabel,
 
                             color = MaterialTheme.colorScheme.onSurfaceVariant
 
@@ -4527,7 +4530,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(DesignTokens.SpaceSm))
 
                 AppActionButton(
 
@@ -4575,7 +4578,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                     .align(Alignment.BottomEnd)
 
-                    .padding(end = 24.dp, bottom = 48.dp)
+                    .padding(end = DesignTokens.SpaceXxl, bottom = 48.dp)
 
                     .size(160.dp),
 
@@ -4587,7 +4590,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
             Surface(
 
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(DesignTokens.RadiusMd),
 
                 color = MaterialTheme.colorScheme.primaryContainer,
 
@@ -4597,7 +4600,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                     .padding(end = 120.dp, bottom = 160.dp)
 
-                    .consistentShadow(8.dp, RoundedCornerShape(16.dp))
+                    .consistentShadow(DesignTokens.SpaceSm, RoundedCornerShape(DesignTokens.RadiusMd))
 
             ) {
 
@@ -4605,13 +4608,13 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                     text = "Ciallo～(∠・ω< )⌒★",
 
-                    modifier = Modifier.padding(16.dp, 8.dp),
+                    modifier = Modifier.padding(DesignTokens.SpaceLg, DesignTokens.SpaceSm),
 
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
 
                     fontWeight = FontWeight.Bold,
 
-                    fontSize = 14.sp
+                    fontSize = DesignTokens.TypeBodySmall
 
                 )
 
@@ -4637,7 +4640,7 @@ private fun BookmarkHangingRibbon(
 
         modifier = modifier
 
-            .width(20.dp)
+            .width(DesignTokens.SpaceXl)
 
             .height(34.dp)
 
@@ -4663,7 +4666,7 @@ private fun BookmarkHangingRibbon(
 
             lineTo(w, h)
 
-            lineTo(w / 2f, h - 8.dp.toPx()) // Triangular V-notch
+            lineTo(w / 2f, h - DesignTokens.SpaceSm.toPx()) // Triangular V-notch
 
             lineTo(0f, h)
 
@@ -5038,7 +5041,7 @@ private fun ReaderThemePreviewCard(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(DesignTokens.RadiusControl),
         color = preview.bg,
         border = if (selected) {
             BorderStroke(2.dp, MintPrimary)
@@ -5050,15 +5053,15 @@ private fun ReaderThemePreviewCard(
         Box(modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp)) {
             Text(
                 "永远相信美好的\n事情正在发生",
-                fontSize = 10.sp,
-                lineHeight = 14.sp,
+                fontSize = DesignTokens.TypeMicro,
+                lineHeight = DesignTokens.TypeBodySmall,
                 color = preview.fg,
                 maxLines = 2,
                 modifier = Modifier.align(Alignment.TopStart)
             )
             Text(
                 preview.name,
-                fontSize = 10.sp,
+                fontSize = DesignTokens.TypeMicro,
                 fontWeight = FontWeight.SemiBold,
                 color = preview.fg.copy(alpha = 0.6f),
                 modifier = Modifier.align(Alignment.BottomStart)
@@ -5069,7 +5072,7 @@ private fun ReaderThemePreviewCard(
                     contentDescription = "已选择",
                     tint = MintPrimary,
                     modifier = Modifier
-                        .size(14.dp)
+                        .size(DesignTokens.SpaceComfortable)
                         .align(Alignment.TopEnd)
                 )
             }
@@ -5096,13 +5099,13 @@ private fun ReaderPageModeChip(
     )
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(DesignTokens.RadiusSm),
         color = selectedTint,
         border = if (selected) BorderStroke(1.dp, MintPrimary.copy(alpha = 0.8f)) else null,
         modifier = modifier.heightIn(min = 40.dp)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = DesignTokens.SpaceSm, vertical = DesignTokens.SpaceTight),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
@@ -5113,11 +5116,11 @@ private fun ReaderPageModeChip(
                     tint = MintPrimary,
                     modifier = Modifier.size(13.dp)
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(DesignTokens.SpaceXs))
             }
             Text(
                 label,
-                fontSize = 13.sp,
+                fontSize = DesignTokens.TypeLabel,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 color = if (selected) accentColor else contentColor.copy(alpha = 0.85f)
             )
@@ -5143,24 +5146,24 @@ private fun ReaderFontOptionRow(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 44.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(DesignTokens.RadiusSm))
             .background(if (selected) MintPrimary.copy(alpha = 0.10f) else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = DesignTokens.SpaceSm, vertical = DesignTokens.SpaceCompact),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             if (selected) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
             contentDescription = null,
             tint = if (selected) MintPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(DesignTokens.SpaceLoose)
         )
-        Spacer(modifier = Modifier.width(10.dp))
+        Spacer(modifier = Modifier.width(DesignTokens.SpaceTight))
         Column(modifier = Modifier.weight(1f)) {
-            Text(name, fontSize = 14.sp, fontWeight = FontWeight.Medium, fontFamily = family)
+            Text(name, fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium, fontFamily = family)
             Text(
                 sample,
-                fontSize = 11.sp,
+                fontSize = DesignTokens.TypeCaptionSmall,
                 color = contentColor.copy(alpha = 0.65f),
                 fontFamily = family,
                 maxLines = 1

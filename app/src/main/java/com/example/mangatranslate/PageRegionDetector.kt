@@ -37,11 +37,10 @@ class PageRegionDetector(
 
     suspend fun detect(bitmap: Bitmap): PageRegionResult? {
         coroutineContext.ensureActive()
-        return if (PageRegionTiling.shouldUseLongImageTiling(bitmap.width, bitmap.height)) {
-            runCatching { detectLongImageTiledPage(bitmap) }.getOrElse { return null }
-        } else {
-            runCatching { detectSingleBitmap(bitmap) }.getOrElse { return null }
-        }
+        return try {
+            if (PageRegionTiling.shouldUseLongImageTiling(bitmap.width, bitmap.height)) detectLongImageTiledPage(bitmap)
+            else detectSingleBitmap(bitmap)
+        } catch (e: Exception) { coroutineContext.ensureActive(); null }
     }
 
     /* ══ 常规页 ══ */
@@ -80,7 +79,7 @@ class PageRegionDetector(
             bubbles = balloonsRejoined,
             textLines = rawLines,
             textBlocks = blocks,
-            complete = true,
+            complete = textDetectionOk,
         )
     }
 
@@ -184,7 +183,7 @@ class PageRegionDetector(
         val detectedTextLines = ArrayList<RectF>()
         for (tile in paddleTiles) {
             coroutineContext.ensureActive()
-            val tileBitmap = cropRegion(bitmap, tile, PageRegionTiling.DETECTION_MAX_EDGE) ?: continue
+            val tileBitmap = cropRegion(bitmap, tile, PageRegionTiling.DETECTION_MAX_EDGE) ?: throw TranslationFailure.Ocr.exception()
             try {
                 val localLines = paddle.detectLines(tileBitmap)
                 detectedTextLines.addAll(

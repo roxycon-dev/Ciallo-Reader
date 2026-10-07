@@ -1,5 +1,7 @@
 package com.example.ui.reader
 
+import com.example.ui.design.DesignTokens
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
@@ -51,23 +53,23 @@ internal fun ReadingSettingsPanel(
         SideEffect { (view.parent as? DialogWindowProvider)?.window?.setDimAmount(0f) }
         BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
             val wide = maxWidth >= 600.dp || maxWidth > maxHeight
-            val shape = RoundedCornerShape(28.dp)
+            val shape = RoundedCornerShape(DesignTokens.RadiusOverlay)
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.08f)))
             AnimatedVisibility(
                 visibleState = visibility,
                 enter = fadeIn(tween(220)) + slideInVertically(tween(300)) { it / 8 },
                 exit = fadeOut(tween(160)) + slideOutVertically(tween(180)) { it / 8 },
                 modifier = Modifier.align(if (wide) Alignment.CenterEnd else Alignment.BottomCenter)
-                    .padding(horizontal = if (wide) 20.dp else 10.dp, vertical = 10.dp),
+                    .padding(horizontal = if (wide) DesignTokens.SpaceXl else DesignTokens.SpaceTight, vertical = DesignTokens.SpaceTight),
             ) {
                 Box(
                     Modifier.widthIn(max = if (wide) 440.dp else 560.dp).fillMaxWidth()
                         .heightIn(max = maxHeight * if (wide) 0.94f else 0.80f)
-                        .shadow(10.dp, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.08f), spotColor = Color.Black.copy(alpha = 0.10f))
+                        .shadow(DesignTokens.SpaceTight, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.08f), spotColor = Color.Black.copy(alpha = 0.10f))
                         .clip(shape)
                         .then(if (backdrop != null) Modifier.drawPlainBackdrop(
                             backdrop = backdrop, shape = { shape },
-                            effects = { blur(8.dp.toPx()) },
+                            effects = { blur(DesignTokens.SpaceSm.toPx()) },
                         ) else Modifier)
                         .background(themeColor.copy(alpha = 0.56f))
                         .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.10f), Color.Transparent)))

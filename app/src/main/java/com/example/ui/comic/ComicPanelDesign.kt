@@ -1,5 +1,8 @@
 package com.example.ui.comic
 
+import com.example.ui.design.DesignTokens
+import com.example.ui.design.ReadingPalette
+
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -56,6 +59,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
@@ -100,22 +104,22 @@ internal fun PanelSectionCard(
     Column(
         modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = DesignTokens.SpaceXs)
             .animateContentSize(tween(180))
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(DesignTokens.RadiusXl))
             .background(PanelCardBg)
-            .border(0.5.dp, PanelCardStroke, RoundedCornerShape(24.dp))
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .border(0.5.dp, PanelCardStroke, RoundedCornerShape(DesignTokens.RadiusXl))
+            .padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceComfortable)
     ) {
         if (title != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 icon?.let {
                     Icon(it, null, tint = MintPrimary.copy(alpha = 0.9f), modifier = Modifier.size(15.dp))
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(DesignTokens.SpaceCompact))
                 }
-                Text(title, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp)
+                Text(title, color = TextPrimary, fontSize = DesignTokens.TypeSection, fontWeight = FontWeight.SemiBold, lineHeight = DesignTokens.TypeSectionLineHeight)
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(DesignTokens.SpaceSm))
         }
         content()
     }
@@ -138,12 +142,12 @@ internal fun PanelTabRow(
     Row(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(DesignTokens.RadiusNavigation))
             .background(PanelChipBg)
             .horizontalScroll(rememberScrollState())
             .selectableGroup()
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+            .padding(DesignTokens.SpaceXs),
+        horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceXs)
     ) {
         tabs.forEachIndexed { i, tab ->
             val active = i == selected
@@ -151,15 +155,15 @@ internal fun PanelTabRow(
             Column(
                 Modifier
                     .width(58.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(DesignTokens.RadiusControl))
                     .background(tint)
                     .border(
                         0.5.dp,
                         if (active) selectedStroke() else Color.Transparent,
-                        RoundedCornerShape(14.dp)
+                        RoundedCornerShape(DesignTokens.RadiusControl)
                     )
                     .selectable(active, role = Role.Tab) { onSelect(i) }
-                    .padding(vertical = 10.dp),
+                    .padding(vertical = DesignTokens.SpaceTight),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Icon(
@@ -172,7 +176,7 @@ internal fun PanelTabRow(
                 Text(
                     tab.label,
                     color = if (active) MintPrimary else TextSecondary,
-                    fontSize = 12.sp,
+                    fontSize = DesignTokens.TypeCaption,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1
                 )
@@ -184,24 +188,24 @@ internal fun PanelTabRow(
 /** Read-only status is text, never a switch that cannot be operated. */
 @Composable
 internal fun PanelHint(text: String) {
-    Text(text, color = TextSecondary, fontSize = 12.sp, lineHeight = 18.sp,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp))
+    Text(text, color = TextSecondary, fontSize = DesignTokens.TypeCaption, lineHeight = DesignTokens.TypeCaptionLineHeight,
+        modifier = Modifier.fillMaxWidth().padding(vertical = DesignTokens.SpaceXs))
 }
 
 /** A scrollable rail gives tablets enough room for all seven categories. */
 @Composable
 internal fun PanelTabRail(tabs: List<PanelTabData>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier.width(92.dp).verticalScroll(rememberScrollState()).selectableGroup(),
-        verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceXs)) {
         tabs.forEachIndexed { index, tab ->
             val active = index == selected
             val tint by animateColorAsState(if (active) selectedBg() else Color.Transparent, label = "railTint")
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(tint)
-                .selectable(active, role = Role.Tab) { onSelect(index) }.padding(vertical = 8.dp),
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(DesignTokens.RadiusNavigation)).background(tint)
+                .selectable(active, role = Role.Tab) { onSelect(index) }.padding(vertical = DesignTokens.SpaceSm),
                 horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(tab.icon, null, tint = if (active) MintPrimary else TextSecondary, modifier = Modifier.size(21.dp))
-                Spacer(Modifier.height(6.dp))
-                Text(tab.label, color = if (active) MintPrimary else TextSecondary, fontSize = 13.sp,
+                Spacer(Modifier.height(DesignTokens.SpaceCompact))
+                Text(tab.label, color = if (active) MintPrimary else TextSecondary, fontSize = DesignTokens.TypeLabel,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal)
             }
         }
@@ -257,7 +261,7 @@ internal fun PanelSlider(
             .pointerInput(valueRange, steps, enabled, reverse) {
                 if (!enabled) return@pointerInput
                 val slop = viewConfiguration.touchSlop
-                val inset = 10.dp.toPx()
+                val inset = DesignTokens.SpaceTight.toPx()
                 fun posToValue(x: Float): Float {
                     val physical = ((x - inset) / (size.width - 2f * inset).coerceAtLeast(1f)).coerceIn(0f, 1f)
                     val f = snap(if (reverse) 1f - physical else physical)
@@ -304,10 +308,10 @@ internal fun PanelSlider(
                 }
             }
     ) {
-        val inset = with(density) { 10.dp.toPx() }
+        val inset = with(density) { DesignTokens.SpaceTight.toPx() }
         val trackWidth = (constraints.maxWidth.toFloat() - inset * 2).coerceAtLeast(1f)
-        val thumbR = with(density) { 8.dp.toPx() }
-        val pressRingR = with(density) { (if (enabled) 12.dp else 10.dp).toPx() }
+        val thumbR = with(density) { DesignTokens.SpaceSm.toPx() }
+        val pressRingR = with(density) { (if (enabled) DesignTokens.SpaceMd else DesignTokens.SpaceTight).toPx() }
         val trackH = with(density) { 5.dp.toPx() }
         // DrawScope 不是组合作用域：@Composable 的 MintPrimary 需在组合期取值
         val fillEnabled = MintPrimary.copy(alpha = 0.9f)
@@ -318,7 +322,7 @@ internal fun PanelSlider(
             val cx = inset + trackWidth * (if (reverse) 1f - fraction else fraction)
             // 轨道
             drawRoundRect(
-                color = Color(0x2EFFFFFF),
+                color = ReadingPalette.ControlTrack,
                 cornerRadius = CornerRadius(trackH / 2),
                 topLeft = Offset(inset, cy - trackH / 2),
                 size = Size(trackWidth, trackH),
@@ -341,7 +345,7 @@ internal fun PanelSlider(
             }
             // 圆钮
             drawCircle(
-                if (enabled) Color(0xFFFFFFFF) else Color(0xAAFFFFFF),
+                if (enabled) Color(0xFFFFFFFF) else ReadingPalette.OnGlassMuted,
                 radius = thumbR * pressScale,
                 center = Offset(cx, cy),
             )
@@ -364,8 +368,8 @@ internal fun PanelSwitch(
         animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = 1400f),
         label = "panelSwitch"
     )
-    val trackColor = lerpColor(Color(0x33FFFFFF), MintPrimary.copy(alpha = 0.85f), t)
-    val travel = with(LocalDensity.current) { 18.dp.toPx() }
+    val trackColor = lerpColor(ReadingPalette.SwitchTrack, MintPrimary.copy(alpha = 0.85f), t)
+    val travel = with(LocalDensity.current) { DesignTokens.SpaceLoose.toPx() }
     Box(
         modifier
             .width(46.dp)
@@ -374,7 +378,7 @@ internal fun PanelSwitch(
             .background(trackColor)
             .border(
                 0.5.dp,
-                lerpColor(Color(0x2EFFFFFF), MintPrimary.copy(alpha = 0.6f), t),
+                lerpColor(ReadingPalette.ControlTrack, MintPrimary.copy(alpha = 0.6f), t),
                 CircleShape
             )
             .clickableNoRipple { onChange(!checked) }
@@ -407,3 +411,14 @@ internal fun panelSelectedStroke(): Color = selectedStroke()
 
 /** 背景类型色卡（阅读背景的可视化选择） */
 internal data class PanelBgSwatch(val label: String, val fill: Color, val gradient: Brush? = null)
+
+/** Decorative marker inside a labelled row or selected option; avoid duplicate TalkBack announcements. */
+@Composable
+internal fun PanelDecorativeIcon(
+    imageVector: ImageVector,
+    tint: Color,
+    modifier: Modifier = Modifier,
+) {
+    Icon(imageVector, contentDescription = null, tint = tint,
+        modifier = modifier.clearAndSetSemantics { })
+}

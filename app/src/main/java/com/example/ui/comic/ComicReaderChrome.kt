@@ -1,5 +1,8 @@
 package com.example.ui.comic
 
+import com.example.ui.design.DesignTokens
+import com.example.ui.design.ReadingPalette
+
 import com.example.ui.components.overlayTouchShield
 
 import android.graphics.Bitmap
@@ -87,6 +90,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.MintPrimary
@@ -106,7 +110,7 @@ internal val PanelBg = Color(0xD91A1A1E)
 internal val PanelBgGlass = Color(0xCC1A1A1E)
 internal val PanelChipBg = Color(0x16FFFFFF)
 internal val PanelChipActiveBg = Color(0x30FFFFFF)
-internal val StrokeColor = Color(0x1FFFFFFF)
+internal val StrokeColor = ReadingPalette.GlassStroke
 internal val TextPrimary = Color(0xFFF2F2F4)
 // 0xB3 alpha ≈ 70% 白，对 PanelBg 对比度 ≈ 5.9:1（旧 0x99 仅 ~4:1，12sp 标签低于 WCAG AA）
 internal val TextSecondary = Color(0xB3FFFFFF)
@@ -125,7 +129,7 @@ internal fun Modifier.comicPanelGlass(backdrop: Backdrop?, shape: Shape): Modifi
         shape = { shape },
         effects = {
             colorControls(saturation = 1.18f)
-            blur(radius = 10.dp.toPx())
+            blur(radius = DesignTokens.SpaceTight.toPx())
         },
     ).background(PanelBgGlass)
 
@@ -143,6 +147,7 @@ fun ComicReaderChrome(
     panel: ComicPanel,
     onPanelChange: (ComicPanel) -> Unit,
     panelGlassBackdrop: LayerBackdrop? = null,
+    settingsInitialTab: Int = 0,
     title: String,
     chapterTitle: String?,
     currentPage: Int,
@@ -179,6 +184,7 @@ fun ComicReaderChrome(
     onExit: () -> Unit,
     onDownloadTranslationModels: () -> Unit = {},
     onTranslationRefresh: (Boolean) -> Unit = {},
+    onBottomBarHeightChanged: (Int) -> Unit = {},
 ) {
     val onDismissPanel = { onPanelChange(ComicPanel.NONE) }
     val currentRaw = (currentPage - 1).coerceIn(0, (pages.size - 1).coerceAtLeast(0))
@@ -214,6 +220,7 @@ fun ComicReaderChrome(
     // 底部控制栏 + 悬浮缩略图气泡（气泡由 Chrome 层渲染，不占底栏布局）
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         AnimatedVisibility(
+            modifier = Modifier.onSizeChanged { onBottomBarHeightChanged(it.height) },
             visible = visible && panel == ComicPanel.NONE,
             enter = fadeIn(tween(ENTER_MS)) + slideInVertically(tween(ENTER_MS)) { it },
             exit = fadeOut(tween(EXIT_MS)) + slideOutVertically(tween(EXIT_MS)) { it },
@@ -293,6 +300,7 @@ fun ComicReaderChrome(
                     glassBackdrop = panelGlassBackdrop,
                     onDownloadTranslationModels = onDownloadTranslationModels,
                     onTranslationRefresh = onTranslationRefresh,
+                    initialTab = settingsInitialTab,
                 )
                 ComicPanel.TOC -> ComicTocSheet(
                     toc = toc, currentChapterIndex = currentChapterIndex,
@@ -346,23 +354,23 @@ private fun ComicTopBar(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
-            .background(Color(0xD9101012))
-            .border(0.5.dp, StrokeColor, RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
+            .clip(RoundedCornerShape(bottomStart = DesignTokens.SpaceXl, bottomEnd = DesignTokens.SpaceXl))
+            .background(ReadingPalette.ChromeSurface)
+            .border(0.5.dp, StrokeColor, RoundedCornerShape(bottomStart = DesignTokens.SpaceXl, bottomEnd = DesignTokens.SpaceXl))
             .statusBarsPadding()
-            .padding(horizontal = 6.dp, vertical = 8.dp)
+            .padding(horizontal = DesignTokens.SpaceCompact, vertical = DesignTokens.SpaceSm)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             ChromeIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", onClick = onExit)
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(DesignTokens.SpaceXs))
             Column(Modifier.weight(1f)) {
                 Text(
-                    title, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                    title, color = TextPrimary, fontSize = DesignTokens.TypeBody, fontWeight = FontWeight.SemiBold,
                     maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     chapterTitle ?: ("${config.mode.label} · ${config.direction.label}"),
-                    color = TextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                    color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall, maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
             }
             ChromeIconButton(Icons.Filled.AutoStories, "目录") { onOpenPanel(ComicPanel.TOC) }
@@ -394,17 +402,17 @@ private fun ComicTopBar(
                 DropdownMenu(
                     expanded = favMenuOpen,
                     onDismissRequest = { favMenuOpen = false },
-                    containerColor = Color(0xFF232327),
+                    containerColor = ReadingPalette.DialogSurface,
                 ) {
                     Text(
                         "收藏预设",
-                        color = TextSecondary, fontSize = 11.sp,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall,
+                        modifier = Modifier.padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceXs),
                     )
                     favorites.forEach { p ->
                         DropdownMenuItem(
                             text = { Text(p.name, color = TextPrimary) },
-                            leadingIcon = { Text(p.emoji, color = MintPrimary, fontSize = 12.sp) },
+                            leadingIcon = { Text(p.emoji, color = MintPrimary, fontSize = DesignTokens.TypeCaption) },
                             onClick = {
                                 favMenuOpen = false
                                 onApplyPresetConfig(p.config)
@@ -418,7 +426,7 @@ private fun ComicTopBar(
                 DropdownMenu(
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
-                    containerColor = Color(0xFF232327),
+                    containerColor = ReadingPalette.DialogSurface,
                 ) {
                     DropdownMenuItem(
                         text = { Text("临时合页 / 取消", color = TextPrimary) },
@@ -477,34 +485,34 @@ private fun ComicBottomBar(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-            .background(Color(0xD9101012))
-            .border(0.5.dp, StrokeColor, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            .clip(RoundedCornerShape(topStart = DesignTokens.SpaceXl, topEnd = DesignTokens.SpaceXl))
+            .background(ReadingPalette.ChromeSurface)
+            .border(0.5.dp, StrokeColor, RoundedCornerShape(topStart = DesignTokens.SpaceXl, topEnd = DesignTokens.SpaceXl))
             .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceCompact)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "$currentPage / $totalPages",
-                color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold
+                color = TextPrimary, fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Bold
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(DesignTokens.SpaceSm))
             Text(
                 // 垂直列表按滚动位置，其余模式按页数。
                 "· ${
                     if (continuousFraction in 0f..1f) (continuousFraction * 100).toInt()
                     else (currentPage.toFloat() / totalPages.coerceAtLeast(1) * 100).toInt()
                 }%",
-                color = TextSecondary, fontSize = 12.sp
+                color = TextSecondary, fontSize = DesignTokens.TypeCaption
             )
             Spacer(Modifier.weight(1f))
             Text(
                 if (autoRead) "自动阅读中" else config.mode.label,
                 // 状态文字默认次级色；自动阅读激活态才用强调色（强调色留给可交互/激活语义）
                 color = if (autoRead) MintPrimary else TextSecondary,
-                fontSize = 11.sp
+                fontSize = DesignTokens.TypeCaptionSmall
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(DesignTokens.SpaceCompact))
             ChromeIconButton(if (reverse) Icons.Filled.ChevronRight else Icons.Filled.ChevronLeft, "上一页") { onGoPrev() }
             ChromeIconButton(
                 if (autoRead) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -541,7 +549,7 @@ private fun ComicBottomBar(
         if (onPrevChapter != null || onNextChapter != null) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)
             ) {
                 ChapterNavButton(
                     "上一$chapterNavLabel", enabled = onPrevChapter != null,
@@ -560,13 +568,13 @@ private fun ComicBottomBar(
 private fun ChapterNavButton(text: String, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
         modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(DesignTokens.RadiusSm))
             .background(if (enabled) PanelChipBg else Color(0x10FFFFFF))
             .clickableNoRipple { if (enabled) onClick() }
-            .padding(vertical = 10.dp),
+            .padding(vertical = DesignTokens.SpaceTight),
         contentAlignment = Alignment.Center
     ) {
-        Text(text, color = if (enabled) TextPrimary else Color(0x55FFFFFF), fontSize = 12.sp)
+        Text(text, color = if (enabled) TextPrimary else Color(0x55FFFFFF), fontSize = DesignTokens.TypeCaption)
     }
 }
 
@@ -583,28 +591,28 @@ internal fun ComicThumbPreview(
     }
     Column(
         modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(DesignTokens.RadiusSm))
             .background(PanelBg)
-            .border(0.5.dp, StrokeColor, RoundedCornerShape(12.dp))
-            .padding(6.dp),
+            .border(0.5.dp, StrokeColor, RoundedCornerShape(DesignTokens.RadiusSm))
+            .padding(DesignTokens.SpaceCompact),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             Modifier
                 .size(width = 96.dp, height = 128.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0x22FFFFFF)),
+                .clip(RoundedCornerShape(DesignTokens.RadiusXs))
+                .background(ReadingPalette.InputStroke),
             contentAlignment = Alignment.Center
         ) {
             bitmap?.let {
                 Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             } ?: com.example.ui.components.ChasingDots(
-                size = 20.dp,
+                size = DesignTokens.SpaceXl,
                 color = MintPrimary,
             )
         }
-        Spacer(Modifier.height(4.dp))
-        Text("第 ${rawShown + 1} 页", color = TextPrimary, fontSize = 11.sp)
+        Spacer(Modifier.height(DesignTokens.SpaceXs))
+        Text("第 ${rawShown + 1} 页", color = TextPrimary, fontSize = DesignTokens.TypeCaptionSmall)
     }
 }
 
@@ -644,13 +652,13 @@ internal fun SegmentRow(
     selected: Int,
     onSelect: (Int) -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Text(title, color = TextSecondary, fontSize = 12.sp)
-        Spacer(Modifier.height(6.dp))
+    Column(Modifier.fillMaxWidth().padding(vertical = DesignTokens.SpaceXs)) {
+        Text(title, color = TextSecondary, fontSize = DesignTokens.TypeCaption)
+        Spacer(Modifier.height(DesignTokens.SpaceCompact))
         FlowRow(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(DesignTokens.RadiusSm))
                 .background(PanelChipBg)
                 .selectableGroup()
                 .padding(3.dp),
@@ -671,13 +679,13 @@ internal fun SegmentRow(
                         )
                         .selectable(active, role = Role.RadioButton) { onSelect(id) }
                         .heightIn(min = 44.dp)
-                        .padding(vertical = 8.dp, horizontal = 10.dp),
+                        .padding(vertical = DesignTokens.SpaceSm, horizontal = DesignTokens.SpaceTight),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         label,
-                        color = if (active) MintPrimary else Color(0xAAFFFFFF),
-                        fontSize = 12.sp,
+                        color = if (active) MintPrimary else ReadingPalette.OnGlassMuted,
+                        fontSize = DesignTokens.TypeCaption,
                         fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                         softWrap = true
                     )
@@ -702,9 +710,9 @@ internal fun SliderRow(
 ) {
     Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(title, color = TextSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            Text(title, color = TextSecondary, fontSize = DesignTokens.TypeCaption, modifier = Modifier.weight(1f))
             Spacer(Modifier.weight(1f))
-            Text(format(value), color = MintPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text(format(value), color = MintPrimary, fontSize = DesignTokens.TypeCaption, fontWeight = FontWeight.Medium)
         }
         PanelSlider(
             value = value,
@@ -722,12 +730,12 @@ internal fun SliderRow(
 internal fun SwitchRow(title: String, subtitle: String? = null, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(
         Modifier.fillMaxWidth().heightIn(min = 48.dp)
-            .toggleable(checked, role = Role.Switch, onValueChange = onChange).padding(vertical = 6.dp),
+            .toggleable(checked, role = Role.Switch, onValueChange = onChange).padding(vertical = DesignTokens.SpaceCompact),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, color = TextPrimary, fontSize = 13.sp)
-            subtitle?.let { Text(it, color = TextSecondary, fontSize = 11.sp) }
+            Text(title, color = TextPrimary, fontSize = DesignTokens.TypeLabel)
+            subtitle?.let { Text(it, color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall) }
         }
         PanelSwitch(checked = checked, onChange = onChange, modifier = Modifier.clearAndSetSemantics { })
     }
@@ -745,14 +753,14 @@ internal fun ComicSheetContainer(
 ) {
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
     val wide = maxWidth >= 600.dp || maxWidth > maxHeight
-    val sheetShape = RoundedCornerShape(28.dp)
+    val sheetShape = RoundedCornerShape(DesignTokens.RadiusOverlay)
     Column(
         Modifier
             // adaptiveSheetWidth = widthIn 必须在 fillMaxWidth 之前：先钳制最大宽度再填充——
             // 反序会让 fillMaxWidth 先撑满屏宽，560dp 背景钉在左侧留出无背景空区。
             // 横屏放宽到 840dp，与阅读设置面板（第 11 条）同一套自适应规范
             .align(if (wide) Alignment.CenterEnd else Alignment.BottomCenter)
-            .padding(horizontal = if (wide) 16.dp else 8.dp, vertical = 8.dp)
+            .padding(horizontal = if (wide) DesignTokens.SpaceLg else DesignTokens.SpaceSm, vertical = DesignTokens.SpaceSm)
             .widthIn(max = 620.dp).fillMaxWidth()
             .fillMaxHeight(if (wide) 0.94f else heightFraction)
             .clip(sheetShape)
@@ -763,14 +771,14 @@ internal fun ComicSheetContainer(
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             Box(
                 Modifier
-                    .padding(top = 10.dp)
-                    .size(width = 40.dp, height = 4.dp)
+                    .padding(top = DesignTokens.SpaceTight)
+                    .size(width = 40.dp, height = DesignTokens.SpaceXs)
                     .clip(CircleShape)
-                    .background(Color(0x2EFFFFFF))
+                    .background(ReadingPalette.ControlTrack)
             )
         }
-        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, color = TextPrimary, fontSize = 21.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        Row(Modifier.fillMaxWidth().padding(start = DesignTokens.SpaceXl, end = DesignTokens.SpaceSm), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, color = TextPrimary, fontSize = DesignTokens.TypeSectionLineHeight, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             androidx.compose.material3.IconButton(onClick = onDismiss) {
                 Icon(androidx.compose.material.icons.Icons.Filled.Close, "关闭$title", tint = TextSecondary)
             }
@@ -781,7 +789,7 @@ internal fun ComicSheetContainer(
                 .weight(1f)
                 .navigationBarsPadding()
                 .then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier)
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = DesignTokens.SpaceXl)
         ) {
             content()
         }
@@ -793,7 +801,7 @@ internal fun ComicSheetContainer(
 @Composable
 internal fun SectionLabel(text: String) {
     Text(
-        text, color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(top = 14.dp, bottom = 2.dp)
+        text, color = TextSecondary, fontSize = DesignTokens.TypeCaption, fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(top = DesignTokens.SpaceComfortable, bottom = 2.dp)
     )
 }

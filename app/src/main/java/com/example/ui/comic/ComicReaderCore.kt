@@ -1,5 +1,8 @@
 package com.example.ui.comic
 
+import com.example.ui.design.DesignTokens
+import com.example.ui.design.ReadingPalette
+
 import android.graphics.Bitmap
 import android.graphics.RectF
 import androidx.compose.animation.AnimatedVisibility
@@ -274,8 +277,8 @@ fun ComicReaderCore(
 
     /* ── 漫画翻译协调器（第十五/十六/十八轮）：YOLO 气泡+离线 OCR → 用户选定引擎 → 形状烘焙回缓存 ── */
     OrtSessions.ensureCacheRoot(context)
-    val translationCoordinator = remember {
-        TranslationCoordinator(context, OnlineFallbackTranslator(context.applicationContext), LlmBubbleTranslator(context))
+    val translationCoordinator = remember(bookKey, title) {
+        TranslationCoordinator(context, OnlineFallbackTranslator(context.applicationContext), LlmBubbleTranslator(context, glossaryScope = bookKey ?: title))
     }
     // 用户显式选择的引擎（第十八轮）随配置同步；换引擎同页自动重译（缓存 key 含引擎标识）
     translationCoordinator.selectedEngine = config.translationEngine
@@ -288,6 +291,9 @@ fun ComicReaderCore(
     val translationEpoch by translationCoordinator.epoch.collectAsStateWithLifecycle()
     val translatingPages by translationCoordinator.busyKeys.collectAsStateWithLifecycle()
     val translationFailures by translationCoordinator.failedKeys.collectAsStateWithLifecycle()
+    val translationFailureDetails by translationCoordinator.failures.collectAsStateWithLifecycle()
+    val translationProgress by translationCoordinator.progress.collectAsStateWithLifecycle()
+    val translationNotices by translationCoordinator.notices.collectAsStateWithLifecycle()
     DisposableEffect(translationCoordinator) {
         onDispose {
             // release = 取消任务 + 归还 ONNX 会话内存（det/rec/yolo 约 60-100MB 常驻）
@@ -323,7 +329,8 @@ fun ComicReaderCore(
     fun scheduleTranslationWindow(entries: List<ComicPageLoader.WindowEntry>, cfg: ComicReaderConfig) {
         if (!cfg.translationEnabled) return
         val forcedLang = cfg.translationLang.takeIf { it != "auto" }
-        entries.forEach { entry ->
+        translationCoordinator.retainWindow(entries.mapTo(mutableSetOf()) { it.cacheKey })
+        entries.sortedByDescending { it.visible }.forEach { entry ->
             translationCoordinator.schedule(
                 scope = translationScope,
                 cacheKey = entry.cacheKey,
@@ -397,7 +404,9 @@ fun ComicReaderCore(
 
     /* ── 控制层 / 面板 ── */
     var controlsVisible by remember { mutableStateOf(true) }
+    var readerBottomBarHeightPx by remember { mutableIntStateOf(0) }
     var panel by remember { mutableStateOf(ComicPanel.NONE) }
+    var settingsInitialTab by remember { mutableIntStateOf(0) }
     var autoRead by remember { mutableStateOf(false) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val lifecycleState by lifecycle.currentStateFlow.collectAsStateWithLifecycle()
@@ -684,32 +693,59 @@ fun ComicReaderCore(
             ComicSceneEffectOverlay(scene = config.scene, modifier = Modifier.fillMaxSize())
         }
 
-        // 翻译进行中角标（第十五轮）：当前/预取窗口任一页在译时轻提示
-        if (config.translationEnabled && translatingPages.isNotEmpty() && panel == ComicPanel.NONE) {
+        // Status must clear the measured chrome, including navigation insets, chapter buttons and font scaling.
+        val translationStatusBottom = with(LocalDensity.current) {
+            if (controlsVisible) maxOf(96.dp, readerBottomBarHeightPx.toDp() + DesignTokens.SpaceMd) else 96.dp
+        }
+        // Translation progress only follows the visible page, not background prefetch.
+        val modelStatus = when (val status = translationModelState) {
+            com.example.mangatranslate.TranslateModelManager.DownloadState.Ready -> null
+            is com.example.mangatranslate.TranslateModelManager.DownloadState.Downloading -> "准备 OCR 模型 · ${(status.progress * 100).toInt()}%"
+            is com.example.mangatranslate.TranslateModelManager.DownloadState.Failed -> "OCR 模型下载失败 · 点按检查翻译设置"
+            else -> "检查 OCR 模型…"
+        }
+        if (config.translationEnabled && modelStatus != null && panel == ComicPanel.NONE) {
+            Text(modelStatus, color = Color.White, fontSize = DesignTokens.TypeCaption,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = translationStatusBottom, start = DesignTokens.SpaceXl, end = DesignTokens.SpaceXl)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(50)).background(PanelBg)
+                    .clickableNoRipple { settingsInitialTab = 3; panel = ComicPanel.SETTINGS }.padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceMd))
+        }
+        val currentTranslationKeys = currentSpreadData?.slots?.map { slot ->
+            val rot = ((config.bookRotation + (bookState.pageRotations[slot.ref.id] ?: 0)) % 360 + 360) % 360
+            "${slot.ref.id}|${slot.half}|${config.imagePipelineFingerprint()}|r$rot"
+        }.orEmpty()
+        val currentTranslationBusy = currentTranslationKeys.firstOrNull { it in translatingPages }
+        if (config.translationEnabled && currentTranslationBusy != null && panel == ComicPanel.NONE) {
             Box(
                 Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 96.dp)
+                    .padding(bottom = translationStatusBottom)
                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(50))
                     .background(Color(0xB3141416))
-                    .padding(horizontal = 14.dp, vertical = 7.dp)
+                    .padding(horizontal = DesignTokens.SpaceComfortable, vertical = 7.dp)
             ) {
-                Text("正在翻译…", color = Color(0xE6FFFFFF), fontSize = 12.sp)
+                Text(translationProgress[currentTranslationBusy] ?: "正在翻译…", color = Color(0xE6FFFFFF), fontSize = DesignTokens.TypeCaption)
             }
         }
-        val currentTranslationFailed = currentSpreadData?.slots?.any { slot ->
-            val rot = ((config.bookRotation + (bookState.pageRotations[slot.ref.id] ?: 0)) % 360 + 360) % 360
-            "${slot.ref.id}|${slot.half}|${config.imagePipelineFingerprint()}|r$rot" in translationFailures
-        } == true
-        if (config.translationEnabled && currentTranslationFailed && translatingPages.isEmpty() && panel == ComicPanel.NONE) {
-            Text("翻译未完成 · 点按重试", color = Color.White, fontSize = 12.sp,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)
+        val currentFailure = currentTranslationKeys.firstOrNull { it in translationFailures }?.let { translationFailureDetails[it] }
+        if (config.translationEnabled && currentFailure != null && currentTranslationBusy == null && panel == ComicPanel.NONE) {
+            val action = if (currentFailure.retryable) "点按重试" else "点按检查设置"
+            Text("${currentFailure.description} · $action", color = Color.White, fontSize = DesignTokens.TypeCaption,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = translationStatusBottom, start = DesignTokens.SpaceXl, end = DesignTokens.SpaceXl)
                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(50)).background(PanelBg)
                     .clickableNoRipple {
-                        translationCoordinator.takeBakedKeys().forEach { loader.evictProcessed(it) }
-                        translationCoordinator.resetMarks()
-                        translationCoordinator.bumpEpoch()
-                    }.padding(horizontal = 16.dp, vertical = 14.dp))
+                        if (currentFailure.retryable) {
+                            currentTranslationKeys.forEach { loader.evictProcessed(it) }
+                            translationCoordinator.retryPages(currentTranslationKeys)
+                        } else { settingsInitialTab = 3; panel = ComicPanel.SETTINGS }
+                    }.padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceComfortable))
+        }
+        val currentNotice = currentTranslationKeys.firstNotNullOfOrNull { translationNotices[it] }
+        if (config.translationEnabled && currentNotice != null && currentFailure == null && currentTranslationBusy == null && panel == ComicPanel.NONE) {
+            Text(currentNotice, color = Color.White, fontSize = DesignTokens.TypeCaption,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = translationStatusBottom, start = DesignTokens.SpaceXl, end = DesignTokens.SpaceXl)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(50)).background(PanelBg)
+                    .clickableNoRipple { settingsInitialTab = 3; panel = ComicPanel.SETTINGS }.padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceMd))
         }
     }
     }   // CompositionLocalProvider(LocalComicTranslationEpoch)
@@ -732,7 +768,9 @@ fun ComicReaderCore(
     ComicReaderChrome(
         visible = controlsVisible,
         panel = panel,
-        onPanelChange = { panel = it },
+        onPanelChange = { settingsInitialTab = 0; panel = it },
+        settingsInitialTab = settingsInitialTab,
+        onBottomBarHeightChanged = { readerBottomBarHeightPx = it },
         panelGlassBackdrop = panelGlassBackdrop,
         title = title,
         chapterTitle = chapterTitle,
@@ -1575,7 +1613,7 @@ private fun ComicVerticalItem(
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = if (config.mode == ComicMode.WEBTOON) 0.dp else 4.dp),
+            .padding(horizontal = if (config.mode == ComicMode.WEBTOON) 0.dp else DesignTokens.SpaceXs),
         contentAlignment = Alignment.Center
     ) {
         when (val s = state) {
@@ -1588,7 +1626,7 @@ private fun ComicVerticalItem(
                     enhanceHintFor(
                         config,
                         loader.sizes.value[slot.ref.id]?.let { maxOf(it.width, it.height) } ?: 2400,
-                    )?.let { Text(it, color = Color(0xAAFFFFFF), fontSize = 12.sp) }
+                    )?.let { Text(it, color = ReadingPalette.OnGlassMuted, fontSize = DesignTokens.TypeCaption) }
                 }
             }
             is PageBitmapState.Failed -> Column(
@@ -1596,7 +1634,7 @@ private fun ComicVerticalItem(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text("图片加载失败", color = Color(0xFFFF9A9A))
+                Text("图片加载失败", color = ReadingPalette.Error)
                 TextButton(onClick = { retry++ }) { Text("点击重试", color = Color.White.copy(alpha = 0.8f)) }
             }
             is PageBitmapState.Ready -> {
@@ -2047,11 +2085,11 @@ private fun DoubleSpreadContent(
                         Modifier
                             .width(with(density) { ((container.width - gapPx) / 2f).toDp() })
                             .height(320.dp)
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
-                            .background(Color(0x14FFFFFF)),
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(DesignTokens.RadiusInner))
+                            .background(ReadingPalette.SubtleFill),
                         contentAlignment = Alignment.Center
                     ) {
-                        TextButton(onClick = { retry++ }) { Text("加载失败·重试", color = Color(0xFFFF9A9A), fontSize = 12.sp) }
+                        TextButton(onClick = { retry++ }) { Text("加载失败·重试", color = ReadingPalette.Error, fontSize = DesignTokens.TypeCaption) }
                     }
                 } else {
                     Box(
@@ -2065,7 +2103,7 @@ private fun DoubleSpreadContent(
                             enhanceHintFor(
                                 config,
                                 loader.sizes.value[slot.ref.id]?.let { maxOf(it.width, it.height) } ?: 2400,
-                            )?.let { Text(it, color = Color(0xAAFFFFFF), fontSize = 12.sp) }
+                            )?.let { Text(it, color = ReadingPalette.OnGlassMuted, fontSize = DesignTokens.TypeCaption) }
                         }
                     }
                 }
@@ -2079,8 +2117,8 @@ private fun DoubleSpreadContent(
 @Composable
 internal fun ComicRefinementFeedback(refining: Boolean, error: Throwable?, modifier: Modifier = Modifier, onRetry: () -> Unit) {
     if (!refining && error == null) return
-    Column(modifier.background(Color(0x99000000)).padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        if (error == null) Text("高清图加载中…", color = Color.White, fontSize = 12.sp)
+    Column(modifier.background(ReadingPalette.ScrimStrong).padding(DesignTokens.SpaceSm), horizontalAlignment = Alignment.CenterHorizontally) {
+        if (error == null) Text("高清图加载中…", color = Color.White, fontSize = DesignTokens.TypeCaption)
         else TextButton(onClick = onRetry) { Text("高清图加载失败 · 重试", color = Color.White) }
     }
 }
@@ -2140,7 +2178,7 @@ private fun PagePlaceholder(state: PageBitmapState, onRetry: () -> Unit, enhance
                 // 第六轮第 5 条：增强引擎开启时的耗时预期提示——用户可区分
                 // "AI 处理中（有明确预期）"与"卡死"
                 enhanceHint?.let {
-                    Text(it, color = Color(0xAAFFFFFF), fontSize = 12.sp)
+                    Text(it, color = ReadingPalette.OnGlassMuted, fontSize = DesignTokens.TypeCaption)
                 }
             }
         }
@@ -2149,7 +2187,7 @@ private fun PagePlaceholder(state: PageBitmapState, onRetry: () -> Unit, enhance
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text("图片加载失败", color = Color(0xFFFF9A9A))
+            Text("图片加载失败", color = ReadingPalette.Error)
             TextButton(onClick = onRetry) { Text("点击重试", color = Color.White.copy(alpha = 0.8f)) }
         }
         is PageBitmapState.Ready -> Unit
@@ -2166,7 +2204,7 @@ internal fun ComicLoadingFeedback(ref: ComicPageRef?, onRetry: (() -> Unit)? = n
         val progress by flow.collectAsStateWithLifecycle()
         progress
     } else null
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceTight)) {
         com.example.ui.components.ChasingDots(size = 40.dp, color = androidx.compose.material3.MaterialTheme.colorScheme.secondary)
         val fraction = transfer?.fraction
         if (fraction != null && fraction < 1f) LinearProgressIndicator(progress = { fraction }, modifier = Modifier.width(144.dp))
@@ -2177,7 +2215,7 @@ internal fun ComicLoadingFeedback(ref: ComicPageRef?, onRetry: (() -> Unit)? = n
             elapsed >= 5 -> "连接较慢，正在加载…"
             else -> "正在加载页面…"
         }
-        Text(label, color = Color(0xBBFFFFFF), fontSize = 12.sp)
+        Text(label, color = Color(0xBBFFFFFF), fontSize = DesignTokens.TypeCaption)
         if (elapsed >= 8 && onRetry != null) TextButton(onClick = onRetry) {
             Text("重新加载", color = Color.White)
         }

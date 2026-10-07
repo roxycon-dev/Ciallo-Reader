@@ -19,12 +19,14 @@ import java.util.concurrent.TimeUnit
  * 自定义 AI 接口翻译（第十六轮，复刻原仓库 TextBubbleTranslationCoordinator 协议）：
  *
  * - OpenAI 兼容（chat/completions）与 Gemini 两种格式；用户自填 endpoint/key/model；
- * - "翻译之神"提示词（assets/mt/llm_prompt.txt，MIT, jedzqer）强制只输出 JSON；
+ * - 简洁漫画翻译规则（assets/mt/llm_prompt.txt），只输出 JSON；
  * - 请求：{"items":[{id,text}...],"glossary":{...}}，响应：{"items":[{id,translation}...]}；
- * - 严格校验（重复/缺失/多余 id 均判失败），静默重试 3 次；
+ * - 严格校验 ID；每批最多重试一次，整页 28 秒预算，拒绝访问立即反馈；
  * - glossary_used 并入译名表跨页积累（人名/专名前后一致）。
  */
-class LlmBubbleTranslator(private val context: Context) {
+class LlmBubbleTranslator(private val context: Context, private val clientOverride: OkHttpClient? = null, glossaryScope: String = "global") {
+    @Volatile var lastFailure: TranslationFailure? = null
+        private set
 
     data class LlmConfig(
         val apiUrl: String,
@@ -39,35 +41,39 @@ class LlmBubbleTranslator(private val context: Context) {
 
     suspend fun testConnection(): String? = kotlinx.coroutines.withTimeoutOrNull(15_000) {
         val cfg = loadConfig()
-        if (!cfg.isValid()) return@withTimeoutOrNull null
+        lastFailure = null
+        if (!TranslationPrivacy.allowed(context)) { lastFailure = TranslationFailure.Privacy; return@withTimeoutOrNull null }
+        if (!cfg.isValid()) { lastFailure = TranslationFailure.Config; return@withTimeoutOrNull null }
         val start = android.os.SystemClock.elapsedRealtime()
         val result = try { withContext(Dispatchers.IO) {
             requestOnce(cfg, PROMPT_FALLBACK, listOf(Item(0, "Hello, how are you?")))
         } }
-        catch (e: Exception) { kotlinx.coroutines.currentCoroutineContext().ensureActive(); null }
+        catch (e: Exception) { kotlinx.coroutines.currentCoroutineContext().ensureActive(); lastFailure = TranslationFailure.from(e); null }
         result?.get(0)?.takeIf(String::isNotBlank)?.let {
             "连接成功 · ${android.os.SystemClock.elapsedRealtime() - start} ms · $it"
         }
     }
 
     private val client by lazy {
-        com.example.source.SharedHttpTransport.builder()
+        clientOverride ?: com.example.source.SharedHttpTransport.builder()
             .connectTimeout(8, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(18, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
-            .callTimeout(35, TimeUnit.SECONDS)
+            .callTimeout(22, TimeUnit.SECONDS)
             .build()
     }
 
     private val secrets = com.example.data.EncryptedSecretStore(context)
     private val glossaryLock = Any()
+    private val glossaryKey = if (glossaryScope == "global") "glossary" else "glossary_" +
+        java.security.MessageDigest.getInstance("SHA-256").digest(glossaryScope.toByteArray()).take(12).joinToString("") { "%02x".format(it) }
     /** 译名表（会话级持久，SharedPreferences 落盘），跨页积累保证人名一致。 */
     private val glossary = LinkedHashMap<String, String>()
 
     init {
         runCatching {
             val prefs = context.getSharedPreferences("mt_llm", Context.MODE_PRIVATE)
-            val raw = prefs.getString("glossary", null) ?: return@runCatching
+            val raw = prefs.getString(glossaryKey, null) ?: return@runCatching
             require(raw.length <= 256 * 1024)
             val o = JSONObject(raw)
             o.keys().asSequence().take(128).forEach { k ->
@@ -82,13 +88,13 @@ class LlmBubbleTranslator(private val context: Context) {
             val o = JSONObject()
             synchronized(glossaryLock) { glossary.forEach { (k, v) -> o.put(k, v) } }
             context.getSharedPreferences("mt_llm", Context.MODE_PRIVATE)
-                .edit().putString("glossary", o.toString()).apply()
+                .edit().putString(glossaryKey, o.toString()).apply()
         }
     }
 
     fun cacheFingerprint():String {
         val cfg=loadConfig()
-        val data="${cfg.apiUrl}|${cfg.modelName}|${cfg.geminiFormat}"
+        val data="${cfg.apiUrl}|${cfg.modelName}|${cfg.geminiFormat}|$glossaryKey|prompt-v3"
         return java.security.MessageDigest.getInstance("SHA-256").digest(data.toByteArray()).joinToString("") { "%02x".format(it) }
     }
     fun glossarySnapshot(): Map<String, String> =
@@ -98,52 +104,77 @@ class LlmBubbleTranslator(private val context: Context) {
         val p = context.getSharedPreferences("mt_llm", Context.MODE_PRIVATE)
         return LlmConfig(
             apiUrl = p.getString("api_url", "") ?: "",
-            apiKey = secrets.read("api_key", p) ?: "",
+            apiKey = if (p.getBoolean("use_api_key", true)) secrets.read("api_key", p) ?: "" else "",
             modelName = p.getString("model_name", "") ?: "",
             geminiFormat = p.getBoolean("gemini_format", false),
         )
     }
 
     fun saveConfig(cfg: LlmConfig) {
-        secrets.write("api_key", cfg.apiKey)
+        // Anonymous endpoints need no keystore; explicitly disable stale keys when clearing.
+        if (cfg.apiKey.isBlank()) secrets.remove("api_key") else secrets.write("api_key", cfg.apiKey)
         context.getSharedPreferences("mt_llm", Context.MODE_PRIVATE).edit()
             .remove("api_key")
             .putString("api_url", cfg.apiUrl.trim())
             .putString("model_name", cfg.modelName.trim())
             .putBoolean("gemini_format", cfg.geminiFormat)
+            .putBoolean("use_api_key", cfg.apiKey.isNotBlank())
             .apply()
     }
 
     /**
      * 整页气泡一次请求。返回 id→译文；失败返回 null（调用方保留原文）。
-     * 解析异常（缺 id/重复 id/多余 id/非法 JSON）自动重试，共 3 次。
+     * 每批最多重试一次；永久拒绝立即反馈，整页最多等待 28 秒。
      */
     suspend fun translateBubbles(items: List<Item>): Map<Int, String>? =
         withContext(Dispatchers.IO) {
+            lastFailure = null
             if (items.isEmpty()) return@withContext emptyMap()
             if (items.size > 500 || items.sumOf { it.text.length.toLong() } > 128_000) return@withContext null
-            if(!TranslationPrivacy.allowed(context)) return@withContext null
+            if(!TranslationPrivacy.allowed(context)) { lastFailure = TranslationFailure.Privacy; return@withContext null }
             val cfg = loadConfig()
-            if (!cfg.isValid()) return@withContext null
+            if (!cfg.isValid()) { lastFailure = TranslationFailure.Config; return@withContext null }
             val prompt = runCatching {
                 context.assets.open("mt/llm_prompt.txt").bufferedReader(Charsets.UTF_8).readText()
             }.getOrElse {
                 PROMPT_FALLBACK
             }
-            var lastError: String? = null
-            repeat(RETRY_COUNT) { attempt ->
-                kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                if(attempt>0) kotlinx.coroutines.delay(500L shl (attempt-1))
-                val result = try { requestOnce(cfg, prompt, items) } catch(e:Exception) {
-                    if(e is kotlinx.coroutines.CancellationException) throw e
-                    null
+            try {
+                // Keep the whole page ordered and in context; bound input/output size per request.
+                kotlinx.coroutines.withTimeout(28_000L) {
+                    val out = linkedMapOf<Int, String>()
+                    for (batch in batches(items)) {
+                        var result: Map<Int, String>? = null
+                        for (attempt in 0..1) {
+                            try { result = requestOnce(cfg, prompt, batch); break }
+                            catch (e: Exception) {
+                                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                                val failure = TranslationFailure.from(e)
+                                if (attempt == 1 || !failure.retryable) throw e
+                                kotlinx.coroutines.delay(400L)
+                            }
+                        }
+                        out.putAll(result ?: throw TranslationFailure.Format.exception())
+                    }
+                    out
                 }
-                if (result != null) return@withContext result
-                lastError = "parse_or_network"
+            } catch (e: Exception) {
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                lastFailure = TranslationFailure.from(e)
+                null
             }
-            lastError
-            null
         }
+
+    internal fun batches(items: List<Item>): List<List<Item>> {
+        val chunks = mutableListOf<MutableList<Item>>()
+        for (item in items) {
+            require(item.text.length <= 6000) { "单个对白过长" }
+            if (chunks.isEmpty() || chunks.last().size >= 20 || chunks.last().sumOf { it.text.length } + item.text.length > 6000)
+                chunks.add(mutableListOf())
+            chunks.last().add(item)
+        }
+        return chunks
+    }
 
     /** 整页翻译便捷入口：列表下标即 id。返回 index→译文。 */
     suspend fun translateBuckets(regions: List<TranslatedRegion>): Map<Int, String>? =
@@ -160,12 +191,12 @@ class LlmBubbleTranslator(private val context: Context) {
             .post(body.toRequestBody("application/json".toMediaType()))
             .build()
         client.newCall(request).executeCancellable().use { resp ->
-            if (!resp.isSuccessful) return null
-            val raw = resp.body?.byteStream()?.use { it.readImportBytes(2 * 1024 * 1024).toString(Charsets.UTF_8) } ?: return null
+            if (!resp.isSuccessful) throw TranslationFailure.http(resp.code).exception()
+            val raw = resp.body?.byteStream()?.use { it.readImportBytes(2 * 1024 * 1024).toString(Charsets.UTF_8) } ?: throw TranslationFailure.Format.exception()
             com.example.source.parser.RuleBudget.json(raw)
             val content = if (cfg.geminiFormat) parseGeminiContent(raw) else parseOpenAiContent(raw)
-            if (content == null) return null
-            return parseStrict(content, items)
+            if (content == null) throw TranslationFailure.Format.exception()
+            return parseStrict(content, items) ?: throw TranslationFailure.Format.exception()
         }
     }
 
@@ -186,8 +217,12 @@ class LlmBubbleTranslator(private val context: Context) {
             .put("model", cfg.modelName)
             .put("messages", messages)
             .put("temperature", 0.2)
+            .put("stream", false)
+            .put("max_tokens", (itemsOutputBudget(userPayload)).coerceIn(1024, 8192))
         return compatibleEndpoint(cfg.apiUrl) to body.toString()
     }
+
+    private fun itemsOutputBudget(payload: String): Int = payload.length * 2 + 512
 
     internal fun compatibleEndpoint(apiUrl: String): String {
         val base = apiUrl.trim().trimEnd('/').toHttpUrlOrNull()
@@ -255,14 +290,19 @@ class LlmBubbleTranslator(private val context: Context) {
         val json = runCatching { JSONObject(cleaned) }.getOrNull() ?: return null
         val arr = json.optJSONArray("items") ?: return null
         val want = requested.map { it.id }.toSet()
+        if (want.size != requested.size) return null
         val out = HashMap<Int, String>(arr.length())
         for (i in 0 until arr.length()) {
             val o = arr.optJSONObject(i) ?: return null
             if (!o.has("id") || !o.has("translation")) return null
-            val id = o.getInt("id")
+            val numericId = o.opt("id") as? Number ?: return null
+            if (!numericId.toDouble().isFinite() || numericId.toDouble() != numericId.toInt().toDouble()) return null
+            val id = numericId.toInt()
             if (id in out) return null          // 重复 id → 判失败重试
-            val translation = o.optString("translation").trim()
-            if (translation.isBlank()) return null
+            val rawTranslation = o.opt("translation") as? String ?: return null
+            // Explicit empty means skipped noise; whitespace-only is malformed output.
+            if (rawTranslation.isNotEmpty() && rawTranslation.isBlank()) return null
+            val translation = rawTranslation.trim()
             out[id] = translation
         }
         if (out.keys.toSet() != want) return null   // 缺失/多余 id → 判失败重试
@@ -270,7 +310,7 @@ class LlmBubbleTranslator(private val context: Context) {
         if (used != null) {
             synchronized(glossaryLock) {
                 used.keys().asSequence().forEach { k ->
-                    val v = used.optString(k)
+                    val v = used.opt(k) as? String ?: return@forEach
                     if (k.isNotBlank() && v.isNotBlank() && k.length<=80 && v.length<=120) {
                         glossary.remove(k); glossary[k]=v
                         while(glossary.size>128) glossary.remove(glossary.keys.first())
@@ -283,7 +323,6 @@ class LlmBubbleTranslator(private val context: Context) {
     }
 
     companion object {
-        private const val RETRY_COUNT = 3
 
         /** 离线兜底精简版提示词（与原仓库协议兼容；assets 缺失时用）。 */
         val PROMPT_FALLBACK = """你是漫画翻译机。把外语漫画文字翻译成简体中文。只输出合法 JSON，禁止任何解释或 markdown 代码块。

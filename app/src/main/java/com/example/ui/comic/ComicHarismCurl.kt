@@ -137,7 +137,6 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
     private var dragForwarded = false
     private var dragFromLeft = false
     private var curlStartX = 0f
-    private var dragScale = 1f
     private var touchTravel = 0f
     private var velocityTracker: VelocityTracker? = null
     val pageGeometryValid: Boolean get() = getCurlRenderer().hasExplicitPageRect()
@@ -351,7 +350,7 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                     }
                     view.removeCallbacks(longPressRunnable)
                     if (dragForwarded) {
-                        dispatchSynthetic(MotionEvent.ACTION_CANCEL, curlStartX, downY, downTime)
+                        dispatchSynthetic(MotionEvent.ACTION_CANCEL, curlStartX + (me.x - downX), downY + (me.y - downY), downTime)
                         dragForwarded = false
                     }
                     chapterEdgeActive = false
@@ -405,11 +404,10 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                     // Direction follows the swipe, regardless of which side was touched.
                     dragFromLeft = dx > 0f
                     curlStartX = bookX(if (dragFromLeft) 0.03f else 0.97f)
-                    dragScale = abs(bookX(1f) - bookX(0f)) * 0.58f / comicTurnTravel(width.toFloat(), resources.displayMetrics.density)
                     dispatchSynthetic(MotionEvent.ACTION_DOWN, curlStartX, downY, downTime)
                     dragForwarded = true
                 }
-                dispatchSynthetic(MotionEvent.ACTION_MOVE, curlStartX + (me.x - downX) * dragScale,
+                dispatchSynthetic(MotionEvent.ACTION_MOVE, curlStartX + (me.x - downX),
                     downY + (me.y - downY), downTime)
                 return true
             }
@@ -469,7 +467,8 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                 val intent = if (me.actionMasked == MotionEvent.ACTION_UP)
                     comicTurnIntent(me.x - downX, releaseVelocity, width.toFloat(), resources.displayMetrics.density) else 0
                 val commit = intent == if (dragFromLeft) 1 else -1
-                val releaseX = if (commit) bookX(if (dragFromLeft) 0.80f else 0.20f) else curlStartX
+                setReleaseCommit(commit)
+                val releaseX = curlStartX + (me.x - downX)
                 dispatchSynthetic(MotionEvent.ACTION_UP, releaseX, downY + (me.y - downY), downTime)
                 dragForwarded = false
                 return true

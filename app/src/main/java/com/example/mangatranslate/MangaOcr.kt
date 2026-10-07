@@ -140,8 +140,7 @@ class PaddleDetector(modelFile: File) {
         while (y < srcH) {
             val yEnd = min(srcH, y + tileH)
             val tile = Bitmap.createBitmap(bitmap, 0, y, srcW, yEnd - y)
-            val piece = runCatching { detectLinesWhole(tile) }.getOrDefault(emptyList())
-            tile.recycle()
+            val piece = try { detectLinesWhole(tile) } finally { if (tile !== bitmap) tile.recycle() }
             piece.forEach { r -> all.add(RectF(r.left, r.top + y, r.right, r.bottom + y)) }
             if (yEnd >= srcH) break
             y = yEnd - overlap
@@ -178,7 +177,7 @@ class PaddleDetector(modelFile: File) {
                         sortBoxesReadingOrder(rects)
                     }
                 } catch (_: OrtException) {
-                    emptyList()
+                    throw TranslationFailure.Ocr.exception()
                 }
             }
         } finally {
@@ -199,13 +198,15 @@ class PaddleDetector(modelFile: File) {
         val padX = ((INPUT - newW) / 2f).coerceAtLeast(0f)
         val padY = ((INPUT - newH) / 2f).coerceAtLeast(0f)
         canvas.drawBitmap(resized, padX, padY, null)
-        resized.recycle()
+        if (resized !== bitmap) resized.recycle()
 
         val input = FloatArray(3 * INPUT * INPUT)
+        val sourcePixels = IntArray(INPUT * INPUT)
+        padded.getPixels(sourcePixels, 0, INPUT, 0, 0, INPUT, INPUT)
         var offset = 0
         for (y in 0 until INPUT) {
             for (x in 0 until INPUT) {
-                val pixel = padded[x, y]
+                val pixel = sourcePixels[offset]
                 val b = ((pixel shr 16) and 0xFF) / 255f
                 val g = ((pixel shr 8) and 0xFF) / 255f
                 val r = (pixel and 0xFF) / 255f
@@ -377,9 +378,11 @@ class PaddleRecognizer(modelFile: File, charsetLines: List<String>) {
         val resized = bitmap.scale(targetW, imgH)
         return try {
             val input = FloatArray(3 * imgH * imgW)
+            val sourcePixels = IntArray(targetW * imgH)
+            resized.getPixels(sourcePixels, 0, targetW, 0, 0, targetW, imgH)
             for (y in 0 until imgH) {
                 for (x in 0 until targetW) {
-                    val pixel = resized[x, y]
+                    val pixel = sourcePixels[y * targetW + x]
                     val b = ((pixel shr 16) and 0xFF) / 255f
                     val g = ((pixel shr 8) and 0xFF) / 255f
                     val r = (pixel and 0xFF) / 255f
@@ -400,11 +403,11 @@ class PaddleRecognizer(modelFile: File, charsetLines: List<String>) {
                         ctcDecode(output.value, shape)
                     }
                 } catch (_: OrtException) {
-                    RecResult("", 0f)
+                    throw TranslationFailure.Ocr.exception()
                 }
             }
         } finally {
-            resized.recycle()
+            if (resized !== bitmap) resized.recycle()
         }
     }
 

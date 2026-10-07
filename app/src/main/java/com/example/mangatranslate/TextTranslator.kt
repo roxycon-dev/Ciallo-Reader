@@ -73,6 +73,8 @@ class OnlineFallbackTranslator(
     }
     private val sentences = android.util.LruCache<String, String>(512)
     private val requests = Semaphore(2)
+    @Volatile var lastFailure: TranslationFailure? = null
+        private set
 
     override suspend fun prepare(sourceLang: String): String? = null
     override suspend fun translate(text: String, sourceLang: String): String? =
@@ -80,7 +82,11 @@ class OnlineFallbackTranslator(
 
     suspend fun translateBatch(texts: List<String>, sourceLang: String): List<String>? = withContext(Dispatchers.IO) {
         if (texts.isEmpty()) return@withContext emptyList()
-        if (context != null && !TranslationPrivacy.allowed(context)) return@withContext null
+        lastFailure = null
+        if (context != null && !TranslationPrivacy.allowed(context)) {
+            lastFailure = TranslationFailure.Privacy
+            return@withContext null
+        }
         require(texts.size <= 500 && texts.sumOf { it.length } <= 128_000) { "翻译请求过大" }
         if (sourceLang == "zh") return@withContext texts
         val normalized = texts.map { it.trim() }
@@ -94,7 +100,7 @@ class OnlineFallbackTranslator(
                 chunks.add(mutableListOf())
             chunks.last().add(text)
         }
-        withTimeoutOrNull(10_000L) {
+        val completed = withTimeoutOrNull(16_000L) {
             coroutineScope {
                 chunks.map { batch -> async {
                     requests.withPermit {
@@ -105,7 +111,9 @@ class OnlineFallbackTranslator(
                 } }.awaitAll()
             }
         }
+        if (completed == null) lastFailure = TranslationFailure.Timeout
         val out = normalized.map { if (it.isBlank()) "" else sentences.get("$sourceLang|$it") ?: "" }
+        if (out.all { it.isNotBlank() }) lastFailure = null
         out.takeIf { it.any(String::isNotBlank) }
     }
 
@@ -120,14 +128,24 @@ class OnlineFallbackTranslator(
             .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
             .header("Referer", "https://transmart.qq.com/")
             .post(body.toString().toRequestBody("application/json".toMediaType())).build()
-        return runCatching {
-            client.newCall(request).executeCancellable().use { response ->
-                if (!response.isSuccessful) return@runCatching null
+        // Retry a transient failure once, per batch. Never retry rejected credentials or inputs.
+        repeat(2) { attempt ->
+          try {
+            return client.newCall(request).executeCancellable().use { response ->
+                if (!response.isSuccessful) throw TranslationFailure.http(response.code).exception()
                 val raw = response.body?.byteStream()?.use { it.readImportBytes(2 * 1024 * 1024).toString(Charsets.UTF_8) }
-                    ?: return@runCatching null
-                parseTransmart(raw, texts.size)
+                    ?: throw TranslationFailure.Format.exception()
+                parseTransmart(raw, texts.size) ?: throw TranslationFailure.Format.exception()
             }
-        }.getOrElse { kotlinx.coroutines.currentCoroutineContext().ensureActive(); null }
+          } catch (error: Exception) {
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            val failure = TranslationFailure.from(error)
+            lastFailure = if (failure.code == "auth") failure.copy(description = "免费服务拒绝请求，请切换网络或使用自定义 API") else failure
+            if (attempt == 1 || !failure.retryable || failure.code == "format") return null
+            kotlinx.coroutines.delay(600L)
+          }
+        }
+        return null
     }
 
     internal fun parseTransmart(raw: String, expectCount: Int): List<String>? = runCatching {
