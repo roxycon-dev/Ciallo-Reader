@@ -80,7 +80,7 @@ class ComicSettingsStore(context: Context) {
     }
 
     fun saveGlobalConfig(config: ComicReaderConfig) {
-        prefs.edit().putString(KEY_GLOBAL_CONFIG, config.toJson().toString()).apply()
+        prefs.edit().putString(KEY_GLOBAL_CONFIG, config.normalized().toJson().toString()).apply()
     }
 
     /* ── 预设系统 ── */
@@ -105,7 +105,7 @@ class ComicSettingsStore(context: Context) {
     fun createPreset(name: String, emoji: String, config: ComicReaderConfig): ComicPreset {
         val preset = ComicPreset(
             id = "preset_" + UUID.randomUUID().toString().take(12),
-            name = name, emoji = emoji, config = config, builtIn = false
+            name = name.trim().ifBlank { "我的预设" }, emoji = emoji, config = config.normalized(), builtIn = false
         )
         savePresets(loadPresets() + preset)
         return preset
@@ -147,8 +147,8 @@ class ComicSettingsStore(context: Context) {
     fun saveCustomFitPreset(name: String, base: ComicFit, scalePct: Int): ComicCustomFitPreset {
         val preset = ComicCustomFitPreset(
             id = "cfit_" + UUID.randomUUID().toString().take(10),
-            name = name.ifBlank { "缩放 %d%%".format(scalePct) },
-            base = base, scalePct = scalePct.coerceIn(50, 250),
+            name = name.trim().ifBlank { "缩放 %d%%".format(scalePct) },
+            base = base.takeUnless { it == ComicFit.CUSTOM } ?: ComicFit.FIT_PAGE, scalePct = scalePct.coerceIn(50, 250),
         )
         saveCustomFitPresets(loadCustomFitPresets() + preset)
         return preset
@@ -169,8 +169,8 @@ class ComicSettingsStore(context: Context) {
         val old = list[idx]
         if (old.builtIn) return null
         val updated = old.copy(
-            name = name ?: old.name,
-            config = config ?: old.config
+            name = name?.trim()?.takeIf { it.isNotBlank() } ?: old.name,
+            config = config?.normalized() ?: old.config
         )
         list[idx] = updated
         savePresets(list)
@@ -247,7 +247,7 @@ class ComicSettingsStore(context: Context) {
             ?.let { runCatching { ComicReaderConfig.fromJson(JSONObject(it)) }.getOrNull() }
 
     fun saveBookConfig(bookKey: String, config: ComicReaderConfig) {
-        prefs.edit().putString("book_cfg_$bookKey", config.toJson().toString()).apply()
+        prefs.edit().putString("book_cfg_$bookKey", config.normalized().toJson().toString()).apply()
     }
 
     fun clearBookConfig(bookKey: String) {
@@ -323,7 +323,7 @@ data class ComicCustomFitPreset(
         fun fromJson(json: JSONObject): ComicCustomFitPreset = ComicCustomFitPreset(
             id = json.optString("id"),
             name = json.optString("name", "自定义"),
-            base = ComicFit.entries.firstOrNull { it.name == json.optString("base") } ?: ComicFit.FIT_PAGE,
+            base = ComicFit.entries.firstOrNull { it.name == json.optString("base") && it != ComicFit.CUSTOM } ?: ComicFit.FIT_PAGE,
             scalePct = json.optInt("scalePct", 100).coerceIn(50, 250),
         )
     }

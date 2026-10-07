@@ -5,12 +5,22 @@ package com.example.ui.comic
 import com.example.ui.components.overlayTouchShield
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.IconButton
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.paneTitle
 import android.graphics.Bitmap
@@ -35,6 +45,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -95,6 +106,7 @@ import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Height
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.RotateRight
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.VerticalSplit
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.ZoomIn
@@ -120,7 +132,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -176,6 +187,8 @@ internal fun ComicSettingsSheet(
     onBookStateChange: (ComicBookState) -> Unit,
     onDismiss: () -> Unit,
     glassBackdrop: LayerBackdrop? = null,
+    onDownloadTranslationModels: () -> Unit = {},
+    onTranslationRefresh: (Boolean) -> Unit = {},
 ) {
     var tab by remember { mutableIntStateOf(0) }
     val update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit = { onConfigChange(it(config)) }
@@ -226,7 +239,7 @@ internal fun ComicSettingsSheet(
                                 0 -> ModeTab(config, update)
                                 1 -> PageTab(config, update, store)
                                 2 -> ImageTab(config, update, onOpenCrop, pages, loader, currentRawPage, bookState, onBookStateChange)
-                                3 -> TranslationTab(config, update)
+                            3 -> TranslationTab(config, update, onDownloadTranslationModels, onTranslationRefresh)
                                 4 -> EffectTab(config, update)
                                 5 -> AutoTab(config, update)
                                 6 -> GestureTab(config, update)
@@ -305,6 +318,8 @@ internal fun ComicSettingsSheet(
 private fun TranslationTab(
     config: ComicReaderConfig,
     update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit,
+    onDownloadModels: () -> Unit,
+    onRefresh: (Boolean) -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -317,12 +332,13 @@ private fun TranslationTab(
             TranslateModelManager.DownloadState.Ready -> { modelsReady = true; downloading = -1f; downloadError = null }
             is TranslateModelManager.DownloadState.Downloading -> { downloading = state.progress; downloadError = null }
             is TranslateModelManager.DownloadState.Failed -> { downloading = -1f; downloadError = state.reason }
-            TranslateModelManager.DownloadState.NotDownloaded -> { downloading = -1f }
+            TranslateModelManager.DownloadState.NotDownloaded -> { downloading = -1f; modelsReady = TranslateModelManager.isReady(context) }
         }
     }
     var cacheBytes by remember { mutableStateOf(0L) }
     LaunchedEffect(Unit) { cacheBytes = withContext(Dispatchers.IO) { TranslationCache.totalBytes(context) } }
     val onlineFallback = remember { OnlineFallbackTranslator(context.applicationContext) }
+    DisposableEffect(onlineFallback) { onDispose { onlineFallback.close() } }
     var onlineTesting by remember { mutableStateOf(false) }
     var onlineTestResult by remember { mutableStateOf<String?>(null) }
 
@@ -330,15 +346,7 @@ private fun TranslationTab(
         if (downloading >= 0f) return
         downloading = 0f
         downloadError = null
-        scope.launch {
-            val err = TranslateModelManager.ensureDownloaded(context) { p -> downloading = p.coerceIn(0f, 1f) }
-            downloading = -1f
-            if (err == null) {
-                modelsReady = true
-            } else {
-                downloadError = err
-            }
-        }
+        onDownloadModels()
     }
 
     // Automatic downloads belong to the reader, so changing categories never cancels OCR setup.
@@ -348,6 +356,9 @@ private fun TranslationTab(
     var llmKey by remember { mutableStateOf(llmTranslator.loadConfig().apiKey) }
     var llmModel by remember { mutableStateOf(llmTranslator.loadConfig().modelName) }
     var llmGemini by remember { mutableStateOf(llmTranslator.loadConfig().geminiFormat) }
+    var showKey by remember { mutableStateOf(false) }
+    var aiTesting by remember { mutableStateOf(false) }
+    var aiTestResult by remember { mutableStateOf<String?>(null) }
 
     // 第十八轮：引擎二级导航（null=引擎列表页；非 null=进入对应配置页）
     var engineSubPage by remember { mutableStateOf<String?>(null) }
@@ -356,9 +367,26 @@ private fun TranslationTab(
 
     fun saveLlm(url: String, key: String, model: String, gemini: Boolean) {
         llmUrl = url; llmKey = key; llmModel = model; llmGemini = gemini
-        runCatching { llmTranslator.saveConfig(LlmBubbleTranslator.LlmConfig(url, key, model, gemini)) }
-            .onFailure { android.widget.Toast.makeText(context, it.message ?: "配置保存失败", android.widget.Toast.LENGTH_LONG).show() }
+        aiTestResult = null
     }
+    // Keep keystore writes and page invalidation out of the per-keystroke path.
+    LaunchedEffect(llmUrl, llmKey, llmModel, llmGemini) {
+        kotlinx.coroutines.delay(500)
+        val next = LlmBubbleTranslator.LlmConfig(llmUrl, llmKey, llmModel, llmGemini)
+        if (next != llmTranslator.loadConfig()) {
+            withContext(Dispatchers.IO) { llmTranslator.saveConfig(next) }
+            onRefresh(false)
+        }
+    }
+    DisposableEffect(Unit) { onDispose {
+        val next = LlmBubbleTranslator.LlmConfig(llmUrl, llmKey, llmModel, llmGemini)
+        runCatching {
+            if (next != llmTranslator.loadConfig()) {
+                llmTranslator.saveConfig(next)
+                onRefresh(false)
+            }
+        }
+    } }
 
     if (engineSubPage == "ai") {
         /* ── 二级页：自定义 AI 配置 ── */
@@ -368,9 +396,10 @@ private fun TranslationTab(
             PanelTextField("API 地址（如 https://api.deepseek.com）", llmUrl) {
                 saveLlm(it, llmKey, llmModel, llmGemini)
             }
-            PanelTextField("API Key", llmKey) {
+            PanelTextField("API Key", llmKey, obscured = !showKey) {
                 saveLlm(llmUrl, it, llmModel, llmGemini)
             }
+            TextButton(onClick = { showKey = !showKey }) { Text(if (showKey) "隐藏密钥" else "显示密钥", color = TextSecondary) }
             PanelTextField("模型名（如 deepseek-chat）", llmModel) {
                 saveLlm(llmUrl, llmKey, it, llmGemini)
             }
@@ -379,19 +408,31 @@ private fun TranslationTab(
                 subtitle = if (llmGemini) "走 Google Gemini generateContent" else "走 OpenAI chat/completions",
                 checked = llmGemini,
             ) { v -> saveLlm(llmUrl, llmKey, llmModel, v) }
+            TextButton(enabled = !aiTesting && LlmBubbleTranslator.LlmConfig(llmUrl, llmKey, llmModel, llmGemini).isValid(), onClick = {
+                aiTesting = true
+                scope.launch {
+                    try {
+                        withContext(Dispatchers.IO) { llmTranslator.saveConfig(LlmBubbleTranslator.LlmConfig(llmUrl, llmKey, llmModel, llmGemini)) }
+                        val result = llmTranslator.testConnection()
+                        aiTestResult = result ?: "未获得有效译文，请检查地址、模型和密钥"
+                        onRefresh(false)
+                    } finally { aiTesting = false }
+                }
+            }) { Text(if (aiTesting) "正在检查…" else "测试 AI 翻译", color = MintPrimary) }
+            aiTestResult?.let { PanelHint(it) }
         }
     } else if (engineSubPage == "online") {
         /* ── 二级页：在线翻译设置 ── */
         PanelSectionCard("在线翻译", Icons.Filled.Public) {
             PanelRow("返回引擎列表", Icons.AutoMirrored.Filled.ArrowBack) { engineSubPage = null }
             Spacer(Modifier.height(6.dp))
-            val langIdx = when (config.translationLang) { "ja" -> 1; "en" -> 2; else -> 0 }
+            val langIdx = when (config.translationLang) { "ja" -> 1; "en" -> 2; "ko" -> 3; else -> 0 }
             SegmentRow(
                 "页面文字",
-                listOf(0 to "自动识别", 1 to "日文", 2 to "英文"),
+                listOf(0 to "自动识别", 1 to "日文", 2 to "英文", 3 to "韩文"),
                 langIdx,
             ) { i ->
-                val lang = when (i) { 1 -> "ja"; 2 -> "en"; else -> "auto" }
+                val lang = when (i) { 1 -> "ja"; 2 -> "en"; 3 -> "ko"; else -> "auto" }
                 update { it.copy(translationLang = lang) }
             }
             Spacer(Modifier.height(8.dp))
@@ -402,6 +443,7 @@ private fun TranslationTab(
                 scope.launch {
                     try {
                         val start = android.os.SystemClock.elapsedRealtime()
+                        onlineFallback.close() // Connectivity tests must reach the service, not the sentence cache.
                         val result = onlineFallback.translate("Hello, how are you?", "en")
                         onlineTestResult = if (result.isNullOrBlank()) "暂时无法连接，请检查网络后重试"
                             else "连接成功 · ${android.os.SystemClock.elapsedRealtime() - start} ms · $result"
@@ -444,13 +486,13 @@ private fun TranslationTab(
                 title = "整页自动翻译",
                 checked = config.translationEnabled,
             ) { v -> update { it.copy(translationEnabled = v) } }
-            val langIdx = when (config.translationLang) { "ja" -> 1; "en" -> 2; else -> 0 }
+            val langIdx = when (config.translationLang) { "ja" -> 1; "en" -> 2; "ko" -> 3; else -> 0 }
             SegmentRow(
                 "页面文字",
-                listOf(0 to "自动识别", 1 to "日文", 2 to "英文"),
+                listOf(0 to "自动识别", 1 to "日文", 2 to "英文", 3 to "韩文"),
                 langIdx,
             ) { i ->
-                val lang = when (i) { 1 -> "ja"; 2 -> "en"; else -> "auto" }
+                val lang = when (i) { 1 -> "ja"; 2 -> "en"; 3 -> "ko"; else -> "auto" }
                 update { it.copy(translationLang = lang) }
             }
         }
@@ -458,10 +500,7 @@ private fun TranslationTab(
 
     PanelSectionCard("离线模型", Icons.Filled.CloudDownload) {
         if (modelsReady) {
-            SwitchRow(
-                title = "OCR 模型（约 31MB，已下载）",
-                checked = true, onChange = { }
-            )
+            PanelHint("OCR 与气泡识别模型已就绪 · 约 34 MB")
         } else if (downloading >= 0f) {
             Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                 Text("正在下载模型 ${(downloading * 100).toInt()}%", color = TextPrimary, fontSize = 13.sp)
@@ -485,7 +524,7 @@ private fun TranslationTab(
         } else {
             Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Text(
-                    "需要下载离线 OCR 模型（约 31MB，仅一次）",
+                    "需要下载 OCR 与气泡识别模型（约 34 MB，仅一次）",
                     color = TextSecondary, fontSize = 12.sp
                 )
                 Spacer(Modifier.height(8.dp))
@@ -524,11 +563,7 @@ private fun TranslationTab(
     }
 
     PanelSectionCard("译文缓存", Icons.Filled.CleaningServices) {
-        SwitchRow(
-            title = "已缓存译文（${cacheBytes / 1024 / 1024}MB / 64MB）",
-            checked = cacheBytes > 0,
-            onChange = { }
-        )
+        PanelHint("已缓存译文 %.1f MB / 64 MB".format(cacheBytes / (1024f * 1024f)))
         Row(
             Modifier
                 .fillMaxWidth()
@@ -536,7 +571,7 @@ private fun TranslationTab(
                 .background(PanelChipBg)
                 .clickableNoRipple {
                     scope.launch {
-                        withContext(Dispatchers.IO) { TranslationCache.clear(context) }
+                        onRefresh(true)
                         cacheBytes = 0
                     }
                 }
@@ -556,6 +591,13 @@ private fun TranslationTab(
 private fun ModeTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit) {
     PanelSectionCard("阅读模式", Icons.Filled.AutoStories) {
         ModeGrid(config.mode) { m -> update { c -> c.copy(mode = m) } }
+        PanelHint(when (config.mode) {
+            ComicMode.SINGLE -> "每次显示一页；宽度适配可平移查看长页。"
+            ComicMode.DOUBLE -> "横向配对显示；跨页扫描图保持独占，封面可单独显示。"
+            ComicMode.WEBTOON -> "纵向阅读长图，可保留页间距并选择磁吸。"
+            ComicMode.CONTINUOUS -> "纵向无缝拼接，保持自由滚动。"
+            ComicMode.MAGNETIC -> "拖动跟手，松手按距离与速度吸附到相邻页。"
+        })
     }
     PanelSectionCard("阅读方向", Icons.Filled.SwapHoriz) {
         DirectionGrid(config.direction) { d -> update { c -> c.copy(direction = d) } }
@@ -571,6 +613,10 @@ private fun ModeTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> C
             ),
             config.pageAnim.ordinal
         ) { i -> update { it.copy(pageAnim = ComicPageAnim.entries[i]) } }
+        if (!curlEngineActive(config.pageAnim, config.direction, config.mode) && config.pageAnim == ComicPageAnim.CURL)
+            PanelHint("仿真动画用于横向单页 / 双页；当前模式保留设置，切换后生效。")
+        if (config.mode == ComicMode.WEBTOON || config.mode == ComicMode.CONTINUOUS)
+            PanelHint("纵向列表使用连续滚动，翻页动画在单页 / 双页中生效。")
     }
     // 第 6/7 条：条漫模式磁吸到页边界（可关闭）；无缝滚动恒无磁吸且强制 0 间距
     if (config.mode == ComicMode.WEBTOON || config.mode == ComicMode.CONTINUOUS) {
@@ -580,7 +626,7 @@ private fun ModeTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> C
                     update { it.copy(webtoonSnap = v) }
                 }
             } else {
-                SwitchRow("无缝拼接", "页间距为 0，连续不断停", true) { }
+                PanelHint("无缝拼接已启用 · 页间距固定为 0，自由滚动")
             }
         }
     }
@@ -591,25 +637,26 @@ private fun ModeTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> C
 private fun ModeGrid(selected: ComicMode, onSelect: (ComicMode) -> Unit) {
     // FlowRow：3 个一行网格；大字体下放不下的项自动换行，文字永不被压缩截断
     FlowRow(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        Modifier.fillMaxWidth().padding(vertical = 4.dp).selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         maxItemsInEachRow = 3
     ) {
         ComicMode.entries.forEach { m ->
             val active = m == selected
+            val tint by animateColorAsState(if (active) panelSelectedBg() else PanelChipBg, label = "modeTint")
             Box(
                 Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (active) PanelChipActiveBg else PanelChipBg)
+                    .background(tint)
                     .border(
                         0.5.dp,
                         if (active) MintPrimary.copy(alpha = 0.6f) else Color.Transparent,
                         RoundedCornerShape(12.dp)
                     )
-                    .clickableNoRipple { onSelect(m) }
-                    .padding(vertical = 10.dp, horizontal = 4.dp),
+                    .selectable(active, role = Role.RadioButton) { onSelect(m) }
+                    .heightIn(min = 48.dp).padding(vertical = 10.dp, horizontal = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -629,19 +676,21 @@ private fun ModeGrid(selected: ComicMode, onSelect: (ComicMode) -> Unit) {
 @Composable
 private fun DirectionGrid(selected: ComicDirection, onSelect: (ComicDirection) -> Unit) {
     FlowRow(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        Modifier.fillMaxWidth().padding(vertical = 4.dp).selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         maxItemsInEachRow = 3
     ) {
         ComicDirection.entries.forEach { d ->
             val active = d == selected
+            val tint by animateColorAsState(if (active) panelSelectedBg() else PanelChipBg, label = "directionTint")
             Box(
                 Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (active) PanelChipActiveBg else PanelChipBg)
-                    .clickableNoRipple { onSelect(d) }
+                    .background(tint)
+                    .selectable(active, role = Role.RadioButton) { onSelect(d) }
+                    .heightIn(min = 48.dp)
                     .padding(vertical = 10.dp, horizontal = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -662,6 +711,7 @@ private fun DirectionGrid(selected: ComicDirection, onSelect: (ComicDirection) -
 /** 缩放档位展示序列（第 10 条五种数学定义 + 第 26 条自定义档） */
 private val FitOptions = listOf(
     ComicFit.FIT_PAGE to "整页",
+    ComicFit.FIT_WIDTH to "适应宽度",
     ComicFit.FIT_HEIGHT to "高度",
     ComicFit.ORIGINAL to "原始",
     ComicFit.FILL to "铺满",
@@ -684,22 +734,27 @@ private fun PageTab(
             FitOptions.mapIndexed { i, (_, label) -> i to label },
             FitOptions.indexOfFirst { it.first == config.fit }.coerceAtLeast(0),
         ) { i -> update { it.copy(fit = FitOptions[i].first) } }
+        PanelHint(when (config.fit) {
+            ComicFit.FIT_PAGE -> "完整显示页面，保留比例与留白。"
+            ComicFit.FIT_WIDTH -> "填满宽度，超出高度的内容可拖动查看。"
+            ComicFit.FIT_HEIGHT -> "填满高度，超出宽度的内容可左右拖动查看。"
+            ComicFit.ORIGINAL -> "按图像像素显示，大图可平移查看。"
+            ComicFit.FILL -> "保持比例铺满，多余部分居中裁切。"
+            ComicFit.STRETCH -> "铺满显示区域，图像比例会改变。"
+            ComicFit.CUSTOM -> "在基础适配上叠加缩放系数，可保存常用档位。"
+        })
+        if (config.mode == ComicMode.WEBTOON || config.mode == ComicMode.CONTINUOUS)
+            PanelHint("纵向列表固定适应宽度；以上适配设置用于分页模式。")
     }
 
     if (config.fit == ComicFit.CUSTOM) {
         PanelSectionCard("自定义缩放", Icons.Filled.Tune) {
             SegmentRow(
                 "基础适配",
-                listOf(
-                    ComicFit.FIT_PAGE to "整页", ComicFit.FIT_WIDTH to "适应宽度",
-                    ComicFit.FIT_HEIGHT to "高度", ComicFit.ORIGINAL to "原始",
-                ).mapIndexed { i, (_, label) -> i to label },
-                listOf(ComicFit.FIT_PAGE, ComicFit.FIT_WIDTH, ComicFit.FIT_HEIGHT, ComicFit.ORIGINAL)
-                    .indexOf(config.customFitBase).coerceAtLeast(0),
+                FitOptions.filter { it.first != ComicFit.CUSTOM }.mapIndexed { i, (_, label) -> i to label },
+                FitOptions.filter { it.first != ComicFit.CUSTOM }.indexOfFirst { it.first == config.customFitBase }.coerceAtLeast(0),
             ) { i ->
-                update {
-                    it.copy(customFitBase = listOf(ComicFit.FIT_PAGE, ComicFit.FIT_WIDTH, ComicFit.FIT_HEIGHT, ComicFit.ORIGINAL)[i])
-                }
+                update { it.copy(customFitBase = FitOptions.filter { option -> option.first != ComicFit.CUSTOM }[i].first) }
             }
             SliderRow(
                 "缩放系数", config.customFitScale, 0.5f..2.5f,
@@ -738,8 +793,8 @@ private fun PageTab(
                                         )
                                     }
                                 }
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                .heightIn(min = 48.dp).padding(horizontal = 10.dp, vertical = 12.dp),
+                            maxLines = 2, overflow = TextOverflow.Ellipsis,
                         )
                         TextButton(onClick = {
                             store.deleteCustomFitPreset(p.id)
@@ -764,6 +819,7 @@ private fun PageTab(
     }
 
     PanelSectionCard("间距", Icons.Filled.Height) {
+        if (config.mode == ComicMode.CONTINUOUS) PanelHint("无缝模式固定零间距，切换其他模式后使用保存的间距。")
         SliderRow(
             "页面间距", config.pageSpacingDp, 0f..40f,
             format = { "${it.toInt()} dp" },
@@ -777,6 +833,7 @@ private fun PageTab(
     }
 
     PanelSectionCard("双页排列", Icons.Filled.Bookmark) {
+        if (config.mode != ComicMode.DOUBLE) PanelHint("用于双页模式或临时合页，参数会保留。")
         SwitchRow("首页单独显示", "封面页不与正文配对", config.doubleFirstAlone) { v ->
             update { it.copy(doubleFirstAlone = v) }
         }
@@ -799,10 +856,14 @@ private fun PageTab(
             format = { "${it.toInt()} dp" },
             onChange = { v -> update { it.copy(doubleShiftYDp = v) } }
         )
+        TextButton(onClick = { update { it.copy(doubleGapDp = 8f, doubleAlign = ComicDoubleAlign.CENTER,
+            doubleShiftXDp = 0f, doubleShiftYDp = 0f, doubleFirstAlone = false) } }) {
+            Text("恢复双页排版默认值", color = TextSecondary)
+        }
     }
 
     PanelSectionCard("缩放", Icons.Filled.ZoomIn) {
-        SwitchRow("双击放大", "再次双击还原", config.doubleTapZoom) { v ->
+        SwitchRow("双击放大", "循环切换适配、放大与原始像素档位", config.doubleTapZoom) { v ->
             update { it.copy(doubleTapZoom = v) }
         }
         SwitchRow("长按放大", "按住临时放大，松手还原", config.longPressZoom) { v ->
@@ -869,6 +930,8 @@ private fun ImageTab(
     }
 
     PanelSectionCard("大图拆分", Icons.Filled.VerticalSplit) {
+        PanelHint(if (config.splitWide) "依据宽高比与装订缝识别跨页；位置以检测到的书缝为基准微调。"
+            else "开启宽页拆分后，左右顺序和拆分位置生效。")
         SwitchRow("宽页自动拆分", "跨页扫描图拆为左右两页", config.splitWide) { v ->
             update { it.copy(splitWide = v) }
         }
@@ -880,6 +943,9 @@ private fun ImageTab(
             format = { "%.0f%%".format(it * 100) },
             onChange = { v -> update { it.copy(splitPosition = v) } }
         )
+        TextButton(onClick = { update { it.copy(splitPosition = 0.5f, splitReverse = false) } }) {
+            Text("恢复拆分位置与顺序", color = TextSecondary)
+        }
     }
 
     PanelSectionCard("旋转", Icons.Filled.RotateRight) {
@@ -889,6 +955,13 @@ private fun ImageTab(
             ((config.bookRotation % 360) + 360) % 360
         ) { deg -> update { it.copy(bookRotation = deg) } }
         val pageRef = pages.getOrNull(currentRawPage)
+        pageRef?.let { ref ->
+            if ((bookState.pageRotations[ref.id] ?: 0) != 0) {
+                TextButton(onClick = { onBookStateChange(bookState.copy(pageRotations = bookState.pageRotations - ref.id)) }) {
+                    Text("还原本页旋转", color = TextSecondary)
+                }
+            }
+        }
         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ActionChip("旋转本页 +90°", Modifier.weight(1f)) {
                 if (pageRef != null) {
@@ -900,13 +973,9 @@ private fun ImageTab(
             }
             ActionChip(
                 if (currentRawPage in bookState.mergeAnchors) "取消临时合页" else "与下一页临时合页",
-                Modifier.weight(1f)
+                Modifier.weight(1f), enabled = currentRawPage in bookState.mergeAnchors || currentRawPage < pages.lastIndex
             ) {
-                onBookStateChange(
-                    if (currentRawPage in bookState.mergeAnchors)
-                        bookState.copy(mergeAnchors = bookState.mergeAnchors - currentRawPage)
-                    else bookState.copy(mergeAnchors = bookState.mergeAnchors + currentRawPage)
-                )
+                onBookStateChange(bookState.toggleMerge(currentRawPage, pages.size))
             }
         }
     }
@@ -921,7 +990,7 @@ private fun ImageTab(
         if (enh != ComicEnhanceMode.OFF) {
             Text(enh.desc, color = TextSecondary, fontSize = 11.sp)
             SliderRow(
-                "增强强度", config.enhanceStrength.toFloat(), 0f..100f,
+                "增强强度", config.enhanceStrength.toFloat(), 0f..100f, steps = 99,
                 format = { "${it.toInt()}" },
                 onChange = { v -> update { it.copy(enhanceStrength = v.toInt()) } }
             )
@@ -929,7 +998,7 @@ private fun ImageTab(
     }
 
     PanelSectionCard("滤镜", Icons.Filled.Tune) {
-        FilterPreview(pages.getOrNull(currentRawPage), loader, config)
+        FilterPreview(pages.getOrNull(currentRawPage), loader, config, bookState.pageRotations[pages.getOrNull(currentRawPage)?.id] ?: 0)
         SliderRow("亮度", config.filterBrightness.toFloat(), -100f..100f, format = { "${it.toInt()}" }) { v ->
             update { it.copy(filterBrightness = v.toInt()) }
         }
@@ -964,32 +1033,39 @@ private fun ImageTab(
 }
 
 @Composable
-private fun ActionChip(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun ActionChip(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
         modifier
             .clip(RoundedCornerShape(12.dp))
             .background(PanelChipBg)
-            .clickableNoRipple(onClick)
-            .padding(vertical = 10.dp, horizontal = 12.dp),
+            .then(if (enabled) Modifier.clickableNoRipple(onClick) else Modifier.semantics { disabled() })
+            .heightIn(min = 48.dp).padding(vertical = 10.dp, horizontal = 12.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(text, color = TextPrimary, fontSize = 12.sp, maxLines = 1, softWrap = false)
+        Text(text, color = if (enabled) TextPrimary else TextSecondary, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }
 
 /** 滤镜实时预览小图（独立小图管线，不重处理全尺寸页） */
 @Composable
-private fun FilterPreview(page: ComicPageRef?, loader: ComicPageLoader, config: ComicReaderConfig) {
+private fun FilterPreview(page: ComicPageRef?, loader: ComicPageLoader, config: ComicReaderConfig, pageRotation: Int) {
     if (page == null) return
-    val previewKey = "${page.id}|${config.imagePipelineFingerprint()}"
+    val previewKey = "${page.id}|${config.imagePipelineFingerprint()}|$pageRotation"
+    val original by produceState<Bitmap?>(null, page.id) {
+        value = withContext(Dispatchers.Default) {
+            try { loader.loadPreview(page, ComicImagePipeline.Geometry(), ComicImagePipeline.Toning()) }
+            catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; null }
+        }
+    }
     val bitmap by produceState<Bitmap?>(null, previewKey) {
+        kotlinx.coroutines.delay(80)
         value = withContext(Dispatchers.Default) {
             runCatching {
                 loader.loadPreview(
                     page,
                     ComicImagePipeline.Geometry(
                         cropMode = config.cropMode, manualCrop = config.manualCrop,
-                        rotationDeg = config.bookRotation
+                        rotationDeg = config.bookRotation + pageRotation
                     ),
                     ComicImagePipeline.Toning(
                         brightness = config.filterBrightness, contrast = config.filterContrast,
@@ -1006,17 +1082,21 @@ private fun FilterPreview(page: ComicPageRef?, loader: ComicPageLoader, config: 
         Modifier.fillMaxWidth().padding(vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        listOf("原图" to original, "当前效果" to bitmap).forEach { (label, preview) ->
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             Modifier
-                .width(64.dp)
-                .aspectRatio(0.7f)
+                .fillMaxWidth().height(144.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color(0x22FFFFFF)),
             contentAlignment = Alignment.Center
         ) {
-            bitmap?.let {
-                Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            preview?.let {
+            Image(it.asImageBitmap(), label, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
             } ?: com.example.ui.components.ChasingDots(size = 18.dp, color = MintPrimary)
+        }
+        Text(label, color = TextSecondary, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+        }
         }
     }
 }
@@ -1027,7 +1107,7 @@ private fun FilterPreview(page: ComicPageRef?, loader: ComicPageLoader, config: 
 @Composable
 private fun BgSwatchRow(selected: ComicBgType, onSelect: (ComicBgType) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        Modifier.fillMaxWidth().padding(vertical = 2.dp).selectableGroup(),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         val swatches = listOf(
@@ -1039,7 +1119,13 @@ private fun BgSwatchRow(selected: ComicBgType, onSelect: (ComicBgType) -> Unit) 
         )
         swatches.forEach { (type, label, fill) ->
             val active = type == selected
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            val ring by animateColorAsState(if (active) MintPrimary else Color(0x40FFFFFF), label = "backgroundRing")
+            Column(
+                Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
+                    .selectable(active, role = Role.RadioButton) { onSelect(type) }
+                    .heightIn(min = 64.dp).padding(vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 Box(
                     Modifier
                         .size(40.dp)
@@ -1047,10 +1133,10 @@ private fun BgSwatchRow(selected: ComicBgType, onSelect: (ComicBgType) -> Unit) 
                         .background(fill)
                         .border(
                             width = if (active) 2.dp else 0.5.dp,
-                            color = if (active) MintPrimary else Color(0x40FFFFFF),
+                            color = ring,
                             shape = CircleShape
                         )
-                        .clickableNoRipple { onSelect(type) },
+                        ,
                     contentAlignment = Alignment.Center
                 ) {
                     if (active) {
@@ -1076,7 +1162,8 @@ private fun BgSwatchRow(selected: ComicBgType, onSelect: (ComicBgType) -> Unit) 
                 Text(
                     label,
                     color = if (active) MintPrimary else TextSecondary,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal
                 )
             }
@@ -1099,30 +1186,32 @@ private fun SceneOptionFlow(selected: ComicScene, onSelect: (ComicScene) -> Unit
         Triple(ComicScene.NIGHT, "夏夜", Icons.Filled.NightsStay),
     )
     FlowRow(
-        Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth().selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         maxItemsInEachRow = 4
     ) {
         scenes.forEach { (s, label, icon) ->
             val active = s == selected
+            val tint by animateColorAsState(if (active) panelSelectedBg() else PanelChipBg, label = "sceneTint")
             Column(
                 Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (active) panelSelectedBg() else PanelChipBg)
+                    .background(tint)
                     .border(
                         0.5.dp,
                         if (active) panelSelectedStroke() else Color.Transparent,
                         RoundedCornerShape(12.dp)
                     )
-                    .clickableNoRipple { onSelect(s) }
+                    .selectable(active, role = Role.RadioButton) { onSelect(s) }
+                    .heightIn(min = 64.dp)
                     .padding(vertical = 9.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Icon(
                     icon,
-                    contentDescription = label,
+                    contentDescription = null,
                     tint = if (active) MintPrimary else Color(0x99FFFFFF),
                     modifier = Modifier.size(17.dp)
                 )
@@ -1132,7 +1221,8 @@ private fun SceneOptionFlow(selected: ComicScene, onSelect: (ComicScene) -> Unit
                     color = if (active) MintPrimary else Color(0xAAFFFFFF),
                     fontSize = 11.sp,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                    maxLines = 1
+                    maxLines = 2,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
         }
@@ -1148,17 +1238,18 @@ internal fun EngineCard(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val tint by animateColorAsState(if (selected) MintPrimary.copy(alpha = 0.14f) else PanelChipBg, label = "engineTint")
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) MintPrimary.copy(alpha = 0.14f) else PanelChipBg)
+            .background(tint)
             .border(
                 1.dp,
                 if (selected) MintPrimary.copy(alpha = 0.6f) else Color.Transparent,
                 RoundedCornerShape(14.dp)
             )
-            .clickableNoRipple(onClick)
+            .selectable(selected, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1206,6 +1297,7 @@ internal fun PanelRow(label: String, icon: androidx.compose.ui.graphics.vector.I
 internal fun PanelTextField(
     label: String,
     value: String,
+    obscured: Boolean = false,
     onValueChange: (String) -> Unit,
 ) {
     Column(
@@ -1219,6 +1311,7 @@ internal fun PanelTextField(
             value = value,
             onValueChange = onValueChange,
             singleLine = true,
+            visualTransformation = if (obscured) PasswordVisualTransformation() else VisualTransformation.None,
             textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 13.sp),
             colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MintPrimary.copy(alpha = 0.6f),
@@ -1273,17 +1366,18 @@ private fun EffectTab(config: ComicReaderConfig, update: ((ComicReaderConfig) ->
 
 @Composable
 private fun AutoTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit) {
+    PanelHint("从阅读底栏启动 / 暂停。打开面板、切到后台时暂停，返回阅读后继续。")
     PanelSectionCard("自动翻页", Icons.Filled.Schedule) {
         SliderRow(
-            "翻页间隔", config.autoPageIntervalSec, 2f..60f,
+            "翻页间隔", config.autoPageIntervalSec, 1f..120f, steps = 118,
             format = { "${it.toInt()} 秒" }
         ) { v -> update { it.copy(autoPageIntervalSec = v) } }
     }
 
     PanelSectionCard("自动滚动", Icons.Filled.SwipeVertical) {
         SliderRow(
-            "滚动速度", config.autoScrollSpeedDp, 10f..300f,
-            format = { "${it.toInt()} dp/s" }
+            "滚动速度", config.autoScrollSpeedDp, 5f..400f, steps = 394,
+            format = { "${it.toInt()} / 秒" }
         ) { v -> update { it.copy(autoScrollSpeedDp = v) } }
     }
 }
@@ -1293,15 +1387,25 @@ private fun AutoTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> C
 @Composable
 private fun GestureTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit) {
     PanelSectionCard("点按区域动作", Icons.Filled.PanTool) {
+        PanelHint(if (config.direction == ComicDirection.RTL && config.mode != ComicMode.WEBTOON && config.mode != ComicMode.CONTINUOUS)
+            "右至左阅读：左侧对应下一页区域，右侧对应上一页区域。"
+            else "按阅读轴分为三个区域；控制栏显示时，翻页点按先收起控制栏。")
         val actions = ComicGestureAction.entries.map { it.ordinal to it.label }
-        SegmentRow("左 / 上区域", actions, config.gestureTapLeft.ordinal) { i ->
+        val vertical = config.mode == ComicMode.WEBTOON || config.mode == ComicMode.CONTINUOUS ||
+            config.direction == ComicDirection.TTB && config.mode != ComicMode.DOUBLE
+        val reverse = config.direction == ComicDirection.RTL && !vertical
+        SegmentRow(if (vertical) "顶部区域" else if (reverse) "右侧区域" else "左侧区域", actions, config.gestureTapLeft.ordinal) { i ->
             update { it.copy(gestureTapLeft = ComicGestureAction.entries[i]) }
         }
         SegmentRow("中间区域", actions, config.gestureTapCenter.ordinal) { i ->
             update { it.copy(gestureTapCenter = ComicGestureAction.entries[i]) }
         }
-        SegmentRow("右 / 下区域", actions, config.gestureTapRight.ordinal) { i ->
+        SegmentRow(if (vertical) "底部区域" else if (reverse) "左侧区域" else "右侧区域", actions, config.gestureTapRight.ordinal) { i ->
             update { it.copy(gestureTapRight = ComicGestureAction.entries[i]) }
+        }
+        TextButton(onClick = { update { it.copy(gestureTapLeft = ComicGestureAction.PREV,
+            gestureTapCenter = ComicGestureAction.TOGGLE_CONTROLS, gestureTapRight = ComicGestureAction.NEXT) } }) {
+            Text("恢复默认点按动作", color = TextSecondary)
         }
     }
 
@@ -1310,7 +1414,7 @@ private fun GestureTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -
         SwitchRow("双指合拢退出", "缩小到阈值时退出阅读", config.gesturePinchClose) { v ->
             update { it.copy(gesturePinchClose = v) }
         }
-        SwitchRow("侧边滑动关闭", null, config.gestureEdgeSwipe) { v ->
+        SwitchRow("侧边滑动关闭", "从两侧边缘向内滑动；放大查看时不触发", config.gestureEdgeSwipe) { v ->
             update { it.copy(gestureEdgeSwipe = v) }
         }
         SwitchRow("长按呼出控制层", "与长按放大互斥（放大优先）", config.gestureLongPressPanel) { v ->
@@ -1450,9 +1554,11 @@ internal fun ComicPresetSheet(
     glassBackdrop: LayerBackdrop? = null,
 ) {
     var presets by remember { mutableStateOf(store.loadPresets()) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     var defaultId by remember { mutableStateOf(store.defaultPresetId()) }
     var renameTarget by remember { mutableStateOf<ComicPreset?>(null) }
     var createDialog by remember { mutableStateOf(false) }
+    var deleteTarget by remember { mutableStateOf<ComicPreset?>(null) }
 
     fun refresh() {
         presets = store.loadPresets()
@@ -1477,7 +1583,7 @@ internal fun ComicPresetSheet(
                         // 图标
                         Box(
                             Modifier
-                                .size(40.dp)
+                                .size(48.dp)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(Color(0x2AF0D9C0)),
                             contentAlignment = Alignment.Center
@@ -1527,6 +1633,7 @@ internal fun ComicPresetSheet(
                                 .clip(RoundedCornerShape(9.dp))
                                 .background(Color(0xFFF0D9C0))
                                 .clickableNoRipple { onApply(preset.config) }
+                                .heightIn(min = 48.dp)
                                 .padding(horizontal = 14.dp, vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) { Text("应用", color = Color(0xFF0E1512), fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
@@ -1537,7 +1644,7 @@ internal fun ComicPresetSheet(
                         // 收藏开关（第 27 条：收藏后置顶 + 长按设置入口快捷应用）
                         Box(
                             Modifier
-                                .size(40.dp)
+                                .size(48.dp)
                                 .clip(CircleShape)
                                 .clickableNoRipple {
                                     store.togglePresetFavorite(preset.id)
@@ -1555,7 +1662,7 @@ internal fun ComicPresetSheet(
                         // 设为默认
                         Box(
                             Modifier
-                                .size(40.dp)
+                                .size(48.dp)
                                 .clip(CircleShape)
                                 .clickableNoRipple {
                                     store.setDefaultPreset(preset.id)
@@ -1572,7 +1679,7 @@ internal fun ComicPresetSheet(
                         }
                         Box(
                             Modifier
-                                .size(40.dp)
+                                .size(48.dp)
                                 .clip(CircleShape)
                                 .clickableNoRipple {
                                     store.duplicatePreset(preset.id)
@@ -1583,9 +1690,15 @@ internal fun ComicPresetSheet(
                             Icon(Icons.Filled.ContentCopy, "复制", tint = TextSecondary, modifier = Modifier.size(15.dp))
                         }
                         if (!preset.builtIn) {
+                            IconButton(onClick = {
+                                store.updatePreset(preset.id, config = currentConfig)
+                                refresh()
+                                android.widget.Toast.makeText(context,
+                                    "已更新预设", android.widget.Toast.LENGTH_SHORT).show()
+                            }) { Icon(Icons.Filled.Save, "用当前设置更新预设", tint = TextSecondary, modifier = Modifier.size(16.dp)) }
                             Box(
                                 Modifier
-                                    .size(40.dp)
+                                    .size(48.dp)
                                     .clip(CircleShape)
                                     .clickableNoRipple { renameTarget = preset },
                                 contentAlignment = Alignment.Center
@@ -1594,11 +1707,10 @@ internal fun ComicPresetSheet(
                             }
                             Box(
                                 Modifier
-                                    .size(40.dp)
+                                    .size(48.dp)
                                     .clip(CircleShape)
                                     .clickableNoRipple {
-                                        store.deletePreset(preset.id)
-                                        refresh()
+                                        deleteTarget = preset
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -1616,6 +1728,7 @@ internal fun ComicPresetSheet(
                         .clip(RoundedCornerShape(12.dp))
                         .background(PanelChipActiveBg)
                         .clickableNoRipple { createDialog = true }
+                        .heightIn(min = 48.dp)
                         .padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
@@ -1652,6 +1765,16 @@ internal fun ComicPresetSheet(
             },
             onDismiss = { renameTarget = null }
         )
+    }
+    deleteTarget?.let { target ->
+        AlertDialog(onDismissRequest = { deleteTarget = null },
+            title = { Text("删除预设", color = TextPrimary) },
+            text = { Text("删除「${target.name}」？当前阅读配置仍会保留。", color = TextSecondary) },
+            confirmButton = { TextButton(onClick = { store.deletePreset(target.id); refresh(); deleteTarget = null }) {
+                Text("删除", color = TextPrimary)
+            } },
+            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("取消", color = TextSecondary) } },
+            containerColor = PanelBg)
     }
 }
 
@@ -1690,6 +1813,7 @@ private fun PresetNameDialog(
 
 /* ══════════════ 手动裁边编辑器 ══════════════ */
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ComicCropSheet(
     page: ComicPageRef?,
@@ -1709,21 +1833,24 @@ internal fun ComicCropSheet(
     var crop by remember(config.manualCrop) {
         mutableStateOf(
             config.manualCrop?.let { floatArrayOf(it[0], it[1], it[2], it[3]) }
-                ?: floatArrayOf(0.06f, 0.06f, 0.94f, 0.94f)
+                ?: floatArrayOf(0f, 0f, 1f, 1f)
         )
     }
-    var layoutSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size(1f, 1f)) }
-    var imgRect by remember { mutableStateOf(Rect(0f, 0f, 1f, 1f)) }
     // 第 6 节：裁边框贴边轻触觉（组合期取 view，lambda 内使用）
     val cropHapticView = androidx.compose.ui.platform.LocalView.current
+    var lastEdgeHaptic by remember { mutableStateOf(0L) }
 
     fun onCropChangeWithHaptic(view: android.view.View): (FloatArray) -> Unit = { raw ->
         // 限制最小裁剪区 5%；贴边（0/1 边界被钳制）轻触觉反馈
-        raw[0] = raw[0].coerceIn(0f, raw[2] - 0.05f)
-        raw[1] = raw[1].coerceIn(0f, raw[3] - 0.05f)
+        raw[0] = raw[0].coerceIn(0f, (raw[2] - 0.05f).coerceAtLeast(0f))
+        raw[1] = raw[1].coerceIn(0f, (raw[3] - 0.05f).coerceAtLeast(0f))
         raw[2] = raw[2].coerceIn(raw[0] + 0.05f, 1f)
         raw[3] = raw[3].coerceIn(raw[1] + 0.05f, 1f)
-        if (raw[0] == 0f || raw[1] == 0f || raw[2] == 1f || raw[3] == 1f) {
+        val newlyAtEdge = (raw[0] == 0f && crop[0] != 0f) || (raw[1] == 0f && crop[1] != 0f) ||
+            (raw[2] == 1f && crop[2] != 1f) || (raw[3] == 1f && crop[3] != 1f)
+        val now = android.os.SystemClock.uptimeMillis()
+        if (newlyAtEdge && now - lastEdgeHaptic > 150L) {
+            lastEdgeHaptic = now
             if (com.example.ui.feedback.HapticsGate.enabled) {
                 view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
             }
@@ -1741,22 +1868,22 @@ internal fun ComicCropSheet(
         Column(Modifier.fillMaxSize().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("手动裁边", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.weight(1f))
+            }
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = {
-                    crop = floatArrayOf(0.06f, 0.06f, 0.94f, 0.94f)
+                    crop = floatArrayOf(0f, 0f, 1f, 1f)
                 }) { Text("重置", color = TextSecondary) }
                 TextButton(onClick = onDismiss) { Text("取消", color = TextSecondary) }
                 TextButton(onClick = { onApply(crop[0], crop[1], crop[2], crop[3]) }) {
                     Text("保存", color = MintPrimary, fontWeight = FontWeight.SemiBold)
                 }
             }
-            Text("拖动四角调整裁剪区域（不修改原文件）", color = TextSecondary, fontSize = 11.sp)
+            Text("拖动角与边调整范围，拖动框内移动选区。", color = TextSecondary, fontSize = 11.sp)
 
             Spacer(Modifier.height(12.dp))
             BoxWithImageLayout(
                 bitmap = bitmap,
                 modifier = Modifier.weight(1f),
-                onLayout = { size, rect -> layoutSize = size; imgRect = rect },
             ) { canvasModifier ->
                 CropCanvas(
                     canvasModifier = canvasModifier,
@@ -1779,7 +1906,6 @@ internal fun ComicCropSheet(
 private fun BoxWithImageLayout(
     bitmap: Bitmap?,
     modifier: Modifier = Modifier,
-    onLayout: (androidx.compose.ui.geometry.Size, Rect) -> Unit,
     content: @Composable (Modifier) -> Unit,
 ) {
     val density = androidx.compose.ui.platform.LocalDensity.current
@@ -1788,7 +1914,7 @@ private fun BoxWithImageLayout(
         if (bmp != null) {
             val image = bmp.asImageBitmap()
             androidx.compose.foundation.layout.BoxWithConstraints(
-                Modifier.fillMaxWidth().aspectRatio(0.75f)
+                Modifier.fillMaxSize(), contentAlignment = Alignment.Center
             ) {
                 val boxW = maxWidth.value * density.density
                 val boxH = maxHeight.value * density.density
@@ -1797,9 +1923,6 @@ private fun BoxWithImageLayout(
                 val drawH: Float
                 if (boxW / boxH > ratio) { drawH = boxH; drawW = boxH * ratio }
                 else { drawW = boxW; drawH = boxW / ratio }
-                LaunchedEffect(drawW, drawH) {
-                    onLayout(androidx.compose.ui.geometry.Size(drawW, drawH), Rect(0f, 0f, drawW, drawH))
-                }
                 // 图片 + 裁剪层叠加
                 Box(
                     Modifier.size(
@@ -1835,6 +1958,7 @@ private fun CropCanvas(
     val currentOnChange by rememberUpdatedState(onCropChange)
     Box(
         canvasModifier
+            .semantics { contentDescription = "裁剪选区" }
             .pointerInput(Unit) {
                 val hr = handleR.toPx()
                 awaitEachGesture {
@@ -1856,6 +1980,7 @@ private fun CropCanvas(
                     if (active == -1) edges.forEachIndexed { i, c ->
                         if ((down.position - c).getDistance() < hr * 1.6f) active = i + 4
                     }
+                    if (active == -1 && down.position.x in x0..x1 && down.position.y in y0..y1) active = 8
                     if (active >= 0) {
                         while (true) {
                             val ev = awaitPointerEvent()
@@ -1863,17 +1988,27 @@ private fun CropCanvas(
                             if (!ch.pressed) break
                             val px = (ch.position.x / w).coerceIn(0f, 1f)
                             val py = (ch.position.y / h).coerceIn(0f, 1f)
+                            val left = px.coerceAtMost(currentCrop[2] - .05f)
+                            val right = px.coerceAtLeast(currentCrop[0] + .05f)
+                            val top = py.coerceAtMost(currentCrop[3] - .05f)
+                            val bottom = py.coerceAtLeast(currentCrop[1] + .05f)
                             // 派生基准 = 最新 crop（连续交替拖动四边互不回退）
                             val n = currentCrop.copyOf()
                             when (active) {
-                                0 -> { n[0] = px; n[1] = py }
-                                1 -> { n[2] = px; n[1] = py }
-                                2 -> { n[0] = px; n[3] = py }
-                                3 -> { n[2] = px; n[3] = py }
-                                4 -> n[1] = py
-                                5 -> n[3] = py
-                                6 -> n[0] = px
-                                7 -> n[2] = px
+                                0 -> { n[0] = left; n[1] = top }
+                                1 -> { n[2] = right; n[1] = top }
+                                2 -> { n[0] = left; n[3] = bottom }
+                                3 -> { n[2] = right; n[3] = bottom }
+                                4 -> n[1] = top
+                                5 -> n[3] = bottom
+                                6 -> n[0] = left
+                                7 -> n[2] = right
+                                8 -> {
+                                    val delta = ch.position - ch.previousPosition
+                                    val dx = (delta.x / w).coerceIn(-n[0], 1f - n[2])
+                                    val dy = (delta.y / h).coerceIn(-n[1], 1f - n[3])
+                                    n[0] += dx; n[2] += dx; n[1] += dy; n[3] += dy
+                                }
                             }
                             currentOnChange(n)
                             ch.consume()

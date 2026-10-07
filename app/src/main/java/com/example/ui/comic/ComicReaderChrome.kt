@@ -81,6 +81,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -115,7 +118,8 @@ internal val TextSecondary = Color(0xB3FFFFFF)
  * （CURL 的 GL 层采不到）时回退纯半透明 PanelBg。
  */
 internal fun Modifier.comicPanelGlass(backdrop: Backdrop?, shape: Shape): Modifier =
-    if (backdrop == null) background(PanelBg)
+    // SurfaceView cannot provide a blurred capture; retain a quiet, legible surface.
+    if (backdrop == null) background(PanelBg.copy(alpha = 0.96f))
     else drawPlainBackdrop(
         backdrop = backdrop,
         shape = { shape },
@@ -173,6 +177,8 @@ fun ComicReaderChrome(
     onBookStateChange: (ComicBookState) -> Unit,
     onToggleControls: () -> Unit,
     onExit: () -> Unit,
+    onDownloadTranslationModels: () -> Unit = {},
+    onTranslationRefresh: (Boolean) -> Unit = {},
 ) {
     val onDismissPanel = { onPanelChange(ComicPanel.NONE) }
     val currentRaw = (currentPage - 1).coerceIn(0, (pages.size - 1).coerceAtLeast(0))
@@ -200,13 +206,8 @@ fun ComicReaderChrome(
             // 新反馈条目6：三点菜单"旋转本页 90°"入口已移除（按用户要求）；
             // 旋转能力本体保留在设置面板·图像 Tab（"整本旋转/旋转本页 +90°"），
             // pageRotations 状态模型不受影响（手动裁边/管线指纹仍引用）
-            onToggleMerge = {
-                val anchors = bookState.mergeAnchors
-                onBookStateChange(
-                    if (currentRaw in anchors) bookState.copy(mergeAnchors = anchors - currentRaw)
-                    else bookState.copy(mergeAnchors = anchors + currentRaw)
-                )
-            },
+            canToggleMerge = currentRaw in bookState.mergeAnchors || currentRaw < pages.lastIndex,
+            onToggleMerge = { onBookStateChange(bookState.toggleMerge(currentRaw, pages.size)) },
         )
     }
 
@@ -290,6 +291,8 @@ fun ComicReaderChrome(
                     bookState = bookState, onBookStateChange = onBookStateChange,
                     onDismiss = onDismissPanel,
                     glassBackdrop = panelGlassBackdrop,
+                    onDownloadTranslationModels = onDownloadTranslationModels,
+                    onTranslationRefresh = onTranslationRefresh,
                 )
                 ComicPanel.TOC -> ComicTocSheet(
                     toc = toc, currentChapterIndex = currentChapterIndex,
@@ -332,13 +335,14 @@ private fun ComicTopBar(
     onApplyPresetConfig: (ComicReaderConfig) -> Unit,
     onExit: () -> Unit,
     onOpenPanel: (ComicPanel) -> Unit,
+    canToggleMerge: Boolean,
     onToggleMerge: () -> Unit,
     onGodMoment: (() -> Unit)?,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     // 收藏预设快捷应用（第 27 条）：长按"阅读设置"按钮直接弹出收藏列表一键应用
     var favMenuOpen by remember { mutableStateOf(false) }
-    val favorites by remember { mutableStateOf(store.favoritePresets()) }
+    var favorites by remember { mutableStateOf(store.favoritePresets()) }
     Column(
         Modifier
             .fillMaxWidth()
@@ -371,9 +375,12 @@ private fun ComicTopBar(
                     Modifier
                         .size(44.dp)
                         .clip(CircleShape)
-                        .pointerInput(favorites.isNotEmpty()) {
+                        .pointerInput(store) {
                             detectTapGestures(
-                                onLongPress = { if (favorites.isNotEmpty()) favMenuOpen = true },
+                                onLongPress = {
+                                    favorites = store.favoritePresets()
+                                    if (favorites.isNotEmpty()) favMenuOpen = true else onOpenPanel(ComicPanel.PRESET)
+                                },
                                 onTap = { onOpenPanel(ComicPanel.SETTINGS) },
                             )
                         },
@@ -416,6 +423,7 @@ private fun ComicTopBar(
                     DropdownMenuItem(
                         text = { Text("临时合页 / 取消", color = TextPrimary) },
                         leadingIcon = { Icon(Icons.Filled.AutoStories, null, tint = TextSecondary) },
+                        enabled = canToggleMerge,
                         onClick = { menuOpen = false; onToggleMerge() }
                     )
                     DropdownMenuItem(
@@ -694,7 +702,7 @@ internal fun SliderRow(
 ) {
     Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(title, color = TextSecondary, fontSize = 12.sp)
+            Text(title, color = TextSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
             Spacer(Modifier.weight(1f))
             Text(format(value), color = MintPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
         }
@@ -704,6 +712,7 @@ internal fun SliderRow(
             onValueChangeFinished = onFinished,
             valueRange = range,
             steps = steps,
+            modifier = Modifier.semantics { contentDescription = title; stateDescription = format(value) },
         )
     }
 }
@@ -712,14 +721,15 @@ internal fun SliderRow(
 @Composable
 internal fun SwitchRow(title: String, subtitle: String? = null, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            .toggleable(checked, role = Role.Switch, onValueChange = onChange).padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
             Text(title, color = TextPrimary, fontSize = 13.sp)
             subtitle?.let { Text(it, color = TextSecondary, fontSize = 11.sp) }
         }
-        PanelSwitch(checked = checked, onChange = onChange)
+        PanelSwitch(checked = checked, onChange = onChange, modifier = Modifier.clearAndSetSemantics { })
     }
 }
 

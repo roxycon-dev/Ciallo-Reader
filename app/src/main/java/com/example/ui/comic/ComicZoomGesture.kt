@@ -765,3 +765,70 @@ fun Modifier.comicEdgeSwipe(enabled: Boolean, zoomed: () -> Boolean = { false },
             }
         }
     }
+
+/** Observe before nested scroll arbitration; the existing library still owns pinch/pan/fling. */
+internal fun Modifier.comicVerticalGestures(
+    state: net.engawapg.lib.zoomable.ZoomState,
+    config: ComicReaderConfig,
+    callbacks: ComicGestureCallbacks,
+    onTouchActive: (Boolean) -> Unit = {},
+): Modifier = composed {
+    val scope = rememberCoroutineScope()
+    val latestConfig by rememberUpdatedState(config)
+    val latestCallbacks by rememberUpdatedState(callbacks)
+    val latestTouchActive by rememberUpdatedState(onTouchActive)
+    pointerInput(state) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            latestTouchActive(true)
+            val initialScale = state.scale
+            var twoFinger = false
+            var pinchRatio = 1f
+            var moved = false
+            var held = false
+            var translation = Offset.Zero
+            var holdAnimation: Job? = null
+            val holdJob = scope.launch {
+                delay(viewConfiguration.longPressTimeoutMillis)
+                if (!moved && !twoFinger) {
+                    if (latestConfig.longPressZoom) {
+                        held = true
+                        holdAnimation = scope.launch { state.changeScale(max(2.5f, initialScale), down.position, tween(180)) }
+                    } else if (latestConfig.gestureLongPressPanel) {
+                        latestCallbacks.onLongPress(down.position)
+                    }
+                }
+            }
+            try {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    if (!change.pressed) break
+                    translation += change.positionChange()
+                    if (translation.getDistance() > viewConfiguration.touchSlop) moved = true
+                    if (event.changes.count { it.pressed } > 1) {
+                        twoFinger = true
+                        holdJob.cancel()
+                        pinchRatio *= event.calculateZoom()
+                        if (latestConfig.gesturePinchClose && initialScale <= 1.02f && pinchRatio < 0.62f) {
+                            event.changes.forEach { it.consume() }
+                            latestCallbacks.onPinchClose()
+                            break
+                        }
+                    }
+                    if (held) {
+                        val pan = change.positionChange()
+                        if (holdAnimation?.isActive != true && pan != Offset.Zero)
+                            scope.launch { state.applyGesture(pan, 1f, change.position, change.uptimeMillis) }
+                        change.consume()
+                    }
+                }
+            } finally {
+                latestTouchActive(false)
+                holdJob.cancel()
+                holdAnimation?.cancel()
+                if (held) scope.launch { state.changeScale(initialScale, down.position, tween(180)) }
+            }
+        }
+    }
+}

@@ -26,6 +26,62 @@ import org.robolectric.annotation.Config
 @Config(sdk = [33])
 class ComicCurlGestureArbitrationTest {
 
+    @Test fun firstPinchStreamIsForwardedThroughTheNativeHandoff() {
+        val t = SystemClock.uptimeMillis()
+        var frames = 0
+        var ended = 0
+        var kind = ""
+        v.onZoomStart = { reason, _, _ -> kind = reason }
+        v.onZoomMotion = { frames++ }
+        v.onZoomEnd = { ended++ }
+        v.onTouch(v, MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, 400f, 1200f, 0))
+        v.onTouch(v, twoFingerEvent(MotionEvent.ACTION_POINTER_DOWN + (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), t + 40))
+        v.onTouch(v, twoFingerEvent(MotionEvent.ACTION_MOVE, t + 90))
+        v.onTouch(v, MotionEvent.obtain(t, t + 140, MotionEvent.ACTION_UP, 400f, 1200f, 0))
+        assertEquals("pinch", kind)
+        assertEquals(3, frames)
+        assertEquals(1, ended)
+        assertEquals(1, zoomOpened)
+        assertTrue(!v.isTouchActive)
+    }
+
+    @Test fun holdZoomSignalsTemporaryEntryAndRelease() {
+        // View.postDelayed is queued until attachment; model a real host window.
+        val host = org.robolectric.Robolectric.buildActivity(android.app.Activity::class.java).setup()
+        host.get().setContentView(v)
+        try {
+            val t = SystemClock.uptimeMillis()
+            var kind = ""
+            var ended = 0
+            v.onZoomStart = { reason, _, _ -> kind = reason }
+            v.onZoomEnd = { ended++ }
+            v.onTouch(v, MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, 400f, 1200f, 0))
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(550))
+            assertEquals("hold", kind)
+            v.onTouch(v, MotionEvent.obtain(t, t + 600, MotionEvent.ACTION_UP, 400f, 1200f, 0))
+            assertEquals(1, ended)
+        } finally { host.pause().stop().destroy() }
+    }
+
+    @Test fun edgeCloseIsSeparateFromTheAdjacentPageTapShortcut() {
+        v.layout(0, 0, 1080, 1920)
+        v.edgeSwipeEnabled = true
+        v.doubleTapZoomEnabled = false
+        var closed = 0
+        var taps = 0
+        v.onEdgeBack = { closed++ }
+        v.onQuickTap = { _, _ -> taps++ }
+        val t = SystemClock.uptimeMillis()
+        v.onTouch(v, MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, 4f, 800f, 0))
+        v.onTouch(v, MotionEvent.obtain(t, t + 100, MotionEvent.ACTION_MOVE, 250f, 800f, 0))
+        v.onTouch(v, MotionEvent.obtain(t, t + 150, MotionEvent.ACTION_UP, 250f, 800f, 0))
+        assertEquals(1, closed)
+        v.onTouch(v, MotionEvent.obtain(t + 300, t + 300, MotionEvent.ACTION_DOWN, 4f, 800f, 0))
+        v.onTouch(v, MotionEvent.obtain(t + 300, t + 340, MotionEvent.ACTION_UP, 4f, 800f, 0))
+        assertEquals(1, closed)
+        assertEquals(1, taps)
+    }
+
     private lateinit var v: ComicCurlView
     private var zoomOpened = 0
 

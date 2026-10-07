@@ -37,7 +37,7 @@ Android 端小说 / 漫画阅读器，内置多书源在线聚合搜索与下载
 | compileSdk / targetSdk | 35                                                                  |
 | 技术栈                    | Kotlin 2.0 + Jetpack Compose（Material 3）+ MVVM + Room + WorkManager |
 | 架构                     | MVVM + StateFlow + Repository，单 Activity + Navigation Compose       |
-| 测试                     | 690 项定义（JVM / Robolectric）；100 项设备测试定义；1.2.5 专项执行 269 + 3 项通过                  |
+| 测试                     | 715 项定义（JVM / Robolectric）；103 项设备测试定义；同版本打磨专项执行 294 + 6 项通过                  |
 | 正式安装包 | 1.2.5 / 206，arm64-v8a；见 [v1.2.5 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.2.5) |
 
 ***
@@ -114,6 +114,8 @@ Android 端小说 / 漫画阅读器，内置多书源在线聚合搜索与下载
 
 [1.2.5 阅读体验优化与验证](docs/reader-polish-1.2.5-2026-10-07.md)。
 
+[1.2.5 漫画七个设置分类、54 个配置字段与操作的逐项打磨记录](docs/comic-feature-polish-1.2.5-2026-10-07.md)：补齐双页适配、首次缩放手势、自动阅读暂停、全局与本书配置隔离、原图 / 效果对照、缓存清除与预设更新。所有功能保留，不把配置往返测试等同于竞品评测。
+
 ### 书架与数据
 
 - 书架分类（支持 PIN 锁）、导入、排序；卡片显示章节进度
@@ -147,7 +149,11 @@ Android 端小说 / 漫画阅读器，内置多书源在线聚合搜索与下载
 
 ## 截图
 
-1.2.5 阅读设置实拍：手机主题玻璃排版、平板小说排版与漫画侧栏。下图来自 Android 模拟器，正文及漫画为生成的验证样例。
+1.2.5 同版本逐项打磨实拍：[完整功能记录与四种屏幕截图](docs/comic-feature-polish-1.2.5-2026-10-07.md)。
+
+<img src="./docs/screenshots/shot-reader125-comic-polish-tablet.jpg" width="760" alt="漫画设置逐项打磨后的平板主题分类"/>
+
+1.2.5 首次发布阅读设置实拍：手机主题玻璃排版、平板小说排版与漫画侧栏。下图来自 Android 模拟器，正文及漫画为生成的验证样例。
 
 <img src="./docs/screenshots/shot-reader125-novel-phone.jpg" width="280" alt="1.2.5 手机小说排版设置"/>
 
@@ -180,7 +186,7 @@ echo "sdk.dir=/你的/Android/Sdk/路径" > local.properties
 ./gradlew :app:assembleRelease
 ```
 
-1.2.5 APK 可从 [GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.2.5/Ciallo-Reader-v1.2.5.apk) 下载；使用 Release 构建、R8 混淆与资源精简，原始输出在 `app/build/outputs/apk/release/app-release.apk`。当前包沿用 1.2.3 签名，可覆盖安装。GitHub 旧 1.2.1 包使用另一证书：若出现签名冲突，先在设置中导出备份，再安装新版并恢复；未备份前不要卸载旧版。
+2026-10-07 对 1.2.5 / 206 进行同版本补充更新：已安装首次 1.2.5 的用户请手动下载新版 APK 覆盖安装。1.2.5 APK 可从 [GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.2.5/Ciallo-Reader-v1.2.5.apk) 下载；使用 Release 构建、R8 混淆与资源精简，原始输出在 `app/build/outputs/apk/release/app-release.apk`。当前包沿用 1.2.3 签名，可覆盖安装。GitHub 旧 1.2.1 包使用另一证书：若出现签名冲突，先在设置中导出备份，再安装新版并恢复；未备份前不要卸载旧版。
 
 ***
 
@@ -301,6 +307,7 @@ Release 包只含 arm64 库，x86_64 模拟器转译运行会崩溃；Debug 包�
 
 | 版本    | 日期         | 主要内容                              |
 | ----- | ---------- | --------------------------------- |
+| 1.2.5（同版本更新） | 2026-10-07 | 漫画设置逐项打磨：缩放与双页适配、自动阅读、裁边合页、配置隔离、翻译缓存和预设管理 |
 | 1.2.5 | 2026-10-07 | 小说主题玻璃排版、漫画自适应设置与动效、翻页手势及在线翻译优化 |
 | 1.2.4 | 2026-10-06 | 修复了一些书源显示bug |
 | 1.2.3 | 2026-10-05 | 常用词与专名多语言搜索、缺词在线补充与缓存、简称匹配、滚动用词卡片、Tab 动画、原生选字复制及更新检查修复 |

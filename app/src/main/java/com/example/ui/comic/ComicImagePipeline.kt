@@ -67,7 +67,7 @@ object ComicImagePipeline {
 
     fun Toning.hasWork(): Boolean = brightness != 0 || contrast != 0 || saturation != 0 ||
         hue != 0 || gamma != 1.0f || sharpen > 0 || shadow != 0 || bw ||
-        enhanceMode != ComicEnhanceMode.OFF
+        (enhanceMode != ComicEnhanceMode.OFF && enhanceStrength > 0)
 
     /** [Toning.hasWork] 的对外导出（成员扩展无法在 object 外直接调用） */
     fun toningHasWork(tone: Toning): Boolean = tone.hasWork()
@@ -78,6 +78,7 @@ object ComicImagePipeline {
      * 估算而非精确值——目的是让用户知道"在处理而不是卡死"。
      */
     fun enhanceEstimateSec(mode: ComicEnhanceMode, strength: Int, longEdge: Int): Double {
+        if (strength <= 0) return 0.0
         val base = when (mode) {
             ComicEnhanceMode.OFF -> return 0.0
             ComicEnhanceMode.CAS -> 0.4
@@ -569,7 +570,7 @@ object ComicImagePipeline {
         // - SUPER_RES = Lanczos 2x 重建 + 边缘掩码强锐化；
         // - ANIME4K 平坦降噪 0.20→0.12（0.20 在噪声底上产生整体灰移，观感变脏）。
         val strength = tone.enhanceStrength / 100f
-        bmp = when (tone.enhanceMode) {
+        bmp = when (if (tone.enhanceStrength <= 0) ComicEnhanceMode.OFF else tone.enhanceMode) {
             ComicEnhanceMode.CAS -> casSharpenEdges(
                 anime4kLines(bmp, strength, kExtra = 0.34f + 0.34f * strength),
                 0.45f + 0.4f * strength, edgeRange = 26,

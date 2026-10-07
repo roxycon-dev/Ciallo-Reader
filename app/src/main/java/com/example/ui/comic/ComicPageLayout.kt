@@ -168,6 +168,10 @@ object ComicPageLayout {
         if (pages.isEmpty()) return ComicLayout(emptyList(), emptyMap())
         val rtl = config.direction == ComicDirection.RTL
         val double = config.mode == ComicMode.DOUBLE
+        val merges = bookState.mergeAnchors.filter { it >= 0 && it < pages.lastIndex }.sorted()
+            .fold(emptySet<Int>()) { accepted, anchor ->
+                if (anchor - 1 in accepted) accepted else accepted + anchor
+            }.takeUnless { config.mode == ComicMode.WEBTOON || config.mode == ComicMode.CONTINUOUS } ?: emptySet()
 
         // 1. 展开为显示单元：宽页按需拆分（记录原始页索引，合页锚点按原始索引判断）
         data class RawUnitGroup(val rawIndex: Int, val units: List<Unit>)
@@ -176,7 +180,7 @@ object ComicPageLayout {
         pages.forEachIndexed { idx, page ->
             val size = sizes[page.id]
             val isWide = isWidePage(size)
-            val anchorMerged = bookState.mergeAnchors.contains(idx)
+            val anchorMerged = idx in merges || idx - 1 in merges
             if (config.splitWide && isWide && !anchorMerged) {
                 // 拆分顺序：默认 RTL 先右半边；splitReverse 反转手动纠正扫描顺序。
                 // 拆分半页各自成组，参与后续配对/合页流程。
@@ -197,7 +201,7 @@ object ComicPageLayout {
         var i = 0
         while (i < rawGroups.size) {
             val group = rawGroups[i]
-            val isAnchor = bookState.mergeAnchors.contains(group.rawIndex)
+            val isAnchor = merges.contains(group.rawIndex)
             val groupUnits = group.units
             if (isAnchor && i + 1 < rawGroups.size && groupUnits.size == 1 && !groupUnits[0].fromSplit) {
                 val nextUnits = rawGroups[i + 1].units

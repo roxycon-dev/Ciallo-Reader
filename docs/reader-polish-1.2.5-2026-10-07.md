@@ -1,5 +1,7 @@
 # Ciallo Reader 1.2.5 阅读体验优化
 
+> 本文记录首次发布的 1.2.5。按用户要求，同版本安装包已进行补充替换；当前 APK、摘要、逐项功能改进和测试范围请看 [漫画逐项打磨报告](comic-feature-polish-1.2.5-2026-10-07.md)。以下大小和 SHA-256 为首次发布归档，不能用于校验替换后的附件。
+
 ## 改动范围
 
 - 小说阅读排版继续使用现有状态、持久化、字体和阅读主题。窗口从阅读背景取氛围色，从应用主题取交互强调色；使用 8dp 背景模糊、56% 主题玻璃底、24dp 浅色分组卡、数值徽标与轻量选择动画。阅读背景与正文一起进入玻璃捕获层，避免透明文字层与原正文叠出双影。`AppSwitch`、Squishy 开关实现、尺寸、配色和动画均未改。
@@ -39,7 +41,7 @@
 - `tools/ui-gate.ps1` 未通过旧 UI 字面量数量基线；本轮增加了排版样式值，未修改基线掩盖增长。该项需后续统一设计 token 工作处理，不能报告为全量检查通过。
 - 验收日志、原始 XML、模拟器截图与发布回执保留在本机 `artifacts/release-1.2.5/` 和 `artifacts/reader125-device/`。正式 arm64 包在模拟器覆盖安装，两次冷启动及启动期窗口方向 / 密度变化复核通过，无 AndroidRuntime 致命异常。最终复核使用 swangle 图形后端并关闭 Vulkan；此前 swiftshader_indirect 下 QEMU 宿主访问违规崩溃，已由 Windows 应用日志区分。Debug 探针不进入正式包；没有用户手机实装或全部平板型号覆盖。
 
-安装包 SHA-256：`332c0fa06bcbde8189476537a5ed09d5c1c78b91c3a865d3df7a4a3dde740245`。
+首次发布归档安装包 SHA-256：`332c0fa06bcbde8189476537a5ed09d5c1c78b91c3a865d3df7a4a3dde740245`。
 
 [下载 1.2.5 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.2.5)，附件沿用 APK + `SHA256SUMS.txt`。
 

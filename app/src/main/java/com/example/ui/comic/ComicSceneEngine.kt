@@ -65,11 +65,13 @@ class ComicAmbientAudio private constructor(
         val asset = assetOf(scene)
         // 真实录音主路径：assets → MediaPlayer 循环
         if (asset != null) {
+            var opening: android.media.MediaPlayer? = null
             runCatching {
-                val afd = context.assets.openFd("ambient/$asset")
                 val mp = android.media.MediaPlayer()
-                mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                afd.close()
+                opening = mp
+                context.assets.openFd("ambient/$asset").use { afd ->
+                    mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                }
                 mp.isLooping = true
                 mp.setAudioAttributes(
                     android.media.AudioAttributes.Builder()
@@ -78,15 +80,28 @@ class ComicAmbientAudio private constructor(
                         .build()
                 )
                 mp.setVolume(volume, volume)
-                mp.prepare()
-                mp.start()
                 player = mp
                 running = true
+                mp.setOnPreparedListener { ready ->
+                    if (player === ready && running) {
+                        ready.setVolume(volume, volume)
+                        ready.start()
+                    }
+                }
+                mp.setOnErrorListener { failed, _, _ ->
+                    if (player === failed) {
+                        runCatching { failed.release() }
+                        player = null
+                        runCatching { startSynth(scene) }.onFailure { running = false }
+                    }
+                    true
+                }
+                mp.prepareAsync()
                 return
-            }
+            }.onFailure { runCatching { opening?.release() }; player = null; running = false }
         }
         // 兜底：资产缺失（异常打包等）时回退程序合成，保证功能不缺失
-        startSynth(scene)
+        runCatching { startSynth(scene) }.onFailure { running = false }
     }
 
     private fun startSynth(scene: ComicScene) {
@@ -126,8 +141,8 @@ class ComicAmbientAudio private constructor(
 
     fun setVolume(v: Float) {
         volume = v.coerceIn(0f, 1f)
-        player?.setVolume(volume, volume)
-        track?.setVolume(volume)
+        runCatching { player?.setVolume(volume, volume) }
+        runCatching { track?.setVolume(volume) }
     }
 
     fun stop() {
@@ -137,6 +152,8 @@ class ComicAmbientAudio private constructor(
             runCatching { release() }
         }
         player = null
+        // Unblock a streaming write before joining its producer.
+        runCatching { track?.pause(); track?.flush() }
         try {
             thread?.join(300)
         } catch (_: InterruptedException) {

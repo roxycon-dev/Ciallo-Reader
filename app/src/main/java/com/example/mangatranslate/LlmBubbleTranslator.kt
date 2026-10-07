@@ -10,6 +10,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
@@ -31,16 +32,30 @@ class LlmBubbleTranslator(private val context: Context) {
         val modelName: String,
         val geminiFormat: Boolean,
     ) {
-        fun isValid(): Boolean = apiUrl.isNotBlank() && modelName.isNotBlank()
+        fun isValid(): Boolean = apiUrl.trim().toHttpUrlOrNull() != null && modelName.isNotBlank()
     }
 
     data class Item(val id: Int, val text: String)
 
+    suspend fun testConnection(): String? = kotlinx.coroutines.withTimeoutOrNull(15_000) {
+        val cfg = loadConfig()
+        if (!cfg.isValid()) return@withTimeoutOrNull null
+        val start = android.os.SystemClock.elapsedRealtime()
+        val result = try { withContext(Dispatchers.IO) {
+            requestOnce(cfg, PROMPT_FALLBACK, listOf(Item(0, "Hello, how are you?")))
+        } }
+        catch (e: Exception) { kotlinx.coroutines.currentCoroutineContext().ensureActive(); null }
+        result?.get(0)?.takeIf(String::isNotBlank)?.let {
+            "连接成功 · ${android.os.SystemClock.elapsedRealtime() - start} ms · $it"
+        }
+    }
+
     private val client by lazy {
         com.example.source.SharedHttpTransport.builder()
-            .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(180, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .callTimeout(35, TimeUnit.SECONDS)
             .build()
     }
 
@@ -171,7 +186,14 @@ class LlmBubbleTranslator(private val context: Context) {
             .put("model", cfg.modelName)
             .put("messages", messages)
             .put("temperature", 0.2)
-        return "${cfg.apiUrl.trim()}/chat/completions" to body.toString()
+        return compatibleEndpoint(cfg.apiUrl) to body.toString()
+    }
+
+    internal fun compatibleEndpoint(apiUrl: String): String {
+        val base = apiUrl.trim().trimEnd('/').toHttpUrlOrNull()
+            ?: throw IllegalArgumentException("API 地址须以 http(s):// 开头")
+        if (base.encodedPath.endsWith("/chat/completions")) return base.toString()
+        return base.newBuilder().addPathSegments("chat/completions").build().toString()
     }
 
     private fun buildGemini(cfg: LlmConfig, prompt: String, userPayload: String): Pair<String, String> {
@@ -184,10 +206,13 @@ class LlmBubbleTranslator(private val context: Context) {
                 )
             )
         ).put("generationConfig", JSONObject().put("temperature", 0.2))
-        val base = cfg.apiUrl.trim().removePrefix("https://")
-        val host = base.substringBefore('/')
-        val path = base.substringAfter('/', "v1beta")
-        return "https://$host/$path/models/${cfg.modelName}:generateContent?key=${cfg.apiKey}" to body.toString()
+        val base = cfg.apiUrl.trim().trimEnd('/').toHttpUrlOrNull()
+            ?: throw IllegalArgumentException("API 地址须以 http(s):// 开头")
+        val endpoint = base.newBuilder()
+            .apply { if (base.encodedPath == "/") addPathSegment("v1beta") }
+            .addPathSegment("models").addPathSegment("${cfg.modelName}:generateContent")
+            .setQueryParameter("key", cfg.apiKey).build()
+        return endpoint.toString() to body.toString()
     }
 
     /**
@@ -236,7 +261,9 @@ class LlmBubbleTranslator(private val context: Context) {
             if (!o.has("id") || !o.has("translation")) return null
             val id = o.getInt("id")
             if (id in out) return null          // 重复 id → 判失败重试
-            out[id] = o.getString("translation")
+            val translation = o.optString("translation").trim()
+            if (translation.isBlank()) return null
+            out[id] = translation
         }
         if (out.keys.toSet() != want) return null   // 缺失/多余 id → 判失败重试
         val used = json.optJSONObject("glossary_used")

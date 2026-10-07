@@ -4,6 +4,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -99,6 +101,7 @@ internal fun PanelSectionCard(
         modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
+            .animateContentSize(tween(180))
             .clip(RoundedCornerShape(24.dp))
             .background(PanelCardBg)
             .border(0.5.dp, PanelCardStroke, RoundedCornerShape(24.dp))
@@ -178,16 +181,23 @@ internal fun PanelTabRow(
     }
 }
 
+/** Read-only status is text, never a switch that cannot be operated. */
+@Composable
+internal fun PanelHint(text: String) {
+    Text(text, color = TextSecondary, fontSize = 12.sp, lineHeight = 18.sp,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp))
+}
+
 /** A scrollable rail gives tablets enough room for all seven categories. */
 @Composable
 internal fun PanelTabRail(tabs: List<PanelTabData>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier.width(92.dp).verticalScroll(rememberScrollState()).selectableGroup(),
-        verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        verticalArrangement = Arrangement.spacedBy(4.dp)) {
         tabs.forEachIndexed { index, tab ->
             val active = index == selected
             val tint by animateColorAsState(if (active) selectedBg() else Color.Transparent, label = "railTint")
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(tint)
-                .selectable(active, role = Role.Tab) { onSelect(index) }.padding(vertical = 12.dp),
+                .selectable(active, role = Role.Tab) { onSelect(index) }.padding(vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(tab.icon, null, tint = if (active) MintPrimary else TextSecondary, modifier = Modifier.size(21.dp))
                 Spacer(Modifier.height(6.dp))
@@ -237,7 +247,10 @@ internal fun PanelSlider(
                 progressBarRangeInfo = ProgressBarRangeInfo(value, valueRange, steps)
                 setProgress { target ->
                     if (!enabled) false else {
-                        latestOnValueChange(target.coerceIn(valueRange)); latestOnValueChangeFinished(); true
+                        val fraction = ((target.coerceIn(valueRange) - valueRange.start) /
+                            (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
+                        latestOnValueChange(valueRange.start + snap(fraction) * (valueRange.endInclusive - valueRange.start))
+                        latestOnValueChangeFinished(); true
                     }
                 }
             }

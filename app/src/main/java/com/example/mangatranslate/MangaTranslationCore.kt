@@ -12,6 +12,7 @@ import android.text.StaticLayout
 import android.text.TextPaint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -43,7 +44,7 @@ data class TranslatedRegion(
     override fun equals(other: Any?): Boolean =
         other is TranslatedRegion && rect == other.rect && original == other.original &&
             translated == other.translated && lang == other.lang && vertical == other.vertical &&
-            contour?.contentEquals(other.contour) == true && lineRects == other.lineRects
+            (contour === other.contour || contour?.contentEquals(other.contour) == true) && lineRects == other.lineRects
     override fun hashCode(): Int = rect.hashCode() * 31 + translated.hashCode()
 }
 
@@ -740,7 +741,7 @@ class MangaPageTranslator(
  */
 class TranslationCoordinator(
     context: Context,
-    textTranslator: TextTranslator,
+    private val textTranslator: TextTranslator,
     private val llmTranslator: LlmBubbleTranslator,
 ) {
     private val appContext = context.applicationContext
@@ -755,6 +756,7 @@ class TranslationCoordinator(
     private val jobs = ConcurrentHashMap<String, Job>()
     private val translateMutex = PageMemoryBudget.gate
     private val bakedKeys = ConcurrentHashMap.newKeySet<String>()
+    @Volatile private var clearing = false
 
     /** 快速开关保护：release 后又来了新任务（重开翻译）时，待执行的会话关闭作废。 */
     @Volatile
@@ -781,14 +783,14 @@ class TranslationCoordinator(
         loadBase: suspend () -> Bitmap?,
         publishBaked: suspend (Bitmap) -> Unit,
     ) {
-        if (!translator.ocrReady) return
+        if (clearing || !translator.ocrReady) return
         if (bakedKeys.contains(cacheKey) || jobs.containsKey(cacheKey) || failedKeys.value.contains(cacheKey)) return
         releasePending = false // 新任务到达：翻译重新启用，作废挂起的会话关闭
         // 第十七轮：缓存 key 带引擎+源语言标识——切换引擎或"页面文字"语言后同页自动重译
         val engine = selectedEngine
         val modelTag = if(engine == "ai") llmTranslator.cacheFingerprint() else "transmart-v2"
         val enginePrefix = "$translationKey@$engine-${forcedLang ?: "auto"}-$modelTag-v2"
-        jobs[cacheKey] = scope.launch {
+        val job = scope.launch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
             val t0 = android.os.SystemClock.elapsedRealtime()
             try {
                 busyKeys.update { it + cacheKey }
@@ -803,6 +805,7 @@ class TranslationCoordinator(
                     TranslationCache.read(appContext, engineKey, base.width, base.height)
                         ?: (if (engine == "ai") translator.translatePage(base, forcedLang)
                             else translator.translatePageOnline(base, forcedLang)).also {
+                            kotlinx.coroutines.currentCoroutineContext().ensureActive()
                             if (it.hasUsableText && it.regions.all { region -> region.translated.isNotBlank() })
                                 TranslationCache.write(appContext, engineKey, it)
                         }
@@ -822,6 +825,7 @@ class TranslationCoordinator(
                     textScale,
                 )
                 val t3 = android.os.SystemClock.elapsedRealtime()
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
                 bakedKeys.add(cacheKey)
                 if (translation.regions.any { it.translated.isBlank() }) failedKeys.update { it + cacheKey }
                 publishBaked(baked)
@@ -841,10 +845,11 @@ class TranslationCoordinator(
                 // 单页失败静默（保留原文）；下次进入该页会重试
                 android.util.Log.w("MTPerf", "page=${cacheKey.take(40)} engine=$selectedEngine FAIL ${e.javaClass.simpleName}: ${e.message?.take(120)} elapsed=${android.os.SystemClock.elapsedRealtime() - t0}ms")
             } finally {
-                busyKeys.update { it - cacheKey }
-                jobs.remove(cacheKey)
+                if (jobs.remove(cacheKey, kotlinx.coroutines.currentCoroutineContext()[Job]))
+                    busyKeys.update { it - cacheKey }
             }
         }
+        if (jobs.putIfAbsent(cacheKey, job) == null) job.start() else job.cancel()
     }
 
     /** 字号缩放变化：清烘焙标记（缓存 JSON 仍有效，重烘焙很快）。 */
@@ -876,6 +881,19 @@ class TranslationCoordinator(
         jobs.values.forEach { it.cancel() }
         jobs.clear()
         busyKeys.value = emptySet()
+    }
+
+    fun clearTextCache() { textTranslator.close() }
+
+    /** Wait for native OCR to finish before clearing the cache it can still publish into. */
+    suspend fun cancelAllAndJoin() {
+        clearing = true
+        try {
+            val pending = jobs.values.toList()
+            pending.forEach { it.cancel() }
+            pending.forEach { it.join() }
+            busyKeys.value = emptySet()
+        } finally { clearing = false }
     }
 
     /**

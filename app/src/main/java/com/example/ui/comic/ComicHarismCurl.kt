@@ -94,6 +94,16 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
      * 由 Compose 侧打开缩放覆盖层（本视图不再参与该手势余下事件）。
      */
     var onZoomGesture: (() -> Unit)? = null
+    var onZoomStart: ((String, Float, Float) -> Unit)? = null
+    var onZoomMotion: ((MotionEvent) -> Unit)? = null
+    var onZoomEnd: (() -> Unit)? = null
+    var edgeSwipeEnabled = false
+    var onEdgeBack: (() -> Unit)? = null
+    private var edgeClosing = false
+    private fun beginZoom(kind: String, x: Float, y: Float) {
+        onZoomStart?.invoke(kind, x, y)
+        onZoomGesture?.invoke()
+    }
 
     /** 双击放大开关（第 17 条：随设置实时更新） */
     var doubleTapZoomEnabled = false
@@ -120,6 +130,8 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
     var autoFlipping = false
 
     private var downTime = 0L
+    var isTouchActive: Boolean = false
+        private set
     private var downX = 0f
     private var downY = 0f
     private var dragForwarded = false
@@ -172,6 +184,10 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
         syntheticDownTime = 0L
     }
     override fun onPause() {
+        isTouchActive = false
+        pendingQuickTap?.let { removeCallbacks(it) }
+        pendingQuickTap = null
+        removeCallbacks(longPressRunnable)
         cancelAutoFlip()
         super.onPause()
     }
@@ -186,7 +202,7 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
     private val longPressRunnable = Runnable {
         if (!dragForwarded && !autoFlipping) {
             longPressFired = true
-            if (longPressZoomEnabled) onZoomGesture?.invoke()
+            if (longPressZoomEnabled) beginZoom("hold", downX, downY)
             else if (longPressPanelEnabled) onLongPress?.invoke(downX, downY)
         }
     }
@@ -275,15 +291,17 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
         }
         // 双指手势激活后：吞掉余下事件直到全部抬起
         if (multiTouch) {
+            onZoomMotion?.invoke(me)
             if (me.actionMasked == MotionEvent.ACTION_UP ||
                 me.actionMasked == MotionEvent.ACTION_CANCEL
             ) {
-                if (me.pointerCount <= 1) multiTouch = false
+                if (me.pointerCount <= 1) { multiTouch = false; isTouchActive = false; onZoomEnd?.invoke() }
             }
             return true
         }
         when (me.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                isTouchActive = true
                 pendingQuickTap?.let { view.removeCallbacks(it) }
                 if (com.example.BuildConfig.DEBUG) {
                     android.util.Log.d(
@@ -302,6 +320,7 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                 startedAtForwardEdge = !isAnimating() && isAtForwardEdge?.invoke() == true
                 startedAtBackwardEdge = !isAnimating() && isAtBackwardEdge?.invoke() == true
                 longPressFired = false
+                edgeClosing = false
                 // 双击窗口内的第二击：直接进缩放，不再走点按/拖拽
                 if (doubleTapZoomEnabled &&
                     lastQuickTapAt > 0L &&
@@ -312,7 +331,7 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                     pendingQuickTap?.let { view.removeCallbacks(it) }
                     lastQuickTapAt = 0L
                     if (com.example.BuildConfig.DEBUG) android.util.Log.d("CURLDBG", "double-tap -> zoom")
-                    onZoomGesture?.invoke()
+                    beginZoom("double", me.x, me.y)
                     return true
                 }
                 doubleTapActive = false
@@ -338,14 +357,27 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                     chapterEdgeActive = false
                     multiTouch = true
                     longPressFired = false
-                    onZoomGesture?.invoke()
+                    beginZoom("pinch", (me.getX(0) + me.getX(1)) / 2f, (me.getY(0) + me.getY(1)) / 2f)
+                    onZoomMotion?.invoke(me)
                 }
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
                 velocityTracker?.addMovement(me)
                 touchTravel = max(touchTravel, hypot(me.x - downX, me.y - downY))
-                if (doubleTapActive) return true
+                if (doubleTapActive || longPressFired && longPressZoomEnabled) {
+                    onZoomMotion?.invoke(me)
+                    return true
+                }
+                val edgePx = 24f * resources.displayMetrics.density
+                val inward = if (downX <= edgePx) me.x - downX else downX - me.x
+                if (edgeSwipeEnabled && !dragForwarded &&
+                    (downX <= edgePx || downX >= width - edgePx) && inward > slopPx &&
+                    inward > abs(me.y - downY) * 1.5f) {
+                    edgeClosing = true
+                    view.removeCallbacks(longPressRunnable)
+                }
+                if (edgeClosing) return true
                 if (chapterEdgeActive) {
                     return true
                 }
@@ -382,12 +414,20 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                isTouchActive = false
                 velocityTracker?.addMovement(me)
                 velocityTracker?.computeCurrentVelocity(1000)
                 val releaseVelocity = velocityTracker?.xVelocity ?: 0f
                 velocityTracker?.recycle()
                 velocityTracker = null
                 view.removeCallbacks(longPressRunnable)
+                if (edgeClosing) {
+                    edgeClosing = false
+                    if (me.actionMasked == MotionEvent.ACTION_UP && abs(me.x - downX) > 64f * resources.displayMetrics.density)
+                        onEdgeBack?.invoke()
+                    return true
+                }
+                if (longPressFired && longPressZoomEnabled) { onZoomEnd?.invoke(); return true }
                 if (chapterEdgeActive) {
                     chapterEdgeActive = false
                     if (me.actionMasked == MotionEvent.ACTION_UP) {
@@ -405,6 +445,7 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                 }
                 if (doubleTapActive) {
                     doubleTapActive = false
+                    onZoomEnd?.invoke()
                     return true
                 }
                 if (!dragForwarded) {
@@ -450,7 +491,7 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
      * 的松手动画完成翻页并触发 onSettledIndex。
      */
     fun startAutoFlip(fromLeft: Boolean, done: () -> Unit) {
-        if (autoFlipping || isAnimating() || dragForwarded) return
+        if (autoFlipping || isAnimating() || dragForwarded || isTouchActive) return
         autoFlipping = true
         syntheticDrag = true
         val w = width.toFloat()
@@ -588,6 +629,46 @@ internal class ComicHarismController {
     @Synchronized
     fun getCache(key: String): Bitmap? = slotCache[key]
 
+    /** A zoom snapshot contains book pixels only, with the same geometry as the visible spread. */
+    fun zoomSource(spreadIndex: Int, width: Int, height: Int): Pair<Bitmap, Size>? {
+        val cfg = config ?: return null
+        val spread = layout?.spreads?.getOrNull(spreadIndex) ?: return null
+        val sources = spread.slots.mapNotNull { slot ->
+            getCache(slotCacheKey(slot, cfg, bookState))?.let(::softenForSoftware)
+        }
+        if (sources.size != spread.slots.size || sources.isEmpty()) return null
+        val container = Size(width.toFloat(), height.toFloat())
+        if (sources.size == 1) {
+            val src = sources.first()
+            return src to fittedSize(Size(src.width.toFloat(), src.height.toFloat()), container,
+                cfg.fit, cfg.customFitScale, cfg.customFitBase)
+        }
+        val gap = cfg.doubleGapDp * density
+        val ordered = if (cfg.direction == ComicDirection.RTL) sources.reversed() else sources
+        val pageContainer = Size(((width - gap) / 2f).coerceAtLeast(1f), height.toFloat())
+        val sizes = ordered.map { fittedSize(Size(it.width.toFloat(), it.height.toFloat()), pageContainer,
+            cfg.fit, cfg.customFitScale, cfg.customFitBase) }
+        val content = Size(sizes.sumOf { it.width.toDouble() }.toFloat() + gap, sizes.maxOf { it.height })
+        val downsample = min(1f, 2400f / max(content.width, content.height))
+        val out = Bitmap.createBitmap(max(1, (content.width * downsample).toInt()),
+            max(1, (content.height * downsample).toInt()), Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
+        canvas.scale(downsample, downsample)
+        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+        var x = 0f
+        ordered.forEachIndexed { index, src ->
+            val size = sizes[index]
+            val top = when (cfg.doubleAlign) {
+                ComicDoubleAlign.TOP -> 0f
+                ComicDoubleAlign.BOTTOM -> content.height - size.height
+                else -> (content.height - size.height) / 2f
+            }
+            canvas.drawBitmap(src, null, RectF(x, top, x + size.width, top + size.height), paint)
+            x += size.width + gap
+        }
+        return out to content
+    }
+
     @Synchronized
     private fun knownSize(key: String): Size? = knownSizes[key]
 
@@ -710,7 +791,8 @@ internal class ComicHarismController {
         var fitExtra = 1f
         if (cfg.fit == ComicFit.CUSTOM) {
             effFit = if (cfg.customFitBase == ComicFit.CUSTOM) ComicFit.FIT_PAGE else cfg.customFitBase
-            fitExtra = cfg.customFitScale
+            // The physical page rect already includes custom scaling.
+            fitExtra = 1f
         }
         val paint = Paint().apply { isFilterBitmap = true }
         drawSpreadFit(canvas, srcs, bw.toFloat(), bh.toFloat(), gap, effFit, cfg.doubleAlign, paint, shiftXPx, shiftYPx, fitExtra)
@@ -770,7 +852,7 @@ internal class ComicHarismController {
         var fitExtra = 1f
         if (cfg.fit == ComicFit.CUSTOM) {
             effFit = if (cfg.customFitBase == ComicFit.CUSTOM) ComicFit.FIT_PAGE else cfg.customFitBase
-            fitExtra = cfg.customFitScale
+            fitExtra = 1f
         }
         drawSpreadFit(canvas, listOf(src), bw.toFloat(), bh.toFloat(), 0f, effFit, cfg.doubleAlign, paint, 0f, 0f, fitExtra)
         return bmp
@@ -980,8 +1062,8 @@ internal fun curlPageRects(
         val availW = (containerW - gapPx) / 2f
         fun fitOne(sz: Size?): Size? {
             if (sz == null || sz.width <= 0f || sz.height <= 0f) return null
-            val s = min(availW / sz.width, containerH / sz.height)
-            return Size(sz.width * s, sz.height * s)
+            return fittedSize(sz, Size(availW.coerceAtLeast(1f), containerH), config.fit,
+                config.customFitScale, config.customFitBase)
         }
         // 展示位（与 DoubleSpreadContent 同构）：LTR [s0 左, s1 右]；RTL [s1 左, s0 右]
         val leftSlot = (if (rtl) slots.getOrNull(1) else slots.getOrNull(0))
@@ -1128,6 +1210,20 @@ internal fun ComicHarismCurlReader(
     val controller = remember { ComicHarismController() }
     // 第 17 条：缩放覆盖层（双击/长按/双指触发）
     var zoomOverlay by remember { mutableStateOf(false) }
+    val curlZoom = remember { ComicZoomState() }
+    var zoomSource by remember { mutableStateOf<Pair<Bitmap, Size>?>(null) }
+    val zoomScope = androidx.compose.runtime.rememberCoroutineScope()
+    var zoomKind by remember { mutableStateOf("") }
+    val zoomTouch = remember { floatArrayOf(0f, 0f, 0f, 1f) }
+    androidx.activity.compose.BackHandler(enabled = zoomOverlay) { zoomOverlay = false }
+    LaunchedEffect(zoomOverlay, currentSpread, layout) {
+        if (!zoomOverlay) { zoomSource = null; return@LaunchedEffect }
+        while (zoomSource == null) {
+            val view = controller.view ?: break
+            zoomSource = controller.zoomSource(currentSpread, view.width, view.height)
+            if (zoomSource == null) delay(120)
+        }
+    }
     // 当前 spread 纹理未就绪（慢网络）：GL 纸面只有静止点环（harism 无逐帧重绘通道），
     // Compose 层叠加与书库搜索同款的动画 ChasingDots —— 纹理就绪即刻撤下
     var curlPageLoading by remember { mutableStateOf(false) }
@@ -1360,8 +1456,8 @@ internal fun ComicHarismCurlReader(
     }
 
     /* ── 自动翻页（while 循环驱动：翻页成功不改 key 也能继续下一轮，避免冻结） ── */
-    if (autoRead && n > 0) {
-        LaunchedEffect(autoRead, autoIntervalSec) {
+    if (autoRead && n > 0 && !zoomOverlay) {
+        LaunchedEffect(autoRead, autoIntervalSec, currentSpread, n) {
             while (isActive) {
                 delay((autoIntervalSec * 1000).toLong())
                 if (latestCurrent < n - 1) {
@@ -1462,11 +1558,53 @@ internal fun ComicHarismCurlReader(
                         latestCallbacks.onTapZone(Offset(x, y), Size(width.toFloat(), height.toFloat()))
                     }
                     onLongPress = { x, y -> latestCallbacks.onLongPress(Offset(x, y)) }
-                    onZoomGesture = { zoomOverlay = true }
+                    onZoomStart = { kind, x, y ->
+                        curlZoom.releaseJob?.cancel()
+                        curlZoom.scale = 1f; curlZoom.offsetX = 0f; curlZoom.offsetY = 0f
+                        curlZoom.containerSize = Size(width.toFloat(), height.toFloat())
+                        zoomSource = controller.zoomSource(latestCurrent, width, height)
+                        curlZoom.contentSize = zoomSource?.second ?: curlZoom.containerSize
+                        zoomKind = kind
+                        zoomTouch[0] = x; zoomTouch[1] = y; zoomTouch[2] = 0f; zoomTouch[3] = 1f
+                        zoomOverlay = true
+                        if (kind != "pinch") curlZoom.snapZoomTo(2.5f, Offset(x, y))
+                    }
+                    onZoomMotion = { event ->
+                        val point = if (event.pointerCount >= 2)
+                            Offset((event.getX(0) + event.getX(1)) / 2f, (event.getY(0) + event.getY(1)) / 2f)
+                            else Offset(event.x, event.y)
+                        val previous = Offset(zoomTouch[0], zoomTouch[1])
+                        if (zoomKind == "pinch" && event.pointerCount >= 2) {
+                            val distance = hypot(event.getX(0) - event.getX(1), event.getY(0) - event.getY(1))
+                            if (event.actionMasked == MotionEvent.ACTION_MOVE && zoomTouch[2] > 0f) {
+                                val ratio = distance / zoomTouch[2]
+                                zoomTouch[3] *= ratio
+                                curlZoom.updateTransform(ratio, point - previous, point)
+                                if (latestConfig.gesturePinchClose && zoomTouch[3] < 0.62f) {
+                                    zoomOverlay = false
+                                    latestCallbacks.onPinchClose()
+                                }
+                            }
+                            zoomTouch[2] = distance
+                        } else if (event.actionMasked == MotionEvent.ACTION_MOVE) {
+                            if (zoomKind == "double")
+                                curlZoom.updateTransform((1f + (point.y - previous.y) * 0.004f).coerceAtLeast(0.5f), Offset.Zero, point)
+                            else curlZoom.panBy(point - previous)
+                        }
+                        zoomTouch[0] = point.x; zoomTouch[1] = point.y
+                    }
+                    onZoomEnd = {
+                        val temporary = zoomKind == "hold"
+                        curlZoom.releaseJob = zoomScope.launch {
+                            if (temporary) { curlZoom.animateReset(); zoomOverlay = false }
+                            else curlZoom.settle()
+                        }
+                    }
+                    onEdgeBack = { latestCallbacks.onEdgeBack() }
                     onSettledIndex = { h ->
                         val our = controller.toOur(h)
                         if (com.example.BuildConfig.DEBUG) android.util.Log.d("CURLDBG", "settled h=$h -> our=$our (twoPage=${controller.twoPage} reversed=${controller.reversed})")
-                        if (our in 0 until n && our != latestCurrent) latestOnSpread(our)
+                        if (our in 0 until latestLayout.spreadCount && our != latestCurrent) latestOnSpread(our)
                     }
                 }
             },
@@ -1475,6 +1613,7 @@ internal fun ComicHarismCurlReader(
                 v.doubleTapZoomEnabled = latestConfig.doubleTapZoom
                 v.longPressZoomEnabled = latestConfig.longPressZoom
                 v.longPressPanelEnabled = latestConfig.gestureLongPressPanel
+                v.edgeSwipeEnabled = latestConfig.gestureEdgeSwipe
                 v.setSpreadStep(if (twoPageMode) 2 else 1)
                 v.forwardSign = if (rtl) 1f else -1f
                 v.isAtForwardEdge = { latestCurrent >= latestLayout.spreadCount - 1 }
@@ -1509,16 +1648,13 @@ internal fun ComicHarismCurlReader(
             }
         }
         if (zoomOverlay) {
-            val v = controller.view
-            val bmp = remember(zoomOverlay, currentSpread, layout) {
-                if (v != null && v.width > 0) {
-                    val hIdx = controller.toHarism(currentSpread)
-                    controller.composeSpread(hIdx, v.width, v.height, mirrorForRenderer = false)
-                } else null
-            }
             ComicCurlZoomOverlay(
-                bitmap = bmp,
+                bitmap = zoomSource?.first,
+                contentSize = zoomSource?.second,
                 config = config,
+                zoomState = curlZoom,
+                readerCallbacks = latestCallbacks,
+                dynamicBackground = dynamicBgColor,
                 onDismiss = { zoomOverlay = false },
             )
         }
@@ -1533,14 +1669,16 @@ internal fun ComicHarismCurlReader(
 @Composable
 private fun ComicCurlZoomOverlay(
     bitmap: Bitmap?,
+    contentSize: Size?,
     config: ComicReaderConfig,
+    zoomState: ComicZoomState,
+    readerCallbacks: ComicGestureCallbacks,
+    dynamicBackground: Color?,
     onDismiss: () -> Unit,
 ) {
-    val zoomState = remember { ComicZoomState() }
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .background(Color(0xE6000000))
     ) {
         val density = androidx.compose.ui.platform.LocalDensity.current
         val container = Size(maxWidth.value * density.density, maxHeight.value * density.density)
@@ -1548,15 +1686,17 @@ private fun ComicCurlZoomOverlay(
             if (bitmap != null) {
                 val intrinsic = Size(bitmap.width.toFloat(), bitmap.height.toFloat())
                 zoomState.containerSize = container
-                zoomState.contentSize = fittedSize(intrinsic, container, config.fit, config.customFitScale, config.customFitBase)
+                zoomState.contentSize = contentSize ?: fittedSize(intrinsic, container, config.fit, config.customFitScale, config.customFitBase)
                 zoomState.intrinsicSize = intrinsic
             }
         }
+        ComicReaderBackground(config.bgType, config.paperIntensity, dynamicBackground)
         val callbacks = ComicGestureCallbacks(
-            onTapZone = { _, _ -> if (!zoomState.isZoomed) onDismiss() },
-            onLongPress = { },
-            onPinchClose = { onDismiss() },
-            onEdgeBack = { onDismiss() },
+            onTapZone = { position, size -> if (!zoomState.isZoomed) onDismiss() else readerCallbacks.onTapZone(position, size) },
+            onLongPress = readerCallbacks.onLongPress,
+            onPinchClose = readerCallbacks.onPinchClose,
+            onEdgeBack = readerCallbacks.onEdgeBack,
+            onZoomedEdgeSwipe = { direction -> readerCallbacks.onZoomedEdgeSwipe?.invoke(direction); onDismiss() },
         )
         Box(
             Modifier
@@ -1581,7 +1721,7 @@ private fun ComicCurlZoomOverlay(
             }
         }
         Text(
-            "双指缩放 · 双击切换档位 · 单击退出",
+            "双指缩放 · 双击切换档位 · 缩回适配后点按返回",
             color = Color(0xAAFFFFFF),
             fontSize = 11.sp,
             modifier = Modifier

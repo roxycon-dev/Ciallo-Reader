@@ -50,7 +50,7 @@ object ComicReaderBackgrounds {
     private fun generatePaper(key: Int): ImageBitmap {
         val size = 256
         val base = intArrayOf(0xFFF3ECDF.toInt(), 0xFFF1E9DB.toInt())
-        val amp = 2 + key * 9 / 20
+        val amp = if (key == 0) 0 else 2 + key * 9 / 20
         val pixels = IntArray(size * size)
         val rnd = java.util.Random(20260828L)
         var noise = 0
@@ -59,7 +59,7 @@ object ComicReaderBackgrounds {
             val n = (noise and 0xFF) - 128
             // 横向纤维：x 相关微扰
             val fiber = ((i % size) % 37 - 18) / 6
-            val c = base[abs(i / size) % 2]
+            val c = base[if (key == 0) 0 else abs(i / size) % 2]
             val r = (((c shr 16) and 0xFF) + n * amp / 128 + fiber * amp / 24).coerceIn(0, 255)
             val g = (((c shr 8) and 0xFF) + n * amp / 128 + fiber * amp / 26).coerceIn(0, 255)
             val b = ((c and 0xFF) + n * amp / 132 + fiber * amp / 28).coerceIn(0, 255)

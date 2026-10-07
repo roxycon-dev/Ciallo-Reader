@@ -103,6 +103,42 @@ data class ComicReaderConfig(
     /** 翻译引擎（第十八轮二级导航显式选择）：ai=自定义接口 / online=在线翻译 */
     val translationEngine: String = "online",
 ) {
+    /** Repair imported/old settings before they reach layout or native rendering. */
+    fun normalized(): ComicReaderConfig {
+        fun Float.bounded(low: Float, high: Float, fallback: Float): Float =
+            if (isFinite()) coerceIn(low, high) else fallback
+        val crop = manualCrop?.takeIf { it.size == 4 && it.all(Float::isFinite) }?.let {
+            val l = it[0].coerceIn(0f, 0.95f)
+            val t = it[1].coerceIn(0f, 0.95f)
+            val r = it[2].coerceIn(0f, 1f)
+            val b = it[3].coerceIn(0f, 1f)
+            if (r - l >= 0.05f - 0.00001f && b - t >= 0.05f - 0.00001f) listOf(l, t, r, b) else null
+        }
+        return copy(
+            customFitBase = customFitBase.takeUnless { it == ComicFit.CUSTOM } ?: ComicFit.FIT_PAGE,
+            customFitScale = customFitScale.bounded(0.5f, 2.5f, 1f),
+            pageSpacingDp = pageSpacingDp.bounded(0f, 40f, 8f),
+            doubleGapDp = doubleGapDp.bounded(0f, 40f, 8f),
+            doubleShiftXDp = doubleShiftXDp.bounded(-40f, 40f, 0f),
+            doubleShiftYDp = doubleShiftYDp.bounded(-40f, 40f, 0f),
+            bookRotation = Math.floorMod(bookRotation / 90, 4) * 90,
+            manualCrop = crop, splitPosition = splitPosition.bounded(0.3f, 0.7f, 0.5f),
+            enhanceStrength = enhanceStrength.coerceIn(0, 100),
+            filterBrightness = filterBrightness.coerceIn(-100, 100),
+            filterContrast = filterContrast.coerceIn(-100, 100),
+            filterSaturation = filterSaturation.coerceIn(-100, 100),
+            filterHue = filterHue.coerceIn(-180, 180),
+            filterGamma = filterGamma.bounded(0.5f, 2.2f, 1f),
+            filterSharpen = filterSharpen.coerceIn(0, 100), filterShadow = filterShadow.coerceIn(-100, 100),
+            paperIntensity = paperIntensity.coerceIn(0, 100), sceneVolume = sceneVolume.coerceIn(0, 100),
+            autoPageIntervalSec = autoPageIntervalSec.bounded(1f, 120f, 6f),
+            autoScrollSpeedDp = autoScrollSpeedDp.bounded(5f, 400f, 40f),
+            translationTextScale = translationTextScale.bounded(0.8f, 1.4f, 1f),
+            translationLang = translationLang.takeIf { it in setOf("auto", "ja", "en", "ko") } ?: "auto",
+            translationEngine = translationEngine.takeIf { it in setOf("ai", "online") } ?: "online",
+        )
+    }
+
     fun toJson(): JSONObject = JSONObject().apply {
         put("mode", mode.name)
         put("direction", direction.name)
@@ -234,7 +270,7 @@ data class ComicReaderConfig(
                 translationTextScale = json.optDouble("translationTextScale", 1.0).toFloat().coerceIn(0.8f, 1.4f),
                 translationEngine = json.optString("translationEngine", "online")
                     .takeIf { it in setOf("ai", "online") } ?: "online",
-            )
+            ).normalized()
         }
     }
 }
@@ -322,6 +358,13 @@ data class ComicBookState(
     /** 临时合页：以该页为左页与下一页组成跨页（显示层行为） */
     val mergeAnchors: Set<Int> = emptySet(),
 ) {
+    /** Both the toolbar and settings use one non-overlapping merge rule. */
+    fun toggleMerge(rawIndex: Int, pageCount: Int): ComicBookState {
+        if (rawIndex in mergeAnchors) return copy(mergeAnchors = mergeAnchors - rawIndex)
+        if (rawIndex !in 0 until (pageCount - 1).coerceAtLeast(0)) return this
+        return copy(mergeAnchors = (mergeAnchors - (rawIndex - 1) - (rawIndex + 1)) + rawIndex)
+    }
+
     fun toJson(): JSONObject = JSONObject().apply {
         put("lastPage", lastPage)
         lastChapterSig?.let { put("lastChapterSig", it) }
