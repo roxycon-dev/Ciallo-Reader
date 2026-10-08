@@ -30,6 +30,9 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.withTimeoutOrNull
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -44,6 +47,8 @@ class ComicPageLoader(
     /** 在线漫画专用加载器（解密/headers 代理），null 时用全局默认 */
     private val remoteImageLoader: ImageLoader? = null,
 ) {
+    init { ComicNeuralBackend.configure(context) }
+
     companion object {
         /** 解码/处理长边上限 */
         const val DECODE_MAX_EDGE = 2800
@@ -171,14 +176,22 @@ class ComicPageLoader(
     private var pinnedBytes = 0L
     private val windowKeys = LinkedHashSet<String>()       // 迭代序 = 窗口优先级（高→低）
 
-    class PageLoadResult(val bitmap: Bitmap, val fromCache: Boolean)
+    class PageLoadResult(val bitmap: Bitmap, val fromCache: Boolean, val error: Throwable? = null)
 
     /** All renderer modes share visible-page priority, Wi-Fi policy and preload limits. */
     suspend fun loadForDisplay(
         ref: ComicPageRef, cacheKey: String, geo: ComicImagePipeline.Geometry,
         tone: ComicImagePipeline.Toning, visible: Boolean,
     ): PageLoadResult {
-        if (visible) return load(ref, cacheKey, geo, tone)
+        if (visible) return try {
+            comicDisplayLoadWithTimeout { load(ref, cacheKey, geo, tone) }
+        } catch (error: IOException) {
+            // Our own deadline cancels load internally; still release foreground priority
+            // so neighbors cannot wait forever for an already failed visible request.
+            terminalLoads.put(cacheKey, false)
+            availabilityEpoch.update { it + 1 }
+            throw error
+        }
         cachedOrPinned(cacheKey)?.let { return PageLoadResult(it, true) }
         if (ref is ComicPageRef.Remote && appPrefs.preloadWifiOnly && !wifiConnectedOrUnmetered()) {
             // Promotion to a visible page restarts its producer and bypasses this wait.
@@ -368,15 +381,15 @@ class ComicPageLoader(
             // 原图冒充该档结果被永久缓存，之后"关了再开/切任何档位"都命中同一张原图，
             // 表现为"无论怎么切换档位画面都没有区别"。失败结果只保显示、不驻留。
             var failedFallback = false
+            var processingError: Throwable? = null
             val bitmap = mutex.withLock {
                 cachedOrPinned(cacheKey) ?: run {
                     // 磁盘持久化命中（仅重管线档）：免解码+免推理直接用，
                     // 并回填内存 LRU（下次内存路径直达）
                     if (ComicProcessedDiskCache.eligible(tone.enhanceMode)) {
                         withContext(Dispatchers.IO) { diskCache.read(cacheKey) }?.let { fromDisk ->
-                            if (!sizeMap.containsKey(ref.id)) {
-                                putSize(ref.id, SizeI(fromDisk.width, fromDisk.height))
-                            }
+                            // Processed dimensions may be enlarged, cropped or half a spread.
+                            // They must never masquerade as the original file's dimensions.
                             cache.put(cacheKey, fromDisk)
                             return@run fromDisk
                         }
@@ -428,7 +441,7 @@ class ComicPageLoader(
                     val didWork = ComicImagePipeline.hasWork(geo, tone)
                     // One download. Publish a correctly cropped/rotated readable preview before
                     // waiting for expensive enhancement. It never enters the final-result cache.
-                    if (ref is ComicPageRef.Remote && ComicImagePipeline.toningHasWork(tone)) {
+                    if (ComicImagePipeline.toningHasWork(tone)) {
                         try {
                             val preview = ComicImagePipeline.process(capEdge(raw, 960), geo, ComicImagePipeline.Toning())
                             readingPreviews.put(cacheKey, preview)
@@ -436,6 +449,7 @@ class ComicPageLoader(
                         } catch (ce: CancellationException) {
                             throw ce
                         } catch (_: Exception) { /* Preview failure does not block the full page. */ }
+                        catch (_: OutOfMemoryError) { /* Skip the optional preview allocation. */ }
                     }
                     currentCoroutineContext().ensureActive()
                     var processed: Bitmap? = null
@@ -446,10 +460,21 @@ class ComicPageLoader(
                         // 直接复用 Toning.hasWork()——手抄字段集会在 Toning
                         // 新增调色字段时漂移成"有调色不进闸门"回归
                         val heavy = ComicImagePipeline.toningHasWork(tone)
+                        suspend fun process(): Bitmap? = try {
+                            runInterruptible { ComicImagePipeline.process(raw, geo, tone) }
+                        } catch (ce: CancellationException) {
+                            throw ce
+                        } catch (error: Exception) {
+                            processingError = error
+                            null
+                        } catch (error: OutOfMemoryError) {
+                            processingError = error
+                            null
+                        }
                         processed = if (heavy) pixelOpGate.withPermit {
-                            runCatching { ComicImagePipeline.process(raw, geo, tone) }.getOrNull()
+                            process()
                         } else {
-                            runCatching { ComicImagePipeline.process(raw, geo, tone) }.getOrNull()
+                            process()
                         }
                     }
                     if (processed != null) {
@@ -470,7 +495,8 @@ class ComicPageLoader(
                     } else {
                         // 处理失败（真异常）：显示原图、不缓存、不驻留（下次进入自动重试管线）
                         failedFallback = true
-                        raw
+                        // Preserve the page's crop/split/rotation when enhancement fails.
+                        ComicImagePipeline.process(raw, geo, ComicImagePipeline.Toning())
                     }
                 }
             }
@@ -478,7 +504,11 @@ class ComicPageLoader(
             cacheDbg { "put key=$cacheKey bytes=${bitmap.byteCount} max=${cache.maxSize()}" }
             if (!failedFallback) pinIfWindowed(cacheKey, bitmap)
             finished = true
-            PageLoadResult(bitmap, false)
+            PageLoadResult(bitmap, false, processingError)
+        } catch (error: OutOfMemoryError) {
+            // Includes decode, preview and geometry fallback allocations. UI must receive
+            // a terminal/retryable error even when no enhanced bitmap could be allocated.
+            throw IOException("图片处理内存不足，请重试或关闭画质增强", error)
         } finally {
             if (finished || currentCoroutineContext().isActive) terminalLoads.put(cacheKey, finished)
             availabilityEpoch.update { it + 1 }
@@ -819,15 +849,10 @@ class ComicPageLoader(
             short = short * DECODE_MAX_EDGE / long
             long = DECODE_MAX_EDGE.toLong()
         }
-        val x2 = when (enhanceMode) {
-            ComicEnhanceMode.ANIME4K, ComicEnhanceMode.WAIFU2X -> long < 2400
-            ComicEnhanceMode.SUPER_RES -> long <= 1800
-            else -> false
-        }
-        if (x2 && long < ComicImagePipeline.MAX_EDGE) {
-            val nl = minOf(long * 2, ComicImagePipeline.MAX_EDGE.toLong())
-            short = short * nl / long
-            long = nl
+        if (enhanceMode == ComicEnhanceMode.WAIFU2X || enhanceMode == ComicEnhanceMode.SUPER_RES) {
+            val target = ComicEdgeUpscaler.targetSize(long.toInt(), short.toInt().coerceAtLeast(1))
+            long = target.first.toLong()
+            short = target.second.toLong()
         }
         return long * short * 4L
     }
@@ -963,3 +988,10 @@ class ComicPageLoader(
         }
     }
 }
+
+/** A stalled source or enhancement must eventually become a retryable terminal state. */
+internal suspend fun <T : Any> comicDisplayLoadWithTimeout(
+    timeoutMillis: Long = 90_000,
+    block: suspend () -> T,
+): T = withTimeoutOrNull(timeoutMillis) { block() }
+    ?: throw IOException("图片加载或画质增强超时，请重试")

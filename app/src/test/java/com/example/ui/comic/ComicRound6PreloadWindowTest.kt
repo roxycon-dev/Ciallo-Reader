@@ -66,17 +66,16 @@ class ComicRound6PreloadWindowTest {
     }
 
     @Test
-    fun `估算-低分辨率页2x档与2400自适应边界`() {
-        // WAIFU2X：1200×1600（长边<2400）→ ×2 = 2400×3200
-        assertEquals(3200L * 2400L * 4, ComicPageLoader(context).estimateProcessedBytes(1200, 1600, ComicEnhanceMode.WAIFU2X))
-        // WAIFU2X：2800×2000（长边≥2400，2x 无增益不放大）→ 原尺寸
-        assertEquals(2800L * 2000L * 4, ComicPageLoader(context).estimateProcessedBytes(2800, 2000, ComicEnhanceMode.WAIFU2X))
-        // ANIME4K 与 WAIFU2X 同为 <2400 → 2x
-        assertEquals(3200L * 2400L * 4, ComicPageLoader(context).estimateProcessedBytes(1200, 1600, ComicEnhanceMode.ANIME4K))
-        // SUPER_RES：≤1800 才 2x（1800×1200 → nl=3200, short=1200*3200/1800=2133）
-        assertEquals(3200L * 2133L * 4, ComicPageLoader(context).estimateProcessedBytes(1200, 1800, ComicEnhanceMode.SUPER_RES))
-        // SUPER_RES：1800 以上不放大
-        assertEquals(1801L * 1200L * 4, ComicPageLoader(context).estimateProcessedBytes(1801, 1200, ComicEnhanceMode.SUPER_RES))
+    fun `估算-各档与实际输出预算一致且不低估大图`() {
+        val loader = ComicPageLoader(context)
+        for (mode in ComicEnhanceMode.entries) for ((w, h) in listOf(600 to 900, 1200 to 1600, 1200 to 1800, 1801 to 1200, 2800 to 2000)) {
+            val (tw, th) = if (mode == ComicEnhanceMode.WAIFU2X || mode == ComicEnhanceMode.SUPER_RES)
+                ComicEdgeUpscaler.targetSize(w, h) else w to h
+            assertEquals("$mode at ${w}x$h", tw.toLong() * th * 4, loader.estimateProcessedBytes(w, h, mode))
+        }
+        assertEquals(600L * 900 * 16, loader.estimateProcessedBytes(600, 900, ComicEnhanceMode.SUPER_RES))
+        assertEquals(2800L * 2000 * 4, loader.estimateProcessedBytes(2800, 2000, ComicEnhanceMode.WAIFU2X))
+        assertEquals(1200L * 1600 * 4, loader.estimateProcessedBytes(1200, 1600, ComicEnhanceMode.ANIME4K))
     }
 
     @Test

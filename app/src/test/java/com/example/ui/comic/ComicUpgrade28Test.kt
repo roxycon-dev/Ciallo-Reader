@@ -321,11 +321,13 @@ class ComicUpgrade28Test {
     }
 
     @Test
-    fun `条目20 - Restore CNN 真实改变画面且尺寸不变`() {
-        // 简单黑白线条图
-        val bmp = solid(64, 64, Color.WHITE.toInt()) { x, y ->
+    fun `条目20 - Restore CNN 修复软化线条且保留纸底与尺寸`() {
+        val clean = solid(64, 64, Color.WHITE.toInt()) { x, y ->
             if (x == 32 || y == 32 || (abs(x - 32) + abs(y - 32) == 12)) Color.BLACK.toInt() else null
         }
+        // 完全清晰的饱和黑白边缘应受保护，不能要求 CNN 凑改动像素数。
+        // 改为真正需要恢复的软化线稿，保留原有 >50 像素生效要求。
+        val bmp = Bitmap.createScaledBitmap(ComicImagePipeline.lanczosScaleTo(clean, 32, 32), 64, 64, true)
         val out = Anime4KCnn.restore(bmp, 1.0f, maxEdge = 64)
         assertEquals(64, out.width); assertEquals(64, out.height)
         var diff = 0
@@ -333,6 +335,8 @@ class ComicUpgrade28Test {
             if (out.getPixel(x, y) != bmp.getPixel(x, y)) diff++
         }
         assertTrue("CNN 输出应与输入不同（残差生效）diff=$diff", diff > 50)
+        assertEquals(Color.WHITE, out.getPixel(0, 0))
+        assertFalse(bmp.isRecycled)
     }
 
     @Test
@@ -343,7 +347,7 @@ class ComicUpgrade28Test {
         val out = Anime4KCnn.upscale2x(bmp, 1.0f, maxSrcEdge = 64)
         assertEquals(80, out.width)
         assertEquals(60, out.height)
-        // 强度=0：残差不叠加，输出≈纯双线性基准（与强度 1 不同）
+        // 强度=0：残差不叠加，输出为 EASU 基准（与强度 1 不同）
         val out0 = Anime4KCnn.upscale2x(bmp, 0f, maxSrcEdge = 64)
         var diff = 0
         for (y in 0 until 60) for (x in 0 until 80) {

@@ -972,7 +972,7 @@ fun rememberPageBitmap(
                 visible = visible,
             )
             previews.cancel()
-            state.value = PageBitmapState.Ready(result.bitmap)
+            state.value = PageBitmapState.Ready(result.bitmap, error = result.error)
         } catch (ce: CancellationException) {
             throw ce
         } catch (error: Exception) {
@@ -1824,7 +1824,7 @@ fun visibleIntrinsicRect(z: ComicZoomState): RectF? {
 }
 
 @Composable
-private fun SinglePageContent(
+internal fun SinglePageContent(
     slot: ComicSlot,
     config: ComicReaderConfig,
     loader: ComicPageLoader,
@@ -1987,7 +1987,7 @@ private fun SinglePageContent(
 
 /** 双页内容：两页按可用宽度适配（等高约束），阅读顺序排列 + 间距 + 对齐 + 位置修正 */
 @Composable
-private fun DoubleSpreadContent(
+internal fun DoubleSpreadContent(
     spread: ComicSpread,
     config: ComicReaderConfig,
     loader: ComicPageLoader,
@@ -2226,5 +2226,5 @@ internal fun ComicLoadingFeedback(ref: ComicPageRef?, onRetry: (() -> Unit)? = n
 internal fun enhanceHintFor(config: ComicReaderConfig, longEdge: Int): String? {
     if (config.enhanceMode == ComicEnhanceMode.OFF) return null
     val sec = ComicImagePipeline.enhanceEstimateSec(config.enhanceMode, config.enhanceStrength, longEdge)
-    return "AI 增强处理中 · 约 ${if (sec == sec.toLong().toDouble()) sec.toInt().toString() else sec}s"
+    return "画质增强处理中 · 约 ${if (sec == sec.toLong().toDouble()) sec.toInt().toString() else sec}s"
 }

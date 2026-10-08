@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.floor
 
 /**
  * Anime4K CNN CPU 求值器（第 20 条增强引擎）。
@@ -13,10 +14,10 @@ import kotlin.math.roundToInt
  * - go_0/go_1 = 上一层输出的正/负半波（激活打包）；
  * - 边缘 clamp 采样（等价 texOff）；
  * - Restore 末层输出 3 通道残差 + 原图；Upscale 末层 depth-to-space x2
- *   （4 通道 = 2x2 子像素，(oy%2)*2+(ox%2)），基准 = 原图双线性 2x。
+ *   （4 通道 = 2x2 子像素，(oy%2)*2+(ox%2)）。EASU 基准 + 受局部细节约束的残差。
  *
- * 性能：输入先钳制到安全分辨率（RESTORE ≤1280 / UPSCALE ≤900 长边），
- * 全程 FloatArray 单趟，由 ComicPageLoader 的 pixelOpGate 并发闸门串行化。
+ * 原生像素分块推理，8px halo 覆盖四层卷积及子像素采样的感受野。
+ * 不缩小整页；256px 工作块将三份浮点平面限制在约 3.4MiB。
  */
 internal object Anime4KCnn {
 
@@ -52,6 +53,9 @@ internal object Anime4KCnn {
     private val restoreLayers by lazy { readFlat(Anime4KCnnWeights.RESTORE_S) }
     private val upscaleLayers by lazy { readFlat(Anime4KCnnWeights.UPSCALE_S) }
 
+    internal fun referenceConvolution(model: String, rgba: FloatArray, width: Int, height: Int): FloatArray =
+        runNetwork(if (model == "restore") restoreLayers else upscaleLayers, rgba, width, height)
+
     /* ── 基础采样与卷积 ── */
 
     /** clamp 边缘采样：返回 tex 平面 (x,y) 的 RGBA（act: 0 原始 / 1 正半波 / 2 负半波） */
@@ -70,8 +74,9 @@ internal object Anime4KCnn {
      *  第六轮第 5 条：行条带多核并行（读 src ±1 行越界只读安全，out 独立缓冲）。 */
     private fun convLayer(layer: Layer, src0: FloatArray, src1: FloatArray, w: Int, h: Int): FloatArray {
         val out = FloatArray(w * h * 4)
-        val v = FloatArray(4)
-        ComicImagePipeline.parallelStripes(h) { y0, y1 ->
+        ComicImagePipeline.parallelStripes(h, minParallelRows = 128) { y0, y1 ->
+            // Each worker owns its sample buffer. Sharing this array races every mat4 multiply.
+            val v = FloatArray(4)
             for (y in y0 until y1) {
                 for (x in 0 until w) {
                     var r0 = layer.bias[0]; var r1 = layer.bias[1]; var r2 = layer.bias[2]; var r3 = layer.bias[3]
@@ -115,99 +120,138 @@ internal object Anime4KCnn {
 
     private fun clamp255(v: Float): Int = (v * 255f).roundToInt().coerceIn(0, 255)
 
+    /** Remove the network's DC colour bias; only bounded luminance detail may be added. */
+    private fun restoreDetail(conv: FloatArray, w: Int, h: Int): FloatArray {
+        val luminance = FloatArray(w * h) { i ->
+            conv[i * 4] * .299f + conv[i * 4 + 1] * .587f + conv[i * 4 + 2] * .114f
+        }
+        return FloatArray(w * h) { i ->
+            val x = i % w; val y = i / w
+            val mean = (luminance[max(0, y - 1) * w + x] + luminance[min(h - 1, y + 1) * w + x] +
+                luminance[y * w + max(0, x - 1)] + luminance[y * w + min(w - 1, x + 1)]) * .25f
+            luminance[i] - mean
+        }
+    }
+
+    private fun edgeGate(plane: FloatArray, w: Int, h: Int, x: Int, y: Int): Float {
+        var lo = 1f; var hi = 0f
+        for (dy in -1..1) for (dx in -1..1) {
+            val i = ((y + dy).coerceIn(0, h - 1) * w + (x + dx).coerceIn(0, w - 1)) * 4
+            val value = plane[i] * .299f + plane[i + 1] * .587f + plane[i + 2] * .114f
+            lo = min(lo, value); hi = max(hi, value)
+        }
+        val edge = (((hi - lo) * 255f - 8f) / 32f).coerceIn(0f, 1f)
+        return edge * edge * (3f - 2f * edge)
+    }
+
     /* ── 公开 API ── */
 
-    /**
-     * Anime4K Restore（轻量档）：线条重建/降噪，不放大。
-     * CNN 在 ≤[maxEdge] 的钳制分辨率上运行，残差按 strength 缩放后叠加回原图。
-     * 第 5 条：不再内部双线性放大回原尺寸（旧版 1280 钳制→CNN→双线性回 2800
-     * 的往返会把重建出的细节整段抹掉，净效果≈轻微模糊——"看不出增强"的病根）；
-     * 钳制时返回 CNN 分辨率的结果，由调用方（ComicImagePipeline.anime4kRestore）
-     * 负责 Lanczos 回原尺寸 + 全分辨率 CAS 收尾。
-     */
-    fun restore(src: Bitmap, strength: Float, maxEdge: Int = 1600): Bitmap {
-        val w0 = src.width; val h0 = src.height
-        if (w0 < 8 || h0 < 8) return src
-        val long = max(w0, h0)
-        val work = if (long > maxEdge) {
-            val s = maxEdge.toFloat() / long
-            Bitmap.createScaledBitmap(src, (w0 * s).toInt().coerceAtLeast(8), (h0 * s).toInt().coerceAtLeast(8), true)
-        } else src
-        val w = work.width; val h = work.height
-        val plane = bitmapToPlane(work)
-        val out = runNetwork(restoreLayers, plane, w, h)
+    /** Restore 保留原尺寸。[maxEdge] 是单块预算，不能用于缩小整页。 */
+    fun restore(src: Bitmap, strength: Float, maxEdge: Int = 256): Bitmap =
+        tiled(src, 1, maxEdge.coerceIn(32, 256)) { restorePatch(it, strength) }
+
+    private fun restorePatch(src: Bitmap, strength: Float): Bitmap {
+        val w = src.width; val h = src.height
+        val plane = bitmapToPlane(src)
+        val out = ComicNeuralBackend.run("restore", plane, w, h) ?: runNetwork(restoreLayers, plane, w, h)
+        val detail = restoreDetail(out, w, h)
         // 末层语义（Anime4K v4.0 Restore GLSL：SAVE = conv + HOOKED_tex）：
         // runNetwork 返回的是"卷积增量"，完整输出 = 原图 + 增量，strength 缩放增量。
         // 第六轮第 5 条（视觉终审）：CNN 残差全量应用在噪声底上产生"整体提亮+
         // 线条变薄"的负向观感（代理判定 worse than original）——残差固定 0.6
         // 上限系数，弱化网络对底色的整体重投影，主要效果交给下游线重建。
         val px = IntArray(w * h)
+        val original = IntArray(w * h)
+        src.getPixels(original, 0, w, 0, 0, w, h)
         for (i in px.indices) {
             val o = i * 4
-            val d = 0.6f * (if (strength >= 0.999f) 1f else strength)
-            val r = plane[o] + out[o] * d
-            val g = plane[o + 1] + out[o + 1] * d
-            val b = plane[o + 2] + out[o + 2] * d
-            px[i] = (0xFF shl 24) or (clamp255(r) shl 16) or (clamp255(g) shl 8) or clamp255(b)
+            val d = 0.6f * strength.coerceIn(0f, 1f) * edgeGate(plane, w, h, i % w, i / w)
+            val delta = (detail[i] * d).coerceIn(-24f / 255f, 24f / 255f)
+                .coerceIn(-minOf(plane[o], plane[o + 1], plane[o + 2]), 1f - maxOf(plane[o], plane[o + 1], plane[o + 2]))
+            val r = plane[o] + delta
+            val g = plane[o + 1] + delta
+            val b = plane[o + 2] + delta
+            px[i] = (original[i] and 0xFF000000.toInt()) or
+                (clamp255(r) shl 16) or (clamp255(g) shl 8) or clamp255(b)
         }
         val restored = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         restored.setPixels(px, 0, w, 0, 0, w, h)
-        // 第六轮第 5 条：回程用精确目标尺寸（比例缩放的舍入会 ±2px）
-        return if (w != w0 || h != h0) ComicImagePipeline.lanczosScaleTo(restored, w0, h0) else restored
+        return restored
     }
 
-    /**
-     * Anime4K Upscale x2（完整档）：CNN 2x 超分（深度到空间 + 双线性基准 + 亮度残差）。
-     * 第 5 条：[maxSrcEdge] 由调用方按"目标尺寸的一半"显式传入（输出恒 ≥ 原分辨率）；
-     * 旧默认 900 使 2800px 原图先缩到 900 再 2x=1800——"超分"实际是降级，病根之一。
-     * 预算上限 1600（输入 1.7M px 时网络平面 ~28MB×3，内存护栏）。
-     */
-    fun upscale2x(src: Bitmap, strength: Float, maxSrcEdge: Int = 1600): Bitmap {
-        val w0 = src.width; val h0 = src.height
-        if (w0 < 8 || h0 < 8) return src
-        val long = max(w0, h0)
-        val work = if (long > maxSrcEdge) {
-            val s = maxSrcEdge.toFloat() / long
-            Bitmap.createScaledBitmap(src, (w0 * s).toInt().coerceAtLeast(8), (h0 * s).toInt().coerceAtLeast(8), true)
-        } else src
-        val w = work.width; val h = work.height
-        val plane = bitmapToPlane(work)
-        val conv = runNetwork(upscaleLayers, plane, w, h)
-        val d = if (strength >= 0.999f) 1f else strength
-        // depth-to-space：out(ox,oy) = bilinear(src, ox/2, oy/2) + conv[cx,cy][(oy%2)*2+(ox%2)]（强度缩放）
+    /** 2× CNN：深度到空间 + EASU 基准。[maxSrcEdge] 是块大小。 */
+    fun upscale2x(src: Bitmap, strength: Float, maxSrcEdge: Int = 256): Bitmap =
+        tiled(src, 2, maxSrcEdge.coerceIn(32, 256)) { upscalePatch(it, strength) }
+
+    private fun upscalePatch(src: Bitmap, strength: Float): Bitmap {
+        val w = src.width; val h = src.height
+        val plane = bitmapToPlane(src)
+        val conv = ComicNeuralBackend.run("upscale", plane, w, h) ?: runNetwork(upscaleLayers, plane, w, h)
         val ow = w * 2; val oh = h * 2
-        val px = IntArray(ow * oh)
+        val baseline = ComicEdgeUpscaler.upscale(src, ow, oh)
+        val base = IntArray(ow * oh)
+        try { baseline.getPixels(base, 0, ow, 0, 0, ow, oh) }
+        finally { if (baseline !== src) baseline.recycle() }
+        val px = base.copyOf()
+        val gates = FloatArray(w * h) { edgeGate(plane, w, h, it % w, it / w) }
+        fun lum(c: Int) = (c shr 16 and 255) * .299f + (c shr 8 and 255) * .587f + (c and 255) * .114f
         for (oy in 0 until oh) {
             val cy = oy ushr 1
-            val fy = (oy + 0.5f) / 2f - 0.5f
-            val sy0 = fy.toInt(); val sy1 = min(sy0 + 1, h - 1)
-            val wy = fy - sy0
-            val sy0c = max(0, sy0)
             for (ox in 0 until ow) {
                 val cx = ox ushr 1
-                val fx = (ox + 0.5f) / 2f - 0.5f
-                val sx0 = fx.toInt(); val sx1 = min(sx0 + 1, w - 1)
-                val wx = fx - sx0
-                val sx0c = max(0, sx0)
-                fun bil(ch: Int): Float {
-                    val i00 = (sy0c * w + sx0c) * 4 + ch
-                    val i01 = (sy0c * w + sx1) * 4 + ch
-                    val i10 = (sy1 * w + sx0c) * 4 + ch
-                    val i11 = (sy1 * w + sx1) * 4 + ch
-                    val top = plane[i00] + (plane[i01] - plane[i00]) * wx
-                    val bot = plane[i10] + (plane[i11] - plane[i10]) * wx
-                    return top + (bot - top) * wy
-                }
                 val ci = (cy * w + cx) * 4 + ((oy and 1) * 2 + (ox and 1))
-                val residual = conv[ci] * d
-                val r = bil(0) + residual
-                val g = bil(1) + residual
-                val b = bil(2) + residual
-                px[oy * ow + ox] = (0xFF shl 24) or (clamp255(r) shl 16) or (clamp255(g) shl 8) or clamp255(b)
+                val index = oy * ow + ox; val color = base[index]
+                val localDetail = lum(color) - (lum(base[max(0, oy - 1) * ow + ox]) +
+                    lum(base[min(oh - 1, oy + 1) * ow + ox]) + lum(base[oy * ow + max(0, ox - 1)]) +
+                    lum(base[oy * ow + min(ow - 1, ox + 1)])) * .25f
+                val predicted = conv[ci] * 255f * strength.coerceIn(0f, 1f) * gates[cy * w + cx]
+                // A video-trained subpixel residual must not reverse manga edges or invent
+                // periodic paper texture. Trust only detail supported by the reconstruction.
+                val bound = min(12f, kotlin.math.abs(localDetail) * .35f)
+                val residual = if (predicted * localDetail > 0f) predicted.coerceIn(-bound, bound) else 0f
+                val red = color shr 16 and 255; val green = color shr 8 and 255; val blue = color and 255
+                val delta = residual.coerceIn(-minOf(red, green, blue).toFloat(), (255 - maxOf(red, green, blue)).toFloat())
+                fun ch(v: Int) = (v + delta).roundToInt().coerceIn(0, 255)
+                px[index] = (color and 0xFF000000.toInt()) or (ch(red) shl 16) or (ch(green) shl 8) or ch(blue)
             }
         }
         val outBmp = Bitmap.createBitmap(ow, oh, Bitmap.Config.ARGB_8888)
         outBmp.setPixels(px, 0, ow, 0, 0, ow, oh)
         return outBmp
+    }
+
+    /** Output cores are disjoint; only privately owned patch bitmaps are recycled. */
+    private fun tiled(src: Bitmap, scale: Int, edge: Int, infer: (Bitmap) -> Bitmap): Bitmap {
+        if (src.width < 8 || src.height < 8) return src
+        val output = Bitmap.createBitmap(src.width * scale, src.height * scale, Bitmap.Config.ARGB_8888)
+        val halo = 8
+        try {
+            for (top in 0 until src.height step edge) {
+                for (left in 0 until src.width step edge) {
+                    if (Thread.currentThread().isInterrupted) throw InterruptedException("CNN cancelled")
+                    val right = min(src.width, left + edge)
+                    val bottom = min(src.height, top + edge)
+                    val x0 = max(0, left - halo); val y0 = max(0, top - halo)
+                    val x1 = min(src.width, right + halo); val y1 = min(src.height, bottom + halo)
+                    val patch = Bitmap.createBitmap(src, x0, y0, x1 - x0, y1 - y0)
+                    var result: Bitmap? = null
+                    try {
+                        result = infer(patch)
+                        val width = (right - left) * scale
+                        val height = (bottom - top) * scale
+                        val pixels = IntArray(width * height)
+                        result.getPixels(pixels, 0, width, (left - x0) * scale, (top - y0) * scale, width, height)
+                        output.setPixels(pixels, 0, width, left * scale, top * scale, width, height)
+                    } finally {
+                        if (result !== patch && result !== src) result?.recycle()
+                        if (patch !== src) patch.recycle()
+                    }
+                }
+            }
+            return output
+        } catch (error: Throwable) {
+            output.recycle()
+            throw error
+        }
     }
 }

@@ -628,46 +628,6 @@ internal class ComicHarismController {
     @Synchronized
     fun getCache(key: String): Bitmap? = slotCache[key]
 
-    /** A zoom snapshot contains book pixels only, with the same geometry as the visible spread. */
-    fun zoomSource(spreadIndex: Int, width: Int, height: Int): Pair<Bitmap, Size>? {
-        val cfg = config ?: return null
-        val spread = layout?.spreads?.getOrNull(spreadIndex) ?: return null
-        val sources = spread.slots.mapNotNull { slot ->
-            getCache(slotCacheKey(slot, cfg, bookState))?.let(::softenForSoftware)
-        }
-        if (sources.size != spread.slots.size || sources.isEmpty()) return null
-        val container = Size(width.toFloat(), height.toFloat())
-        if (sources.size == 1) {
-            val src = sources.first()
-            return src to fittedSize(Size(src.width.toFloat(), src.height.toFloat()), container,
-                cfg.fit, cfg.customFitScale, cfg.customFitBase)
-        }
-        val gap = cfg.doubleGapDp * density
-        val ordered = if (cfg.direction == ComicDirection.RTL) sources.reversed() else sources
-        val pageContainer = Size(((width - gap) / 2f).coerceAtLeast(1f), height.toFloat())
-        val sizes = ordered.map { fittedSize(Size(it.width.toFloat(), it.height.toFloat()), pageContainer,
-            cfg.fit, cfg.customFitScale, cfg.customFitBase) }
-        val content = Size(sizes.sumOf { it.width.toDouble() }.toFloat() + gap, sizes.maxOf { it.height })
-        val downsample = min(1f, 2400f / max(content.width, content.height))
-        val out = Bitmap.createBitmap(max(1, (content.width * downsample).toInt()),
-            max(1, (content.height * downsample).toInt()), Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(out)
-        canvas.scale(downsample, downsample)
-        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
-        var x = 0f
-        ordered.forEachIndexed { index, src ->
-            val size = sizes[index]
-            val top = when (cfg.doubleAlign) {
-                ComicDoubleAlign.TOP -> 0f
-                ComicDoubleAlign.BOTTOM -> content.height - size.height
-                else -> (content.height - size.height) / 2f
-            }
-            canvas.drawBitmap(src, null, RectF(x, top, x + size.width, top + size.height), paint)
-            x += size.width + gap
-        }
-        return out to content
-    }
-
     @Synchronized
     private fun knownSize(key: String): Size? = knownSizes[key]
 
@@ -715,9 +675,16 @@ internal class ComicHarismController {
     fun cacheSize(): Int = slotCache.size
 
     private fun trim() {
+        // GL textures outlive this cache. Keep the visible source pixels as well:
+        // three enhanced pages can exceed 64 MiB even though all three textures fit.
+        val cfg = config
+        val visibleKeys = if (cfg == null) emptySet() else
+            layout?.spreads?.getOrNull(currentSpreadHint)?.slots
+                ?.map { slotCacheKey(it, cfg, bookState) }?.toSet().orEmpty()
         val it = slotCache.entries.iterator()
         while (it.hasNext() && (slotCache.size > 8 || cacheBytes > 64L * 1024 * 1024)) {
             val e = it.next()
+            if (e.key in visibleKeys) continue
             cacheBytes -= e.value.byteCount.toLong()
             it.remove()
         }
@@ -1210,19 +1177,10 @@ internal fun ComicHarismCurlReader(
     // 第 17 条：缩放覆盖层（双击/长按/双指触发）
     var zoomOverlay by remember { mutableStateOf(false) }
     val curlZoom = remember { ComicZoomState() }
-    var zoomSource by remember { mutableStateOf<Pair<Bitmap, Size>?>(null) }
     val zoomScope = androidx.compose.runtime.rememberCoroutineScope()
     var zoomKind by remember { mutableStateOf("") }
     val zoomTouch = remember { floatArrayOf(0f, 0f, 0f, 1f) }
     androidx.activity.compose.BackHandler(enabled = zoomOverlay) { zoomOverlay = false }
-    LaunchedEffect(zoomOverlay, currentSpread, layout) {
-        if (!zoomOverlay) { zoomSource = null; return@LaunchedEffect }
-        while (zoomSource == null) {
-            val view = controller.view ?: break
-            zoomSource = controller.zoomSource(currentSpread, view.width, view.height)
-            if (zoomSource == null) delay(120)
-        }
-    }
     // 当前 spread 纹理未就绪（慢网络）：GL 纸面只有静止点环（harism 无逐帧重绘通道），
     // Compose 层叠加与书库搜索同款的动画 ChasingDots —— 纹理就绪即刻撤下
     var curlPageLoading by remember { mutableStateOf(false) }
@@ -1561,8 +1519,7 @@ internal fun ComicHarismCurlReader(
                         curlZoom.releaseJob?.cancel()
                         curlZoom.scale = 1f; curlZoom.offsetX = 0f; curlZoom.offsetY = 0f
                         curlZoom.containerSize = Size(width.toFloat(), height.toFloat())
-                        zoomSource = controller.zoomSource(latestCurrent, width, height)
-                        curlZoom.contentSize = zoomSource?.second ?: curlZoom.containerSize
+                        curlZoom.contentSize = curlZoom.containerSize
                         zoomKind = kind
                         zoomTouch[0] = x; zoomTouch[1] = y; zoomTouch[2] = 0f; zoomTouch[3] = 1f
                         zoomOverlay = true
@@ -1647,15 +1604,18 @@ internal fun ComicHarismCurlReader(
             }
         }
         if (zoomOverlay) {
+            layout.spreads.getOrNull(currentSpread)?.let { spread ->
             ComicCurlZoomOverlay(
-                bitmap = zoomSource?.first,
-                contentSize = zoomSource?.second,
+                spread = spread,
+                loader = loader,
+                bookState = bookState,
                 config = config,
                 zoomState = curlZoom,
                 readerCallbacks = latestCallbacks,
                 dynamicBackground = dynamicBgColor,
                 onDismiss = { zoomOverlay = false },
             )
+            }
         }
     }
 }
@@ -1666,9 +1626,10 @@ internal fun ComicHarismCurlReader(
  * 单击（未放大时）或捏合收拢退出，回到卷页模式。
  */
 @Composable
-private fun ComicCurlZoomOverlay(
-    bitmap: Bitmap?,
-    contentSize: Size?,
+internal fun ComicCurlZoomOverlay(
+    spread: ComicSpread,
+    loader: ComicPageLoader,
+    bookState: ComicBookState,
     config: ComicReaderConfig,
     zoomState: ComicZoomState,
     readerCallbacks: ComicGestureCallbacks,
@@ -1679,16 +1640,6 @@ private fun ComicCurlZoomOverlay(
         Modifier
             .fillMaxSize()
     ) {
-        val density = androidx.compose.ui.platform.LocalDensity.current
-        val container = Size(maxWidth.value * density.density, maxHeight.value * density.density)
-        LaunchedEffect(bitmap, container, config.fit, config.customFitScale, config.customFitBase) {
-            if (bitmap != null) {
-                val intrinsic = Size(bitmap.width.toFloat(), bitmap.height.toFloat())
-                zoomState.containerSize = container
-                zoomState.contentSize = contentSize ?: fittedSize(intrinsic, container, config.fit, config.customFitScale, config.customFitBase)
-                zoomState.intrinsicSize = intrinsic
-            }
-        }
         ComicReaderBackground(config.bgType, config.paperIntensity, dynamicBackground)
         val callbacks = ComicGestureCallbacks(
             onTapZone = { position, size -> if (!zoomState.isZoomed) onDismiss() else readerCallbacks.onTapZone(position, size) },
@@ -1703,20 +1654,13 @@ private fun ComicCurlZoomOverlay(
                 .onSizeChanged { zoomState.containerSize = Size(it.width.toFloat(), it.height.toFloat()) }
                 .comicZoomable(state = zoomState, config = config, callbacks = callbacks)
         ) {
-            bitmap?.let {
-                ZoomableImageLayer(zoomState, config.fit) {
-                    Image(
-                        bitmap = it.asImageBitmap(),
-                        contentDescription = "放大查看",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.FillBounds,
-                    )
-                }
-            } ?: Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                com.example.ui.components.ChasingDots(
-                    size = 52.dp,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.secondary,
-                )
+            // Share the real loader and its terminal/retry states with every other mode.
+            // No cache polling, no screen-sized snapshot that discards enhanced detail.
+            if (spread.isDouble) {
+                DoubleSpreadContent(spread, config, loader, bookState, zoomState, {},
+                    rtl = config.direction == ComicDirection.RTL)
+            } else spread.slots.firstOrNull()?.let { slot ->
+                SinglePageContent(slot, config, loader, bookState, zoomState, {})
             }
         }
         Text(

@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.ensureActive
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -26,17 +27,14 @@ import kotlin.math.sin
  * 二次精修（开源算法本地化，详见 docs/WHEEL_EVALUATION.md）：
  * - 自动裁边 v2：分块扫描 + RGB 逐通道容差 + 行/列密度噪声容忍 + 单边 1/3 防御
  *   （结构移植自 Kotatsu EdgeDetector/TrimTransformation，Apache-2.0）
- * - Anime4K 档：FastLineDarken 形态学线条重建（膨胀→腐蚀背景场 + 深度比例加深，
- *   平坦区零扰动；算法参考 AviSynth FastLineDarken 思路重写）
- * - CAS / Unsharp / Lanczos 输出统一 overshoot 限幅
- *   （clamp(out, min3x3−ov, max3x3+ov)，AMD FidelityFX CAS 同款思想，MIT）
+ * - 锐化档：噪声门控、亮度细节增强及局部范围钳制，保留色差与纸底。
+ * - 两种 CNN 档：原始尺寸带 halo 分块推理，优先使用内置 ONNX CPU 图。
+ * - 超分辨率档：AMD FSR1 EASU 边缘自适应重建，最高 2×、6M 输出像素预算。
  * - 新增中央装订缝（gutter）检测供拆页判定（ScanTailor VertLineFinder 思想重写，仅借鉴）
  */
 object ComicImagePipeline {
 
     /** 处理后位图长边上限（内存与性能护栏） */
-    // 新反馈第 5 条：2560→3200——lanczos 2x（1600 级源）与超分回原尺寸不再被逐维钳小（
-    // 解码上限 DECODE_MAX_EDGE=2800，3200 容纳其 2x 档与回程放大；内存 ~37MB IntArray 可控）
     const val MAX_EDGE = 3200
 
     data class Geometry(
@@ -84,7 +82,7 @@ object ComicImagePipeline {
             ComicEnhanceMode.CAS -> 0.4
             ComicEnhanceMode.ANIME4K -> 1.9
             ComicEnhanceMode.WAIFU2X -> if (longEdge >= 2400) 1.7 else 2.5
-            ComicEnhanceMode.SUPER_RES -> if (longEdge <= 1800) 1.3 else 0.4
+            ComicEnhanceMode.SUPER_RES -> if (longEdge < 2800) 1.3 else 0.4
         }
         val s = (strength.coerceIn(0, 100) + 25) / 125f
         val areaFactor = (longEdge / 1600.0).let { it * it }.coerceIn(0.45, 1.6)
@@ -98,15 +96,16 @@ object ComicImagePipeline {
      * 只读共享输入（越界±1行读取安全——输入缓冲在处理期间不可变）。
      * 输入/输出为独立缓冲的核天然满足；同缓冲原位核不适用。
      */
-    internal fun parallelStripes(rows: Int, body: (y0: Int, y1: Int) -> Unit) {
+    internal fun parallelStripes(rows: Int, minParallelRows: Int = 768, body: (y0: Int, y1: Int) -> Unit) {
         val cores = Runtime.getRuntime().availableProcessors()
         val minChunk = 96
         // 小任务串行：协程调度开销在小图上会倒挂（实测 CAS 1000x1400 +135ms）
-        if (rows < 768 || cores <= 1) {
+        if (Thread.currentThread().isInterrupted) throw InterruptedException("Image processing cancelled")
+        if (rows < minParallelRows || cores <= 1) {
             body(0, rows)
             return
         }
-        val stripes = minOf(cores, rows / minChunk)
+        val stripes = minOf(4, cores, max(2, rows / minChunk))
         if (stripes <= 1) {
             body(0, rows)
             return
@@ -117,7 +116,10 @@ object ComicImagePipeline {
                 async(Dispatchers.Default) {
                     val y0 = i * per
                     val y1 = minOf(y0 + per, rows)
-                    if (y0 < y1) body(y0, y1)
+                    for (start in y0 until y1 step 32) {
+                        ensureActive()
+                        body(start, minOf(start + 32, y1))
+                    }
                 }
             }.awaitAll()
         }
@@ -127,15 +129,20 @@ object ComicImagePipeline {
 
     fun process(src: Bitmap, geo: Geometry, tone: Toning): Bitmap {
         var bmp = src
-        // 1. 裁边（自动/手动，基于原始方向）
-        bmp = applyCrop(bmp, geo)
-        // 2. 拆片（跨页扫描左右半）
-        bmp = applySplit(bmp, geo)
-        // 3. 旋转（整本 + 单页）
-        if (geo.rotationDeg % 360 != 0) bmp = rotate(bmp, geo.rotationDeg % 360)
-        // 4. 色调 / 滤镜
-        if (tone.hasWork()) bmp = applyToning(bmp, tone)
-        return bmp
+        fun step(next: Bitmap) {
+            if (bmp !== src && bmp !== next) bmp.recycle()
+            bmp = next
+        }
+        try {
+            step(applyCrop(bmp, geo))
+            step(applySplit(bmp, geo))
+            if (geo.rotationDeg % 360 != 0) step(rotate(bmp, geo.rotationDeg % 360))
+            if (tone.hasWork()) step(applyToning(bmp, tone))
+            return bmp
+        } catch (error: Throwable) {
+            if (bmp !== src) bmp.recycle()
+            throw error
+        }
     }
 
     /* ─────────────── 几何变换 ─────────────── */
@@ -552,52 +559,37 @@ object ComicImagePipeline {
 
     private fun applyToning(src: Bitmap, tone: Toning): Bitmap {
         var bmp = src
+        fun step(next: Bitmap) {
+            if (bmp !== src && bmp !== next) bmp.recycle()
+            bmp = next
+        }
+        try {
         // 4a. 亮度/对比度/Gamma/阴影 → LUT
         if (tone.brightness != 0 || tone.contrast != 0 || tone.gamma != 1.0f || tone.shadow != 0) {
-            bmp = applyLut(bmp, buildToneLut(tone))
+            step(applyLut(bmp, buildToneLut(tone)))
         }
         // 4b. 饱和度/色调/黑白 → 色矩阵
         if (tone.saturation != 0 || tone.hue != 0 || tone.bw) {
-            bmp = applyColorMatrix(bmp, buildFilterMatrix(tone))
+            step(applyColorMatrix(bmp, buildFilterMatrix(tone)))
         }
-        // 4c. 增强（新反馈第 5 条重做：四档输出恒 ≥ 原分辨率。旧版先 capForPixelOp
-        // 缩到 2M 像素、CNN 内部再钳 1280/900，处理完显示时反向拉伸——净效果是
-        // 变软而非增强，"完全看不出"即此。各档自带预算，见对应函数）
-        // 第六轮第 5 条终审调参（视觉代理实测驱动）：
-        // - CAS = 边缘掩码锐化 + 轻量线深（纯锐化在线稿上被 overshoot 钳制，
-        //   实测 meanAbsDiff 0.95 "一眼看不出"——叠加线深后线条可辨地更实；
-        //   与 ANIME4K 档的区隔 = 无 CNN/无预降噪，档间 diff 仍有量化断言）；
-        // - SUPER_RES = Lanczos 2x 重建 + 边缘掩码强锐化；
-        // - ANIME4K 平坦降噪 0.20→0.12（0.20 在噪声底上产生整体灰移，观感变脏）。
-        val strength = tone.enhanceStrength / 100f
-        bmp = when (if (tone.enhanceStrength <= 0) ComicEnhanceMode.OFF else tone.enhanceMode) {
-            ComicEnhanceMode.CAS -> casSharpenEdges(
-                anime4kLines(bmp, strength, kExtra = 0.34f + 0.34f * strength),
-                0.45f + 0.4f * strength, edgeRange = 26,
-            )
+        // 4c. 各增强档在原始解码尺寸处理；放大预算仅限制输出，不先缩小文字。
+        val strength = tone.enhanceStrength.coerceIn(0, 100) / 100f
+        step(when (if (tone.enhanceStrength <= 0) ComicEnhanceMode.OFF else tone.enhanceMode) {
+            ComicEnhanceMode.CAS -> ComicEdgeUpscaler.sharpen(bmp, strength)
             ComicEnhanceMode.ANIME4K -> anime4kRestore(bmp, strength)
             ComicEnhanceMode.WAIFU2X -> anime4kUpscale(bmp, strength)
             ComicEnhanceMode.SUPER_RES -> superResolution(bmp, strength)
             ComicEnhanceMode.OFF -> bmp
-        }
-        // 4d. 常规锐化（同样过尺寸护栏：2800px 全尺寸 unsharp 是 ~67MB 瞬时分配）
+        })
+        // 4d. 常规锐化与增强共用保色、抑噪内核，不能把增强结果重新缩回 2M。
         if (tone.sharpen > 0) {
-            bmp = unsharpMask(capForPixelOp(bmp), tone.sharpen / 100f)
+            step(ComicEdgeUpscaler.sharpen(bmp, tone.sharpen.coerceIn(0, 100) / 100f))
         }
         return bmp
-    }
-
-    /** 逐像素增强操作前的尺寸护栏（>2M 像素先等比降到 ~2M，防卡顿/OOM） */
-    private fun capForPixelOp(src: Bitmap): Bitmap {
-        val px = src.width.toLong() * src.height.toLong()
-        if (px <= 2_000_000L) return src
-        val scale = kotlin.math.sqrt(2_000_000f / px)
-        return Bitmap.createScaledBitmap(
-            src,
-            (src.width * scale).toInt().coerceAtLeast(1),
-            (src.height * scale).toInt().coerceAtLeast(1),
-            true
-        )
+        } catch (error: Throwable) {
+            if (bmp !== src) bmp.recycle()
+            throw error
+        }
     }
 
     /** 亮度/对比度/Gamma/阴影像素 LUT */
@@ -905,28 +897,23 @@ object ComicImagePipeline {
         return unsharpMask(denoised, 0.25f + 0.45f * strength)
     }
 
-    /**
-     * ANIME4K 轻量档（新反馈第 5 条）：Restore CNN 线条重建/降噪（≤1600 长边预算）。
-     * 钳制过的源用 Lanczos（非双线性）回原尺寸——细节保留；收尾用 anime4kLines
-     * （FastLineDarken）而非全幅 CAS：线条按深度加深（锐利感）+ 平坦区向邻域均值轻降噪
-     * ——全幅 CAS 会放大压缩噪声，与本档降噪定位冲突（平坦区噪声 RMS 实测反升 47%）。
-     * 终审补强（B 路判定旧版"与原始几乎不可辨"）：①线深系数叠加 kExtra；
-     * ②边缘掩码 CAS（仅 3×3 亮度极差 ≥34 的边缘像素锐化，平坦噪声不进）——
-     * 差异幅度提升到人眼可辨，同时保持平坦区降噪特性。
-     * 输出=原尺寸；降噪 + 线重建 + 线条加深 + 边缘锐化四重效果肉眼可辨。
-     * 第六轮第 5 条：bilateralLite/lines/CAS/CNN 全部行条带并行（真机 ~3× 提速）。
-     */
+    /** 轻量档：保边预降噪 → 原始像素 Restore CNN → 亮度细节恢复。 */
     fun anime4kRestore(src: Bitmap, strength: Float): Bitmap {
+        if (strength <= 0f) return src
         // 预降噪：Restore 网络对 iid 噪声分布外（平坦噪声实测放大 1.8×）——
         // Anime4K 官方 Mode A 同样以降噪前置配合 Restore；bilateral 保边，
         // 线条不受影响，平坦噪声先清掉再进网络
-        val den = bilateralLite(src, radius = 1, sigmaColor = 36f)
-        val restored = Anime4KCnn.restore(den, strength)
-        val native = if (restored.width != src.width || restored.height != src.height) {
-            lanczosScaleTo(restored, src.width, src.height)
-        } else restored
-        val lines = anime4kLines(native, strength, kExtra = 0.25f + 0.35f * strength)
-        return casSharpenEdges(lines, 0.30f + 0.35f * strength)
+        val den = bilateralLite(src, radius = 1, sigmaColor = 12f + 24f * strength)
+        var restored: Bitmap? = null
+        var result: Bitmap? = null
+        try {
+            restored = Anime4KCnn.restore(den, strength)
+            result = ComicEdgeUpscaler.sharpen(restored, 0.65f * strength)
+            return result
+        } finally {
+            if (den !== src && den !== result) den.recycle()
+            if (restored !== src && restored !== den && restored !== result) restored?.recycle()
+        }
     }
 
     /** ANIME4K 平坦区降噪权重（第六轮下调：0.20→0.12——视觉终审实测 0.20 在
@@ -970,49 +957,38 @@ object ComicImagePipeline {
         return createBitmap(w, h, out)
     }
 
-    /**
-     * WAIFU2X 完整档（新反馈第 5 条 + 第六轮自适应）：
-     * - 低/中分辨率源（长边 < 2400）：Upscale CNN 2x 真超分，输出 ≥ 原分辨率
-     *   （旧版 900 钳制使 2800px 页"超分"后只剩 1800px，实为降级）；
-     * - 高分辨率源（长边 ≥ 2400）：2x 输出超过显示密度上限，超分无物理增益且
-     *   显示端缩回后不可辨（第六轮实测：BENCH lapRatio 0.28）——改为
-     *   "高分辨率细节强化"：restore CNN + 全幅强 CAS（与 ANIME4K 档的
-     *   边缘掩码轻锐化明确区隔，档间可辨性有量化断言）。
-     */
+    /** 完整档：预算允许时分块 2× CNN，否则原尺寸 Restore + EASU，最后恢复细节。 */
     fun anime4kUpscale(src: Bitmap, strength: Float): Bitmap {
+        if (strength <= 0f) return src
         val long = max(src.width, src.height)
         if (long < 8) return src
-        if (long >= 2400) {
-            // 高分辨率页：2x 无意义（显示 ≤2800），做同尺寸细节强化
-            val den = bilateralLite(src, radius = 1, sigmaColor = 32f)
-            val restored = Anime4KCnn.restore(den, strength)
-            val native = if (restored.width != src.width || restored.height != src.height) {
-                lanczosScaleTo(restored, src.width, src.height)
-            } else restored
-            return casSharpen(native, 0.55f + 0.4f * strength)
+        val (w, h) = ComicEdgeUpscaler.targetSize(src)
+        // Infer at the native source scale. Never shrink text to satisfy the CNN budget.
+        val up = if (w == src.width * 2 && h == src.height * 2) {
+            Anime4KCnn.upscale2x(src, strength)
+        } else {
+            val restored = Anime4KCnn.restore(src, strength)
+            var scaled: Bitmap? = null
+            try {
+                scaled = ComicEdgeUpscaler.upscale(restored, w, h)
+                scaled
+            } finally {
+                if (restored !== src && restored !== scaled) restored.recycle()
+            }
         }
-        val targetLong = min(long * 2, 3200)
-        val cnnSrcLong = (targetLong / 2).coerceAtLeast(8)
-        val cnnSrc = if (long > cnnSrcLong) lanczosScale(src, cnnSrcLong.toFloat() / long) else src
-        val up = Anime4KCnn.upscale2x(cnnSrc, strength, maxSrcEdge = cnnSrcLong)
-        return if (up.width >= src.width && up.height >= src.height) up
-        else lanczosScaleTo(up, max(src.width, up.width), max(src.height, up.height))
+        var result: Bitmap? = null
+        try { result = ComicEdgeUpscaler.sharpen(up, strength); return result }
+        finally { if (up !== src && up !== result) up.recycle() }
     }
 
-    /**
-     * 超分辨率（新反馈第 5 条重做）：低分辨率源（长边 ≤1800）真 Lanczos 2x 重建 +
-     * 边缘掩码锐化；高分辨率源（显示密度已饱和，2x 无增益徒增内存）直接全分辨率
-     * 边缘掩码锐化。输出恒 ≥ 原分辨率。第六轮：CAS 全幅版在噪声底上不可辨，
-     * 与 CAS 档一同改边缘掩码强锐化（量级更高以区分 CAS 档）。
-     */
+    /** 超分辨率：12 tap EASU 重建斜线，局部去振铃后恢复亮度细节。 */
     fun superResolution(src: Bitmap, strength: Float): Bitmap {
-        val long = max(src.width, src.height)
-        val casAmount = 0.7f + 0.5f * strength
-        return if (long <= 1800) {
-            casSharpenEdges(lanczosScale(src, 2f), casAmount)
-        } else {
-            casSharpenEdges(src, casAmount)
-        }
+        if (strength <= 0f) return src
+        val (w, h) = ComicEdgeUpscaler.targetSize(src)
+        val up = ComicEdgeUpscaler.upscale(src, w, h)
+        var result: Bitmap? = null
+        try { result = ComicEdgeUpscaler.sharpen(up, strength); return result }
+        finally { if (up !== src && up !== result) up.recycle() }
     }
 
     /** 简化双边滤波（颜色相似度加权均值），边缘保持降噪 */
@@ -1060,8 +1036,9 @@ object ComicImagePipeline {
      */
     fun lanczosScale(src: Bitmap, scale: Float): Bitmap {
         if (scale <= 0f || abs(scale - 1f) < 0.01f) return src
-        val nw = max(1, (src.width * scale).roundToInt()).coerceAtMost(MAX_EDGE)
-        val nh = max(1, (src.height * scale).roundToInt()).coerceAtMost(MAX_EDGE)
+        val uniform = min(scale, MAX_EDGE.toFloat() / max(src.width, src.height))
+        val nw = max(1, (src.width * uniform).roundToInt())
+        val nh = max(1, (src.height * uniform).roundToInt())
         return lanczosScaleTo(src, nw, nh)
     }
 
@@ -1079,18 +1056,35 @@ object ComicImagePipeline {
         val scaleY = nh.toFloat() / sh
         val srcPixels = IntArray(sw * sh)
         src.getPixels(srcPixels, 0, sw, 0, 0, sw, sh)
+        // Pixel-centre mapping and widened kernels on reduction prevent phase shifts/moire.
+        // Precompute once per axis; sin() used to run seven times per pixel per pass.
+        fun taps(count: Int, input: Int, scale: Float): List<Pair<IntArray, FloatArray>> {
+            val filterScale = min(1f, scale)
+            val radius = 3f / filterScale
+            return List(count) { i ->
+                val center = (i + 0.5f) / scale - 0.5f
+                val start = kotlin.math.ceil(center - radius).toInt()
+                val end = kotlin.math.floor(center + radius).toInt()
+                val indices = IntArray(end - start + 1) { (start + it).coerceIn(0, input - 1) }
+                val weights = FloatArray(indices.size) { lanczos3((center - (start + it)) * filterScale) }
+                val sum = weights.sum()
+                for (t in weights.indices) weights[t] /= sum
+                indices to weights
+            }
+        }
+        val horizontal = taps(nw, sw, scaleX)
+        val vertical = taps(nh, sh, scaleY)
         val mid = IntArray(nw * sh)
         // 水平 pass（逐行，行并行）
         parallelStripes(sh) { y0, y1 ->
             for (y in y0 until y1) {
                 val rowOff = y * sw
                 for (x in 0 until nw) {
-                    val sx = x / scaleX
-                    val center = sx.toInt()
+                    val (indices, weights) = horizontal[x]
                     var r = 0f; var g = 0f; var b = 0f; var a = 0f; var wsum = 0f
-                    for (t in -3..3) {
-                        val sxx = (center + t).coerceIn(0, sw - 1)
-                        val wgt = lanczos3(sx - sxx)
+                    for (t in indices.indices) {
+                        val sxx = indices[t]
+                        val wgt = weights[t]
                         if (wgt == 0f) continue
                         val p = srcPixels[rowOff + sxx]
                         r += ((p shr 16) and 0xFF) * wgt
@@ -1107,13 +1101,12 @@ object ComicImagePipeline {
         val outPixels = IntArray(nw * nh)
         parallelStripes(nh) { y0, y1 ->
             for (y in y0 until y1) {
-                val sy = y / scaleY
-                val center = sy.toInt()
+                val (indices, weights) = vertical[y]
                 for (x in 0 until nw) {
                     var r = 0f; var g = 0f; var b = 0f; var a = 0f; var wsum = 0f
-                    for (t in -3..3) {
-                        val syy = (center + t).coerceIn(0, sh - 1)
-                        val wgt = lanczos3(sy - syy)
+                    for (t in indices.indices) {
+                        val syy = indices[t]
+                        val wgt = weights[t]
                         if (wgt == 0f) continue
                         val p = mid[syy * nw + x]
                         r += ((p shr 16) and 0xFF) * wgt

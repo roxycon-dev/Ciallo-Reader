@@ -198,6 +198,7 @@ data class ComicReaderConfig(
 
     /** 滤镜/增强/裁边相关的指纹，用于位图处理缓存键。 */
     fun imagePipelineFingerprint(): String = listOf(
+        "enhance-v2",
         cropMode.name, manualCrop?.joinToString(","), bookRotation,
         splitWide, splitPosition,
         enhanceMode.name, enhanceStrength,
@@ -310,16 +311,13 @@ enum class ComicCropMode(val label: String) {
     OFF("关闭"), WHITE("裁白边"), BLACK("裁黑边"), AUTO("自动识别")
 }
 
-/** 画质增强（真实像素级处理，非状态开关）。四档效果取向互异（第六轮第 5 条）：
- * CAS = 同尺寸锐化（最快）；ANIME4K = 同尺寸线条重建+降噪（深线清洁）；
- * WAIFU2X = 低分辨率页 2× 神经网络超分 / 高分辨率页细节强化（最慢，有耗时提示）；
- * SUPER_RES = 低分辨率页 Lanczos 2× 重建+强锐化。 */
+/** 保留历史枚举值兼容设置；四档分别提供抑噪锐化、CNN 修复、CNN 放大和 EASU 重建。 */
 enum class ComicEnhanceMode(val label: String, val desc: String) {
     OFF("关闭", ""),
-    CAS("锐化增强", "对比度自适应锐化，强化线条与小字（最快，约 0.5 秒/页）"),
-    ANIME4K("Anime4K 轻量", "Anime4K Restore CNN 线条重建降噪，不放大（约 2-4 秒/页）"),
-    WAIFU2X("超分 完整", "Anime4K Upscale CNN ×2 神经网络超分（低分辨率页收益最大；约 2-6 秒/页，处理时有预计耗时提示）"),
-    SUPER_RES("超分辨率", "Lanczos 2× 重建 + 自适应锐化（低分辨率页翻倍清晰度）"),
+    CAS("锐化增强", "保色锐化，强化线条与小字；抑制平坦噪点与白边，处理最快"),
+    ANIME4K("Anime4K 轻量", "原生分辨率线条修复、保边降噪与细节增强"),
+    WAIFU2X("超分 完整", "分块神经网络重建，最高 2× 放大；保留细线与小字，首次处理较慢"),
+    SUPER_RES("超分辨率", "边缘自适应重建，最高 2× 放大；减少斜线锯齿，抑制白边与噪点"),
 }
 
 /** 阅读背景 */

@@ -8,7 +8,7 @@
 
 Kotlin · Jetpack Compose (Material 3) · MVVM · 单 Activity
 
-[下载 1.2.7 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.2.7/Ciallo-Reader-v1.2.7.apk) ·
+[下载 1.2.8 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.2.8/Ciallo-Reader-v1.2.8.apk) ·
 [功能](#功能) ·
 [安装](#安装) ·
 [使用说明](#使用说明) ·
@@ -16,7 +16,7 @@ Kotlin · Jetpack Compose (Material 3) · MVVM · 单 Activity
 [提交 Issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
 
 ![Android](https://img.shields.io/badge/Android-API%2024%2B-green)
-![Release](https://img.shields.io/badge/Release-v1.2.7-orange)
+![Release](https://img.shields.io/badge/Release-v1.2.8-orange)
 ![Architecture](https://img.shields.io/badge/Architecture-MVVM-blue)
 ![UI](https://img.shields.io/badge/UI-Compose%20M3-8A2BE2)
 ![License](https://img.shields.io/badge/License-All%20Rights%20Reserved-lightgrey)
@@ -31,20 +31,20 @@ Android 端小说 / 漫画阅读器，内置多书源在线聚合搜索与下载
 
 | 项目                     | 内容                                                                  |
 | ---------------------- | ------------------------------------------------------------------- |
-| 当前版本                   | 1.2.7                                                               |
+| 当前版本                   | 1.2.8                                                               |
 | 开发状态                   | 个人项目 · 活跃开发中                                                        |
 | 最低系统                   | Android 7.0（API 24）                                                 |
 | compileSdk / targetSdk | 35                                                                  |
 | 技术栈                    | Kotlin 2.0 + Jetpack Compose（Material 3）+ MVVM + Room + WorkManager |
 | 架构                     | MVVM + StateFlow + Repository，单 Activity + Navigation Compose       |
-| 测试 | 747 项 JVM / Robolectric、128 项 Android 设备测试定义；1.2.7 专项结果见 [阅读与收藏修复验证](docs/reader-fixes-1.2.7-2026-10-07.md) |
-| 正式安装包 | 1.2.7 / 208，arm64-v8a；见 [v1.2.7 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.2.7) |
+| 测试 | 764 项 JVM / Robolectric、133 项 Android 设备测试定义；本轮 280 项漫画回归通过，设备用例未执行，见 [画质增强验证](docs/comic-enhancement-rebuild-2026-10-08.md) |
+| 正式安装包 | 1.2.8 / 209，arm64-v8a；见 [v1.2.8 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.2.8) |
 
 ***
 
 ## 功能
 
-1.2.7 修复漫画双指缩放后的异常惯性、书架与收藏多选底栏触摸穿透、收藏来源警告误判，并补齐拷贝漫画公开详情分享链接；同名跨来源收藏保持独立。[修复与验证说明](docs/reader-fixes-1.2.7-2026-10-07.md)。
+1.2.8 修复增强大图放大时一直加载，重构四档画质增强和普通锐化：保留原始细字与线条，加入边缘自适应放大、保色抑噪和分块 CNN；图片先显示可读预览，失败可重试。[增强重构与验证说明](docs/comic-enhancement-rebuild-2026-10-08.md)。
 
 多语言搜索支持常用词与作品 / 人物名称映射，本地优先，缺少时在线补充并缓存；结果顶部的书源管理同款关键词卡片可查看名称、来源、提交状态与在线失败原因，支持重新查词，随结果一起滚走。人物简称支持明确的人名分隔与唯一性检查，本地缺少时在线补全。分类 PIN 保护不会误关在线补词，全局无痕会显示暂停原因。[多语言搜索说明](docs/multilingual-keyword-search-v5-2026-10-05.md)。[1.2.3 神回封面与发布说明](docs/release-1.2.3-2026-10-05.md)。
 
@@ -80,7 +80,7 @@ Android 端小说 / 漫画阅读器，内置多书源在线聚合搜索与下载
 - 仿真拖动按手指位移跟随；短滑 / 快速滑动在松手后判定，收尾动画从实际抓取点继续
 - 翻页引擎：无 / 平移 / 渐变 / 仿真卷页（含双页书脊、刚体封面、透纸背面）
 - 缩放：双击三档、长按临时放大、双指缩放平移，大图按可视区域局部解码
-- 图像处理：自动裁边、跨页拆片、色调调整、锐化、放大（Anime4K / Lanczos3）
+- 图像处理：自动裁边、跨页拆片、色调调整；四档画质增强与普通锐化，保色抑噪、边缘自适应放大和分块 CNN，增强模型内置无需下载
 - 阅读背景：纯色 / 纸张纹理 / 随当前页取色的沉浸模式
 - 预设系统：内置日漫 / 条漫 / 老漫画，可自建与收藏；每本漫画独立配置
 - 自动翻页 / 自动滚动、整本或单页旋转、音量键翻页
@@ -118,7 +118,7 @@ Android 端小说 / 漫画阅读器，内置多书源在线聚合搜索与下载
 - OCR 与译文分别缓存，网络重试复用已识别对白；翻回已译页直接显示，译名表按漫画隔离，关闭翻译释放模型内存
 - 大模型瞬时故障可降级腾讯机翻并提示原因；降级结果不冒充 AI 译文缓存。免费免 Key 大模型的稳定调用源尚未核实
 
-[1.2.5 跟手翻页与翻译链路重构记录](docs/comic-translation-rebuild-1.2.5-2026-10-07.md)。这是 1.2.5 历史优化记录；当前版本为 1.2.6。
+[1.2.5 跟手翻页与翻译链路重构记录](docs/comic-translation-rebuild-1.2.5-2026-10-07.md)。这是 1.2.5 历史优化记录；当前版本为 1.2.8。
 
 [1.2.5 阅读体验优化与验证](docs/reader-polish-1.2.5-2026-10-07.md)。
 
@@ -195,7 +195,7 @@ echo "sdk.dir=/你的/Android/Sdk/路径" > local.properties
 ./gradlew :app:assembleRelease
 ```
 
-2026-10-07 发布 1.2.6 / 207：可从 [GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.2.6/Ciallo-Reader-v1.2.6.apk) 下载；使用 Release 构建、R8 混淆与资源精简，原始输出在 `app/build/outputs/apk/release/app-release.apk`。当前包沿用 1.2.3 签名，可覆盖安装。GitHub 旧 1.2.1 包使用另一证书：若出现签名冲突，先在设置中导出备份，再安装新版并恢复；未备份前不要卸载旧版。
+2026-10-09 发布 1.2.8 / 209：可从 [GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.2.8/Ciallo-Reader-v1.2.8.apk) 下载；使用 Release 构建、R8 混淆与资源精简，原始输出在 `app/build/outputs/apk/release/app-release.apk`。当前包沿用 1.2.3 签名，可覆盖安装。GitHub 旧 1.2.1 包使用另一证书：若出现签名冲突，先在设置中导出备份，再安装新版并恢复；未备份前不要卸载旧版。
 
 ***
 
@@ -304,6 +304,7 @@ Release 包只含 arm64 库，x86_64 模拟器转译运行会崩溃；Debug 包�
 - 翻译管线：[jedzqer/manga-translator-android](https://github.com/jedzqer/manga-translator-android)
 - 仿真卷页：[harism/android-pagecurl](https://github.com/harism/android-pagecurl)
 - 缩放组件：[usuiat/Zoomable](https://github.com/usuiat/Zoomable)
+- 漫画画质增强：[AMD FidelityFX FSR1](https://github.com/GPUOpen-Effects/FidelityFX-FSR)、[bloc97/Anime4K](https://github.com/bloc97/Anime4K)，MIT 许可随安装包保留
 - 底部弹窗：[skydoves/FlexibleBottomSheet](https://github.com/skydoves/FlexibleBottomSheet)
 - Venera 源：[venera-app/venera-configs](https://github.com/venera-app/venera-configs)
 - 环境音素材：CC0（明细见 `app/src/main/assets/ambient/CREDITS.md`）
@@ -316,6 +317,8 @@ Release 包只含 arm64 库，x86_64 模拟器转译运行会崩溃；Debug 包�
 
 | 版本    | 日期         | 主要内容                              |
 | ----- | ---------- | --------------------------------- |
+| 1.2.8 | 2026-10-09 | 增强大图放大加载修复，四档增强与普通锐化重构，保色抑噪、EASU 与分块 CNN |
+| 1.2.7 | 2026-10-07 | 漫画缩放惯性、底栏触摸穿透、收藏警告与拷贝分享链接修复 |
 | 1.2.6 | 2026-10-07 | 书架分享原文件与多附件，收藏分享详情链接，本地漫画保留原归档 |
 | 1.2.5（同版本更新） | 2026-10-07 | 漫画设置逐项打磨：缩放与双页适配、自动阅读、裁边合页、配置隔离、翻译缓存和预设管理 |
 | 1.2.5 | 2026-10-07 | 小说主题玻璃排版、漫画自适应设置与动效、翻页手势及在线翻译优化 |

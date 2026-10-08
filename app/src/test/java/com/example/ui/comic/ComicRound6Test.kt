@@ -31,7 +31,7 @@ import kotlin.random.Random
  * 第六轮验收测试（round6_review 证据索引）：
  * - 第 1/4 条：缓存播种（rememberPageBitmap 初值 = 缓存命中即 Ready）
  * - 第 4 条现象三：EXIF 方向解析 / 矩阵 / 区域映射 / decodeLocal 端到端
- * - 第 5 条：四档增强显示尺度可辨性（vs 原图 + 档间两两）+ 耗时上限
+ * - 四档增强：已知清晰参考的恢复误差、原始分辨率与耗时上限
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -200,7 +200,7 @@ class ComicRound6Test {
 
     /* ═══════════ 第 5 条：四档增强可辨性 + 耗时 ═══════════ */
 
-    private fun syntheticPage(w: Int, h: Int): Bitmap {
+    private fun syntheticPage(w: Int, h: Int, addNoise: Boolean = true): Bitmap {
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         c.drawColor(Color.rgb(246, 244, 238))
@@ -218,7 +218,7 @@ class ComicRound6Test {
         for (k in 0 until w * h / 240) c.drawCircle(rnd.nextInt(w).toFloat(), rnd.nextInt(h).toFloat(), 1.5f, p)
         val px = IntArray(w * h)
         bmp.getPixels(px, 0, w, 0, 0, w, h)
-        for (i in px.indices) {
+        for (i in if (addNoise) px.indices else IntRange.EMPTY) {
             val n = rnd.nextInt(9) - 4
             px[i] = (0xFF shl 24) or
                 ((((px[i] shr 16) and 0xFF) + n).coerceIn(0, 255) shl 16) or
@@ -232,25 +232,28 @@ class ComicRound6Test {
     private fun scaledTo(b: Bitmap, w: Int, h: Int): Bitmap =
         Bitmap.createScaledBitmap(b, w, h, true)
 
-    private fun meanAbsDiff(a: Bitmap, b: Bitmap): Double {
+    private fun reconstructionError(a: Bitmap, b: Bitmap): Double {
         val w = min(a.width, b.width); val h = min(a.height, b.height)
         val pa = IntArray(w * h); val pb = IntArray(w * h)
         scaledTo(a, w, h).getPixels(pa, 0, w, 0, 0, w, h)
         scaledTo(b, w, h).getPixels(pb, 0, w, 0, 0, w, h)
         var s = 0.0
         for (i in pa.indices) {
-            s += abs(((pa[i] shr 16) and 0xFF) - ((pb[i] shr 16) and 0xFF))
-            s += abs(((pa[i] shr 8) and 0xFF) - ((pb[i] shr 8) and 0xFF))
-            s += abs((pa[i] and 0xFF) - (pb[i] and 0xFF))
+            for (shift in listOf(0, 8, 16)) {
+                val d = (pa[i] ushr shift and 255) - (pb[i] ushr shift and 255)
+                s += d.toDouble() * d
+            }
         }
         return s / pa.size / 3.0
     }
 
     @Test
-    fun `四档增强 - 显示尺度下与原图及彼此均可辨`() {
-        // 低分辨率源（超分收益最大场景）：720x1000（第六轮：真实显示尺度）
-        val src = syntheticPage(720, 1000)
-        val dw = 720; val dh = 1000
+    fun `四档增强 - 恢复软化线稿不以全图色移制造区别`() {
+        // 旧的全图 MAD 下限会奖励底色漂移、噪声放大及无意义的档间区别。
+        // 已知清晰参考 → 降采样 → 双线性放大，评估真正的恢复误差。
+        val truth = syntheticPage(720, 1000, addNoise = false)
+        val src = scaledTo(ComicImagePipeline.lanczosScaleTo(truth, 360, 500), 720, 1000)
+        val baseline = reconstructionError(truth, src)
         val modes = listOf(
             ComicEnhanceMode.CAS, ComicEnhanceMode.ANIME4K,
             ComicEnhanceMode.WAIFU2X, ComicEnhanceMode.SUPER_RES,
@@ -262,18 +265,9 @@ class ComicRound6Test {
             )
         }
         for (m in modes) {
-            val d = meanAbsDiff(scaledTo(src, dw, dh), scaledTo(outs[m]!!, dw, dh))
-            // CAS 档为纯锐化+轻线深（无 CNN/重采样），overshoot 钳制下差异量
-            // 天然低于 CNN/重采样档（视觉终审确认 2.5+ 已可辨）——阈值分档
-            val floor = if (m == ComicEnhanceMode.CAS) 2.4 else 3.0
-            assertTrue("第 5 条：$m 在显示尺度下与原图差异须肉眼可辨（meanAbsDiff=$d < $floor）", d >= floor)
-        }
-        for (i in modes.indices) for (j in i + 1 until modes.size) {
-            val d = meanAbsDiff(scaledTo(outs[modes[i]]!!, dw, dh), scaledTo(outs[modes[j]]!!, dw, dh))
-            assertTrue(
-                "第 5 条：${modes[i]} vs ${modes[j]} 显示尺度差异须可辨（meanAbsDiff=$d < 2.5）",
-                d >= 2.5,
-            )
+            val error = reconstructionError(truth, outs[m]!!)
+            println("QUALITY full-page $m MSE=$error baseline=$baseline")
+            assertTrue("$m must restore details without degrading the known reference ($error vs $baseline)", error < baseline)
         }
         // 超分档输出分辨率恒 ≥ 原图（不降级）
         for (m in modes) {
