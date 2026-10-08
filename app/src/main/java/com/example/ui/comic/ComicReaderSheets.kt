@@ -126,6 +126,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -1068,38 +1069,48 @@ private fun ActionChip(text: String, modifier: Modifier = Modifier, enabled: Boo
     }
 }
 
-/** 滤镜实时预览小图（独立小图管线，不重处理全尺寸页） */
+/** Compare a shared native detail crop or the whole page; changing modes clears stale previews. */
 @Composable
-private fun FilterPreview(page: ComicPageRef?, loader: ComicPageLoader, config: ComicReaderConfig, pageRotation: Int) {
+internal fun FilterPreview(page: ComicPageRef?, loader: ComicPageLoader, config: ComicReaderConfig, pageRotation: Int) {
     if (page == null) return
-    val previewKey = "${page.id}|${config.imagePipelineFingerprint()}|$pageRotation"
-    val original by produceState<Bitmap?>(null, page.id) {
-        value = withContext(Dispatchers.Default) {
-            try { loader.loadPreview(page, ComicImagePipeline.Geometry(), ComicImagePipeline.Toning()) }
-            catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; null }
+    var detail by remember(page.id) { mutableStateOf(true) }
+    var retry by remember(page.id) { mutableIntStateOf(0) }
+    val geometry = ComicImagePipeline.Geometry(cropMode = config.cropMode, manualCrop = config.manualCrop,
+        rotationDeg = config.bookRotation + pageRotation)
+    val previewKey = "${page.id}|${config.imagePipelineFingerprint()}|$pageRotation|$detail|$retry"
+    SegmentRow("对比范围", listOf(0 to "整页", 1 to "原始细节"), if (detail) 1 else 0) { detail = it == 1 }
+    val original by key(page.id, geometry, detail, retry) {
+        produceState<PageBitmapState>(PageBitmapState.Loading) {
+            try {
+                val bitmap = loader.loadPreview(page, geometry, ComicImagePipeline.Toning(), detail)
+                    ?: throw java.io.IOException("预览解码失败")
+                value = PageBitmapState.Ready(bitmap)
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                value = PageBitmapState.Failed(error)
+            }
         }
     }
-    val bitmap by produceState<Bitmap?>(null, previewKey) {
+    val bitmap by key(previewKey) { produceState<PageBitmapState>(PageBitmapState.Loading) {
         kotlinx.coroutines.delay(80)
-        value = withContext(Dispatchers.Default) {
-            runCatching {
-                loader.loadPreview(
+        try {
+                val result = loader.loadPreview(
                     page,
-                    ComicImagePipeline.Geometry(
-                        cropMode = config.cropMode, manualCrop = config.manualCrop,
-                        rotationDeg = config.bookRotation + pageRotation
-                    ),
+                    geometry,
                     ComicImagePipeline.Toning(
                         brightness = config.filterBrightness, contrast = config.filterContrast,
                         saturation = config.filterSaturation, hue = config.filterHue,
                         gamma = config.filterGamma, sharpen = config.filterSharpen,
                         shadow = config.filterShadow, bw = config.filterBW,
                         enhanceMode = config.enhanceMode, enhanceStrength = config.enhanceStrength,
-                    )
-                )
-            }.getOrNull()
+                    ), detail,
+                ) ?: throw java.io.IOException("预览解码失败")
+                value = PageBitmapState.Ready(result)
+        } catch (error: Exception) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            value = PageBitmapState.Failed(error)
         }
-    }
+    } }
     Row(
         Modifier.fillMaxWidth().padding(vertical = DesignTokens.SpaceCompact),
         horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceTight)
@@ -1113,9 +1124,14 @@ private fun FilterPreview(page: ComicPageRef?, loader: ComicPageLoader, config: 
                 .background(ReadingPalette.InputStroke),
             contentAlignment = Alignment.Center
         ) {
-            preview?.let {
-            Image(it.asImageBitmap(), label, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-            } ?: com.example.ui.components.ChasingDots(size = DesignTokens.SpaceLoose, color = MintPrimary)
+            when (preview) {
+                is PageBitmapState.Ready -> Image(preview.bitmap.asImageBitmap(), label,
+                    Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                is PageBitmapState.Failed -> TextButton(onClick = { retry++ }) {
+                    Text("预览失败 · 重试", color = TextSecondary)
+                }
+                PageBitmapState.Loading -> com.example.ui.components.ChasingDots(size = DesignTokens.SpaceLoose, color = MintPrimary)
+            }
         }
         Text(label, color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall, modifier = Modifier.padding(top = DesignTokens.SpaceXs))
         }

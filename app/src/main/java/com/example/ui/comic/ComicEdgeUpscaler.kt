@@ -105,13 +105,39 @@ internal object ComicEdgeUpscaler {
         return Bitmap.createBitmap(output, width, height, Bitmap.Config.ARGB_8888)
     }
 
-    /** Luma-only bounded detail gain. Flat noise and linear gradients receive almost no gain. */
-    fun sharpen(src: Bitmap, strength: Float): Bitmap {
+    /**
+     * Restore softened ink at two spatial scales. A blurred stroke's centre is a local
+     * minimum: clamping to the cross's min/max would erase exactly that restoration.
+     * Only a supported soft extremum may extend that range, with a small bounded margin.
+     * Flat paper, linear ramps and already resolved hard transitions remain unchanged.
+     */
+    fun sharpen(src: Bitmap, strength: Float): Bitmap = sharpenImpl(src, strength, restoreInk = true)
+
+    /** The reconstructed image already has focused ink; refine antialiasing without restoring twice. */
+    fun sharpenReconstruction(src: Bitmap, strength: Float): Bitmap = sharpenImpl(src, strength, restoreInk = false)
+
+    /** Crisp antialiased pages contain a large proportion of already steep edge samples. */
+    private fun restorationScale(pixels: IntArray, w: Int, h: Int): Float {
+        val step = max(1, sqrt(w.toDouble() * h / 65_536).toInt())
+        fun lum(c: Int): Float = (c shr 16 and 255) * .299f + (c shr 8 and 255) * .587f + (c and 255) * .114f
+        var edges = 0; var focused = 0
+        for (y in 0 until h - 1 step step) for (x in 0 until w - 1 step step) {
+            val i = y * w + x; val c = lum(pixels[i])
+            val horizontal = abs(c - lum(pixels[i + 1])); val vertical = abs(c - lum(pixels[i + w]))
+            if (horizontal > 12f) { edges++; if (horizontal > 72f) focused++ }
+            if (vertical > 12f) { edges++; if (vertical > 72f) focused++ }
+        }
+        if (edges < 64) return 1f
+        return ((.40f - focused.toFloat() / edges) / .25f).coerceIn(0f, 1f)
+    }
+
+    private fun sharpenImpl(src: Bitmap, strength: Float, restoreInk: Boolean): Bitmap {
         if (strength <= 0f || src.width < 3 || src.height < 3) return src
         val w = src.width; val h = src.height
         val pixels = IntArray(w * h)
         src.getPixels(pixels, 0, w, 0, 0, w, h)
         val out = pixels.copyOf()
+        val restoreStrength = if (restoreInk) strength.coerceIn(0f, 1f) * restorationScale(pixels, w, h) else strength
         fun lum(c: Int): Float = (c shr 16 and 255) * 0.299f + (c shr 8 and 255) * 0.587f + (c and 255) * 0.114f
         ComicImagePipeline.parallelStripes(h - 2) { y0, y1 ->
             for (y in y0 + 1 until y1 + 1) for (x in 1 until w - 1) {
@@ -120,12 +146,40 @@ internal object ComicEdgeUpscaler {
                 val d = lum(pixels[i + 1]); val e = lum(pixels[i + w])
                 val lo = minOf(c, a, b, d, e); val hi = maxOf(c, a, b, d, e)
                 val range = hi - lo
-                val edge = ((range - 8f) / 40f).coerceIn(0f, 1f)
+                if (!restoreInk) {
+                    val edge = ((range - 8f) / 40f).coerceIn(0f, 1f)
+                    val detail = c - (a + b + d + e) * .25f
+                    val gain = edge * edge * (3f - 2f * edge) * strength.coerceIn(0f, 1f)
+                    val red = pixels[i] shr 16 and 255; val green = pixels[i] shr 8 and 255; val blue = pixels[i] and 255
+                    val delta = (detail * gain * 1.8f).coerceIn(-24f * strength, 24f * strength)
+                        .coerceIn(lo - c, hi - c)
+                        .coerceIn(-minOf(red, green, blue).toFloat(), (255 - maxOf(red, green, blue)).toFloat())
+                    fun ch(shift: Int) = ((pixels[i] ushr shift and 255) + delta).roundToInt().coerceIn(0, 255)
+                    out[i] = (pixels[i] and 0xFF000000.toInt()) or (ch(16) shl 16) or (ch(8) shl 8) or ch(0)
+                    continue
+                }
+                val edge = ((range - 8f) / 28f).coerceIn(0f, 1f)
                 val detail = c - (a + b + d + e) * 0.25f
-                val gain = edge * edge * (3f - 2f * edge) * strength.coerceIn(0f, 1f)
+                if (edge == 0f || abs(detail) < .25f) continue
+                // Opposing samples distinguish a soft stroke/transition from a one-sided
+                // step. Very large jumps are already focused; do not invent dark outlines.
+                val opposing = max(min(abs(c - a), abs(c - e)), min(abs(c - b), abs(c - d)))
+                val soft = ((opposing - 1f) / 5f).coerceIn(0f, 1f) *
+                    (1f - ((opposing - 64f) / 48f).coerceIn(0f, 1f))
+                if (soft == 0f) continue
+                val ax = (x - 2).coerceAtLeast(0); val bx = (x + 2).coerceAtMost(w - 1)
+                val ay = (y - 2).coerceAtLeast(0); val by = (y + 2).coerceAtMost(h - 1)
+                val broad = c - (lum(pixels[ay * w + x]) + lum(pixels[by * w + x]) +
+                    lum(pixels[y * w + ax]) + lum(pixels[y * w + bx])) * .25f
+                // A broader supported residual survives fitting the full page to the screen.
+                val supported = if (broad * detail > 0f) broad else 0f
+                val gain = edge * edge * (3f - 2f * edge) * soft * restoreStrength
+                val minimum = c <= lo + .01f && ((c < b - 2f && c < d - 2f) || (c < a - 2f && c < e - 2f))
+                val maximum = c >= hi - .01f && ((c > b + 2f && c > d + 2f) || (c > a + 2f && c > e + 2f))
+                val margin = min(20f, range * .6f) * restoreStrength * soft
                 val red = pixels[i] shr 16 and 255; val green = pixels[i] shr 8 and 255; val blue = pixels[i] and 255
-                val delta = (detail * gain * 1.8f).coerceIn(-24f * strength, 24f * strength)
-                    .coerceIn(lo - c, hi - c)
+                val delta = ((detail * 2.2f + supported * .75f) * gain).coerceIn(-36f * restoreStrength, 36f * restoreStrength)
+                    .coerceIn(lo - c - if (minimum) margin else 0f, hi - c + if (maximum) margin else 0f)
                     .coerceIn(-minOf(red, green, blue).toFloat(), (255 - maxOf(red, green, blue)).toFloat())
                 fun ch(shift: Int) = ((pixels[i] ushr shift and 255) + delta).roundToInt().coerceIn(0, 255)
                 out[i] = (pixels[i] and 0xFF000000.toInt()) or (ch(16) shl 16) or (ch(8) shl 8) or ch(0)

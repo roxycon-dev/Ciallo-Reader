@@ -198,7 +198,7 @@ data class ComicReaderConfig(
 
     /** 滤镜/增强/裁边相关的指纹，用于位图处理缓存键。 */
     fun imagePipelineFingerprint(): String = listOf(
-        "enhance-v2",
+        "enhance-v3",
         cropMode.name, manualCrop?.joinToString(","), bookRotation,
         splitWide, splitPosition,
         enhanceMode.name, enhanceStrength,

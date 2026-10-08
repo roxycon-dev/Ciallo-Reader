@@ -186,6 +186,26 @@ class ComicEnhancementV2Test {
         }
     }
 
+    @Test fun aLateReadingPreviewCannotReplaceTheFinalCurlBitmap() {
+        val ref = ComicPageRef.Remote("preview-final-order", "https://example.invalid/page.jpg")
+        val slot = ComicSlot(ref, 0)
+        val config = ComicReaderConfig(enhanceMode = ComicEnhanceMode.SUPER_RES)
+        val controller = ComicHarismController().apply {
+            this.config = config
+            this.layout = ComicLayout(listOf(ComicSpread(0, listOf(slot))), emptyMap())
+            currentSpreadHint = 0
+        }
+        val key = slotCacheKey(slot, config, ComicBookState())
+        val preview = Bitmap.createBitmap(64, 96, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GRAY) }
+        val final = Bitmap.createBitmap(128, 192, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.BLUE) }
+        assertTrue(controller.putPreviewCache(key, preview))
+        controller.putCache(key, final)
+        assertFalse("Late progressive/neighbor events cannot downgrade the final page", controller.putPreviewCache(key, preview))
+        assertSame(final, controller.getCache(key))
+        controller.clearCache()
+        assertTrue("A new load can publish its own preview after reset", controller.putPreviewCache(key, preview))
+    }
+
     @Test fun edgeReconstructionImprovesDegradedDiagonalAgainstKnownReferenceAndExportsEvidence() {
         val truth = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
         truth.eraseColor(Color.WHITE)
@@ -202,7 +222,8 @@ class ComicEnhancementV2Test {
         val baseline = mse(bilinear); val actual = mse(enhanced)
         println("QUALITY diagonal PSNR bilinear=${10 * log10(65025 / baseline)} enhanced=${10 * log10(65025 / actual)}")
         assertTrue("Reconstruction error must improve, not just sharpness ($actual vs $baseline)", actual < baseline)
-        val dir = File(System.getProperty("user.dir"), "../artifacts/enhancement-2026-10-08/quality").apply { mkdirs() }
+        assertTrue("Already focused diagonal/text quality must survive stronger blurred-ink restoration", 10 * log10(65025 / actual) >= 30.0)
+        val dir = File(System.getProperty("user.dir"), "../artifacts/enhancement-visibility-2026-10-09/reconstruction-quality").apply { mkdirs() }
         for ((name, bmp) in listOf("reference" to truth, "degraded-bilinear" to bilinear, "enhanced-easu" to enhanced))
             File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }

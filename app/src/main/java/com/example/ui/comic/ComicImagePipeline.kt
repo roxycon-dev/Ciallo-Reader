@@ -903,12 +903,12 @@ object ComicImagePipeline {
         // 预降噪：Restore 网络对 iid 噪声分布外（平坦噪声实测放大 1.8×）——
         // Anime4K 官方 Mode A 同样以降噪前置配合 Restore；bilateral 保边，
         // 线条不受影响，平坦噪声先清掉再进网络
-        val den = bilateralLite(src, radius = 1, sigmaColor = 12f + 24f * strength)
+        val den = bilateralLite(src, radius = 1, sigmaColor = 8f + 12f * strength)
         var restored: Bitmap? = null
         var result: Bitmap? = null
         try {
             restored = Anime4KCnn.restore(den, strength)
-            result = ComicEdgeUpscaler.sharpen(restored, 0.65f * strength)
+            result = ComicEdgeUpscaler.sharpen(restored, strength)
             return result
         } finally {
             if (den !== src && den !== result) den.recycle()
@@ -964,31 +964,38 @@ object ComicImagePipeline {
         if (long < 8) return src
         val (w, h) = ComicEdgeUpscaler.targetSize(src)
         // Infer at the native source scale. Never shrink text to satisfy the CNN budget.
-        val up = if (w == src.width * 2 && h == src.height * 2) {
-            Anime4KCnn.upscale2x(src, strength)
-        } else {
-            val restored = Anime4KCnn.restore(src, strength)
-            var scaled: Bitmap? = null
-            try {
-                scaled = ComicEdgeUpscaler.upscale(restored, w, h)
-                scaled
-            } finally {
-                if (restored !== src && restored !== scaled) restored.recycle()
-            }
-        }
+        // Restore before enlargement: a one-output-pixel correction largely vanishes
+        // when a 2x image is fitted back to reading size. Native ink restoration survives.
+        val restored = anime4kRestore(src, strength)
+        var up: Bitmap? = null
         var result: Bitmap? = null
-        try { result = ComicEdgeUpscaler.sharpen(up, strength); return result }
-        finally { if (up !== src && up !== result) up.recycle() }
+        try {
+            up = if (w == src.width * 2 && h == src.height * 2) {
+                Anime4KCnn.upscale2x(restored, strength)
+            } else ComicEdgeUpscaler.upscale(restored, w, h)
+            result = ComicEdgeUpscaler.sharpenReconstruction(up, strength)
+            return result
+        } finally {
+            if (restored !== src && restored !== result) restored.recycle()
+            if (up !== src && up !== restored && up !== result) up?.recycle()
+        }
     }
 
     /** 超分辨率：12 tap EASU 重建斜线，局部去振铃后恢复亮度细节。 */
     fun superResolution(src: Bitmap, strength: Float): Bitmap {
         if (strength <= 0f) return src
         val (w, h) = ComicEdgeUpscaler.targetSize(src)
-        val up = ComicEdgeUpscaler.upscale(src, w, h)
+        val restored = ComicEdgeUpscaler.sharpen(src, strength)
+        var up: Bitmap? = null
         var result: Bitmap? = null
-        try { result = ComicEdgeUpscaler.sharpen(up, strength); return result }
-        finally { if (up !== src && up !== result) up.recycle() }
+        try {
+            up = ComicEdgeUpscaler.upscale(restored, w, h)
+            result = ComicEdgeUpscaler.sharpenReconstruction(up, strength)
+            return result
+        } finally {
+            if (restored !== src && restored !== result) restored.recycle()
+            if (up !== src && up !== restored && up !== result) up?.recycle()
+        }
     }
 
     /** 简化双边滤波（颜色相似度加权均值），边缘保持降噪 */

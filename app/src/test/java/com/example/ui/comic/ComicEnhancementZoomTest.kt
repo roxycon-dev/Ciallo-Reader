@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
@@ -87,5 +88,27 @@ class ComicEnhancementZoomTest {
             rule.onAllNodesWithContentDescription("第 1 页").assertCountEquals(2)
             rule.onNodeWithText("加载失败·重试").assertDoesNotExist()
         } finally { loader.shutdown() }
+    }
+
+    @Test fun settingsDetailPreviewsHaveTerminalRetryAndRecoverWithoutCachingAFailure() {
+        val file = File(context.cacheDir, "native-preview-retry.png").apply { delete() }
+        val ref = ComicPageRef.Local("native-preview-retry", file.absolutePath)
+        val loader = ComicPageLoader(context)
+        try {
+            rule.setContent {
+                Column(Modifier.requiredSize(400.dp, 700.dp)) {
+                    FilterPreview(ref, loader, ComicReaderConfig(enhanceMode = ComicEnhanceMode.SUPER_RES), 0)
+                }
+            }
+            rule.waitUntil(8000) { rule.onAllNodesWithText("预览失败 · 重试").fetchSemanticsNodes().size == 2 }
+            rule.onNodeWithContentDescription("当前效果").assertDoesNotExist()
+            val bitmap = Bitmap.createBitmap(128, 192, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GREEN) }
+            file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            rule.onAllNodesWithText("预览失败 · 重试").onFirst().performClick()
+            rule.waitUntil(8000) { rule.onAllNodesWithContentDescription("当前效果").fetchSemanticsNodes().isNotEmpty() }
+            rule.onNodeWithContentDescription("原图").assertExists()
+            rule.onNodeWithText("原始细节").assertExists()
+            rule.onAllNodesWithText("预览失败 · 重试").assertCountEquals(0)
+        } finally { loader.shutdown(); file.delete() }
     }
 }

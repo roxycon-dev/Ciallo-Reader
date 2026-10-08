@@ -613,11 +613,25 @@ internal class ComicHarismController {
 
     /** LRU 预加载缓存：条数 ≤8 且字节 ≤64MB（防强引用绕过 loader LruCache 字节预算） */
     private val slotCache = LinkedHashMap<String, Bitmap>(16, 0.75f, true)
+    private val finalCacheKeys = HashSet<String>()
     private val knownSizes = LinkedHashMap<String, Size>()
     private var cacheBytes = 0L
 
     @Synchronized
     fun putCache(key: String, bmp: Bitmap) {
+        finalCacheKeys.add(key)
+        storeCache(key, bmp)
+    }
+
+    /** Late preview notifications may arrive after final loading or cache eviction. */
+    @Synchronized
+    fun putPreviewCache(key: String, bmp: Bitmap): Boolean {
+        if (key in finalCacheKeys || slotCache[key] === bmp) return false
+        storeCache(key, bmp)
+        return true
+    }
+
+    private fun storeCache(key: String, bmp: Bitmap) {
         val old = slotCache.put(key, bmp)
         knownSizes[key] = Size(bmp.width.toFloat(), bmp.height.toFloat())
         while (knownSizes.size > 512) knownSizes.remove(knownSizes.keys.first())
@@ -667,6 +681,7 @@ internal class ComicHarismController {
         view?.let { v -> pendingRefresh?.let { v.removeCallbacks(it) } }
         pendingRefresh = null
         slotCache.clear()
+        finalCacheKeys.clear()
         knownSizes.clear()
         cacheBytes = 0L
     }
@@ -686,6 +701,7 @@ internal class ComicHarismController {
             val e = it.next()
             if (e.key in visibleKeys) continue
             cacheBytes -= e.value.byteCount.toLong()
+            finalCacheKeys.remove(e.key)
             it.remove()
         }
     }
@@ -1185,6 +1201,8 @@ internal fun ComicHarismCurlReader(
     // Compose 层叠加与书库搜索同款的动画 ChasingDots —— 纹理就绪即刻撤下
     var curlPageLoading by remember { mutableStateOf(false) }
     var curlPageFailed by remember { mutableStateOf(false) }
+    var curlPageRefining by remember { mutableStateOf(false) }
+    var curlEnhancementError by remember { mutableStateOf<Throwable?>(null) }
     var pageRetry by remember { mutableIntStateOf(0) }
     val latestCurrent by rememberUpdatedState(currentSpread)
     val latestOnSpread by rememberUpdatedState(onSpreadChanged)
@@ -1334,6 +1352,8 @@ internal fun ComicHarismCurlReader(
         controller.currentSpreadHint = currentSpread
         val gen = ++controller.displayGeneration
         curlPageFailed = false
+        curlPageRefining = false
+        curlEnhancementError = null
         // 加载圈判定与 composeSpread 纹理解析同源：精确键或任意变体命中即视为已就绪
         curlPageLoading = layout.spreads.getOrNull(currentSpread)?.slots?.any { slot ->
             controller.getCache(slotCacheKey(slot, config, bookState)) == null &&
@@ -1350,8 +1370,7 @@ internal fun ComicHarismCurlReader(
                 layout.spreads.getOrNull(currentSpread)?.slots?.forEach { slot ->
                     val key = slotCacheKey(slot, config, bookState)
                     if (loader.peekProcessed(key) == null) loader.peekReadingPreview(key)?.let {
-                        if (controller.getCache(key) !== it) {
-                            controller.putCache(key, it)
+                        if (controller.putPreviewCache(key, it)) {
                             changed = true
                         }
                     }
@@ -1360,6 +1379,7 @@ internal fun ComicHarismCurlReader(
                     controller.applyPageRects(currentSpread, config, bookState, layout)
                     controller.refreshDisplay(currentSpread)
                     curlPageLoading = false
+                    curlPageRefining = ComicImagePipeline.toningHasWork(toneOf(config))
                 }
             }
         }
@@ -1367,6 +1387,7 @@ internal fun ComicHarismCurlReader(
         withContext(Dispatchers.Default) {
             targets.forEach { si ->
                 var failed = false
+                var enhancementError: Throwable? = null
                 layout.spreads[si].slots.forEach { slot ->
                     val key = slotCacheKey(slot, config, bookState)
                     val rotation = ((config.bookRotation + (bookState.pageRotations[slot.ref.id] ?: 0)) % 360 + 360) % 360
@@ -1383,6 +1404,7 @@ internal fun ComicHarismCurlReader(
                             visible = si == currentSpread,
                         )
                         controller.putCache(key, result.bitmap)
+                        if (result.error != null) enhancementError = result.error
                         if (si == currentSpread) currentShown = true
                     } catch (ce: CancellationException) {
                         throw ce
@@ -1401,6 +1423,8 @@ internal fun ComicHarismCurlReader(
                         controller.pendingRetexture = false
                         curlPageFailed = failed
                         curlPageLoading = false
+                        curlPageRefining = false
+                        curlEnhancementError = enhancementError
                     }
                 }
             }
@@ -1594,6 +1618,10 @@ internal fun ComicHarismCurlReader(
             ) {
                 ComicLoadingFeedback(layout.spreads.getOrNull(currentSpread)?.slots?.firstOrNull()?.ref) { pageRetry++ }
             }
+        }
+        if (!zoomOverlay) {
+            ComicRefinementFeedback(curlPageRefining, curlEnhancementError,
+                Modifier.align(Alignment.BottomCenter)) { pageRetry++ }
         }
         if (curlPageFailed && !zoomOverlay) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

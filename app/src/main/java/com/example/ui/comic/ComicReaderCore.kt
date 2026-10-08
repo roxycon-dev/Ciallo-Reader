@@ -2224,7 +2224,7 @@ internal fun ComicLoadingFeedback(ref: ComicPageRef?, onRetry: (() -> Unit)? = n
 
 /** 增强处理耗时提示文案（null = 未开启增强，不显示） */
 internal fun enhanceHintFor(config: ComicReaderConfig, longEdge: Int): String? {
-    if (config.enhanceMode == ComicEnhanceMode.OFF) return null
+    if (config.enhanceMode == ComicEnhanceMode.OFF || config.enhanceStrength <= 0) return null
     val sec = ComicImagePipeline.enhanceEstimateSec(config.enhanceMode, config.enhanceStrength, longEdge)
     return "画质增强处理中 · 约 ${if (sec == sec.toLong().toDouble()) sec.toInt().toString() else sec}s"
 }

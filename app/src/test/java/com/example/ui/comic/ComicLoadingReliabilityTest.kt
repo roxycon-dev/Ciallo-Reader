@@ -158,7 +158,7 @@ class ComicLoadingReliabilityTest {
         } finally { loader.shutdown() }
     }
 
-    @Test fun `parallel remote loads download once and enhancement publishes a geometry-correct preview`() = imageLoad {
+    @Test fun `parallel remote loads download once and retire preview after a geometry-correct result`() = imageLoad {
         val requests = AtomicInteger()
         val src = Bitmap.createBitmap(160, 240, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.WHITE) }
         val bytes = ByteArrayOutputStream().also { src.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
@@ -178,10 +178,10 @@ class ComicLoadingReliabilityTest {
             val results = (0..3).map { async { loader.load(ref, "one-key", geo, tone) } }.awaitAll()
             assertEquals(1, requests.get())
             assertTrue(results.all { it.bitmap === results.first().bitmap })
-            val preview = loader.peekReadingPreview("one-key")!!
-            assertEquals(240, preview.width)
-            assertEquals(80, preview.height)
+            assertEquals(240, results.first().bitmap.width)
+            assertEquals(80, results.first().bitmap.height)
             assertTrue(loader.previewEpoch.value > 0)
+            assertNull("A completed final image must retire its temporary preview", loader.peekReadingPreview("one-key"))
             assertSame(results.first().bitmap, loader.peekProcessed("one-key"))
         } finally { loader.shutdown(); imageLoader.shutdown() }
     }

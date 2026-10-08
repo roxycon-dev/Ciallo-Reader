@@ -104,6 +104,10 @@ class ComicPageLoader(
     private val previewCache = object : LruCache<String, Bitmap>(PREVIEW_CACHE_BYTES) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
     }
+    private val previewInputs = object : LruCache<String, Bitmap>(PREVIEW_CACHE_BYTES) {
+        override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
+    }
+    private val previewInputMutex = Mutex()
 
     /** 缩略图缓存（进度条/目录） */
     private val thumbCache = object : LruCache<String, Bitmap>(8 shl 20) {
@@ -498,7 +502,7 @@ class ComicPageLoader(
                         // Preserve the page's crop/split/rotation when enhancement fails.
                         ComicImagePipeline.process(raw, geo, ComicImagePipeline.Toning())
                     }
-                }
+                }.also { readingPreviews.remove(cacheKey) }
             }
             recordPageBytes(ref, bitmap)
             cacheDbg { "put key=$cacheKey bytes=${bitmap.byteCount} max=${cache.maxSize()}" }
@@ -565,15 +569,34 @@ class ComicPageLoader(
         ref: ComicPageRef,
         geo: ComicImagePipeline.Geometry,
         tone: ComicImagePipeline.Toning,
+        detail: Boolean = false,
     ): Bitmap? = withContext(Dispatchers.Default) {
-        val key = "pv|${ref.id}|${geo.half}|${geo.splitPosition}|${geo.rotationDeg}|${geo.cropMode}|${geo.manualCrop}" +
-            "|${tone.brightness},${tone.contrast},${tone.saturation},${tone.hue},${tone.gamma}," +
-            "${tone.sharpen},${tone.shadow},${tone.bw},${tone.enhanceMode},${tone.enhanceStrength}"
+        val inputKey = "pv-native-detail|${ref.id}|$geo|$detail"
+        val key = "$inputKey|$tone"
         previewCache.get(key)?.let { return@withContext it }
-        val small = decodeRaw(ref, maxEdge = 540) ?: return@withContext null
-        val out = runCatching { ComicImagePipeline.process(small, geo, tone) }.getOrDefault(small)
-        previewCache.put(key, out)
-        out
+        try {
+            val small = previewInputMutex.withLock {
+                previewInputs.get(inputKey) ?: run {
+                    val decoded = decodeRaw(ref, maxEdge = if (detail) DECODE_MAX_EDGE else 540)
+                        ?: return@withContext null
+                    val geometry = ComicImagePipeline.process(decoded, geo, ComicImagePipeline.Toning())
+                    val sample = if (detail) {
+                        val w = minOf(480, geometry.width); val h = minOf(480, geometry.height)
+                        Bitmap.createBitmap(geometry, (geometry.width - w) / 2, (geometry.height - h) / 2, w, h)
+                    } else geometry
+                    if (geometry !== decoded && geometry !== sample) geometry.recycle()
+                    previewInputs.put(inputKey, sample)
+                    sample
+                }
+            }
+            // Original and enhanced crops share native pixels. A failed/cancelled
+            // preview must never be cached and labelled as the enhanced image.
+            val out = runInterruptible { ComicImagePipeline.process(small, ComicImagePipeline.Geometry(), tone) }
+            previewCache.put(key, out)
+            out
+        } catch (error: OutOfMemoryError) {
+            throw IOException("增强预览内存不足，请重试", error)
+        }
     }
 
     /** 进度缩略图 */
@@ -974,6 +997,7 @@ class ComicPageLoader(
         }
         previewCache.evictAll()
         readingPreviews.evictAll()
+        previewInputs.evictAll()
         // regionCache 条目虽含指纹 key，但陈旧 tile 仍占 32MB LRU 空间——一并清空
         regionCache.evictAll()
         // decoder 池同样回收（evictAll 触发 entryRemoved → recycle）：必须先拿
