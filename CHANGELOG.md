@@ -2,6 +2,12 @@
 
 All notable changes to Ciallo Reader are documented in this file.
 
+## [1.3.0] — 2026-10-09
+
+- 修复开启画质增强后，仿真卷页翻到下一页先出现空白的问题：相邻页的原图预览提前进入卷页缓存，纹理创建直接读取共享加载结果，增强完成后再替换最终图。
+- 相邻页预加载完成也会通知卷页刷新；翻页或拖动期间延后更新纹理，落定后立即补齐已有预览，旧页回调不会取消新页的刷新。
+- 保留双页、RTL、拆页和单页旋转；最终图拒绝迟到预览覆盖。版本 1.3.0 / 211。[修复与验证](docs/comic-curl-enhancement-paging-1.3.0-2026-10-09.md)。
+
 ## [1.2.9] — 2026-10-09
 
 - 修正增强与普通锐化效果偏弱：模糊墨线中心不再被钳回原值，两个空间尺度恢复原始细字；已清晰页面降低处理力度，保留纸底和颜色。
@@ -578,4 +584,3 @@ All notable changes to Ciallo Reader are documented in this file.
 | SquishyToggleSwitch | [Swapnil-J-Patil/Switch-Animation](https://github.com/Swapnil-J-Patil/Switch-Animation-Jetpack-Compose/) | 弹性挤压开关            |
 | ChromaFlow          | [M1n9yu23/ChromaFlow](https://github.com/M1n9yu23/ChromaFlow)（概念参考）                                      | 边缘光弧巡游效果          |
 | ShimmerFy           | [tusharhow/Shimmerfy](https://github.com/tusharhow/Shimmerfy)（概念参考）                                      | 卡面珠光微光层           |
-

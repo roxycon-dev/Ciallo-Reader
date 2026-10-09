@@ -8,7 +8,7 @@
 
 Kotlin · Jetpack Compose (Material 3) · MVVM · 单 Activity
 
-[下载 1.2.9 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.2.9/Ciallo-Reader-v1.2.9.apk) ·
+[下载 1.3.0 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.0/Ciallo-Reader-v1.3.0.apk) ·
 [功能](#功能) ·
 [安装](#安装) ·
 [使用说明](#使用说明) ·
@@ -16,7 +16,7 @@ Kotlin · Jetpack Compose (Material 3) · MVVM · 单 Activity
 [提交 Issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
 
 ![Android](https://img.shields.io/badge/Android-API%2024%2B-green)
-![Release](https://img.shields.io/badge/Release-v1.2.9-orange)
+![Release](https://img.shields.io/badge/Release-v1.3.0-orange)
 ![Architecture](https://img.shields.io/badge/Architecture-MVVM-blue)
 ![UI](https://img.shields.io/badge/UI-Compose%20M3-8A2BE2)
 ![License](https://img.shields.io/badge/License-All%20Rights%20Reserved-lightgrey)
@@ -31,18 +31,20 @@ Android 端小说 / 漫画阅读器，内置多书源在线聚合搜索与下载
 
 | 项目                     | 内容                                                                  |
 | ---------------------- | ------------------------------------------------------------------- |
-| 当前版本                   | 1.2.9                                                               |
+| 当前版本                   | 1.3.0                                                               |
 | 开发状态                   | 个人项目 · 活跃开发中                                                        |
 | 最低系统                   | Android 7.0（API 24）                                                 |
 | compileSdk / targetSdk | 35                                                                  |
 | 技术栈                    | Kotlin 2.0 + Jetpack Compose（Material 3）+ MVVM + Room + WorkManager |
 | 架构                     | MVVM + StateFlow + Repository，单 Activity + Navigation Compose       |
-| 测试 | 770 项 JVM / Robolectric、133 项 Android 设备测试定义；本轮 286 项漫画回归通过，见 [增强实际可见性验证](docs/comic-enhancement-visibility-1.2.9-2026-10-09.md)，设备用例未执行 |
-| 正式安装包 | 1.2.9 / 210，arm64-v8a；见 [v1.2.9 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.2.9) |
+| 测试 | 本轮 290 项漫画 JVM / Robolectric 回归通过，36 个套件；见 [1.3.0 卷页修复验证](docs/comic-curl-enhancement-paging-1.3.0-2026-10-09.md)，设备用例未执行 |
+| 正式安装包 | 1.3.0 / 211，arm64-v8a；见 [v1.3.0 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.3.0) |
 
 ***
 
 ## 功能
+
+1.3.0 修复开启画质增强后仿真卷页先空白再显示下一页：提前接入相邻页原图预览，增强完成后安全替换纹理。[修复与验证](docs/comic-curl-enhancement-paging-1.3.0-2026-10-09.md)。
 
 1.2.9 修正画质增强效果偏弱：恢复模糊墨线的中心，超分先恢复原始细字再放大；设置可对比原始像素细节，卷页提示增强进度与失败，迟到预览不能覆盖最终图。[实际可见性与验证](docs/comic-enhancement-visibility-1.2.9-2026-10-09.md)。[1.2.8 增强重构记录](docs/comic-enhancement-rebuild-2026-10-08.md)。
 
@@ -118,7 +120,7 @@ Android 端小说 / 漫画阅读器，内置多书源在线聚合搜索与下载
 - OCR 与译文分别缓存，网络重试复用已识别对白；翻回已译页直接显示，译名表按漫画隔离，关闭翻译释放模型内存
 - 大模型瞬时故障可降级腾讯机翻并提示原因；降级结果不冒充 AI 译文缓存。免费免 Key 大模型的稳定调用源尚未核实
 
-[1.2.5 跟手翻页与翻译链路重构记录](docs/comic-translation-rebuild-1.2.5-2026-10-07.md)。这是 1.2.5 历史优化记录；当前版本为 1.2.9。
+[1.2.5 跟手翻页与翻译链路重构记录](docs/comic-translation-rebuild-1.2.5-2026-10-07.md)。这是 1.2.5 历史优化记录；当前版本为 1.3.0。
 
 [1.2.5 阅读体验优化与验证](docs/reader-polish-1.2.5-2026-10-07.md)。
 
@@ -195,7 +197,7 @@ echo "sdk.dir=/你的/Android/Sdk/路径" > local.properties
 ./gradlew :app:assembleRelease
 ```
 
-2026-10-09 发布 1.2.9 / 210：可从 [GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.2.9/Ciallo-Reader-v1.2.9.apk) 下载；使用 Release 构建、R8 混淆与资源精简，原始输出在 `app/build/outputs/apk/release/app-release.apk`。当前包沿用 1.2.3 签名，可覆盖安装。GitHub 旧 1.2.1 包使用另一证书：若出现签名冲突，先在设置中导出备份，再安装新版并恢复；未备份前不要卸载旧版。
+2026-10-09 发布 1.3.0 / 211：可从 [GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.0/Ciallo-Reader-v1.3.0.apk) 下载；使用 Release 构建、R8 混淆与资源精简，原始输出在 `app/build/outputs/apk/release/app-release.apk`。当前包沿用 1.2.9 签名，可覆盖安装。GitHub 旧 1.2.1 包使用另一证书：若出现签名冲突，先在设置中导出备份，再安装新版并恢复；未备份前不要卸载旧版。
 
 ***
 
@@ -317,6 +319,7 @@ Release 包只含 arm64 库，x86_64 模拟器转译运行会崩溃；Debug 包�
 
 | 版本    | 日期         | 主要内容                              |
 | ----- | ---------- | --------------------------------- |
+| 1.3.0 | 2026-10-09 | 修复画质增强期间仿真卷页下一页空白，提前显示邻页预览并安全更新纹理 |
 | 1.2.9 | 2026-10-09 | 模糊细字恢复力度修正，原始细节对比、预览覆盖与卷页失败反馈修复 |
 | 1.2.8 | 2026-10-09 | 增强大图放大加载修复，四档增强与普通锐化重构，保色抑噪、EASU 与分块 CNN |
 | 1.2.7 | 2026-10-07 | 漫画缩放惯性、底栏触摸穿透、收藏警告与拷贝分享链接修复 |

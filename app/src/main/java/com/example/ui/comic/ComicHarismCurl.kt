@@ -529,7 +529,7 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
 }
 
 /** 控制器：持有 view 与预加载缓存，桥接 Compose 侧状态与 GL 线程的 PageProvider */
-internal class ComicHarismController {
+internal class ComicHarismController(private val loader: ComicPageLoader? = null) {
     var view: ComicCurlView? = null
     var layout: ComicLayout? = null
     var config: ComicReaderConfig? = null
@@ -595,7 +595,7 @@ internal class ComicHarismController {
             twoPage = twoPage, spread = spread, config = config,
             containerW = v.width.toFloat(), containerH = v.height.toFloat(), density = density,
             intrinsicOf = { slot ->
-                (getCache(slotCacheKey(slot, config, state)) ?: getCacheAnyVariant(slot.ref.id))
+                resolveBitmap(slot, config, state)
                     ?.let { Size(it.width.toFloat(), it.height.toFloat()) }
                     ?: knownSize(slotCacheKey(slot, config, state))
             },
@@ -618,9 +618,11 @@ internal class ComicHarismController {
     private var cacheBytes = 0L
 
     @Synchronized
-    fun putCache(key: String, bmp: Bitmap) {
+    fun putCache(key: String, bmp: Bitmap): Boolean {
+        val changed = slotCache[key] !== bmp
         finalCacheKeys.add(key)
         storeCache(key, bmp)
+        return changed
     }
 
     /** Late preview notifications may arrive after final loading or cache eviction. */
@@ -642,14 +644,43 @@ internal class ComicHarismController {
     @Synchronized
     fun getCache(key: String): Bitmap? = slotCache[key]
 
+    /** Texture creation must see loader results even before the Compose collector runs. */
+    private fun exactBitmap(key: String): Bitmap? =
+        loader?.peekProcessed(key) ?: getCache(key) ?: loader?.peekReadingPreview(key)
+
+    fun resolveBitmap(slot: ComicSlot, cfg: ComicReaderConfig, state: ComicBookState): Bitmap? =
+        exactBitmap(slotCacheKey(slot, cfg, state)) ?: getCacheAnyVariant(slot.ref.id)
+
+    @Synchronized
+    fun hasFinalBitmap(key: String): Boolean =
+        loader?.peekProcessed(key) != null || (key in finalCacheKeys && slotCache[key] != null)
+
+    /** Stage neighbors too: their textures are revealed before they become the current page. */
+    fun syncReadingWindow(spreads: List<Int>, cfg: ComicReaderConfig, state: ComicBookState): Boolean {
+        val source = loader ?: return false
+        var changed = false
+        spreads.forEach { index ->
+            layout?.spreads?.getOrNull(index)?.slots?.forEach { slot ->
+                val key = slotCacheKey(slot, cfg, state)
+                val final = source.peekProcessed(key)
+                if (final != null) {
+                    if (putCache(key, final)) changed = true
+                } else source.peekReadingPreview(key)?.let {
+                    if (putPreviewCache(key, it)) changed = true
+                }
+            }
+        }
+        return changed
+    }
+
     @Synchronized
     private fun knownSize(key: String): Size? = knownSizes[key]
 
     private var pendingRefresh: Runnable? = null
     fun refreshDisplay(spread: Int) {
         val v = view ?: return
-        pendingRefresh?.let { v.removeCallbacks(it) }
         if (spread != currentSpreadHint) return
+        pendingRefresh?.let { v.removeCallbacks(it) }
         if (v.isAnimating() || v.isDraggingPage || v.autoFlipping) {
             pendingRefresh = Runnable { if (view === v) refreshDisplay(spread) }
             v.postDelayed(pendingRefresh, 80L)
@@ -744,7 +775,7 @@ internal class ComicHarismController {
         // 精确键优先；未命中回退同页任意变体（防空白闪帧，页身份仍正确）
         var exactMiss = false
         val resolved = slots.mapIndexed { i, slot ->
-            val exact = getCache(slotCacheKey(slot, cfg, st))
+            val exact = exactBitmap(slotCacheKey(slot, cfg, st))
             if (exact == null) {
                 exactMiss = true
                 if (com.example.BuildConfig.DEBUG) {
@@ -815,7 +846,7 @@ internal class ComicHarismController {
         val canvas = Canvas(bmp)
         canvas.drawColor(0xFFFAFAF7.toInt())
         if (reversed && mirrorForRenderer) canvas.scale(-1f, 1f, bw / 2f, bh / 2f)
-        val exact = getCache(slotCacheKey(slot, cfg, bookState))
+        val exact = exactBitmap(slotCacheKey(slot, cfg, bookState))
         if (exact == null) {
             // 第 4 条：当前 spread 纹理未就绪（慢网络）→ 标记待补纹理
             if (harismToSpreadTwo(hIdx, flatUnits.size, reversed) == currentSpreadHint) {
@@ -1189,7 +1220,7 @@ internal fun ComicHarismCurlReader(
     val flatUnits = remember(layout, twoPageMode) {
         if (twoPageMode) buildCurlFlatUnits(layout) else emptyList()
     }
-    val controller = remember { ComicHarismController() }
+    val controller = remember(loader) { ComicHarismController(loader) }
     // 第 17 条：缩放覆盖层（双击/长按/双指触发）
     var zoomOverlay by remember { mutableStateOf(false) }
     val curlZoom = remember { ComicZoomState() }
@@ -1354,32 +1385,34 @@ internal fun ComicHarismCurlReader(
         curlPageFailed = false
         curlPageRefining = false
         curlEnhancementError = null
-        // 加载圈判定与 composeSpread 纹理解析同源：精确键或任意变体命中即视为已就绪
-        curlPageLoading = layout.spreads.getOrNull(currentSpread)?.slots?.any { slot ->
-            controller.getCache(slotCacheKey(slot, config, bookState)) == null &&
-                controller.getCacheAnyVariant(slot.ref.id) == null
-        } == true
         val targets = listOf(currentSpread, currentSpread + 1, currentSpread - 1)
             .filter { it in layout.spreads.indices }
+        val windowChanged = controller.syncReadingWindow(targets, config, bookState)
+        // 加载圈判定与 composeSpread 纹理解析同源：精确键或任意变体命中即视为已就绪
+        val currentSlots = layout.spreads.getOrNull(currentSpread)?.slots.orEmpty()
+        curlPageLoading = currentSlots.any { slot ->
+            controller.resolveBitmap(slot, config, bookState) == null
+        }
+        curlPageRefining = currentSlots.any {
+            controller.resolveBitmap(it, config, bookState) != null &&
+                !controller.hasFinalBitmap(slotCacheKey(it, config, bookState))
+        } && ComicImagePipeline.toningHasWork(toneOf(config))
+        // A turn may land on a texture built before the preview arrived. Rebuild it
+        // immediately from the staged pixels even when syncReadingWindow is unchanged.
+        if (windowChanged || !curlPageLoading) controller.refreshDisplay(currentSpread)
         var currentShown = false
         // Enhancement previews are display-only and are replaced by the exact final bitmap.
         val previews = launch {
             loader.previewEpoch.collect {
                 if (gen != controller.displayGeneration) return@collect
-                var changed = false
-                layout.spreads.getOrNull(currentSpread)?.slots?.forEach { slot ->
-                    val key = slotCacheKey(slot, config, bookState)
-                    if (loader.peekProcessed(key) == null) loader.peekReadingPreview(key)?.let {
-                        if (controller.putPreviewCache(key, it)) {
-                            changed = true
-                        }
-                    }
-                }
-                if (changed) {
-                    controller.applyPageRects(currentSpread, config, bookState, layout)
+                if (controller.syncReadingWindow(targets, config, bookState)) {
                     controller.refreshDisplay(currentSpread)
-                    curlPageLoading = false
-                    curlPageRefining = ComicImagePipeline.toningHasWork(toneOf(config))
+                    val slots = layout.spreads.getOrNull(currentSpread)?.slots.orEmpty()
+                    curlPageLoading = slots.any { controller.resolveBitmap(it, config, bookState) == null }
+                    curlPageRefining = slots.any {
+                        controller.resolveBitmap(it, config, bookState) != null &&
+                            !controller.hasFinalBitmap(slotCacheKey(it, config, bookState))
+                    } && ComicImagePipeline.toningHasWork(toneOf(config))
                 }
             }
         }
@@ -1403,7 +1436,9 @@ internal fun ComicHarismCurlReader(
                             tone = toneOf(config),
                             visible = si == currentSpread,
                         )
-                        controller.putCache(key, result.bitmap)
+                        if (controller.putCache(key, result.bitmap)) withContext(Dispatchers.Main) {
+                            if (gen == controller.displayGeneration) controller.refreshDisplay(currentSpread)
+                        }
                         if (result.error != null) enhancementError = result.error
                         if (si == currentSpread) currentShown = true
                     } catch (ce: CancellationException) {
@@ -1432,8 +1467,7 @@ internal fun ComicHarismCurlReader(
         } finally {
             previews.cancel()
         }
-        // Neighbors only fill caches. Never rebuild the visible texture after waiting
-        // for their network requests: a user may already be dragging the next page.
+        // Neighbor updates refresh idle textures; refreshDisplay defers while a page is moving.
     }
 
     /* ── 自动翻页（while 循环驱动：翻页成功不改 key 也能继续下一轮，避免冻结） ── */

@@ -516,6 +516,9 @@ class ComicPageLoader(
         } finally {
             if (finished || currentCoroutineContext().isActive) terminalLoads.put(cacheKey, finished)
             availabilityEpoch.update { it + 1 }
+            // Curl stages both previews and final neighbor textures from this notification.
+            // Completion must also wake it, including a final bitmap produced by preloadWindow.
+            _previewEpoch.update { it + 1 }
             // Keep the lock registered while other callers are still waiting on it.
             inFlight.release(cacheKey)
         }

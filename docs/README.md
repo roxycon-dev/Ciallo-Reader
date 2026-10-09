@@ -8,6 +8,7 @@
 
 ## 内容
 
+- [1.3.0 仿真卷页增强期间空白修复](comic-curl-enhancement-paging-1.3.0-2026-10-09.md)
 - [Ciallo Reader 1.2.3 发布验证](release-1.2.3-2026-10-05.md)
 - [神回窗口封面加载与图片跑位修复](god-cover-loading-2026-10-05.md)
 - [1.2.2 更新检查修复与发布验证](release-1.2.2-2026-10-05.md)
