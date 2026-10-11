@@ -2,6 +2,8 @@
 
 package com.example.ui.comic
 
+import com.example.ui.reader.readingGlass
+import com.example.ui.feedback.LocalReduceMotion
 import com.example.ui.design.DesignTokens
 import com.example.ui.design.ReadingPalette
 
@@ -205,6 +207,7 @@ internal fun ComicSettingsSheet(
         val wide = maxWidth >= 600.dp || maxWidth > maxHeight
         val rail = wide
         val compact = maxHeight < 480.dp
+        val reduceMotion = LocalReduceMotion.current
         val sheetShape = RoundedCornerShape(DesignTokens.RadiusOverlay)
         Column(
             Modifier
@@ -222,7 +225,7 @@ internal fun ComicSettingsSheet(
             Row(Modifier.fillMaxWidth().padding(start = DesignTokens.SpaceXl, end = DesignTokens.SpaceSm, top = DesignTokens.SpaceTight, bottom = DesignTokens.SpaceCompact),
                 verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.Tune, null, tint = MintPrimary,
-                    modifier = Modifier.clip(CircleShape).background(PanelChipBg).padding(DesignTokens.SpaceTight).size(DesignTokens.SpaceXl))
+                    modifier = Modifier.readingGlass(CircleShape).padding(DesignTokens.SpaceTight).size(DesignTokens.SpaceXl))
                 Spacer(Modifier.width(DesignTokens.SpaceMd))
                 Column(Modifier.weight(1f)) {
                     Text("阅读设置", color = TextPrimary, fontSize = DesignTokens.TypeTitle, fontWeight = FontWeight.SemiBold)
@@ -236,7 +239,7 @@ internal fun ComicSettingsSheet(
                     if (!rail) PanelTabRow(SettingsTabs, tab, { tab = it }, Modifier.padding(horizontal = DesignTokens.SpaceMd))
                     AnimatedContent(
                         targetState = tab,
-                        transitionSpec = { fadeIn(tween(200, delayMillis = 50)) togetherWith fadeOut(tween(120)) },
+                        transitionSpec = { fadeIn(tween(if (reduceMotion) 0 else 180, delayMillis = if (reduceMotion) 0 else 60)) togetherWith fadeOut(tween(if (reduceMotion) 0 else 90)) },
                         label = "comicSettingsTab",
                         modifier = Modifier.fillMaxWidth().weight(1f),
                     ) { selectedTab ->
@@ -259,7 +262,7 @@ internal fun ComicSettingsSheet(
         if (compact) {
             Row(Modifier.fillMaxWidth().padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceCompact),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceMd)) {
-                Row(Modifier.weight(0.8f).clip(RoundedCornerShape(DesignTokens.RadiusControl)).background(PanelChipBg)
+                Row(Modifier.weight(0.8f).readingGlass(RoundedCornerShape(DesignTokens.RadiusControl))
                     .clickableNoRipple(onOpenPreset).padding(horizontal = DesignTokens.SpaceMd, vertical = DesignTokens.SpaceComfortable),
                     verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Tune, null, tint = MintPrimary, modifier = Modifier.size(DesignTokens.SpaceLoose))
@@ -284,8 +287,7 @@ internal fun ComicSettingsSheet(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(DesignTokens.RadiusControl))
-                    .background(PanelChipBg)
+                    .readingGlass(RoundedCornerShape(DesignTokens.RadiusControl))
                     .clickableNoRipple(onOpenPreset)
                     .padding(horizontal = DesignTokens.SpaceComfortable, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -555,8 +557,7 @@ private fun TranslationTab(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(DesignTokens.RadiusControl))
-                        .background(PanelChipBg)
+                        .readingGlass(RoundedCornerShape(DesignTokens.RadiusControl))
                         .clickableNoRipple { startDownload() }
                         .padding(horizontal = DesignTokens.SpaceComfortable, vertical = 11.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -591,8 +592,7 @@ private fun TranslationTab(
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(DesignTokens.RadiusControl))
-                .background(PanelChipBg)
+                .readingGlass(RoundedCornerShape(DesignTokens.RadiusControl))
                 .clickableNoRipple {
                     scope.launch {
                         onRefresh(true)
@@ -668,11 +668,11 @@ private fun ModeGrid(selected: ComicMode, onSelect: (ComicMode) -> Unit) {
     ) {
         ComicMode.entries.forEach { m ->
             val active = m == selected
-            val tint by animateColorAsState(if (active) panelSelectedBg() else PanelChipBg, label = "modeTint")
+            val tint by animateColorAsState(if (active) panelSelectedBg() else Color.Transparent, label = "modeTint")
             Box(
                 Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(DesignTokens.RadiusSm))
+                    .readingGlass(RoundedCornerShape(DesignTokens.RadiusSm))
                     .background(tint)
                     .border(
                         0.5.dp,
@@ -707,11 +707,11 @@ private fun DirectionGrid(selected: ComicDirection, onSelect: (ComicDirection) -
     ) {
         ComicDirection.entries.forEach { d ->
             val active = d == selected
-            val tint by animateColorAsState(if (active) panelSelectedBg() else PanelChipBg, label = "directionTint")
+            val tint by animateColorAsState(if (active) panelSelectedBg() else Color.Transparent, label = "directionTint")
             Box(
                 Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(DesignTokens.RadiusSm))
+                    .readingGlass(RoundedCornerShape(DesignTokens.RadiusSm))
                     .background(tint)
                     .selectable(active, role = Role.RadioButton) { onSelect(d) }
                     .heightIn(min = 48.dp)
@@ -806,8 +806,7 @@ private fun PageTab(
                             color = TextPrimary, fontSize = DesignTokens.TypeCaption,
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(DesignTokens.RadiusXs))
-                                .background(PanelChipBg)
+                                .readingGlass(RoundedCornerShape(DesignTokens.RadiusXs))
                                 .clickableNoRipple {
                                     update {
                                         it.copy(
@@ -928,8 +927,7 @@ private fun ImageTab(
             Modifier
                 .fillMaxWidth()
                 .padding(top = DesignTokens.SpaceCompact)
-                .clip(RoundedCornerShape(DesignTokens.RadiusSm))
-                .background(PanelChipBg)
+                .readingGlass(RoundedCornerShape(DesignTokens.RadiusSm))
                 .clickableNoRipple(onOpenCrop)
                 .padding(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceTight),
             verticalAlignment = Alignment.CenterVertically
@@ -1059,8 +1057,7 @@ private fun ImageTab(
 private fun ActionChip(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
         modifier
-            .clip(RoundedCornerShape(DesignTokens.RadiusSm))
-            .background(PanelChipBg)
+            .readingGlass(RoundedCornerShape(DesignTokens.RadiusSm))
             .then(if (enabled) Modifier.clickableNoRipple(onClick) else Modifier.semantics { disabled() })
             .heightIn(min = 48.dp).padding(vertical = DesignTokens.SpaceTight, horizontal = DesignTokens.SpaceMd),
         contentAlignment = Alignment.Center
@@ -1229,11 +1226,11 @@ private fun SceneOptionFlow(selected: ComicScene, onSelect: (ComicScene) -> Unit
     ) {
         scenes.forEach { (s, label, icon) ->
             val active = s == selected
-            val tint by animateColorAsState(if (active) panelSelectedBg() else PanelChipBg, label = "sceneTint")
+            val tint by animateColorAsState(if (active) panelSelectedBg() else Color.Transparent, label = "sceneTint")
             Column(
                 Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(DesignTokens.RadiusSm))
+                    .readingGlass(RoundedCornerShape(DesignTokens.RadiusSm))
                     .background(tint)
                     .border(
                         0.5.dp,
@@ -1273,11 +1270,11 @@ internal fun EngineCard(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val tint by animateColorAsState(if (selected) MintPrimary.copy(alpha = 0.14f) else PanelChipBg, label = "engineTint")
+    val tint by animateColorAsState(if (selected) MintPrimary.copy(alpha = 0.14f) else Color.Transparent, label = "engineTint")
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(DesignTokens.RadiusControl))
+            .readingGlass(RoundedCornerShape(DesignTokens.RadiusControl))
             .background(tint)
             .border(
                 1.dp,
@@ -1314,8 +1311,7 @@ internal fun PanelRow(label: String, icon: androidx.compose.ui.graphics.vector.I
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(DesignTokens.RadiusSm))
-            .background(PanelChipBg)
+            .readingGlass(RoundedCornerShape(DesignTokens.RadiusSm))
             .clickableNoRipple(onClick)
             .padding(horizontal = DesignTokens.SpaceMd, vertical = DesignTokens.SpaceTight),
         verticalAlignment = Alignment.CenterVertically,

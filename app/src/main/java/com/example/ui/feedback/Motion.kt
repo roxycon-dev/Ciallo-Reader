@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import android.annotation.SuppressLint
 import androidx.compose.ui.platform.LocalContext
 
@@ -20,6 +21,14 @@ import androidx.compose.ui.platform.LocalContext
  * - 触觉分级：selection / light / medium / heavy / success，设置里可关。
  */
 object AppMotion {
+    const val PRESS_MS = 110
+    const val CONTENT_MS = 200
+    const val PAGE_MS = 280
+    const val EXIT_MS = 170
+    /** Position changes carry weight without overshooting neighbouring cards. */
+    fun <T> reorder() = spring<T>(dampingRatio = 0.88f, stiffness = 210f)
+    fun <T> settle() = spring<T>(dampingRatio = 1f, stiffness = 420f)
+    fun <T> press() = spring<T>(dampingRatio = 0.85f, stiffness = 650f)
     /** 常规弹簧：dampingRatio = 22 / (2·√300) ≈ 0.635 */
     val springDefault: FiniteAnimationSpec<Float> =
         spring(dampingRatio = 0.635f, stiffness = 300f, visibilityThreshold = 0.001f)
@@ -187,21 +196,30 @@ fun rememberAppHaptics(): AppHaptics {
 @Composable
 fun systemReduceMotion(): Boolean {
     val context = LocalContext.current
-    return remember(context) {
-        val scaleKeys = listOf(
+    val scaleKeys = remember {
+        listOf(
             android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
             android.provider.Settings.Global.TRANSITION_ANIMATION_SCALE,
             android.provider.Settings.Global.WINDOW_ANIMATION_SCALE
         )
-        scaleKeys.any { key ->
+    }
+    fun readSetting(): Boolean = scaleKeys.any { key ->
             val scale = try {
                 android.provider.Settings.Global.getFloat(context.contentResolver, key, 1f)
             } catch (e: Throwable) {
                 1f
             }
             scale <= REDUCED_MOTION_SCALE_EPSILON
-        }
     }
+    var reduce by remember(context) { mutableStateOf(readSetting()) }
+    DisposableEffect(context) {
+        val observer = object : android.database.ContentObserver(android.os.Handler(android.os.Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) { reduce = readSetting() }
+        }
+        scaleKeys.forEach { key -> context.contentResolver.registerContentObserver(android.provider.Settings.Global.getUriFor(key), false, observer) }
+        onDispose { context.contentResolver.unregisterContentObserver(observer) }
+    }
+    return reduce
 }
 
 /**

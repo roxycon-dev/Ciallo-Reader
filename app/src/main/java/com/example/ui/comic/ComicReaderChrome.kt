@@ -7,6 +7,11 @@ import com.example.ui.components.overlayTouchShield
 
 import android.graphics.Bitmap
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.selection.selectable
@@ -101,6 +106,12 @@ import com.kashif_e.backdrop.drawPlainBackdrop
 import com.kashif_e.backdrop.effects.blur
 import com.kashif_e.backdrop.effects.colorControls
 import com.example.ui.adaptive.adaptiveSheetWidth
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalConfiguration
+import com.example.ui.reader.LocalReadingGlass
+import com.example.ui.reader.ReadingGlassStyle
+import com.example.ui.feedback.LocalReduceMotion
+import com.example.ui.feedback.AppMotion
 
 // 第 11 条：半透明面板底。第七轮第 3 条：毛玻璃路径的暗纱从 0xD9（85%）
 // 收敛到 0xCC（80%）+ 模糊加深——玻璃质感更通透、不再"接近纯黑的沉闷"；
@@ -131,7 +142,7 @@ internal fun Modifier.comicPanelGlass(backdrop: Backdrop?, shape: Shape): Modifi
             colorControls(saturation = 1.18f)
             blur(radius = DesignTokens.SpaceTight.toPx())
         },
-    ).background(PanelBgGlass)
+    ).background(PanelBgGlass.copy(alpha = .62f))
 
 /** 面板/控件的统一过渡节奏 */
 private const val ENTER_MS = 240
@@ -186,6 +197,9 @@ fun ComicReaderChrome(
     onTranslationRefresh: (Boolean) -> Unit = {},
     onBottomBarHeightChanged: (Int) -> Unit = {},
 ) {
+    val reduceMotion = LocalReduceMotion.current
+    val configuration = LocalConfiguration.current
+    val wide = configuration.screenWidthDp >= 600 || configuration.screenWidthDp > configuration.screenHeightDp
     val onDismissPanel = { onPanelChange(ComicPanel.NONE) }
     val currentRaw = (currentPage - 1).coerceIn(0, (pages.size - 1).coerceAtLeast(0))
     // 进度条拖动中的缩略图预览目标页（-1 = 关闭）
@@ -268,8 +282,8 @@ fun ComicReaderChrome(
     // 面板遮罩（与面板同节奏淡入淡出）
     AnimatedVisibility(
         visible = panel != ComicPanel.NONE,
-        enter = fadeIn(tween(ENTER_MS)),
-        exit = fadeOut(tween(EXIT_MS)),
+        enter = fadeIn(tween(if (reduceMotion) 0 else ENTER_MS)),
+        exit = fadeOut(tween(if (reduceMotion) 0 else EXIT_MS)),
     ) {
         Box(
             Modifier
@@ -281,12 +295,22 @@ fun ComicReaderChrome(
 
     AnimatedVisibility(
         visible = panel != ComicPanel.NONE,
-        enter = slideInVertically(tween(ENTER_MS + 40)) { it } + fadeIn(tween(ENTER_MS)),
-        exit = slideOutVertically(tween(EXIT_MS)) { it } + fadeOut(tween(EXIT_MS - 20)),
+        enter = if (reduceMotion) fadeIn(tween(0)) else fadeIn(tween(AppMotion.CONTENT_MS)) +
+            if (wide) slideInHorizontally(AppMotion.reorder()) { it / 6 } else slideInVertically(AppMotion.reorder()) { it / 6 },
+        exit = if (reduceMotion) fadeOut(tween(0)) else fadeOut(tween(AppMotion.EXIT_MS)) +
+            if (wide) slideOutHorizontally(tween(AppMotion.EXIT_MS)) { it / 6 } else slideOutVertically(tween(AppMotion.EXIT_MS)) { it / 6 },
         modifier = Modifier.fillMaxSize(),
     ) {
+        CompositionLocalProvider(LocalReadingGlass provides ReadingGlassStyle(panelGlassBackdrop, Color(0xFF232329), TextPrimary)) {
+        AnimatedContent(
+            targetState = displayedPanel,
+            transitionSpec = {
+                (fadeIn(tween(if (reduceMotion) 0 else 160, delayMillis = if (reduceMotion) 0 else 65)) togetherWith
+                    fadeOut(tween(if (reduceMotion) 0 else 90))).using(SizeTransform(clip = false))
+            }, modifier = Modifier.fillMaxSize(), label = "comicPanelContent",
+        ) { activePanel ->
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            when (displayedPanel) {
+            when (activePanel) {
                 ComicPanel.SETTINGS -> ComicSettingsSheet(
                     config = config, store = store, perBookConfig = perBookConfig,
                     onPerBookConfigChange = onPerBookConfigChange,
@@ -328,6 +352,8 @@ fun ComicReaderChrome(
                 )
                 ComicPanel.NONE -> Unit
             }
+        }
+        }
         }
     }
 }

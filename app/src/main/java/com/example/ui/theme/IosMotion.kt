@@ -6,6 +6,7 @@ import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FiniteAnimationSpec
+import com.example.ui.feedback.AppMotion
 
 /**
  * iOS / SwiftUI 动效规格（2026-09-21 新增）。
@@ -22,17 +23,17 @@ object IosMotion {
 
     // ── 时长（毫秒），对齐 iOS 常见档位 ──
     /** 即时反馈：按压、高亮、小图标切换 */
-    const val FAST = 150
+    const val FAST = AppMotion.PRESS_MS
     /** 常规：内容淡入淡出、行内展开收起 */
-    const val NORMAL = 250
+    const val NORMAL = AppMotion.CONTENT_MS
     /** 页面/视图转场 */
-    const val TRANSITION = 350
+    const val TRANSITION = AppMotion.PAGE_MS
     /** Sheet / 弹窗进出场 */
-    const val SHEET = 400
+    const val SHEET = AppMotion.PAGE_MS
 
     // ── 缓动曲线（与 iOS CAMediaTimingFunction 对应）──
     /** easeOut：起步快、尾部缓 —— iOS 默认出场曲线 */
-    val EaseOut: Easing = CubicBezierEasing(0f, 0f, 0.58f, 1f)
+    val EaseOut: Easing = AppMotion.easeOutCubic
     /** easeInOut：对称缓动，用于同一元素的位置迁移 */
     val EaseInOut: Easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
     /** easeOutQuart：更陡的尾部衰减，Sheet 上推、大位移用 */
@@ -42,28 +43,19 @@ object IosMotion {
      * iOS 标准弹簧（对应 `.spring(response: 0.35, dampingFraction: 0.85)`）。
      * 临界阻尼附近：不弹跳，收尾干脆。适合弹窗、卡片、尺寸变化。
      */
-    fun <T> spring(): SpringSpec<T> = spring(
-        dampingRatio = 0.85f,
-        stiffness = 320f
-    )
+    fun <T> spring(): SpringSpec<T> = AppMotion.settle()
 
     /**
      * 更灵敏的弹簧（response ≈ 0.25）。适合按压反馈、开关、小控件，
      * 手感“跟手”而不拖沓。
      */
-    fun <T> springSnappy(): SpringSpec<T> = spring(
-        dampingRatio = 0.78f,
-        stiffness = 520f
-    )
+    fun <T> springSnappy(): SpringSpec<T> = AppMotion.press()
 
     /**
      * 偏软的弹簧（response ≈ 0.5）。适合大位移 / 整页转场，
      * 位移大时需要更长的收敛时间才不会显得生硬。
      */
-    fun <T> springSoft(): SpringSpec<T> = spring(
-        dampingRatio = 0.90f,
-        stiffness = 220f
-    )
+    fun <T> springSoft(): SpringSpec<T> = AppMotion.reorder()
 
     /** easeOut 补间，[duration] 默认 250ms */
     fun <T> easeOut(duration: Int = NORMAL): FiniteAnimationSpec<T> =

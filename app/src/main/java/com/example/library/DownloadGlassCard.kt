@@ -36,6 +36,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.SideEffect
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.fadeOut
+import com.example.ui.feedback.AppMotion
+import com.example.ui.feedback.LocalReduceMotion
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -78,9 +85,11 @@ fun DownloadGlassCard(
     val context = LocalContext.current
     val imageLoader = rememberZLibraryImageLoader(context)
 
-    var lastBytes by remember { mutableLongStateOf(-1L) }
-    var lastTime by remember { mutableLongStateOf(0L) }
-    var speedBps by remember { mutableLongStateOf(0L) }
+    val taskKey = "${book?.sourceId}:${book?.id}"
+    val reduceMotion = LocalReduceMotion.current
+    var lastBytes by remember(taskKey) { mutableLongStateOf(-1L) }
+    var lastTime by remember(taskKey) { mutableLongStateOf(0L) }
+    var speedBps by remember(taskKey) { mutableLongStateOf(0L) }
 
     LaunchedEffect(state) {
         if (state is DownloadState.Downloading) {
@@ -105,9 +114,16 @@ fun DownloadGlassCard(
         is DownloadState.Success -> 1f
         else -> 0f
     }
+    var previousProgress by remember(taskKey) { mutableFloatStateOf(progress) }
+    val progressTarget = when (state) {
+        is DownloadState.Downloading, is DownloadState.Paused -> maxOf(previousProgress, progress)
+        is DownloadState.Error -> previousProgress
+        else -> progress
+    }
+    SideEffect { previousProgress = progressTarget }
     val animatedProgress by animateFloatAsState(
-        targetValue = progress,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        targetValue = progressTarget,
+        animationSpec = tween(if (reduceMotion) 0 else 160, easing = AppMotion.easeOutCubic),
         label = "downloadProgress"
     )
 
@@ -247,7 +263,11 @@ fun DownloadGlassCard(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                when (state) {
+                AnimatedContent(
+                    targetState = state, contentKey = { it.javaClass },
+                    transitionSpec = { fadeIn(tween(if (reduceMotion) 0 else 180, delayMillis = if (reduceMotion) 0 else 65)) togetherWith fadeOut(tween(if (reduceMotion) 0 else 90)) },
+                    label = "downloadStatus",
+                ) { state -> when (state) {
                     is DownloadState.Downloading -> {
                         val remaining = state.totalBytes - state.downloadedBytes
                         val speedText = if (speedBps > 0) {
@@ -257,7 +277,7 @@ fun DownloadGlassCard(
                         }
                         Row(modifier = Modifier.fillMaxWidth()) {
                             Text(
-                                text = "${(animatedProgress * 100).toInt()}%",
+                                text = "${(progressTarget * 100).toInt()}%",
                                 fontSize = 16.sp,
                                 color = MaterialTheme.colorScheme.secondary,
                                 fontWeight = FontWeight.Bold
@@ -273,22 +293,9 @@ fun DownloadGlassCard(
                         )
                     }
                     is DownloadState.Success -> {
-                        AnimatedVisibility(
-                            visible = true,
-                            enter = scaleIn(
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessMedium
-                                )
-                            ) + fadeIn(tween(300))
-                        ) {
+                        androidx.compose.foundation.layout.Box {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.secondary,
-                                    modifier = Modifier.size(26.dp)
-                                )
+                                com.example.ui.components.CompletionGlyph(MaterialTheme.colorScheme.secondary, Modifier.size(26.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     "已加入书架",
@@ -313,7 +320,7 @@ fun DownloadGlassCard(
                     else -> {
                         Text("准备中…", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                }
+                } }
 
                 // 下载控制：下载中/等待 -> 暂停+取消；已暂停/失败 -> 继续+取消
                 if (state is DownloadState.Pending ||

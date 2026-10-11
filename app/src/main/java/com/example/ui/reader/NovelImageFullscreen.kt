@@ -24,6 +24,26 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.layout.onSizeChanged
+import com.example.ui.feedback.AppMotion
+import com.example.ui.feedback.LocalReduceMotion
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlin.math.min
+import kotlin.math.max
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,6 +69,14 @@ fun NovelImageFullscreenViewer(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val reduce = LocalReduceMotion.current
+    val scope = rememberCoroutineScope()
+    val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
+    val latestDismiss by rememberUpdatedState(onDismiss)
+    val close = { visibility.targetState = false }
+    LaunchedEffect(visibility.isIdle, visibility.currentState, visibility.targetState) {
+        if (visibility.isIdle && !visibility.currentState && !visibility.targetState) latestDismiss()
+    }
     var loaded by remember(path) { mutableStateOf(false) }
     val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, path) {
         value = withContext(Dispatchers.IO) {
@@ -69,12 +97,15 @@ fun NovelImageFullscreenViewer(
     }
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = close,
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             decorFitsSystemWindows = false
         )
     ) {
+        AnimatedVisibility(visibleState = visibility,
+            enter = fadeIn(tween(if (reduce) 0 else 180)) + scaleIn(tween(if (reduce) 0 else 220), initialScale = .97f),
+            exit = fadeOut(tween(if (reduce) 0 else 150)) + scaleOut(tween(if (reduce) 0 else 150), targetScale = .98f)) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -96,31 +127,46 @@ fun NovelImageFullscreenViewer(
                 val scale = remember { mutableFloatStateOf(1f) }
                 val offsetX = remember { mutableFloatStateOf(0f) }
                 val offsetY = remember { mutableFloatStateOf(0f) }
+                var viewport by remember { mutableStateOf(IntSize.Zero) }
+                var zoomJob by remember { mutableStateOf<Job?>(null) }
+                fun bound(offset: Offset, atScale: Float): Offset {
+                    val fit = min(viewport.width.toFloat() / bmp.width, viewport.height.toFloat() / bmp.height)
+                    val maxX = max(0f, (bmp.width * fit * atScale - viewport.width) / 2f)
+                    val maxY = max(0f, (bmp.height * fit * atScale - viewport.height) / 2f)
+                    return Offset(offset.x.coerceIn(-maxX, maxX), offset.y.coerceIn(-maxY, maxY))
+                }
                 val image = bmp.asImageBitmap()
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .onSizeChanged { viewport = it }
                         .pointerInput(path) {
-                            detectTransformGestures { _, pan, zoom, _ ->
-                                scale.value = (scale.value * zoom).coerceIn(1f, 6f)
-                                if (scale.value > 1f) {
-                                    offsetX.value += pan.x
-                                    offsetY.value += pan.y
-                                } else {
-                                    offsetX.value = 0f
-                                    offsetY.value = 0f
-                                }
+                            detectTransformGestures { centroid, pan, zoom, _ ->
+                                zoomJob?.cancel()
+                                val next = (scale.value * zoom).coerceIn(1f, 6f)
+                                val focal = centroid - Offset(size.width / 2f, size.height / 2f)
+                                val offset = Offset(offsetX.value, offsetY.value)
+                                val target = bound(focal - (focal - offset) * (next / scale.value) + pan, next)
+                                scale.value = next
+                                offsetX.value = target.x
+                                offsetY.value = target.y
                             }
                         }
                         .pointerInput(path) {
                             detectTapGestures(
-                                onDoubleTap = {
-                                    if (scale.value > 1.05f) {
-                                        scale.value = 1f
-                                        offsetX.value = 0f
-                                        offsetY.value = 0f
-                                    } else {
-                                        scale.value = 2.5f
+                                onDoubleTap = { point ->
+                                    zoomJob?.cancel()
+                                    val fromScale = scale.value
+                                    val fromOffset = Offset(offsetX.value, offsetY.value)
+                                    val targetScale = if (fromScale > 1.05f) 1f else 2.5f
+                                    val focal = point - Offset(size.width / 2f, size.height / 2f)
+                                    val toOffset = if (targetScale == 1f) Offset.Zero else bound(focal - (focal - fromOffset) * (targetScale / fromScale), targetScale)
+                                    zoomJob = scope.launch {
+                                        Animatable(0f).animateTo(1f, tween(if (reduce) 0 else 220, easing = AppMotion.easeOutCubic)) {
+                                            scale.value = fromScale + (targetScale - fromScale) * value
+                                            offsetX.value = fromOffset.x + (toOffset.x - fromOffset.x) * value
+                                            offsetY.value = fromOffset.y + (toOffset.y - fromOffset.y) * value
+                                        }
                                     }
                                 }
                             )
@@ -163,10 +209,11 @@ fun NovelImageFullscreenViewer(
                     text = "关闭",
                     color = Color.White,
                     modifier = Modifier
-                        .clickable { onDismiss() }
+                        .clickable { close() }
                         .padding(horizontal = 14.dp, vertical = 10.dp)
                 )
             }
+        }
         }
     }
 }

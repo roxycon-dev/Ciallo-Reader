@@ -402,18 +402,20 @@ fun CustomMinutesDialog(
             }
         },
         confirmButton = {
+            val closeOverlay = com.example.ui.components.LocalOverlayClose.current
             AppActionButton(
                 text = "确定",
-                onClick = {
+                onClick = { closeOverlay {
                     val finalValue = text.toIntOrNull()?.coerceIn(1, 180) ?: value.coerceIn(1, 180)
                     onConfirm(finalValue)
-                },
+                } },
                 variant = AppButtonVariant.Primary,
                 buttonSize = AppButtonSize.Small
             )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            val closeOverlay = com.example.ui.components.LocalOverlayClose.current
+            TextButton(onClick = { closeOverlay {  } }) {
                 Text("取消")
             }
         }

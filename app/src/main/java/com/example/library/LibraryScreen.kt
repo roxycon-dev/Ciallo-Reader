@@ -6,6 +6,8 @@
 
 package com.example.library
 
+import com.example.ui.components.catalogCoverMotion
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -42,6 +44,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.Image
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CheckCircle
@@ -188,7 +191,8 @@ fun LibraryScreen(
     favoriteKeys: Set<String> = emptySet(),
     /** 搜索结果直接点 ♡ → 加入 / 取消「我喜欢的」 */
     onToggleFavorite: (SearchBook, Boolean) -> Unit = { _, _ -> },
-    extraBottomPadding: Dp = 0.dp
+    extraBottomPadding: Dp = 0.dp,
+    onBack: (() -> Unit)? = null,
 ) {
     val currentSource by viewModel.currentSource.collectAsStateWithLifecycle()
     val aggregateMode by viewModel.aggregateMode.collectAsStateWithLifecycle()
@@ -587,6 +591,13 @@ fun LibraryScreen(
         title = "书库",
         subtitle = "LIBRARY & SEARCH",
         titleColor = glassTitleColor(),
+        leading = {
+            onBack?.let { back ->
+                IconButton(onClick = back) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回上一层")
+                }
+            }
+        },
                 trailing = {
                     val latestSt = activeDownloadBook?.let { downloadStates[com.example.download.DownloadManager.taskId(it.sourceId, it.id)] }
                     val comicActive = comicDownloading.isNotEmpty()
@@ -682,7 +693,7 @@ fun LibraryScreen(
                 var historyPanelSettled by remember { mutableStateOf(false) }
                 LaunchedEffect(historyPanelVisible) {
                     if (historyPanelVisible) {
-                        kotlinx.coroutines.delay(330)
+                        kotlinx.coroutines.delay(210)
                         historyPanelSettled = true
                     } else {
                         historyPanelSettled = false
@@ -693,14 +704,14 @@ fun LibraryScreen(
                 androidx.compose.animation.AnimatedVisibility(
                     visible = historyPanelVisible,
                     enter = expandVertically(
-                        animationSpec = tween(320, easing = CubicBezierEasing(0f, 0f, 0.2f, 1f))
+                        animationSpec = tween(200, easing = com.example.ui.feedback.AppMotion.easeOutCubic)
                     ) + fadeIn(
-                        animationSpec = tween(320, easing = CubicBezierEasing(0f, 0f, 0.2f, 1f))
+                        animationSpec = tween(200, easing = com.example.ui.feedback.AppMotion.easeOutCubic)
                     ),
                     exit = shrinkVertically(
-                        animationSpec = tween(280, easing = CubicBezierEasing(0.55f, 0.055f, 0.675f, 0.19f))
+                        animationSpec = tween(170, easing = com.example.ui.feedback.AppMotion.easeOutCubic)
                     ) + fadeOut(
-                        animationSpec = tween(240, easing = CubicBezierEasing(0.55f, 0.055f, 0.675f, 0.19f))
+                        animationSpec = tween(170, easing = com.example.ui.feedback.AppMotion.easeOutCubic)
                     )
                 ) {
                     SearchHistoryPanel(
@@ -1114,21 +1125,7 @@ fun LibraryScreen(
         // 下载管理中心：亚克力底部面板（Dialog + decorView 实时模糊 + 径向遮罩）
         if (showDownloadPanel) {
             AcrylicBottomOverlay(onDismissRequest = { showDownloadPanel = false }) {
-                var appear by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) { appear = true }
-                val panelScale by animateFloatAsState(
-                    targetValue = if (appear) 1f else 0.55f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    ),
-                    label = "downloadPanelSpring"
-                )
-                val panelAlpha by animateFloatAsState(
-                    targetValue = if (appear) 1f else 0f,
-                    animationSpec = tween(220),
-                    label = "downloadPanelFade"
-                )
+                val closeDownloadPanel = com.example.ui.components.LocalOverlayClose.current
                 val book = activeDownloadBook
                 val st = book?.let { downloadStates[com.example.download.DownloadManager.taskId(it.sourceId, it.id)] } ?: DownloadState.Idle
                 val comicTasks = comicDownloadTasks.values.toList()
@@ -1136,11 +1133,6 @@ fun LibraryScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(20.dp)
-                        .graphicsLayer {
-                            scaleX = panelScale
-                            scaleY = panelScale
-                            alpha = panelAlpha
-                        }
                 ) {
                     if (comicTasks.isNotEmpty()) {
                         ComicDownloadGlassCard(
@@ -1157,14 +1149,14 @@ fun LibraryScreen(
                                 }
                             },
                             onCancel = { viewModel.cancelComicChapter(it) },
-                            onDismiss = { showDownloadPanel = false }
+                            onDismiss = { closeDownloadPanel {} }
                         )
                     } else {
                         DownloadGlassCard(
                             book = book,
                             state = st,
                             hazeState = hazeState,
-                            onDismiss = { showDownloadPanel = false },
+                            onDismiss = { closeDownloadPanel {} },
                             onPause = { book?.let { viewModel.pauseDownload(com.example.download.DownloadManager.taskId(it.sourceId, it.id)) } },
                             onResume = { book?.let { viewModel.resumeDownload(com.example.download.DownloadManager.taskId(it.sourceId, it.id)) } },
                             onCancel = { book?.let { viewModel.cancelDownload(com.example.download.DownloadManager.taskId(it.sourceId, it.id)) } },
@@ -3050,19 +3042,9 @@ private fun StaggeredComicCard(
         animationSpec = tween(120),
         label = "gridShadow"
     )
-    // 入场动画：淡入 + 轻微上移（只动透明度/位移，不影响测量尺寸）
-    var entered by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { entered = true }
-    val enterAlpha by animateFloatAsState(
-        targetValue = if (entered) 1f else 0f,
-        animationSpec = tween(260),
-        label = "cardEnterAlpha"
-    )
-    val enterSlide by animateFloatAsState(
-        targetValue = if (entered) 0f else 1f,
-        animationSpec = tween(260),
-        label = "cardEnterSlide"
-    )
+    // Lazy item placement owns appearance; scrolling back to a card must not replay it.
+    val enterAlpha = 1f
+    val enterSlide = 0f
     val cardShape = RoundedCornerShape(14.dp)
     val formatBadge = remember(book, novel) {
         listOfNotNull(
@@ -3096,6 +3078,7 @@ private fun StaggeredComicCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(coverRatio)
+                .catalogCoverMotion(book.sourceId, book.id)
                 .clip(cardShape)
                 .background(Color.Gray.copy(alpha = 0.15f))
         ) {

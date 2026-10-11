@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,6 +28,23 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.ui.adaptive.adaptiveDialogWidth
 import com.example.ui.adaptive.adaptiveSheetWidth
 import me.trishiraj.shadowglow.consistentShadow
+
+/** Allows an action button to finish the same exit as back/outside dismissal. */
+val LocalOverlayClose = compositionLocalOf<((() -> Unit) -> Unit)> { { action -> action() } }
+
+@Composable
+private fun overlayDismiss(visibility: MutableTransitionState<Boolean>, onDismiss: () -> Unit): ((() -> Unit) -> Unit) {
+    val latestDismiss by rememberUpdatedState(onDismiss)
+    var pending by remember { mutableStateOf<(() -> Unit)?>(null) }
+    LaunchedEffect(visibility.isIdle, visibility.currentState, visibility.targetState) {
+        if (visibility.isIdle && !visibility.currentState && !visibility.targetState) {
+            pending?.invoke()
+            pending = null
+            latestDismiss()
+        }
+    }
+    return { action -> if (visibility.targetState) { pending = action; visibility.targetState = false } }
+}
 
 /** 亚克力立牌面板：品牌色 tint + 镜面光束 + 顶棱聚光 + 颗粒噪点 + 水晶棱镜描边 + 倒角高光 + 双层阴影。 */
 @Composable
@@ -105,14 +124,16 @@ fun AcrylicDialog(
 ) {
     val activity = LocalContext.current as? Activity
     val blurPx = with(LocalDensity.current) { 18.dp.toPx() }
+    val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
+    val close = overlayDismiss(visibility, onDismissRequest)
     Dialog(
-        onDismissRequest = onDismissRequest,
+        onDismissRequest = { close {} },
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
     ) {
-        DialogLiquidGlass {
+        CompositionLocalProvider(LocalOverlayClose provides close) { DialogLiquidGlass {
             GlassDialogWindowEffect(activity = activity, blurRadiusPx = blurPx)
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                ScrimEntrance {
+                ScrimEntrance(visibility = visibility) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -120,11 +141,11 @@ fun AcrylicDialog(
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
-                                onClick = onDismissRequest
+                                onClick = { close {} }
                             )
                     )
                 }
-                DialogEntrance {
+                DialogEntrance(visibility = visibility) {
                 Column(
                     modifier = modifier
                         .adaptiveDialogWidth(0.86f)
@@ -153,7 +174,7 @@ fun AcrylicDialog(
                 }
                 }
             }
-        }
+        } }
     }
 }
 
@@ -166,14 +187,16 @@ fun AcrylicBottomOverlay(
 ) {
     val activity = LocalContext.current as? Activity
     val blurPx = with(LocalDensity.current) { 18.dp.toPx() }
+    val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
+    val close = overlayDismiss(visibility, onDismissRequest)
     Dialog(
-        onDismissRequest = onDismissRequest,
+        onDismissRequest = { close {} },
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
     ) {
-        DialogLiquidGlass {
+        CompositionLocalProvider(LocalOverlayClose provides close) { DialogLiquidGlass {
             GlassDialogWindowEffect(activity = activity, blurRadiusPx = blurPx)
             Box(modifier = Modifier.fillMaxSize()) {
-                ScrimEntrance {
+                ScrimEntrance(visibility = visibility) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -181,11 +204,11 @@ fun AcrylicBottomOverlay(
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
-                                onClick = onDismissRequest
+                                onClick = { close {} }
                             )
                     )
                 }
-                BottomSheetEntrance(modifier = Modifier.align(Alignment.BottomCenter)) {
+                BottomSheetEntrance(modifier = Modifier.align(Alignment.BottomCenter), visibility = visibility) {
                 Column(
                     modifier = Modifier
                         .adaptiveSheetWidth()
@@ -196,6 +219,6 @@ fun AcrylicBottomOverlay(
                 }
                 }
             }
-        }
+        } }
     }
 }

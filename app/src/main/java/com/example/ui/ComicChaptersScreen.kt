@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.catalogCoverMotion
 import coil.compose.AsyncImage
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -1371,7 +1372,7 @@ private fun ComicHeroHeader(book: SearchBook?, textMode: Boolean, onTextClick: (
                             model = book.cover,
                             contentDescription = book.title,
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxSize().catalogCoverMotion(book.sourceId, book.id),
                         )
                     } else {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

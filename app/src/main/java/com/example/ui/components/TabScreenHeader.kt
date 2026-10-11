@@ -21,6 +21,8 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -31,6 +33,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AppFonts
+
+/** Separate thresholds prevent repeated collapse/expand when a finger hovers near the boundary. */
+internal class HeaderCollapseGate(private val closeAt: Float, private val openAt: Float) {
+    private var collapsed = false
+    fun update(index: Int, offset: Int, forced: Boolean): Boolean {
+        collapsed = if (forced || index > 0) true else if (collapsed) offset > openAt else offset > closeAt
+        return collapsed
+    }
+}
 
 /**
  * 滚动联动折叠头部——四个 Tab 页（书库/书架/统计/设置）共享。
@@ -86,22 +97,28 @@ fun rememberHeaderCollapsed(state: LazyStaggeredGridState, forceCollapsed: Boole
  */
 @Composable
 fun rememberHeaderCollapsedSource(state: LazyListState, forceCollapsed: () -> Boolean = { false }): () -> Boolean {
-    val thresholdPx = with(LocalDensity.current) { 20.dp.toPx() }
-    return { state.firstVisibleItemIndex > 0 || state.firstVisibleItemScrollOffset > thresholdPx || forceCollapsed() }
+    val density = LocalDensity.current
+    val gate = remember(state, density) { HeaderCollapseGate(with(density) { 32.dp.toPx() }, with(density) { 8.dp.toPx() }) }
+    val force by rememberUpdatedState(forceCollapsed)
+    return remember(state, gate) { { gate.update(state.firstVisibleItemIndex, state.firstVisibleItemScrollOffset, force()) } }
 }
 
 /** 网格版折叠信号，语义同 [rememberHeaderCollapsedSource]。 */
 @Composable
 fun rememberHeaderCollapsedSource(state: LazyGridState, forceCollapsed: () -> Boolean = { false }): () -> Boolean {
-    val thresholdPx = with(LocalDensity.current) { 20.dp.toPx() }
-    return { state.firstVisibleItemIndex > 0 || state.firstVisibleItemScrollOffset > thresholdPx || forceCollapsed() }
+    val density = LocalDensity.current
+    val gate = remember(state, density) { HeaderCollapseGate(with(density) { 32.dp.toPx() }, with(density) { 8.dp.toPx() }) }
+    val force by rememberUpdatedState(forceCollapsed)
+    return remember(state, gate) { { gate.update(state.firstVisibleItemIndex, state.firstVisibleItemScrollOffset, force()) } }
 }
 
 /** 瀑布流版折叠信号，语义同 [rememberHeaderCollapsedSource]。 */
 @Composable
 fun rememberHeaderCollapsedSource(state: LazyStaggeredGridState, forceCollapsed: () -> Boolean = { false }): () -> Boolean {
-    val thresholdPx = with(LocalDensity.current) { 20.dp.toPx() }
-    return { state.firstVisibleItemIndex > 0 || state.firstVisibleItemScrollOffset > thresholdPx || forceCollapsed() }
+    val density = LocalDensity.current
+    val gate = remember(state, density) { HeaderCollapseGate(with(density) { 32.dp.toPx() }, with(density) { 8.dp.toPx() }) }
+    val force by rememberUpdatedState(forceCollapsed)
+    return remember(state, gate) { { gate.update(state.firstVisibleItemIndex, state.firstVisibleItemScrollOffset, force()) } }
 }
 
 /**

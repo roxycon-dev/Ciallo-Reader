@@ -94,7 +94,7 @@ fun SplashScreen(
         try {
             scale.animateTo(
                 targetValue = 1.0f,
-                animationSpec = tween(durationMillis = 800)
+                animationSpec = tween(durationMillis = 500)
             )
         } catch (e: CancellationException) {
             throw e
@@ -112,13 +112,13 @@ fun SplashScreen(
         try {
             alpha.animateTo(
                 targetValue = 1.0f,
-                animationSpec = tween(durationMillis = 400)
+                animationSpec = tween(durationMillis = 220)
             )
-            // 开屏海报最长停留 900ms（可点击随时跳过），降低冷启动感知等待
-            delay(900)
+            // 开屏海报停留 400ms（可点击随时跳过），降低冷启动感知等待
+            delay(400)
             alpha.animateTo(
                 targetValue = 0f,
-                animationSpec = tween(durationMillis = 350)
+                animationSpec = tween(durationMillis = 180)
             )
         } catch (e: CancellationException) {
             // Leaving the route must not navigate from a disposed back-stack entry.

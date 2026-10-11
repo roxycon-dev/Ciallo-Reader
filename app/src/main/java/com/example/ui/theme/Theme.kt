@@ -12,6 +12,26 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
+
+val LocalAppDarkTheme = staticCompositionLocalOf { false }
+
+internal fun themeTextContrast(ink: Color, paper: Color): Float {
+    val a = ink.luminance(); val b = paper.luminance()
+    return (maxOf(a, b) + .05f) / (minOf(a, b) + .05f)
+}
+
+/** Light and dark ink cannot cross through the same grey as the surface. */
+internal fun legibleThemeInk(light: Color, dark: Color, paper: Color, progress: Float): Color {
+    val candidate = lerp(light, dark, progress)
+    if (themeTextContrast(candidate, paper) >= 4.5f) return candidate
+    val endpoint = if (themeTextContrast(light, paper) >= themeTextContrast(dark, paper)) light else dark
+    if (themeTextContrast(endpoint, paper) >= 4.5f) return endpoint
+    return if (themeTextContrast(Color.Black, paper) >= themeTextContrast(Color.White, paper)) Color.Black else Color.White
+}
 
 val BasePrimaryColors = listOf(
     Color(0xFF2563EB), // 0: 蓝
@@ -37,9 +57,8 @@ fun MyApplicationTheme(
     colorSecondaryIndex: Int = 2,
     content: @Composable () -> Unit
 ) {
-    // AnimationExample3：animateColorAsState 穿过命名调色板，600ms 平滑过渡，
-    // 切换主题色时整个软件的背景/强调色是渐变过去的，而不是瞬间跳变。
-    val colorTransitionMs = 600
+    val reduceMotion = com.example.ui.feedback.LocalReduceMotion.current || com.example.ui.feedback.systemReduceMotion()
+    val colorTransitionMs = if (reduceMotion) 0 else 280
     val targetPrimary = BasePrimaryColors.getOrElse(colorPrimaryIndex) { BasePrimaryColors[2] }
     val targetSecondary = BaseSecondaryColors.getOrElse(colorSecondaryIndex) { BaseSecondaryColors[2] }
     val primaryColor by animateColorAsState(
@@ -75,7 +94,39 @@ fun MyApplicationTheme(
         onSurface = NightText
     )
 
-    val colorScheme = if (darkTheme) darkColorScheme else lightColorScheme
+    val themeProgress by animateFloatAsState(if (darkTheme) 1f else 0f, tween(if (reduceMotion) 0 else 240, easing = IosMotion.EaseOut), label = "dayNightTheme")
+    fun mix(light: Color, dark: Color) = lerp(light, dark, themeProgress)
+    val paper = mix(lightColorScheme.background, darkColorScheme.background)
+    val surface = mix(lightColorScheme.surface, darkColorScheme.surface)
+    val variant = mix(lightColorScheme.surfaceVariant, darkColorScheme.surfaceVariant)
+    fun containerInk(light: Color, dark: Color, lightPaper: Color, darkPaper: Color) =
+        legibleThemeInk(light, dark, mix(lightPaper, darkPaper), themeProgress)
+    val colorScheme = lightColorScheme.copy(
+        background = paper,
+        surface = surface,
+        onBackground = legibleThemeInk(lightColorScheme.onBackground, darkColorScheme.onBackground, paper, themeProgress),
+        onSurface = legibleThemeInk(lightColorScheme.onSurface, darkColorScheme.onSurface, surface, themeProgress),
+        onSurfaceVariant = legibleThemeInk(lightColorScheme.onSurfaceVariant, darkColorScheme.onSurfaceVariant, variant, themeProgress),
+        surfaceVariant = variant,
+        primaryContainer = mix(lightColorScheme.primaryContainer, darkColorScheme.primaryContainer),
+        onPrimaryContainer = containerInk(lightColorScheme.onPrimaryContainer, darkColorScheme.onPrimaryContainer, lightColorScheme.primaryContainer, darkColorScheme.primaryContainer),
+        secondaryContainer = mix(lightColorScheme.secondaryContainer, darkColorScheme.secondaryContainer),
+        onSecondaryContainer = containerInk(lightColorScheme.onSecondaryContainer, darkColorScheme.onSecondaryContainer, lightColorScheme.secondaryContainer, darkColorScheme.secondaryContainer),
+        outline = mix(lightColorScheme.outline, darkColorScheme.outline),
+        outlineVariant = mix(lightColorScheme.outlineVariant, darkColorScheme.outlineVariant),
+        errorContainer = mix(lightColorScheme.errorContainer, darkColorScheme.errorContainer),
+        onErrorContainer = containerInk(lightColorScheme.onErrorContainer, darkColorScheme.onErrorContainer, lightColorScheme.errorContainer, darkColorScheme.errorContainer),
+        tertiaryContainer = mix(lightColorScheme.tertiaryContainer, darkColorScheme.tertiaryContainer),
+        onTertiaryContainer = containerInk(lightColorScheme.onTertiaryContainer, darkColorScheme.onTertiaryContainer, lightColorScheme.tertiaryContainer, darkColorScheme.tertiaryContainer),
+        inverseSurface = mix(lightColorScheme.inverseSurface, darkColorScheme.inverseSurface),
+        inverseOnSurface = containerInk(lightColorScheme.inverseOnSurface, darkColorScheme.inverseOnSurface, lightColorScheme.inverseSurface, darkColorScheme.inverseSurface),
+        inversePrimary = mix(lightColorScheme.inversePrimary, darkColorScheme.inversePrimary),
+        surfaceContainerLowest = mix(lightColorScheme.surfaceContainerLowest, darkColorScheme.surfaceContainerLowest),
+        surfaceContainerLow = mix(lightColorScheme.surfaceContainerLow, darkColorScheme.surfaceContainerLow),
+        surfaceContainer = mix(lightColorScheme.surfaceContainer, darkColorScheme.surfaceContainer),
+        surfaceContainerHigh = mix(lightColorScheme.surfaceContainerHigh, darkColorScheme.surfaceContainerHigh),
+        surfaceContainerHighest = mix(lightColorScheme.surfaceContainerHighest, darkColorScheme.surfaceContainerHighest),
+    )
 
     MaterialTheme(
         colorScheme = colorScheme,
@@ -84,7 +135,7 @@ fun MyApplicationTheme(
         // 2026-09-21：Android 滚动容器默认带“边缘发光”（overscroll glow），
         // iOS 的 UIScrollView 没有这个效果（它用回弹而非光晕），这是滚动时
         // 一眼能看出的安卓味来源。全局关掉后，长列表/书架的滚动观感明显接近 iOS。
-        CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
+        CompositionLocalProvider(LocalOverscrollConfiguration provides null, LocalAppDarkTheme provides darkTheme) {
             content()
         }
     }

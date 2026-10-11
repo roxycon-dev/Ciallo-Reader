@@ -145,7 +145,7 @@ internal fun curlEngineActive(pageAnim: ComicPageAnim, direction: ComicDirection
  * 第 11 条毛玻璃采样开关（纯函数，单测钉死语义）：
  * - 仅面板打开期间采样：阅读期不挂 layerBackdrop，阅读内容零每帧重录开销；
  * - CURL 引擎页面在 GLSurfaceView（独立 Surface 层，Compose graphicsLayer 采不到，
- *   强行采样只会得到背景色而盖住页），回退纯半透明 PanelBg。
+ *   不挂 native 采样；打开面板时由 ComicFrozenGlassBackdrop 记录已处理的当前页。
  */
 internal fun panelGlassSamplingActive(
     pageAnim: ComicPageAnim,
@@ -587,15 +587,20 @@ fun ComicReaderCore(
     // 供设置/目录/预设面板 drawBackdrop 高斯模糊采样（与底部 Tab 栏同机制）。
     // remember 无条件调用（Compose 规范），仅按需挂 modifier——阅读期零每帧重录开销
     val readerLayerBackdrop = rememberLayerBackdrop()
-    val panelGlassBackdrop: LayerBackdrop? =
-        if (panelGlassSamplingActive(config.pageAnim, config.direction, config.mode, panel != ComicPanel.NONE)) {
-            readerLayerBackdrop
-        } else null
+    var retainPanelGlass by remember { mutableStateOf(false) }
+    LaunchedEffect(panel) {
+        if (panel != ComicPanel.NONE) retainPanelGlass = true
+        else { delay(240); retainPanelGlass = false }
+    }
+    val glassOpen = panel != ComicPanel.NONE || retainPanelGlass
+    val nativeGlass = panelGlassSamplingActive(displayConfig.pageAnim, config.direction, config.mode, glassOpen)
+    val frozenGlass = glassOpen && curlEngineActive(displayConfig.pageAnim, config.direction, config.mode)
+    val panelGlassBackdrop: LayerBackdrop? = if (glassOpen) readerLayerBackdrop else null
     CompositionLocalProvider(LocalComicTranslationEpoch provides translationEpoch) {
     BoxWithConstraints(
         modifier
             .fillMaxSize()
-            .then(if (panelGlassBackdrop != null) Modifier.layerBackdrop(panelGlassBackdrop) else Modifier)
+            .then(if (nativeGlass) Modifier.layerBackdrop(readerLayerBackdrop) else Modifier)
     ) {
         val containerW = constraints.maxWidth.toFloat()
         val containerH = constraints.maxHeight.toFloat()
@@ -765,6 +770,10 @@ fun ComicReaderCore(
     DisposableEffect(Unit) { onDispose { audio.stop() } }
 
     /* ── 控制层与面板 ── */
+    if (frozenGlass) {
+        ComicFrozenGlassBackdrop(readerLayerBackdrop, layout.spreads.getOrNull(currentSpread)?.slots.orEmpty(),
+            displayConfig, loader, bookState, dynamicBg)
+    }
     ComicReaderChrome(
         visible = controlsVisible,
         panel = panel,
@@ -1046,6 +1055,9 @@ private fun ComicPagedReader(
     }
 
     val pagerState = rememberPagerState(initialPage = currentSpread) { layout.spreadCount }
+    // Prefetched chapter switches keep this pager alive but replace the parent's
+    // page state. The long-lived collector must report to the current chapter.
+    val latestOnSpreadChanged by rememberUpdatedState(onSpreadChanged)
     // 第 6 节：翻页落定轻触觉（VIRTUAL_KEY 轻击感，无震动马达噪声）
     val hapticView = androidx.compose.ui.platform.LocalView.current
 
@@ -1056,7 +1068,7 @@ private fun ComicPagedReader(
                 if (com.example.ui.feedback.HapticsGate.enabled) {
                     hapticView.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                 }
-                onSpreadChanged(settled)
+                latestOnSpreadChanged(settled)
             }
     }
     LaunchedEffect(currentSpread) {
@@ -1239,6 +1251,9 @@ private fun ComicMagneticPager(
     val latestCurrentSpread by rememberUpdatedState(currentSpread)
     val latestConfig by rememberUpdatedState(config)
     val latestMagneticNext by rememberUpdatedState(goNext)
+    // Equal-length chapters reuse pointerInput; its commit callback must follow
+    // the chapter just as the current page and config already do.
+    val latestOnSpreadChanged by rememberUpdatedState(onSpreadChanged)
 
     // 翻页提交后重置（拖拽进行中不重置——防外部页码变化打断跟手）
     LaunchedEffect(currentSpread) {
@@ -1337,7 +1352,7 @@ private fun ComicMagneticPager(
                             // 提交前校验动画未被中断（被新手势 stop 的 animateTo 会"正常返回"）
                             if (abs(drag.value - targetOffset) < span * 0.02f) {
                                 drag.snapTo(0f)
-                                onSpreadChanged(targetPage)
+                                latestOnSpreadChanged(targetPage)
                                 // 第 6 节：磁吸吸附成功轻触觉
                                 if (com.example.ui.feedback.HapticsGate.enabled) {
                                     hapticView.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)

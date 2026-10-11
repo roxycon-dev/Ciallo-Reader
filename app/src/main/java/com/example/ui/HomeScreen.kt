@@ -111,6 +111,9 @@ import com.example.ui.theme.AppFonts
 import me.trishiraj.shadowglow.consistentShadow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.AppToast
+import com.example.ui.shelf.shelfCapture
+import com.example.ui.feedback.LocalReduceMotion
+import com.example.ui.feedback.AppMotion
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -183,6 +186,8 @@ fun HomeScreen(
     onMarkFinished: (Book) -> Unit = {},
 ) {
     val sharedTransitionScope = com.example.LocalSharedTransitionScope.current
+    val reduceMotion = LocalReduceMotion.current
+    val shelfMotion = com.example.ui.shelf.rememberShelfMotionState()
     val animatedVisibilityScope = com.example.LocalNavAnimatedVisibilityScope.current
     val streakDays by streakDaysFlow.collectAsStateWithLifecycle()
 
@@ -315,10 +320,7 @@ fun HomeScreen(
         else if (selectedCategory !in protectedCategoryNames) false
         else categories.find { it.name == selectedCategory }?.id !in unlockedCategoryIds
     }
-    // 书架呼吸动画：30fps 自定义驱动（4 秒周期），视觉与 60fps 一致但绘制开销减半。
-    // 真正的启动/暂停逻辑放在 homeGridState 之后（需要读滚动状态）——
-    // 滚动期间冻结呼吸，见下方 LaunchedEffect。
-    val breathingProgress = remember { mutableFloatStateOf(0f) }
+    SideEffect { shelfMotion.hideBooks = selectedCategoryLocked; shelfMotion.hideFavorites = favoritesLocked }
 
     // Filter books by category and search query (debounced)
     // 第七轮第 6.1/6.2 条：分类互斥单归属——选中分类只显示归属它的书；
@@ -481,6 +483,7 @@ fun HomeScreen(
             onDismissRequest = { bookToMove = null },
             title = { Text("选择目标分类", fontWeight = FontWeight.Bold) },
             text = {
+                val close = com.example.ui.components.LocalOverlayClose.current
                 androidx.compose.foundation.layout.Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     val availableCategories = categories.filter { it.name != bookToMove?.category }
                     if (availableCategories.isEmpty()) {
@@ -491,10 +494,10 @@ fun HomeScreen(
                     } else {
                         availableCategories.forEach { cat ->
                             TextButton(
-                                onClick = {
-                                    onMoveBook(bookToMove!!, cat.name)
+                                onClick = { close {
+                                    bookToMove?.let { onMoveBook(it, cat.name) }
                                     bookToMove = null
-                                },
+                                } },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(cat.name)
@@ -505,7 +508,8 @@ fun HomeScreen(
             },
             confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { bookToMove = null }) {
+                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
+                TextButton(onClick = { closeOverlay { bookToMove = null } }) {
                     Text("取消")
                 }
             }
@@ -524,17 +528,21 @@ fun HomeScreen(
                 )
             },
             confirmButton = {
+                val close = com.example.ui.components.LocalOverlayClose.current
                 TextButton(
-                    onClick = {
-                        bookToDelete?.let { onDeleteBook(it) }
+                    onClick = { close {
+                        bookToDelete?.let { book ->
+                            shelfMotion.remove(listOf(book.id.toString()), refreshScope, reduceMotion) { onDeleteBook(book) }
+                        }
                         bookToDelete = null
-                    }
+                    } }
                 ) {
                     Text("确认移出", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { bookToDelete = null }) {
+                val close = com.example.ui.components.LocalOverlayClose.current
+                TextButton(onClick = { close {} }) {
                     Text("取消")
                 }
             }
@@ -619,21 +627,23 @@ fun HomeScreen(
                 )
             },
             confirmButton = {
+                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
                 TextButton(
-                    onClick = {
+                    onClick = { closeOverlay {
                         val old = favCategoryRenameFor
                         if (old != null && text.isNotBlank()) {
                             onRenameFavoriteCategory(old, text.trim())
                             if (favoriteCategory == old) favoriteCategory = text.trim()
                         }
                         favCategoryRenameFor = null
-                    }
+                    } }
                 ) {
                     Text("保存", color = MintPrimary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { favCategoryRenameFor = null }) { Text("取消") }
+                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
+                TextButton(onClick = { closeOverlay { favCategoryRenameFor = null } }) { Text("取消") }
             }
         )
     }
@@ -651,20 +661,22 @@ fun HomeScreen(
                 )
             },
             confirmButton = {
+                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
                 TextButton(
-                    onClick = {
+                    onClick = { closeOverlay {
                         onDeleteFavoriteCategory(name)
                         if (favoriteCategory == name) {
                             favoriteCategory = com.example.ui.favorite.ALL_FAV_CATEGORY
                         }
                         favCategoryDeleteFor = null
-                    }
+                    } }
                 ) {
                     Text("删除", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { favCategoryDeleteFor = null }) { Text("取消") }
+                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
+                TextButton(onClick = { closeOverlay { favCategoryDeleteFor = null } }) { Text("取消") }
             }
         )
     }
@@ -749,30 +761,6 @@ fun HomeScreen(
             }
         }
         hit
-    }
-
-    // 呼吸动画的时钟：只有「有书 且 列表不在滚动 且 不在多选/拖拽」时才走。
-    // 冻结的三个理由，缺一不可：
-    //  1. 滚动中冻结是苹果式取舍——手指在动时，视野里不该有别的东西也在动；
-    //  2. 顺带把滚动期间的每帧重绘需求去掉（这是 jank 的主要来源之一）；
-    //  3. 多选/拖拽中必须冻结：卡片的 itemRect 是拖拽命中与落点的唯一依据，
-    //     卡片若还在 ±3dp 上下浮动，落点矩形会跟着抖，出现"明明对准了却放不进去"。
-    // collectLatest 在状态翻转时会取消内层循环，相位保留在 breathingProgress 里，
-    // 因此恢复后是「接着原来的相位继续」，不会跳变。
-    LaunchedEffect(books.isNotEmpty()) {
-        if (books.isEmpty()) return@LaunchedEffect
-        val twoPi = (2.0 * Math.PI).toFloat()
-        val step = twoPi / 120f // 4000ms / 33ms ≈ 121 步
-        snapshotFlow {
-            homeGridState.isScrollInProgress ||
-                shelfSelection.phase != com.example.ui.shelf.ShelfPhase.BROWSE
-        }.collectLatest { busy ->
-            if (busy) return@collectLatest
-            while (true) {
-                delay(33)
-                breathingProgress.floatValue = (breathingProgress.floatValue + step) % twoPi
-            }
-        }
     }
 
     StarryNightBackground(showLamp = true) {
@@ -923,7 +911,7 @@ fun HomeScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         // 1. TOP BAR GREETINGS & SEARCH
-                        val isDark = MaterialTheme.colorScheme.background == com.example.ui.theme.DarkCharcoal
+                        val isDark = com.example.ui.theme.LocalAppDarkTheme.current
                         val barBgColor = if (isDark) Color(0xFF222428) else Color.White
                         val searchPlaceholderColor = if (isDark) Color.LightGray.copy(alpha = 0.6f) else Color.Gray
                         val searchTextColor = if (isDark) Color.White else Color.DarkGray
@@ -1290,7 +1278,10 @@ fun HomeScreen(
                                                     icon = Icons.Filled.Sort,
                                                     label = when (sortBy) { 0 -> "默认"; 1 -> "A-Z"; else -> "最近" },
                                                     emphasized = sortBy > 0,
-                                                ) { sortBy = (sortBy + 1) % 3 }
+                                                ) {
+                                                    com.example.ui.shelf.keepShelfViewportForSort(homeGridState)
+                                                    sortBy = (sortBy + 1) % 3
+                                                }
 
                                                 Spacer(modifier = Modifier.width(6.dp))
 
@@ -1518,12 +1509,17 @@ fun HomeScreen(
                                             label = "book_press",
                                         )
 
-                                        Box(modifier = Modifier.fillMaxWidth()) {
+                                        Box(modifier = Modifier.fillMaxWidth()
+                                            .animateItem(
+                                                fadeInSpec = if (reduceMotion || selectedCategoryLocked) null else tween(220, easing = AppMotion.easeOutCubic),
+                                                placementSpec = if (reduceMotion || shelfSelection.phase == com.example.ui.shelf.ShelfPhase.DRAGGING) null else AppMotion.reorder(),
+                                                fadeOutSpec = if (reduceMotion || selectedCategoryLocked) null else tween(150),
+                                            )
+                                            .shelfCapture(shelfMotion, book.id.toString())) {
                                             Column(
                                                 modifier = Modifier
                                                     .graphicsLayer {
-                                                        val phase = (book.id.hashCode() % 1000) / 1000f * 2f * Math.PI.toFloat()
-                                                        translationY = (kotlin.math.sin(breathingProgress.floatValue + phase) * 3.dp.toPx()).toFloat()
+                                                        translationY = 0f
                                                         scaleX = scaleAnim * selectedScale * pressScale
                                                         scaleY = scaleAnim * selectedScale * pressScale
                                                         alpha = dimAlpha
@@ -1531,7 +1527,7 @@ fun HomeScreen(
                                                     .then(itemBounds(book.id.toString())),
                                                 horizontalAlignment = Alignment.CenterHorizontally
                                             ) {
-                                            val isThemeDark = MaterialTheme.colorScheme.background == com.example.ui.theme.DarkCharcoal
+                                            val isThemeDark = com.example.ui.theme.LocalAppDarkTheme.current
                                             val coverGradColors = if (isThemeDark) {
                                                 listOf(
                                                     Color(0xFF2B2D31),
@@ -1916,7 +1912,13 @@ fun HomeScreen(
                                     com.example.ui.favorite.FavoriteCard(
                                         item = item,
                                         onClick = { onOpenFavorite(item) },
-                                        modifier = Modifier.then(itemBounds(favKey)),
+                                        modifier = Modifier
+                                            .animateItem(
+                                                fadeInSpec = if (reduceMotion || favoritesLocked) null else tween(220, easing = AppMotion.easeOutCubic),
+                                                placementSpec = if (reduceMotion || shelfSelection.phase == com.example.ui.shelf.ShelfPhase.DRAGGING) null else AppMotion.reorder(),
+                                                fadeOutSpec = if (reduceMotion || favoritesLocked) null else tween(150),
+                                            )
+                                            .shelfCapture(shelfMotion, favKey).then(itemBounds(favKey)),
                                         coverModifier = shelfSelection.coverBoundsModifier(favKey),
                                         selected = favSelected,
                                         // 勾选框按**板块**判定（与书架卡片同一套规则）：
@@ -2051,7 +2053,7 @@ fun HomeScreen(
                                         destructive = true,
                                         onClick = {
                                             val keys = selectedFavs.map { it.key }
-                                            onRemoveFavorites(keys)
+                                            shelfMotion.remove(keys.map { com.example.ui.shelf.favShelfKey(it) }, refreshScope, reduceMotion) { onRemoveFavorites(keys) }
                                             onShowUndo?.invoke("已取消喜欢 ${keys.size} 部") { }
                                             shelfSelection.exitSelection()
                                         },
@@ -2086,7 +2088,9 @@ fun HomeScreen(
                                             enabled = selectedBooks.isNotEmpty(),
                                             destructive = true,
                                             onClick = {
-                                                onDeleteDownloads?.invoke(selectedBooks)
+                                                onDeleteDownloads?.let { remove ->
+                                                    shelfMotion.remove(selectedBooks.map { it.id.toString() }, refreshScope, reduceMotion) { remove(selectedBooks) }
+                                                }
                                                 shelfSelection.exitSelection()
                                             },
                                         ),
@@ -2157,6 +2161,8 @@ fun HomeScreen(
                     }
         }
         }
+
+        com.example.ui.shelf.ShelfShatterOverlay(shelfMotion, Modifier.zIndex(5f))
 
         longPressBook?.let { book ->
             BookActionSheet(
@@ -2346,11 +2352,15 @@ private fun NewCategoryDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onCreate(name.trim()) }, enabled = name.isNotBlank()) {
+            val closeOverlay = com.example.ui.components.LocalOverlayClose.current
+            TextButton(onClick = { closeOverlay { onCreate(name.trim()) } }, enabled = name.isNotBlank()) {
                 Text("新建", color = MintPrimary, fontWeight = FontWeight.Bold)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = {
+            val closeOverlay = com.example.ui.components.LocalOverlayClose.current
+            TextButton(onClick = { closeOverlay {} }) { Text("取消") }
+        },
     )
 }
 

@@ -559,15 +559,16 @@ private fun DayCoverCard(
                 )
             },
             text = {
+                val closeMenu = LocalOverlayClose.current
                 Column {
                     MenuActionRow(
                         label = "前往阅读",
                         enabled = book != null || recordBook != null,
-                        onClick = {
+                        onClick = { closeMenu {
                             showMenu = false
                             if (book != null) onOpenBook(book)
                             else if (recordBook != null) onOpenRecordDetail(recordBook)
-                        }
+                        } }
                     )
                     HorizontalDivider(
                         thickness = 1.dp,
@@ -575,10 +576,10 @@ private fun DayCoverCard(
                     )
                     MenuActionRow(
                         label = "阅读详情",
-                        onClick = {
+                        onClick = { closeMenu {
                             showMenu = false
                             showDetail = true
-                        }
+                        } }
                     )
                     HorizontalDivider(
                         thickness = 1.dp,
@@ -587,16 +588,17 @@ private fun DayCoverCard(
                     MenuActionRow(
                         label = "删除阅读历史",
                         destructive = true,
-                        onClick = {
+                        onClick = { closeMenu {
                             showMenu = false
                             onDeleteRecord(record)
-                        }
+                        } }
                     )
                 }
             },
             confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { showMenu = false }) { Text("取消") }
+                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
+                TextButton(onClick = { closeOverlay { showMenu = false } }) { Text("取消") }
             }
         )
     }
@@ -628,7 +630,8 @@ private fun DayCoverCard(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showDetail = false }) { Text("关闭") }
+                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
+                TextButton(onClick = { closeOverlay { showDetail = false } }) { Text("关闭") }
             }
         )
     }

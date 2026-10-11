@@ -68,6 +68,8 @@ import androidx.compose.ui.semantics.semantics
 import com.example.ui.theme.MintPrimary
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import com.example.ui.reader.readingGlass
+import com.example.ui.feedback.AppMotion
 
 /* ══════════════ 漫画面板设计系统（第七轮第 3 条） ══════════════
  *
@@ -106,9 +108,7 @@ internal fun PanelSectionCard(
             .fillMaxWidth()
             .padding(vertical = DesignTokens.SpaceXs)
             .animateContentSize(tween(180))
-            .clip(RoundedCornerShape(DesignTokens.RadiusXl))
-            .background(PanelCardBg)
-            .border(0.5.dp, PanelCardStroke, RoundedCornerShape(DesignTokens.RadiusXl))
+            .readingGlass(RoundedCornerShape(DesignTokens.RadiusXl), strong = true)
             .padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceComfortable)
     ) {
         if (title != null) {
@@ -142,8 +142,7 @@ internal fun PanelTabRow(
     Row(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(DesignTokens.RadiusNavigation))
-            .background(PanelChipBg)
+            .readingGlass(RoundedCornerShape(DesignTokens.RadiusNavigation))
             .horizontalScroll(rememberScrollState())
             .selectableGroup()
             .padding(DesignTokens.SpaceXs),
@@ -155,7 +154,7 @@ internal fun PanelTabRow(
             Column(
                 Modifier
                     .width(58.dp)
-                    .clip(RoundedCornerShape(DesignTokens.RadiusControl))
+                    .readingGlass(RoundedCornerShape(DesignTokens.RadiusControl))
                     .background(tint)
                     .border(
                         0.5.dp,
@@ -200,7 +199,7 @@ internal fun PanelTabRail(tabs: List<PanelTabData>, selected: Int, onSelect: (In
         tabs.forEachIndexed { index, tab ->
             val active = index == selected
             val tint by animateColorAsState(if (active) selectedBg() else Color.Transparent, label = "railTint")
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(DesignTokens.RadiusNavigation)).background(tint)
+            Column(Modifier.fillMaxWidth().readingGlass(RoundedCornerShape(DesignTokens.RadiusNavigation)).background(tint)
                 .selectable(active, role = Role.Tab) { onSelect(index) }.padding(vertical = DesignTokens.SpaceSm),
                 horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(tab.icon, null, tint = if (active) MintPrimary else TextSecondary, modifier = Modifier.size(21.dp))
@@ -365,7 +364,7 @@ internal fun PanelSwitch(
 ) {
     val t by animateFloatAsState(
         targetValue = if (checked) 1f else 0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = 1400f),
+        animationSpec = AppMotion.press(),
         label = "panelSwitch"
     )
     val trackColor = lerpColor(ReadingPalette.SwitchTrack, MintPrimary.copy(alpha = 0.85f), t)
@@ -374,7 +373,7 @@ internal fun PanelSwitch(
         modifier
             .width(46.dp)
             .height(28.dp)
-            .clip(CircleShape)
+            .readingGlass(CircleShape)
             .background(trackColor)
             .border(
                 0.5.dp,

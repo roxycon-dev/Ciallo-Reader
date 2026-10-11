@@ -28,6 +28,16 @@ import com.example.source.keyword.KeywordProviderState
 import com.example.ui.design.DesignTokens
 import com.example.ui.components.AppSwitch
 import com.example.ui.glasskit.GlassKitCard
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
+import com.example.ui.feedback.AppMotion
+import com.example.ui.feedback.LocalReduceMotion
 
 /** A regular result item: metadata never occupies the pinned search bar. */
 internal fun LazyListScope.keywordSearchPreviewItem(
@@ -59,8 +69,10 @@ internal fun KeywordSearchPreview(
     providers: List<KeywordProviderState> = emptyList(),
     onRetry: (() -> Unit)? = null,
 ) {
+    val reduce = LocalReduceMotion.current
     var expanded by rememberSaveable(words.firstOrNull()) { mutableStateOf(false) }
-    GlassKitCard(modifier = modifier.fillMaxWidth().testTag("keyword_search_preview")) {
+    val arrow by animateFloatAsState(if (expanded) 180f else 0f, tween(if (reduce) 0 else AppMotion.CONTENT_MS), label = "keywordArrow")
+    GlassKitCard(modifier = modifier.fillMaxWidth().animateContentSize(tween(if (reduce) 0 else 220, easing = AppMotion.easeOutCubic)).testTag("keyword_search_preview")) {
         Column(Modifier.padding(DesignTokens.SpaceMd), verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
             Row(Modifier.fillMaxWidth().heightIn(min = DesignTokens.SpaceXxl * 2)
                 .semantics { stateDescription = if (expanded) "已展开" else "已收起" }
@@ -76,11 +88,15 @@ internal fun KeywordSearchPreview(
                         Text("${words.size} 个", style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary)
                     }
-                    Text(status, style = MaterialTheme.typography.labelSmall,
-                        color = if (status.startsWith("正在")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    AnimatedContent(targetState = status,
+                        transitionSpec = { fadeIn(tween(if (reduce) 0 else 160, delayMillis = if (reduce) 0 else 50)) togetherWith fadeOut(tween(if (reduce) 0 else 80)) },
+                        label = "keywordStatus") { currentStatus ->
+                        Text(currentStatus, style = MaterialTheme.typography.labelSmall,
+                            color = if (currentStatus.startsWith("正在")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
-                Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    if (expanded) "收起搜索用词" else "查看搜索用词", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Default.ExpandMore, contentDescription = if (expanded) "收起搜索用词" else "查看搜索用词",
+                    modifier = Modifier.graphicsLayer { rotationZ = arrow }, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (!expanded) {
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),

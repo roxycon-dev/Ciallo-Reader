@@ -70,6 +70,13 @@ import com.example.ui.theme.luminance
 import coil.compose.rememberAsyncImagePainter
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.AppToast
+import com.example.library.LIBRARY_SEARCH_ROUTE
+import com.example.library.LIBRARY_SESSION_ARGUMENT
+import com.example.library.libraryDestinationRoute
+import com.example.library.librarySearchViewModel
+import com.example.library.librarySessionArguments
+import com.example.library.libraryViewModelForSession
+import com.example.library.openDetailSearch
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
@@ -468,14 +475,16 @@ class MainActivity : ComponentActivity() {
                        状态放它里面就会被重置成「默认」——用户看到的就是
                        「进书里看一眼再退出，分类跳回默认了」。 */
                     var shelfCategory by rememberSaveable { mutableStateOf(com.example.data.DEFAULT_CATEGORY) }
+                    val sharedLibraryViewModel = libraryViewModel
 
+                    val navigationReduceMotion = com.example.ui.feedback.LocalReduceMotion.current
                     SharedTransitionLayout { CompositionLocalProvider(LocalSharedTransitionScope provides this) { NavHost(
                         navController = navController,
                         startDestination = "splash",
-                        enterTransition = { fadeIn(tween(250)) },
-                        exitTransition = { fadeOut(tween(250)) },
-                        popEnterTransition = { fadeIn(tween(250)) },
-                        popExitTransition = { fadeOut(tween(250)) }
+                        enterTransition = { com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion) },
+                        exitTransition = { com.example.ui.feedback.NavigationMotion.leave(navigationReduceMotion) },
+                        popEnterTransition = { com.example.ui.feedback.NavigationMotion.returnEnter(navigationReduceMotion) },
+                        popExitTransition = { com.example.ui.feedback.NavigationMotion.returnLeave(navigationReduceMotion) }
                     ) {
                         composable("splash") {
                             SplashScreen(
@@ -677,9 +686,9 @@ class MainActivity : ComponentActivity() {
                                             // 「两张半透明页面叠在一起发灰」的中间帧
                                             // （旧实现是横向各滑 1/3 屏 + 交叉淡化，中间帧必然重影）。
                                             fadeIn(
-                                                animationSpec = tween(durationMillis = 210, delayMillis = 90),
+                                                animationSpec = tween(durationMillis = if (navigationReduceMotion) 0 else 180, delayMillis = if (navigationReduceMotion) 0 else 70),
                                             ).togetherWith(
-                                                fadeOut(animationSpec = tween(durationMillis = 90)),
+                                                fadeOut(animationSpec = tween(durationMillis = if (navigationReduceMotion) 0 else 70)),
                                             )
                                         },
                                         label = "TabSwitch"
@@ -1147,27 +1156,10 @@ class MainActivity : ComponentActivity() {
 
                         composable(
                             "reader",
-                            enterTransition = {
-                                // 2026-09-21：原来是 EnterTransition.None —— 打开书籍时
-                                // 页面瞬间跳出来，是全局最生硬的一处转场。
-                                // 改为 iOS 的 push 转场：新页面自右侧滑入并淡入。
-                                // 只滑 1/3 屏宽而非整屏，配合旧页面淡出，既有方向感又不拖沓。
-                                slideInHorizontally(
-                                    initialOffsetX = { fullWidth -> fullWidth / 3 },
-                                    animationSpec = tween(280, easing = com.example.ui.theme.IosMotion.EaseOut)
-                                ) + fadeIn(tween(200))
-                            },
-                            exitTransition = { fadeOut(tween(220)) },
-                            popEnterTransition = {
-                                fadeIn(tween(240))
-                            },
-                            popExitTransition = {
-                                fadeOut(tween(220)) +
-                                    scaleOut(
-                                        targetScale = 0.96f,
-                                        animationSpec = tween(220, easing = FastOutSlowInEasing)
-                                    )
-                            }
+                            enterTransition = { com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion) },
+                            exitTransition = { com.example.ui.feedback.NavigationMotion.leave(navigationReduceMotion) },
+                            popEnterTransition = { com.example.ui.feedback.NavigationMotion.returnEnter(navigationReduceMotion) },
+                            popExitTransition = { com.example.ui.feedback.NavigationMotion.returnLeave(navigationReduceMotion) }
                         ) { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
                             val selectedBook by viewModel.selectedBook.collectAsStateWithLifecycle()
                             val chapters by viewModel.chapters.collectAsStateWithLifecycle()
@@ -1236,28 +1228,10 @@ class MainActivity : ComponentActivity() {
  }
                         composable(
                             "comic_reader",
-                            enterTransition = {
-                                fadeIn(tween(320)) +
-                                    scaleIn(
-                                        initialScale = 0.96f,
-                                        animationSpec = tween(320, easing = FastOutSlowInEasing)
-                                    )
-                            },
-                            exitTransition = { fadeOut(tween(220)) },
-                            popEnterTransition = {
-                                fadeIn(tween(300)) +
-                                    scaleIn(
-                                        initialScale = 0.98f,
-                                        animationSpec = tween(300, easing = FastOutSlowInEasing)
-                                    )
-                            },
-                            popExitTransition = {
-                                fadeOut(tween(220)) +
-                                    scaleOut(
-                                        targetScale = 0.96f,
-                                        animationSpec = tween(220, easing = FastOutSlowInEasing)
-                                    )
-                            }
+                            enterTransition = { com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion) },
+                            exitTransition = { com.example.ui.feedback.NavigationMotion.leave(navigationReduceMotion) },
+                            popEnterTransition = { com.example.ui.feedback.NavigationMotion.returnEnter(navigationReduceMotion) },
+                            popExitTransition = { com.example.ui.feedback.NavigationMotion.returnLeave(navigationReduceMotion) }
                         ) { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
                             val selectedBook by viewModel.selectedBook.collectAsStateWithLifecycle()
                             val chapters by viewModel.chapters.collectAsStateWithLifecycle()
@@ -1299,15 +1273,44 @@ class MainActivity : ComponentActivity() {
                             )
                         } }
 
+                        composable(LIBRARY_SEARCH_ROUTE) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+                            val searchViewModel = remember(entry, sharedLibraryViewModel) {
+                                librarySearchViewModel(entry, sharedLibraryViewModel)
+                            }
+                            val sessionId = entry.arguments?.getString(LIBRARY_SESSION_ARGUMENT)
+                            val favoriteKeys by viewModel.favoriteKeys.collectAsStateWithLifecycle()
+                            com.example.library.LibraryScreen(
+                                viewModel = searchViewModel,
+                                onBookImported = { selectedTab = 1 },
+                                onOpenSourceManagement = { navController.navigate("source_management") },
+                                onImportLocalBook = {
+                                    selectedCategoryForImport = "全部"
+                                    fileLauncher.launch("*/*")
+                                },
+                                favoriteKeys = favoriteKeys,
+                                onToggleFavorite = { book, next -> viewModel.toggleFavorite(book, next) },
+                                onOpenComic = { book ->
+                                    searchViewModel.openComic(book)
+                                    navController.navigate(libraryDestinationRoute("comic_chapters", sessionId))
+                                },
+                                onOpenLocalNovel = { book -> viewModel.selectBook(book); navController.navigate("reader") },
+                                extraBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+                                onBack = { navController.popBackStack() },
+                            )
+                        } }
+
                         composable(
-                            "comic_chapters",
-                            enterTransition = {
-                                fadeIn(tween(280)) + slideInHorizontally { it / 4 }
-                            },
-                            exitTransition = { fadeOut(tween(200)) },
-                            popEnterTransition = { fadeIn(tween(260)) },
-                            popExitTransition = { fadeOut(tween(200)) }
-                        ) { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+                            "comic_chapters?$LIBRARY_SESSION_ARGUMENT={$LIBRARY_SESSION_ARGUMENT}",
+                            arguments = librarySessionArguments(),
+                            enterTransition = { com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion) },
+                            exitTransition = { com.example.ui.feedback.NavigationMotion.leave(navigationReduceMotion) },
+                            popEnterTransition = { com.example.ui.feedback.NavigationMotion.returnEnter(navigationReduceMotion) },
+                            popExitTransition = { com.example.ui.feedback.NavigationMotion.returnLeave(navigationReduceMotion) }
+                        ) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+                            val librarySessionId = entry.arguments?.getString(LIBRARY_SESSION_ARGUMENT)
+                            val libraryViewModel = remember(entry, sharedLibraryViewModel) {
+                                libraryViewModelForSession(navController, librarySessionId, sharedLibraryViewModel)
+                            }
                             val comicBook by libraryViewModel.comicBook.collectAsStateWithLifecycle()
                             val comicChapters by libraryViewModel.comicChapters.collectAsStateWithLifecycle()
                             val comicChaptersLoading by libraryViewModel.comicChaptersLoading.collectAsStateWithLifecycle()
@@ -1470,11 +1473,7 @@ class MainActivity : ComponentActivity() {
                                 book = comicBook,
                                 sourceName = favoriteSourceNames.firstOrNull { it.id == comicBook?.sourceId }?.name,
                                 onSearchText = { keyword ->
-                                    libraryViewModel.requestAggregateSearch(keyword, comicIsTextMode)
-                                    selectedTab = 0
-                                    if (!navController.popBackStack("home", false)) {
-                                        navController.navigate("home") { launchSingleTop = true }
-                                    }
+                                    navController.openDetailSearch(keyword, comicIsTextMode)
                                 },
                                 chapters = comicChapters,
                                 loading = comicChaptersLoading,
@@ -1505,10 +1504,10 @@ class MainActivity : ComponentActivity() {
                                 onChapterClick = { chapter ->
                                     if (comicIsTextMode) {
                                         libraryViewModel.loadChapterText(chapter)
-                                        navController.navigate("novel_reader_online")
+                                        navController.navigate(libraryDestinationRoute("novel_reader_online", librarySessionId))
                                     } else {
                                         libraryViewModel.loadChapterImages(chapter)
-                                        navController.navigate("comic_reader_online")
+                                        navController.navigate(libraryDestinationRoute("comic_reader_online", librarySessionId))
                                     }
                                 },
                                 onDownloadChapter = { chapter ->
@@ -1541,10 +1540,10 @@ class MainActivity : ComponentActivity() {
                                     ComicJumpState.startPage = page
                                     if (comicIsTextMode) {
                                         libraryViewModel.loadChapterText(chapter)
-                                        navController.navigate("novel_reader_online")
+                                        navController.navigate(libraryDestinationRoute("novel_reader_online", librarySessionId))
                                     } else {
                                         libraryViewModel.loadChapterImages(chapter)
-                                        navController.navigate("comic_reader_online")
+                                        navController.navigate(libraryDestinationRoute("comic_reader_online", librarySessionId))
                                     }
                                 },
                                 onMarkChapterRead = { chapter, index, read ->
@@ -1600,18 +1599,17 @@ class MainActivity : ComponentActivity() {
                         } }
 
                         composable(
-                            "comic_reader_online",
-                            enterTransition = {
-                                fadeIn(tween(300)) +
-                                    scaleIn(
-                                        initialScale = 0.96f,
-                                        animationSpec = tween(300)
-                                    )
-                            },
-                            exitTransition = { fadeOut(tween(220)) },
-                            popEnterTransition = { fadeIn(tween(280)) },
-                            popExitTransition = { fadeOut(tween(220)) }
-                        ) { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+                            "comic_reader_online?$LIBRARY_SESSION_ARGUMENT={$LIBRARY_SESSION_ARGUMENT}",
+                            arguments = librarySessionArguments(),
+                            enterTransition = { com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion) },
+                            exitTransition = { com.example.ui.feedback.NavigationMotion.leave(navigationReduceMotion) },
+                            popEnterTransition = { com.example.ui.feedback.NavigationMotion.returnEnter(navigationReduceMotion) },
+                            popExitTransition = { com.example.ui.feedback.NavigationMotion.returnLeave(navigationReduceMotion) }
+                        ) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+                            val librarySessionId = entry.arguments?.getString(LIBRARY_SESSION_ARGUMENT)
+                            val libraryViewModel = remember(entry, sharedLibraryViewModel) {
+                                libraryViewModelForSession(navController, librarySessionId, sharedLibraryViewModel)
+                            }
                             val comicBook by libraryViewModel.comicBook.collectAsStateWithLifecycle()
                             val activeChapter by libraryViewModel.activeComicChapter.collectAsStateWithLifecycle()
                             val images by libraryViewModel.comicChapterImages.collectAsStateWithLifecycle()
@@ -1724,12 +1722,15 @@ class MainActivity : ComponentActivity() {
                         } }
 
                         composable(
-                            "novel_reader_online",
-                            enterTransition = {
-                                fadeIn(tween(300)) + slideInHorizontally { it / 4 }
-                            },
-                            exitTransition = { fadeOut(tween(200)) }
-                        ) { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+                            "novel_reader_online?$LIBRARY_SESSION_ARGUMENT={$LIBRARY_SESSION_ARGUMENT}",
+                            arguments = librarySessionArguments(),
+                            enterTransition = { com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion) },
+                            exitTransition = { com.example.ui.feedback.NavigationMotion.leave(navigationReduceMotion) }
+                        ) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+                            val librarySessionId = entry.arguments?.getString(LIBRARY_SESSION_ARGUMENT)
+                            val libraryViewModel = remember(entry, sharedLibraryViewModel) {
+                                libraryViewModelForSession(navController, librarySessionId, sharedLibraryViewModel)
+                            }
                             val comicBook by libraryViewModel.comicBook.collectAsStateWithLifecycle()
                             val novelChapter by libraryViewModel.activeNovelChapter.collectAsStateWithLifecycle()
                             val novelText by libraryViewModel.novelChapterText.collectAsStateWithLifecycle()

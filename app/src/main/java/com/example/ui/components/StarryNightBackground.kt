@@ -32,7 +32,7 @@ fun StarryNightBackground(
     content: @Composable BoxScope.() -> Unit
 ) {
     val bgColor = MaterialTheme.colorScheme.background
-    val isDark = bgColor == DarkCharcoal
+    val isDark = com.example.ui.theme.LocalAppDarkTheme.current
     val currentPrimary = MintPrimary
 
     Box(

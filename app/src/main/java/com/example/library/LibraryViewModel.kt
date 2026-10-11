@@ -54,12 +54,20 @@ internal val READER_UNSUPPORTED_FORMATS = setOf("kfx", "djvu", "doc", "rtf", "ch
 internal fun filterReadableFormats(formats: List<BookFormat>): List<BookFormat> =
     formats.filter { it.format.trim().lowercase() !in READER_UNSUPPORTED_FORMATS }
 
-class LibraryViewModel(application: Application) : AndroidViewModel(application) {
+class LibraryViewModel private constructor(
+    application: Application,
+    private val sharedLibrary: LibraryViewModel?,
+) : AndroidViewModel(application) {
+    constructor(application: Application) : this(application, null)
 
-    val sourceManager = SourceManager(SharedPreferencesSourceStorage(application))
-    private val _sourcesReady = MutableStateFlow(false)
+    // Navigation entries own their search/detail state while sharing app services.
+    internal constructor(sharedLibrary: LibraryViewModel) :
+        this(sharedLibrary.getApplication<Application>(), sharedLibrary)
+
+    val sourceManager: SourceManager = sharedLibrary?.sourceManager ?: SourceManager(SharedPreferencesSourceStorage(application))
+    private val _sourcesReady: MutableStateFlow<Boolean> = sharedLibrary?._sourcesReady ?: MutableStateFlow(false)
     val sourcesReady = _sourcesReady.asStateFlow()
-    val downloadManager = DownloadManager(application)
+    val downloadManager: DownloadManager = sharedLibrary?.downloadManager ?: DownloadManager(application)
     val downloadedNovelKeys = AppDatabase.getDatabase(application).bookDao().getAllBooks().map { books ->
         books.filter { !it.isComic && it.sourceId != null && it.comicId != null }
             .map { DownloadManager.taskId(it.sourceId.orEmpty(), it.comicId.orEmpty()) }.toSet()
@@ -67,13 +75,15 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val database = AppDatabase.getDatabase(application)
     private val repository = BookRepository(application, database.bookDao())
 
-    val currentSource: StateFlow<BookSource?> = sourceManager.activeSource
+    private val sessionSource = MutableStateFlow(sharedLibrary?.currentSource?.value)
+    val currentSource: StateFlow<BookSource?> =
+        if (sharedLibrary == null) sourceManager.activeSource else sessionSource.asStateFlow()
     val availableSources: StateFlow<List<BookSource>> = sourceManager.availableSources
 
-    val prefs = com.example.data.PreferencesManager(application)
-    val hasSeenWelcome = MutableStateFlow(prefs.hasSeenWelcome)
-    val hasConfiguredSource = MutableStateFlow(prefs.hasConfiguredSource)
-    val hasImportedLocalBook = MutableStateFlow(prefs.hasImportedLocalBook)
+    val prefs: com.example.data.PreferencesManager = sharedLibrary?.prefs ?: com.example.data.PreferencesManager(application)
+    val hasSeenWelcome: MutableStateFlow<Boolean> = sharedLibrary?.hasSeenWelcome ?: MutableStateFlow(prefs.hasSeenWelcome)
+    val hasConfiguredSource: MutableStateFlow<Boolean> = sharedLibrary?.hasConfiguredSource ?: MutableStateFlow(prefs.hasConfiguredSource)
+    val hasImportedLocalBook: MutableStateFlow<Boolean> = sharedLibrary?.hasImportedLocalBook ?: MutableStateFlow(prefs.hasImportedLocalBook)
 
     // 阅读统计先复用原阅读入口/本地元数据，旧记录才限量并发查找。
     private val _recordCovers = MutableStateFlow<Map<Int, String>>(emptyMap())
@@ -89,7 +99,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val _formatLoading = MutableStateFlow(false)
     val formatLoading: StateFlow<Boolean> = _formatLoading.asStateFlow()
 
-    private val sourceSearches = SourceSearchCoordinator()
+    private val sourceSearches: SourceSearchCoordinator = sharedLibrary?.sourceSearches ?: SourceSearchCoordinator()
     private val recordResolver = ReadingRecordResolver(sourceSearches)
     private var recordResolveJob: Job? = null
     private val _recordCoverHeaders = MutableStateFlow<Map<Int, Map<String, String>>>(emptyMap())
@@ -208,10 +218,25 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     val comicMessage: StateFlow<String?> = ComicDownloadManager.message
 
-    private val _searchHistory = MutableStateFlow<List<String>>(emptyList())
+    private val _searchHistory: MutableStateFlow<List<String>> = sharedLibrary?._searchHistory ?: MutableStateFlow(emptyList())
     val searchHistory: StateFlow<List<String>> = _searchHistory.asStateFlow()
 
     init {
+        if (sharedLibrary == null) {
+            initializeLibrary(application)
+        } else {
+            viewModelScope.launch {
+                availableSources.collect { sources ->
+                    sessionSource.value = sources.firstOrNull { it.id == sessionSource.value?.id }
+                        ?: sources.firstOrNull { it.id == sharedLibrary.currentSource.value?.id }
+                        ?: sources.firstOrNull()
+                }
+            }
+            viewModelScope.launch { currentSource.collect { checkSourceLoginStatus() } }
+        }
+    }
+
+    private fun initializeLibrary(application: Application) {
         ComicDownloadManager.initialize(application)
         _searchHistory.value = prefs.searchHistory
         // 漫画下载完成后刷新“已导入本地书”状态
@@ -394,7 +419,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /* ── 多语言搜索开关（第十一轮第 6 条）：UI 可见可控，驱动 expandVariants ── */
-    private val _multiLanguageSearch = MutableStateFlow(prefs.multiLanguageSearch)
+    private val _multiLanguageSearch: MutableStateFlow<Boolean> = sharedLibrary?._multiLanguageSearch ?: MutableStateFlow(prefs.multiLanguageSearch)
     val multiLanguageSearch: StateFlow<Boolean> = _multiLanguageSearch.asStateFlow()
 
     fun setMultiLanguageSearch(enabled: Boolean) {
@@ -410,7 +435,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private var searchRequestSeq = 0L
 
     // Local keyword mappings are emitted first; structured online names supplement later.
-    private val keywordRepository by lazy { KeywordRepository(getApplication<Application>()) }
+    private val keywordRepository: KeywordRepository by lazy {
+        sharedLibrary?.keywordRepository ?: KeywordRepository(getApplication<Application>())
+    }
     private val _searchKeywords = MutableStateFlow<List<String>>(emptyList())
     val searchKeywords: StateFlow<List<String>> = _searchKeywords.asStateFlow()
     private val _keywordStatus = MutableStateFlow("")
@@ -435,7 +462,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         if (_searchKeywords.value.none { KeywordKeys.query(it) == key }) return
         _keywordDispatches.update { rows -> rows + (key to (rows[key].orEmpty() + source.id)) }
     }
-    private val _onlineKeywordLookup = MutableStateFlow(prefs.multiLanguageOnlineLookup)
+    private val _onlineKeywordLookup: MutableStateFlow<Boolean> = sharedLibrary?._onlineKeywordLookup ?: MutableStateFlow(prefs.multiLanguageOnlineLookup)
     val onlineKeywordLookup: StateFlow<Boolean> = _onlineKeywordLookup.asStateFlow()
 
     fun setOnlineKeywordLookup(enabled: Boolean) {
@@ -965,7 +992,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun checkSourceLoginStatus() {
-        val source = sourceManager.activeSource.value
+        val source = currentSource.value
         if (source != null) {
             viewModelScope.launch {
                 _isCurrentSourceLoggedIn.value = source.isLoggedIn()
@@ -998,7 +1025,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     fun search(keyword: String, forceKeywordRefresh: Boolean = false) {
         cancelAggregateSearch()
-        val source = sourceManager.activeSource.value ?: return
+        val source = currentSource.value ?: return
         val requestSeq = ++searchRequestSeq
         singleSearchJob = viewModelScope.launch {
             if (requestSeq != searchRequestSeq) return@launch
@@ -1080,13 +1107,17 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         resetSearchResults()
         _aggregateMode.value = false
         viewModelScope.launch {
-            sourceManager.setActiveSource(sourceId)
+            if (sharedLibrary == null) {
+                sourceManager.setActiveSource(sourceId)
+            } else {
+                sessionSource.value = availableSources.value.firstOrNull { it.id == sourceId }
+            }
         }
     }
 
     fun startDownload(book: SearchBook) {
         val source = sourceManager.availableSources.value.firstOrNull { it.id == book.sourceId }
-            ?: sourceManager.activeSource.value
+            ?: currentSource.value
             ?: return
         // Z-Library 支持多格式：先取格式列表，多个格式时弹选择框
         if (source is ZLibrarySource) {
@@ -1133,7 +1164,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         _formatPickerBook.value = null
         _pendingFormats.value = emptyList()
         val source = sourceManager.availableSources.value.firstOrNull { it.id == book.sourceId }
-            ?: sourceManager.activeSource.value
+            ?: currentSource.value
             ?: return
         // 默认格式走软件自研 /dl/ + Cookie 方案，非默认格式走 eapi 多格式；
         // 具体路由由 getDownloadInfo 内部按 preferredFormat 决定，这里统一交给下载器。

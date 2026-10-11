@@ -9,6 +9,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import com.example.ui.feedback.LocalReduceMotion
+import com.example.ui.feedback.AppMotion
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -42,6 +46,7 @@ internal fun ReadingSettingsPanel(
 ) {
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val latestDismiss by rememberUpdatedState(onDismiss)
+    val reduceMotion = LocalReduceMotion.current
     LaunchedEffect(visibility.isIdle, visibility.currentState) {
         if (visibility.isIdle && !visibility.currentState && !visibility.targetState) latestDismiss()
     }
@@ -54,11 +59,15 @@ internal fun ReadingSettingsPanel(
         BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
             val wide = maxWidth >= 600.dp || maxWidth > maxHeight
             val shape = RoundedCornerShape(DesignTokens.RadiusOverlay)
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.08f)))
+            val scrim by androidx.compose.animation.core.animateFloatAsState(
+                if (visibility.targetState) .16f else 0f, tween(if (reduceMotion) 0 else AppMotion.CONTENT_MS), label = "readingSettingsScrim")
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = scrim)))
             AnimatedVisibility(
                 visibleState = visibility,
-                enter = fadeIn(tween(220)) + slideInVertically(tween(300)) { it / 8 },
-                exit = fadeOut(tween(160)) + slideOutVertically(tween(180)) { it / 8 },
+                enter = if (reduceMotion) fadeIn(tween(0)) else fadeIn(tween(AppMotion.CONTENT_MS)) +
+                    if (wide) slideInHorizontally(AppMotion.reorder()) { it / 5 } else slideInVertically(AppMotion.reorder()) { it / 5 },
+                exit = if (reduceMotion) fadeOut(tween(0)) else fadeOut(tween(AppMotion.EXIT_MS)) +
+                    if (wide) slideOutHorizontally(tween(AppMotion.EXIT_MS)) { it / 5 } else slideOutVertically(tween(AppMotion.EXIT_MS)) { it / 5 },
                 modifier = Modifier.align(if (wide) Alignment.CenterEnd else Alignment.BottomCenter)
                     .padding(horizontal = if (wide) DesignTokens.SpaceXl else DesignTokens.SpaceTight, vertical = DesignTokens.SpaceTight),
             ) {
@@ -76,7 +85,10 @@ internal fun ReadingSettingsPanel(
                         .border(1.dp, contentColor.copy(alpha = 0.12f), shape)
                         .overlayTouchShield(),
                 ) {
-                    CompositionLocalProvider(LocalContentColor provides contentColor) { content { visibility.targetState = false } }
+                    CompositionLocalProvider(
+                        LocalContentColor provides contentColor,
+                        LocalReadingGlass provides ReadingGlassStyle(backdrop, themeColor, contentColor),
+                    ) { content { visibility.targetState = false } }
                 }
             }
         }

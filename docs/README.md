@@ -8,6 +8,10 @@
 
 ## 内容
 
+- [Ciallo Reader 1.3.1 发布验证](release-1.3.1-2026-10-11.md)
+- [动效审计与改进点](motion-audit-2026-10-11.md)
+- [书架动效与阅读设置玻璃材质调整](motion-polish-2026-10-11.md)
+- [漫画跨话翻页与标签搜索逐层返回修复](reader-navigation-fixes-2026-10-11.md)
 - [1.3.0 仿真卷页增强期间空白修复](comic-curl-enhancement-paging-1.3.0-2026-10-09.md)
 - [Ciallo Reader 1.2.3 发布验证](release-1.2.3-2026-10-05.md)
 - [神回窗口封面加载与图片跑位修复](god-cover-loading-2026-10-05.md)

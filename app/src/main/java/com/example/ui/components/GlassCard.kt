@@ -286,6 +286,7 @@ fun GlassCard(
     val backdrop = LocalGlassBackdrop.current
     val preBlurred = LocalPreBlurredGlass.current
     val quality = LocalRenderQuality.current
+    val reduceMotion = com.example.ui.feedback.LocalReduceMotion.current
     val glassDensity = androidx.compose.ui.platform.LocalDensity.current
     val cardBlurRadiusPx = remember(glassDensity, tweaks.blurRadiusDp) {
         with(glassDensity) { tweaks.blurRadiusDp.dp.toPx() }
@@ -298,16 +299,13 @@ fun GlassCard(
 
     // 极致档专属：按压凝胶弹性缩放（其余档位恒为 1，无任何开销）
     val pressScale by animateFloatAsState(
-        targetValue = if (quality == RenderQuality.MAX && isPressed) 0.97f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        targetValue = if (!reduceMotion && isPressed) 0.98f else 1f,
+        animationSpec = com.example.ui.feedback.AppMotion.press(),
         label = "glassPressScale"
     )
 
     /* ═══ MAX 完整包（A2/B1/B2/C1/C2 + 压力形变）共用状态 ═══ */
-    val isMax = quality == RenderQuality.MAX
+    val isMax = quality == RenderQuality.MAX && !reduceMotion
     val tertiary = MaterialTheme.colorScheme.tertiary
 
     // A2：极光呼吸相位 —— 【已移除】
@@ -387,14 +385,7 @@ fun GlassCard(
         label = "cardPressLift"
     )
 
-    // C2：入场动画（首次组合弹入；非 MAX 恒为 1）
-    var entered by remember { mutableStateOf(!isMax) }
-    LaunchedEffect(Unit) { entered = true }
-    val entrance by animateFloatAsState(
-        targetValue = if (entered) 1f else 0f,
-        animationSpec = tween(360, easing = FastOutSlowInEasing),
-        label = "cardEntrance"
-    )
+    val entrance = 1f
 
     // Layer 2/3/4（物理光路）与 Layer 5/6（棱镜描边 + 内倒角）的预录缓存层
     val lightPathLayer = rememberGraphicsLayer()

@@ -370,18 +370,12 @@ private fun PeriodOverviewCard(
     // MediumBouncy + StiffnessMediumLow），切换周/月/年时数字与圆环平滑过渡。
     val animatedGoal by animateFloatAsState(
         targetValue = goalProgress,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        animationSpec = com.example.ui.feedback.AppMotion.settle(),
         label = "goalRingProgress"
     )
     val animatedPeriodTotal by animateFloatAsState(
         targetValue = periodTotal.toFloat(),
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        animationSpec = com.example.ui.feedback.AppMotion.settle(),
         label = "periodTotal"
     )
     val periodName = listOf("本周", "本月", "今年")[period]

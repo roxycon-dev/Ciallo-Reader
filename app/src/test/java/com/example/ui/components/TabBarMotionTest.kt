@@ -14,6 +14,8 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import com.example.ui.theme.MyApplicationTheme
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.RoborazziOptions
+import com.github.takahirom.roborazzi.RoborazziTaskType
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -26,6 +28,7 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [35], qualifiers = "zh-rCN-w360dp-h780dp-420dpi")
+@OptIn(com.github.takahirom.roborazzi.ExperimentalRoborazziApi::class)
 class TabBarMotionTest {
     @get:Rule val compose = createComposeRule()
     private fun lineCenter(): Float {
@@ -33,7 +36,8 @@ class TabBarMotionTest {
             .first { File(it, "gradlew.bat").exists() }
         val file = File(root, "artifacts/multilingual-search-v5/tab-probe.png")
         file.parentFile.mkdirs()
-        compose.onNodeWithTag("app_tab_bar_surface").captureRoboImage(file.absolutePath)
+        compose.onNodeWithTag("app_tab_bar_surface").captureRoboImage(file.absolutePath,
+            roborazziOptions = RoborazziOptions(taskType = RoborazziTaskType.Record))
         val pixels = requireNotNull(android.graphics.BitmapFactory.decodeFile(file.absolutePath))
         val y = 9.coerceAtMost(pixels.height - 1)
         val xs = (0 until pixels.width).filter { x -> Color(pixels.getPixel(x,y)).luminance() < 0.12f }

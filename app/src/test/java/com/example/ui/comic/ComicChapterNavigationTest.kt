@@ -136,6 +136,80 @@ class ComicChapterNavigationTest {
         }
     }
 
+    @Test fun prefetchedChaptersKeepReportingPagesAndNavigateAtEveryChapterEnd() {
+        assertPrefetchedChapterNavigation(ComicReaderConfig(
+            direction = ComicDirection.LTR, pageAnim = ComicPageAnim.SLIDE, gestureEdgeSwipe = false))
+    }
+
+    @Test fun prefetchedMagneticChaptersKeepReportingPagesAndNavigateAtEveryChapterEnd() {
+        assertPrefetchedChapterNavigation(ComicReaderConfig(mode = ComicMode.MAGNETIC,
+            direction = ComicDirection.LTR, gestureEdgeSwipe = false))
+    }
+
+    @Test fun prefetchedRtlChaptersKeepReportingPagesAndNavigateAtEveryChapterEnd() {
+        assertPrefetchedChapterNavigation(ComicReaderConfig(
+            direction = ComicDirection.RTL, gestureEdgeSwipe = false))
+    }
+
+    private fun assertPrefetchedChapterNavigation(config: ComicReaderConfig) {
+        val refs = pages()
+        val chapters = (0..4).map { chapter ->
+            refs.mapIndexed { page, ref ->
+                ComicPageRef.Local("prefetched-$chapter-$page", (ref as ComicPageRef.Local).path)
+            }
+        }
+        val bookKey = "prefetched-chapter-navigation"
+        ComicSettingsStore(compose.activity).saveBookConfig(bookKey, config)
+        var active by mutableStateOf(0)
+        var entryPage by mutableStateOf(0)
+        var reportedPage = -1
+        var transitions = 0
+        var previousTransitions = 0
+        compose.setContent {
+            MaterialTheme {
+                // A prefetch hit replaces the pages directly, without removing the reader
+                // for a loading screen or creating a new navigation destination.
+                ComicReaderCore(chapters[active], "连续阅读", "第 ${active + 1} 话", bookKey,
+                    initialPage = entryPage, modifier = Modifier.testTag("reader"),
+                    onPageChanged = { page, _ -> reportedPage = page },
+                    onNextChapter = { entryPage = 0; transitions++; active++ },
+                    onPrevChapter = { entryPage = Int.MAX_VALUE; previousTransitions++; active-- },
+                    onExit = {})
+            }
+        }
+        repeat(4) { chapter ->
+            compose.waitForIdle()
+            compose.runOnIdle { assertEquals("chapter $chapter starts on page 1", 0, reportedPage) }
+            repeat(refs.lastIndex) { page ->
+                swipe(config.direction, true)
+                compose.runOnIdle {
+                    assertEquals("chapter $chapter reports page ${page + 2}", page + 1, reportedPage)
+                    assertEquals(chapter, active)
+                }
+            }
+            swipe(config.direction, true)
+            compose.runOnIdle {
+                assertEquals("each last-page swipe must advance one chapter", chapter + 1, active)
+                assertEquals(chapter + 1, transitions)
+            }
+        }
+        repeat(4) { step ->
+            swipe(config.direction, false)
+            compose.runOnIdle {
+                assertEquals("first-page swipe enters the preceding chapter", 3 - step, active)
+                assertEquals("previous chapter opens on its last page", refs.lastIndex, reportedPage)
+                assertEquals(step + 1, previousTransitions)
+            }
+            repeat(refs.lastIndex) { page ->
+                swipe(config.direction, false)
+                compose.runOnIdle {
+                    assertEquals("backward pages keep reporting to the active chapter",
+                        refs.lastIndex - page - 1, reportedPage)
+                }
+            }
+        }
+    }
+
     @Test fun boundaryGestureCancelsForMultitouchReverseAndCancelEvents() {
         var previous = 0
         var next = 0

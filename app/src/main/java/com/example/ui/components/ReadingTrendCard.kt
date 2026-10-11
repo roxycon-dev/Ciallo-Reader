@@ -254,8 +254,9 @@ private fun TrendLineChart(
     // 先纸后墨：数据自左向右描绘进场；流畅档直接定格终态
     val lowQuality = LocalRenderQuality.current == RenderQuality.LOW
     val reveal = remember { Animatable(1f) }
-    LaunchedEffect(series, lowQuality) {
-        if (lowQuality) {
+    val reduce = com.example.ui.feedback.LocalReduceMotion.current
+    LaunchedEffect(lowQuality, reduce) {
+        if (lowQuality || reduce) {
             reveal.snapTo(1f)
         } else {
             reveal.snapTo(0f)

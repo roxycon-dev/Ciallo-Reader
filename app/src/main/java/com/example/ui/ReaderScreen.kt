@@ -118,6 +118,7 @@ import com.ramotion.fluidslider.FluidSlider
 import androidx.compose.runtime.*
 
 import com.kashif_e.backdrop.backdrops.layerBackdrop
+import com.example.ui.reader.readingGlass
 import androidx.compose.ui.Alignment
 
 import androidx.compose.ui.Modifier
@@ -3864,10 +3865,10 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                 Spacer(modifier = Modifier.height(DesignTokens.SpaceTight))
                 Surface(
                     shape = RoundedCornerShape(DesignTokens.RadiusXl),
-                    color = cardTint,
+                    color = Color.Transparent,
                     contentColor = textColor,
                     border = BorderStroke(1.dp, textColor.copy(alpha = 0.07f)),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().readingGlass(RoundedCornerShape(DesignTokens.RadiusXl), strong = true)
                 ) {
                     Column(modifier = Modifier.padding(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceTight)) {
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -3924,10 +3925,10 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                 Spacer(modifier = Modifier.height(DesignTokens.SpaceTight))
                 Surface(
                     shape = RoundedCornerShape(DesignTokens.RadiusXl),
-                    color = cardTint,
+                    color = Color.Transparent,
                     contentColor = textColor,
                     border = BorderStroke(1.dp, textColor.copy(alpha = 0.07f)),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().readingGlass(RoundedCornerShape(DesignTokens.RadiusXl), strong = true)
                 ) {
                     Column(modifier = Modifier.padding(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceTight)) {
                         // 字号：A− / 当前 / A+ 紧凑步进器
@@ -3936,7 +3937,8 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                             Spacer(modifier = Modifier.weight(1f))
                             Surface(
                                 shape = RoundedCornerShape(DesignTokens.RadiusInner),
-                                color = cardTint, contentColor = textColor
+                                color = Color.Transparent, contentColor = textColor,
+                                modifier = Modifier.readingGlass(RoundedCornerShape(DesignTokens.RadiusSm))
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     TextButton(
@@ -5100,9 +5102,9 @@ private fun ReaderPageModeChip(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(DesignTokens.RadiusSm),
-        color = selectedTint,
+        color = Color.Transparent,
         border = if (selected) BorderStroke(1.dp, MintPrimary.copy(alpha = 0.8f)) else null,
-        modifier = modifier.heightIn(min = 40.dp)
+        modifier = modifier.heightIn(min = 40.dp).readingGlass(RoundedCornerShape(DesignTokens.RadiusSm)).background(selectedTint)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = DesignTokens.SpaceSm, vertical = DesignTokens.SpaceTight),

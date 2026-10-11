@@ -545,6 +545,7 @@ fun SourceManagementScreen(
                 )
             },
             dismissButton = {
+                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
                 Row {
                     TextButton(onClick = {
                         com.example.source.SourceLog.clear()
@@ -552,7 +553,7 @@ fun SourceManagementScreen(
                     }) {
                         Text("清空")
                     }
-                    TextButton(onClick = { showDebugLog = false }) {
+                    TextButton(onClick = { closeOverlay { showDebugLog = false } }) {
                         Text("关闭")
                     }
                 }
@@ -568,6 +569,7 @@ fun SourceManagementScreen(
             onDismissRequest = { showImportPicker = false },
             title = { Text("导入书源") },
             text = {
+                val closePicker = com.example.ui.components.LocalOverlayClose.current
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = "支持「阅读」书源 JSON：单源文件、粘贴配置、或直接拉取社区合集。",
@@ -575,30 +577,31 @@ fun SourceManagementScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     TextButton(
-                        onClick = {
+                        onClick = { closePicker {
                             showImportPicker = false
                             fileLauncher.launch("*/*")
-                        },
+                        } },
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("从本地文件导入") }
                     TextButton(
-                        onClick = {
+                        onClick = { closePicker {
                             showImportPicker = false
                             showPasteDialog = true
-                        },
+                        } },
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("粘贴 JSON 配置") }
                     TextButton(
-                        onClick = {
+                        onClick = { closePicker {
                             showImportPicker = false
                             showNetworkDialog = true
-                        },
+                        } },
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("网络导入书源") }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showImportPicker = false }) {
+                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
+                TextButton(onClick = { closeOverlay { showImportPicker = false } }) {
                     Text("取消")
                 }
             }
@@ -621,10 +624,11 @@ fun SourceManagementScreen(
                 )
             },
             confirmButton = {
+                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
                 GradientActionButton(
                     text = "确定导入",
                     onClick = {
-                        if (pasteJsonText.isNotBlank()) {
+                        if (pasteJsonText.isNotBlank()) closeOverlay {
                             viewModel.importSourceFromJsonString(pasteJsonText)
                             pasteJsonText = ""
                             showPasteDialog = false
@@ -633,7 +637,8 @@ fun SourceManagementScreen(
                 )
             },
             dismissButton = {
-                TextButton(onClick = { showPasteDialog = false }) {
+                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
+                TextButton(onClick = { closeOverlay { showPasteDialog = false } }) {
                     Text("取消")
                 }
             }
@@ -677,10 +682,11 @@ fun SourceManagementScreen(
                 }
             },
             confirmButton = {
+                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
                 GradientActionButton(
                     text = "开始导入",
                     onClick = {
-                        if (networkUrl.isNotBlank()) {
+                        if (networkUrl.isNotBlank()) closeOverlay {
                             viewModel.importSourceFromUrl(networkUrl.trim())
                             networkUrl = ""
                             showNetworkDialog = false
@@ -689,7 +695,8 @@ fun SourceManagementScreen(
                 )
             },
             dismissButton = {
-                TextButton(onClick = { showNetworkDialog = false }) {
+                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
+                TextButton(onClick = { closeOverlay { showNetworkDialog = false } }) {
                     Text("取消")
                 }
             }
