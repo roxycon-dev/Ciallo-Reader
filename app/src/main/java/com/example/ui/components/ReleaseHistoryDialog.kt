@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 
 internal data class ReleaseSummary(val version: String, val date: String, val summary: String)
 internal val releaseHistory = listOf(
+    ReleaseSummary("1.3.6", "10-12", "完整增强 · GPU 加速"),
     ReleaseSummary("1.3.5", "10-12", "极速增强 · 后续预生成"),
     ReleaseSummary("1.3.4", "10-12", "漫画增强提速"),
     ReleaseSummary("1.3.3", "10-12", "增强加速 · 设置卡片统一"),

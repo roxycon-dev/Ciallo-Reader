@@ -32,11 +32,12 @@ internal object MangaJaNai {
     const val HALO = 24
     private const val SIDE = TILE + HALO * 2
     private const val DEADLINE_NS = 4_300_000_000L
-    private val lock = java.util.concurrent.locks.ReentrantLock()
+    internal val lock = java.util.concurrent.locks.ReentrantLock()
     @Volatile private var context: Context? = null
     private val _status = MutableStateFlow("")
     val status = _status.asStateFlow()
     private val silent = ThreadLocal<Boolean>()
+    internal val isSilent get() = silent.get() == true
     private var runtime: MangaJaNaiRuntime? = null
     private val tileCache = MangaJaNaiTileCache(1)
     private var verifiedStamp: String? = null
@@ -61,11 +62,12 @@ internal object MangaJaNai {
         val app = context.applicationContext
         if (this.context === app) return
         this.context = app
+        MangaJaNaiFull.configure(app)
         app.registerComponentCallbacks(object : android.content.ComponentCallbacks2 {
             override fun onConfigurationChanged(config: android.content.res.Configuration) = Unit
-            override fun onLowMemory() { cleanup.execute { release() } }
+            override fun onLowMemory() { cleanup.execute { release(); MangaJaNaiFull.release() } }
             override fun onTrimMemory(level: Int) {
-                if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) cleanup.execute { release() }
+                if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) cleanup.execute { release(); MangaJaNaiFull.release() }
             }
         })
     }
@@ -113,7 +115,6 @@ internal object MangaJaNai {
         val stamp = "${file.absolutePath}:${file.lastModified()}:${file.length()}"
         if (verifiedStamp == stamp || verify(file)) {
             verifiedStamp = stamp
-            File(directory, "2x-1200p-v1.onnx").delete()
             return file
         }
         val part = File(directory, "mobile.part")
@@ -125,7 +126,6 @@ internal object MangaJaNai {
             if (file.exists() && !file.delete()) throw IOException("无法替换增强模型")
             if (!part.renameTo(file)) throw IOException("无法保存增强模型")
             verifiedStamp = "${file.absolutePath}:${file.lastModified()}:${file.length()}"
-            File(directory, "2x-1200p-v1.onnx").delete() // obsolete private model only
             return file
         } finally { part.delete() }
     }
@@ -138,6 +138,7 @@ internal object MangaJaNai {
     fun enhance(src: Bitmap, strength: Float): Bitmap {
         lock.lockInterruptibly()
         return try {
+            MangaJaNaiFull.release()
             generation++
             idleRelease?.cancel(false)
             checkCancelled()
@@ -255,6 +256,6 @@ internal object MangaJaNai {
             runtime?.close(); runtime = null; tileCache.clear()
             report("增强失败 · 已保留原图")
             throw error
-        } finally { releaseWhenIdle(); lock.unlock() }
+        } finally { try { releaseWhenIdle() } finally { lock.unlock() } }
     }
 }

@@ -282,7 +282,7 @@ fun ComicReaderCore(
         onDispose {
             loader.clearProcessedCache()
             loader.shutdown()
-            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch { ComicNeuralBackend.release(); MangaJaNai.release() }
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch { ComicNeuralBackend.release(); MangaJaNai.release(); MangaJaNaiFull.release() }
         }
     }
 
@@ -582,7 +582,7 @@ fun ComicReaderCore(
             // 同页双份处理；displayConfig 入 key 后指纹落定即自动重预载并重建驻留，
             // 旧指纹驻留项随之解除——同时消解 F4 的陈旧驻留残留）。
             val online = pages.any { it is ComicPageRef.Remote }
-            val order = if (displayConfig.enhanceMode == ComicEnhanceMode.MANGAJANAI)
+            val order = if (displayConfig.enhanceMode.isJaNai)
                 intArrayOf(currentSpread, currentSpread + 1, currentSpread + 2, currentSpread + 3, currentSpread - 1)
                 else if (online) intArrayOf(currentSpread, currentSpread + 1, currentSpread + 2, currentSpread - 1)
                 else intArrayOf(currentSpread, currentSpread + 1, currentSpread - 1)
@@ -1532,7 +1532,7 @@ private fun ComicVerticalList(
         // verticalPreloadIndices 已返回驻留优先级序（当前 → 前瞻近→远 → 上一页）。
         // config（=防抖 displayConfig）入 key：指纹落定自动重预载并重建驻留。
         val entries = ArrayList<ComicPageLoader.WindowEntry>(8)
-        val prefetch = if (config.enhanceMode == ComicEnhanceMode.MANGAJANAI) maxOf(3, strategy.prefetchWindow) else strategy.prefetchWindow
+        val prefetch = if (config.enhanceMode.isJaNai) maxOf(3, strategy.prefetchWindow) else strategy.prefetchWindow
         verticalPreloadIndices(currentSpread, prefetch, layout.spreadCount).forEach { si ->
             layout.spreads[si].slots.forEach { slot ->
                 val rot = ((config.bookRotation + (bookState.pageRotations[slot.ref.id] ?: 0)) % 360 + 360) % 360
@@ -2206,7 +2206,7 @@ internal fun ComicRefinementFeedback(refining: Boolean, error: Throwable?, modif
     if (!refining && error == null) return
     Column(modifier.background(ReadingPalette.ScrimStrong).padding(DesignTokens.SpaceSm), horizontalAlignment = Alignment.CenterHorizontally) {
         if (error == null) {
-            val modelStatus = if (mode == ComicEnhanceMode.MANGAJANAI) MangaJaNai.status.collectAsStateWithLifecycle().value else ""
+            val modelStatus = when (mode) { ComicEnhanceMode.MANGAJANAI -> MangaJaNai.status.collectAsStateWithLifecycle().value; ComicEnhanceMode.MANGAJANAI_FULL -> MangaJaNaiFull.status.collectAsStateWithLifecycle().value; else -> "" }
             Text(modelStatus.ifBlank { "高清图加载中…" }, color = Color.White, fontSize = DesignTokens.TypeCaption)
         }
         else TextButton(onClick = onRetry) { Text("高清图加载失败 · 重试", color = Color.White) }
@@ -2315,7 +2315,7 @@ internal fun ComicLoadingFeedback(ref: ComicPageRef?, onRetry: (() -> Unit)? = n
 /** 增强处理耗时提示文案（null = 未开启增强，不显示） */
 internal fun enhanceHintFor(config: ComicReaderConfig, longEdge: Int): String? {
     if (config.enhanceMode == ComicEnhanceMode.OFF || config.enhanceStrength <= 0) return null
-    if (config.enhanceMode == ComicEnhanceMode.MANGAJANAI) return "MangaJaNai 处理中"
+    if (config.enhanceMode.isJaNai) return "MangaJaNai 处理中"
     val sec = ComicImagePipeline.enhanceEstimateSec(config.enhanceMode, config.enhanceStrength, longEdge)
     return "画质增强处理中 · 约 ${if (sec == sec.toLong().toDouble()) sec.toInt().toString() else sec}s"
 }

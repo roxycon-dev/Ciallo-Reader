@@ -1010,8 +1010,8 @@ private fun ImageTab(
         ) { i -> update { it.copy(enhanceMode = ComicEnhanceMode.entries[i]) } }
         val enh = ComicEnhanceMode.entries[config.enhanceMode.ordinal]
         if (enh != ComicEnhanceMode.OFF) {
-            if (enh == ComicEnhanceMode.MANGAJANAI) {
-                val state by MangaJaNai.status.collectAsState()
+            if (enh.isJaNai) {
+                val state by (if (enh == ComicEnhanceMode.MANGAJANAI_FULL) MangaJaNaiFull.status else MangaJaNai.status).collectAsState()
                 Text(state.ifBlank { enh.desc }, color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall)
             }
             SliderRow(

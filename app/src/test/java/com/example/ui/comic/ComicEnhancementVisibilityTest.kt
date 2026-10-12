@@ -82,7 +82,7 @@ class ComicEnhancementVisibilityTest {
         fun save(name: String, b: Bitmap) { File(dir, "$name.png").outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) } }
         save("reference", display(truth)); save("off", original)
         val summaries = mutableListOf<String>()
-        val settings = ComicEnhanceMode.entries.filter { it != ComicEnhanceMode.OFF && it != ComicEnhanceMode.MANGAJANAI }.map {
+        val settings = ComicEnhanceMode.entries.filter { it != ComicEnhanceMode.OFF && !it.isJaNai }.map {
             it.name to ComicImagePipeline.Toning(enhanceMode = it, enhanceStrength = 60)
         } + ("REGULAR_SHARPEN" to ComicImagePipeline.Toning(sharpen = 60))
         for ((name, tone) in settings) {

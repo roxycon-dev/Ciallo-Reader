@@ -59,7 +59,7 @@ class MangaJaNaiMobileTest {
         } finally { full.recycle(); half.recycle(); original.recycle(); low.recycle(); ai.recycle() }
     }
 
-    @Test fun bundledModelIsVerifiedOfflineAndMigratesOnlyObsoletePrivateWeights() {
+    @Test fun bundledModelIsVerifiedOfflineAndPreservesFullPrivateWeights() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val directory = File(context.filesDir, "mangajanai").apply { mkdirs() }
         val obsolete = File(directory, "2x-1200p-v1.onnx").apply { writeText("obsolete") }
@@ -67,7 +67,7 @@ class MangaJaNaiMobileTest {
         MangaJaNai.configure(context)
         val model = MangaJaNai.model()
         assertTrue(MangaJaNai.verify(model))
-        assertFalse(obsolete.exists())
+        assertTrue(obsolete.exists()) // Keep the full model when switching to the lightweight mode.
         assertEquals("keep", unrelated.readText())
         assertEquals(MangaJaNai.MODEL_BYTES, model.length())
     }

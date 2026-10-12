@@ -28,6 +28,15 @@ if (!debugKeystoreFile.exists()) {
 }
 
 android {
+  ndkVersion = "29.0.14206865"
+  externalNativeBuild {
+    cmake {
+      path = file("src/main/cpp/CMakeLists.txt")
+      version = "3.22.1"
+    }
+  }
+  // Explicitly package the prebuilt Vulkan runtime as well as our JNI bridge.
+  sourceSets.getByName("main").jniLibs.srcDir("src/main/cpp/vendor/ncnn/lib")
   namespace = "com.example"
   compileSdk = 35
 
@@ -35,8 +44,11 @@ android {
     applicationId = "com.aistudio.novelreader.kxmpzq"
     minSdk = 24
     targetSdk = 35
-    versionCode = 216
-    versionName = "1.3.5"
+    versionCode = 217
+    versionName = "1.3.6"
+    externalNativeBuild {
+      cmake { arguments += "-DANDROID_STL=c++_static" }
+    }
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

@@ -32,7 +32,7 @@ internal class ComicProcessedDiskCache(context: Context) {
 
         /** 重管线档才启用磁盘缓存（纯函数，单测钉死档位集合） */
         fun eligible(mode: ComicEnhanceMode): Boolean =
-            mode == ComicEnhanceMode.MANGAJANAI ||
+            mode.isJaNai ||
                 mode == ComicEnhanceMode.ANIME4K ||
                 mode == ComicEnhanceMode.WAIFU2X ||
                 mode == ComicEnhanceMode.SUPER_RES

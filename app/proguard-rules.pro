@@ -45,6 +45,7 @@
 # （NodeInfo/ValueInfo 等），混淆改名后 NoSuchMethodError 直接 SIGABRT。
 # Java API 体积很小（大头是 27MB 的 .so），整包 keep 无瘦身代价。
 -keep class ai.onnxruntime.** { *; }
+-keep class com.example.ui.comic.MangaJaNaiGpu { *; }
 
 # R8 Optimization & Obfuscation
 -repackageclasses ''

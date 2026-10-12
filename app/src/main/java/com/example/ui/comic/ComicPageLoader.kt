@@ -195,7 +195,7 @@ class ComicPageLoader(
         tone: ComicImagePipeline.Toning, visible: Boolean,
     ): PageLoadResult {
         if (visible) return try {
-            comicDisplayLoadWithTimeout(if (tone.enhanceMode == ComicEnhanceMode.MANGAJANAI) 15_000L else 90_000L) { load(ref, cacheKey, geo, tone) }
+            comicDisplayLoadWithTimeout(when (tone.enhanceMode) { ComicEnhanceMode.MANGAJANAI_FULL -> 900_000L; ComicEnhanceMode.MANGAJANAI -> 15_000L; else -> 90_000L }) { load(ref, cacheKey, geo, tone) }
         } catch (error: IOException) {
             // Our own deadline cancels load internally; still release foreground priority
             // so neighbors cannot wait forever for an already failed visible request.
@@ -204,15 +204,15 @@ class ComicPageLoader(
             throw error
         }
         cachedOrPinned(cacheKey)?.let { return PageLoadResult(it, true) }
-        if (minimal || (tone.enhanceMode == ComicEnhanceMode.MANGAJANAI &&
+        if (minimal || (tone.enhanceMode.isJaNai &&
                 !synchronized(pinnedLock) { windowKeys.contains(cacheKey) })) kotlinx.coroutines.awaitCancellation()
         if (ref is ComicPageRef.Remote && appPrefs.preloadWifiOnly && !wifiConnectedOrUnmetered()) {
             // Promotion to a visible page restarts its producer and bypasses this wait.
             kotlinx.coroutines.awaitCancellation()
         }
-        val gate = if (tone.enhanceMode == ComicEnhanceMode.MANGAJANAI) mangaPreloadGate else preloadGate
+        val gate = if (tone.enhanceMode.isJaNai) mangaPreloadGate else preloadGate
         return gate.withPermit {
-            if (tone.enhanceMode == ComicEnhanceMode.MANGAJANAI || ref is ComicPageRef.Remote) awaitForeground()
+            if (tone.enhanceMode.isJaNai || ref is ComicPageRef.Remote) awaitForeground()
             load(ref, cacheKey, geo, tone, background = true)
         }
     }
@@ -790,7 +790,7 @@ class ComicPageLoader(
             entries.filter { it.visible || it.ref !is ComicPageRef.Remote }
         } else entries
         val effective = if (minimal) entries.filter { it.visible }
-        else if (tone.enhanceMode == ComicEnhanceMode.MANGAJANAI) {
+        else if (tone.enhanceMode.isJaNai) {
             networkEligible.filter { it.visible } + networkEligible.filter { !it.visible && it.ahead }.take(3)
         } else networkEligible
         val newForeground = effective.filter { it.visible }.mapTo(HashSet()) { it.cacheKey }
@@ -819,7 +819,7 @@ class ComicPageLoader(
         }
         val batchKeys = HashSet<String>(effective.size)
         // Tiny originals keep curl readable while serial enhancement prepares the forward pages.
-        if (!minimal && tone.enhanceMode == ComicEnhanceMode.MANGAJANAI) {
+        if (!minimal && tone.enhanceMode.isJaNai) {
             entries.filter { !it.visible && effective.none { candidate -> candidate.cacheKey == it.cacheKey } }.take(2).forEach { e ->
                 batchKeys.add(e.cacheKey)
                 if (peekProcessed(e.cacheKey) == null && peekReadingPreview(e.cacheKey) == null && !preloadJobs.containsKey(e.cacheKey)) {
@@ -846,7 +846,7 @@ class ComicPageLoader(
             cacheDbg { "probe key=${e.ref.id} hit=${probeHit != null}" }
             // Visible pages have their own foreground producer and never wait for this gate.
             if (!minimal && probeHit == null && !e.visible && !preloadJobs.containsKey(e.cacheKey)) {
-                val manga = tone.enhanceMode == ComicEnhanceMode.MANGAJANAI
+                val manga = tone.enhanceMode.isJaNai
                 // Undispatched acquisition preserves next-page order before waiting for foreground.
                 val job = scope.launch(start = if (manga) CoroutineStart.UNDISPATCHED else CoroutineStart.LAZY) {
                     try {
@@ -886,7 +886,7 @@ class ComicPageLoader(
      * 目标值钳在 [基础上限, 窗口驻留硬上限]——超限部分照常 LRU 淘汰，内存安全。
      */
     internal fun ensureWindowCapacity(entries: List<WindowEntry>, tone: ComicImagePipeline.Toning) {
-        mangaWindow = tone.enhanceMode == ComicEnhanceMode.MANGAJANAI
+        mangaWindow = tone.enhanceMode.isJaNai
         windowRetainBytes = if (mangaWindow) minOf(cacheRetainCeilBytes, 64 shl 20) else cacheRetainCeilBytes
         readingPreviews.resize(if (minimal) 2 shl 20 else if (mangaWindow) 6 shl 20 else 8 shl 20)
         var needed = 0L
@@ -924,7 +924,7 @@ class ComicPageLoader(
             short = short * DECODE_MAX_EDGE / long
             long = DECODE_MAX_EDGE.toLong()
         }
-        if (enhanceMode == ComicEnhanceMode.MANGAJANAI) {
+        if (enhanceMode.isJaNai) {
             val (a, b) = MangaJaNai.outputSize(long.toInt(), short.toInt().coerceAtLeast(1))
             return a.toLong() * b * 4
         }

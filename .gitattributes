@@ -1,3 +1,6 @@
 # ONNX protobuf headers can contain more than 8 KiB of text before binary weights.
 # Preserve exact model bytes and prevent text/whitespace diffs and newline conversion.
 *.onnx binary
+*.so binary
+# Preserve upstream generated-header EOF spacing.
+app/src/main/cpp/vendor/ncnn/** whitespace=-blank-at-eof

@@ -78,7 +78,7 @@ object ComicImagePipeline {
     fun enhanceEstimateSec(mode: ComicEnhanceMode, strength: Int, longEdge: Int): Double {
         if (strength <= 0) return 0.0
         val base = when (mode) {
-            ComicEnhanceMode.MANGAJANAI -> return 0.0 // Device-dependent; never invent an ETA.
+            ComicEnhanceMode.MANGAJANAI, ComicEnhanceMode.MANGAJANAI_FULL -> return 0.0 // Device-dependent; never invent an ETA.
             ComicEnhanceMode.OFF -> return 0.0
             ComicEnhanceMode.CAS -> 0.4
             ComicEnhanceMode.ANIME4K -> 1.9
@@ -577,6 +577,7 @@ object ComicImagePipeline {
         val strength = tone.enhanceStrength.coerceIn(0, 100) / 100f
         step(when (if (tone.enhanceStrength <= 0) ComicEnhanceMode.OFF else tone.enhanceMode) {
             ComicEnhanceMode.MANGAJANAI -> MangaJaNai.enhance(bmp, strength)
+            ComicEnhanceMode.MANGAJANAI_FULL -> MangaJaNaiFull.enhance(bmp, strength)
             ComicEnhanceMode.CAS -> ComicEdgeUpscaler.sharpen(bmp, strength)
             ComicEnhanceMode.ANIME4K -> anime4kRestore(bmp, strength)
             ComicEnhanceMode.WAIFU2X -> superResolution(bmp, strength) // Legacy name, unified engine.

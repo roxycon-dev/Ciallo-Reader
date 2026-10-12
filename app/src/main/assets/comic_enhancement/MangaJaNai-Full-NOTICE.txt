@@ -1,0 +1,21 @@
+MangaJaNai full: 2x MangaJaNai 1200p V1 ESRGAN 70k
+Original author: the-database / MangaJaNai
+https://github.com/the-database/MangaJaNai
+ONNX conversion: haesslerian / MangaJaNai_V1_ONNX
+https://huggingface.co/haesslerian/MangaJaNai_V1_ONNX/tree/2f67ff30209f2e0c75b7c55e6f3ffc3adbc960f7
+Original ONNX: 67191396 bytes
+SHA256: c985d6b78ed1a659867cd5697ce80743ad9ddd73868f463e69c824f15f169eb0
+License: Creative Commons Attribution-NonCommercial 4.0 International
+https://creativecommons.org/licenses/by-nc/4.0/
+Full license supplied in MangaJaNai-CC-BY-NC-4.0.txt within the APK.
+Changes by Ciallo Reader: pnnx 20260526 conversion to ncnn; the pixel-unshuffle
+prefix is reproduced in native code. All 351 convolution weights and biases
+remain byte-identical FP32. No quantization, pruning, retraining or input resize.
+The download archive uses lossless ZIP. CPU/Vulkan kernels can differ slightly
+in floating-point rounding. GPU is accepted only after device accuracy/speed probes.
+Larger tiles reduce overlapping work and alter tile boundaries/context;
+this is not a claim of bit-identical pixels to previous 48-pixel tiling.
+The existing 4-million-pixel / 3200-edge display-output cap is retained.
+ncnn runtime: Tencent ncnn 20260526 / e54f7b1, BSD 3-Clause.
+https://github.com/Tencent/ncnn/releases/tag/20260526
+See ncnn-LICENSE.txt in the APK for the complete runtime and third-party licenses.

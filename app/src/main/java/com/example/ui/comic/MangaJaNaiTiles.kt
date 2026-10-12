@@ -39,13 +39,13 @@ internal class MangaJaNaiTileCache(private val capacity: Int = 8) {
 }
 
 /** One native pixel read per tile, followed by the same clamped edge replication as before. */
-internal fun readMangaJaNaiTile(source: Bitmap, x: Int, y: Int, target: IntArray) {
-    val halo = MangaJaNai.HALO
-    val side = MangaJaNai.TILE + halo * 2
+internal fun readMangaJaNaiTile(source: Bitmap, x: Int, y: Int, target: IntArray,
+                              tileSize: Int = MangaJaNai.TILE, halo: Int = MangaJaNai.HALO) {
+    val side = tileSize + halo * 2
     val left = maxOf(0, x - halo)
     val top = maxOf(0, y - halo)
-    val right = minOf(source.width, x + MangaJaNai.TILE + halo)
-    val bottom = minOf(source.height, y + MangaJaNai.TILE + halo)
+    val right = minOf(source.width, x + tileSize + halo)
+    val bottom = minOf(source.height, y + tileSize + halo)
     val dx = left - x + halo
     val dy = top - y + halo
     val width = right - left

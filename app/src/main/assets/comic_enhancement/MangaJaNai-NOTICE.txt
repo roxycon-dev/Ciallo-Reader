@@ -13,5 +13,5 @@ Bundled SHA256: 718b8670ab396a5174e5b4b38f9d3947beaac3afbe9647d494d65925180a2a7b
 License: Creative Commons Attribution-NonCommercial 4.0 International
 See MangaJaNai-CC-BY-NC-4.0.txt for the full license.
 Changes to the image processing: bounded neural input with original-detail residual fusion.
-This lightweight color/illustration model replaces the previous V1 black-and-white ESRGAN model.
+This lightweight model remains separate from the restored full V1 ESRGAN mode.
 The derivative weights and this attribution are bundled in the APK for offline operation.
