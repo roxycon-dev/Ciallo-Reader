@@ -8,6 +8,7 @@
 
 ## 内容
 
+- [Ciallo Reader 1.3.2 发布验证](release-1.3.2-2026-10-12.md)
 - [Ciallo Reader 1.3.1 发布验证](release-1.3.1-2026-10-11.md)
 - [动效审计与改进点](motion-audit-2026-10-11.md)
 - [书架动效与阅读设置玻璃材质调整](motion-polish-2026-10-11.md)

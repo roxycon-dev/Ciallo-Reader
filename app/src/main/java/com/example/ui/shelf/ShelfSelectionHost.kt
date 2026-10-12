@@ -254,7 +254,7 @@ private fun Modifier.multiSelectGlassBar(
     return this
         // ① 外投影：LOW 单层黑晕；其余「主色大晕 + 黑色小晕」两层，MAX 更浓
         .then(
-            if (quality == RenderQuality.LOW) {
+            if (quality <= RenderQuality.LOW) {
                 Modifier.consistentShadow(
                     elevation = 8.dp,
                     shape = shape,
@@ -290,7 +290,7 @@ private fun Modifier.multiSelectGlassBar(
                     blurRadius = 8.dp,
                     refraction = false,
                 )
-                quality == RenderQuality.LOW -> Modifier.background(surface.copy(alpha = 0.97f), shape)
+                quality <= RenderQuality.LOW -> Modifier.background(surface.copy(alpha = 0.97f), shape)
                 quality == RenderQuality.MID -> Modifier.background(surface.copy(alpha = 0.80f), shape)
                 else -> Modifier.background(surface.copy(alpha = 0.62f), shape)
             }
@@ -298,7 +298,7 @@ private fun Modifier.multiSelectGlassBar(
         // ③ 竖向渐变：顶高光 → 主色淡染 → 底略深。单层均色会有"塑料片"感
         .background(
             brush = Brush.verticalGradient(
-                0.0f to Color.White.copy(alpha = if (quality == RenderQuality.LOW) 0.10f else 0.18f),
+                0.0f to Color.White.copy(alpha = if (quality <= RenderQuality.LOW) 0.10f else 0.18f),
                 0.38f to primary.copy(alpha = if (isMax) 0.22f else 0.16f),
                 1.0f to Color.Black.copy(alpha = 0.10f),
             ),
@@ -334,7 +334,7 @@ private fun Modifier.multiSelectGlassBar(
 
         // ⑤ 外圈描边：LOW 白描边，其余虹彩（MAX 更宽更亮）
         .then(
-            if (quality == RenderQuality.LOW) {
+            if (quality <= RenderQuality.LOW) {
                 Modifier.border(1.dp, Color.White.copy(alpha = 0.15f), shape)
             } else {
                 Modifier.iridescentBorder(

@@ -5,8 +5,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 /**
  * 渲染画质档位：主要影响玻璃效果强度与前端动效数量。
  *
- * LOW  流畅 —— 极简质感：无实时模糊/噪点/棱镜描边，单层阴影，装饰性循环动画关闭；
- *              任何设备都能满帧滚动。
+ * MINIMAL 极简 —— 纯色基础控件，无玻璃采样、装饰动画、漫画特效及增强；小缓存解码。
+ * LOW 流畅 —— 无实时模糊/噪点/棱镜描边，单层阴影，装饰性循环动画关闭。
  * MID  均衡 —— 保留玻璃质感（色调/噪点/棱镜描边/缓存装饰层），但不做实时背景模糊；
  *              底栏用半透明底替代毛玻璃。
  * HIGH 高   —— 完整液态玻璃：22dp 实时背景模糊 + 全部七层光学装饰 + 底栏实时毛玻璃。
@@ -15,6 +15,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
  *              更浓郁的色彩饱和、按压凝胶缩放。旗舰机专属。
  */
 enum class RenderQuality(val id: Int, val label: String) {
+    MINIMAL(-1, "极简"),
     LOW(0, "流畅"),
     MID(1, "均衡"),
     HIGH(2, "高"),
@@ -22,6 +23,9 @@ enum class RenderQuality(val id: Int, val label: String) {
 
     /** HIGH 及以上才启用实时背景模糊与 backdrop 捕获层。 */
     val realtimeGlass: Boolean get() = id >= HIGH.id
+
+    val minimal: Boolean get() = this == MINIMAL
+    val decorativeEffects: Boolean get() = id > LOW.id
 
     companion object {
         fun of(id: Int): RenderQuality = entries.firstOrNull { it.id == id } ?: HIGH

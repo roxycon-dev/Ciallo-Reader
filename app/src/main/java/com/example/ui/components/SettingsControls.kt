@@ -17,6 +17,8 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -88,6 +90,17 @@ fun SegmentedPillSelector(
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
     val quality = LocalRenderQuality.current
+    if (quality.minimal) {
+        Row(modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            options.forEach { (id, label) ->
+                Text(label, color = if (id == selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.clip(RoundedCornerShape(10.dp))
+                        .background(if (id == selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                        .clickable { onSelect(id) }.padding(horizontal = 12.dp, vertical = 14.dp))
+            }
+        }
+        return
+    }
     val positions = remember { mutableStateMapOf<Int, Rect>() }
     val textWidths = remember { mutableStateMapOf<Int, Float>() }
     var trackWidth by remember { mutableStateOf(0) }
@@ -284,12 +297,14 @@ fun PageTurnSelectorRow(
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
                     color = if (selected) primary else MaterialTheme.colorScheme.onSurface
                 )
+                if (description.isNotBlank()) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = description,
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                }
             }
             Box(
                 modifier = Modifier

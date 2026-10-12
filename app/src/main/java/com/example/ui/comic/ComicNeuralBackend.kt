@@ -63,6 +63,11 @@ internal object ComicNeuralBackend {
         }
     }
 
+    fun release() = synchronized(lock) {
+        sessions.values.forEach { runCatching { it.close() } }
+        sessions.clear()
+    }
+
     private fun disable(error: Throwable) {
         unavailable = true
         sessions.values.forEach { runCatching { it.close() } }

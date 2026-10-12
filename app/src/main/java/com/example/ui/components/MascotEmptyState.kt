@@ -37,7 +37,7 @@ fun MascotEmptyState(
     // 根据素材情绪选择动效：呼吸/漂浮/弹跳/奔跑抖动/低落摇摆，让静态图“活”起来
     // 流畅档（渲染画质=低）：跳过全部装饰性循环动画，静态展示以省电省性能
     val mood = mascotMoodOf(mascotResId)
-    val mascotAnimOn = LocalRenderQuality.current != RenderQuality.LOW
+    val mascotAnimOn = LocalRenderQuality.current > RenderQuality.LOW
 
     val floatOffset: Float
     val breath: Float

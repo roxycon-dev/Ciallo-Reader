@@ -230,7 +230,9 @@ class MainActivity : ComponentActivity() {
                 colorPrimaryIndex = colorPrimaryIndex,
                 colorSecondaryIndex = colorSecondaryIndex
             ) {
-                val liquidGlass = rememberLiquidGlassProviderState()
+                val renderQualityIdx by viewModel.renderQuality.collectAsStateWithLifecycle()
+                val renderQuality = com.example.ui.components.RenderQuality.of(renderQualityIdx)
+                val liquidGlass = if (renderQuality.realtimeGlass) rememberLiquidGlassProviderState() else null
 
                 // ── A1 系统字体缩放钳制 ────────────────────────────────────
                 // 全 App 有 443 处硬编码 xx.sp，而大量容器高度是写死的
@@ -260,13 +262,14 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(
                     LocalDensity provides clampedDensity,
                     LocalLiquidGlassState provides liquidGlass,
+                    com.example.ui.components.LocalRenderQuality provides renderQuality,
                     com.example.ui.components.LocalScrollTilt provides scrollTilt
                 ) {
                     AppUpdateDialogHost()
                     Surface(
                         modifier = Modifier
                             .fillMaxSize()
-                            .liquidGlassProvider(liquidGlass)
+                            .then(if (liquidGlass != null) Modifier.liquidGlassProvider(liquidGlass) else Modifier)
                             .drawWithContent {
                             drawContent()
                             if (blueLightFilter) {
@@ -282,12 +285,11 @@ class MainActivity : ComponentActivity() {
                         color = MaterialTheme.colorScheme.background
                     ) {
                         val bgConfig by AppBackgroundController.config.collectAsStateWithLifecycle()
-                        val bgActive = bgConfig.mode == 1 && !bgConfig.uri.isNullOrBlank()
+                        val backgroundRequested = bgConfig.mode == 1 && !bgConfig.uri.isNullOrBlank()
                         // 渲染画质档位：设置页可调，主要影响玻璃效果强度与动效数量。
                         // "高"为默认，与历史版本视觉完全一致；低于"高"不挂 backdrop 捕获层。
-                        val renderQualityIdx by viewModel.renderQuality.collectAsStateWithLifecycle()
-                        val renderQuality = com.example.ui.components.RenderQuality.of(renderQualityIdx)
                         val glassEnabled = renderQuality.realtimeGlass
+                        val bgActive = backgroundRequested && !renderQuality.minimal
                         // 滚动惯性倾斜帧循环：仅 MAX 档挂载（该档本就常驻极光等无限动效；
                         // 低档不再引入常驻 ticker，保住「流畅」档的帧空闲与省电）
                         if (renderQuality == com.example.ui.components.RenderQuality.MAX) {
@@ -362,7 +364,7 @@ class MainActivity : ComponentActivity() {
                                 com.example.ui.components.LocalRenderQuality provides renderQuality,
                                 LocalCardTweaks provides cardTweaks.value,
                                 // 「我喜欢的」交互：动效与触觉统一开关（系统"减少动态效果"自动降级）
-                                com.example.ui.feedback.LocalReduceMotion provides com.example.ui.feedback.systemReduceMotion(),
+                                com.example.ui.feedback.LocalReduceMotion provides (com.example.ui.feedback.systemReduceMotion() || renderQuality.minimal),
                                 com.example.ui.feedback.LocalHapticsEnabled provides hapticsEnabled,
                                 // 关掉开关 → 把 Compose 侧的震动实现整体换成空实现：
                                 // 底栏切换、卡片波纹、滑块、开关等 10+ 处 LocalHapticFeedback.current
@@ -1676,7 +1678,7 @@ class MainActivity : ComponentActivity() {
                                     ComicJumpState.lastPage = page
                                     // 读到章尾自动预取下一章（对齐 Mihon/Kotatsu）：
                                     // 剩 3 页时开始拉下一章图片列表 + 预热前两页
-                                    if (total - page <= 3) {
+                                    if (!renderQuality.minimal && total - page <= 3) {
                                         nextChapter?.let { libraryViewModel.prefetchNextComicChapter(it) }
                                     }
                                     val idx = comicChaptersList.indexOfFirst { it.id == ch.id }
@@ -1689,6 +1691,14 @@ class MainActivity : ComponentActivity() {
                                             pageIndex = page,
                                             pageCount = total,
                                         )
+                                    }
+                                },
+                                onFlushProgress = remember(comicBook?.sourceId, comicBook?.id, activeChapter?.id, activeChapterIdx) {
+                                    val b = comicBook
+                                    val ch = activeChapter
+                                    val index = activeChapterIdx
+                                    { page: Int, count: Int ->
+                                        if (b != null && ch != null) viewModel.saveComicProgress(b.sourceId, b.id, ch.id, index, page, count, force = true)
                                     }
                                 },
                                 initialPage = ComicJumpState.startPage,

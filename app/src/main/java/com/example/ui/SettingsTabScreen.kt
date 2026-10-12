@@ -131,6 +131,8 @@ fun SettingsTabScreen(
     favoritesProtected: Boolean = false,
     onSetFavoritesProtected: (Boolean) -> Unit = {},
 ) {
+    var showReleaseHistory by remember { mutableStateOf(false) }
+    if (showReleaseHistory) com.example.ui.components.ReleaseHistoryDialog { showReleaseHistory = false }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var updateChecking by remember { mutableStateOf(false) }
@@ -300,7 +302,7 @@ fun SettingsTabScreen(
                 prefs.appBackgroundMode = 1
                 appBgMode = 1
                 AppBackgroundController.update(1, localUriStr, appBgDim)
-                AppToast.makeText(context, "背景已设置（横竖屏自动裁剪填充）", Toast.LENGTH_SHORT).show()
+                AppToast.makeText(context, "背景已设置", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 AppToast.makeText(context, "背景设置失败", Toast.LENGTH_SHORT).show()
             }
@@ -608,7 +610,7 @@ LazyColumn(
                             }
                             Spacer(modifier = Modifier.height(14.dp))
 
-                            Text("主色调 (Primary)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("主色调", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -630,7 +632,7 @@ LazyColumn(
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            Text("强调色 / 副色 (Secondary)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("强调色", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -652,7 +654,7 @@ LazyColumn(
 
                             Spacer(modifier = Modifier.height(20.dp))
 
-                            Text("实时配色预览卡片", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("预览", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(8.dp))
                             GlassCard(
                                 modifier = Modifier.fillMaxWidth(),
@@ -797,12 +799,13 @@ LazyColumn(
 
                             SegmentedPillSelector(
                                 options = listOf(
+                                    -1 to "极简",
                                     0 to "流畅",
                                     1 to "均衡",
                                     2 to "高",
                                     3 to "极致"
                                 ),
-                                selected = renderQualityVal.coerceIn(0, 3),
+                                selected = renderQualityVal.coerceIn(-1, 3),
                                 onSelect = onRenderQualityChange
                             )
                         }
@@ -831,11 +834,6 @@ LazyColumn(
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
                                         Text("触控反馈", fontWeight = FontWeight.SemiBold)
-                                        Text(
-                                            "点按与滑动时的震动确认",
-                                            fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
                                     }
                                 }
                                 AppSwitch(
@@ -980,7 +978,7 @@ LazyColumn(
                             PageTurnType.entries.forEach { turnType ->
                                 PageTurnSelectorRow(
                                     title = turnType.title,
-                                    description = turnType.description,
+                                    description = "",
                                     type = turnType,
                                     selected = pageTurnMode == turnType.id,
                                     onClick = {
@@ -1127,11 +1125,6 @@ LazyColumn(
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
                                         Text("仅 Wi-Fi 预加载漫画", fontWeight = FontWeight.SemiBold)
-                                        Text(
-                                            "开启后移动网络不会提前下载后面的页，更省流量",
-                                            fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
                                     }
                                 }
                                 AppSwitch(
@@ -1274,7 +1267,6 @@ LazyColumn(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text("缓存管理", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                                    Text("查看应用占用，清理缓存与离线数据", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                             Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
@@ -1326,7 +1318,6 @@ LazyColumn(
                                 Column {
                                     Text("书库使用手册", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                                     Spacer(modifier = Modifier.height(2.dp))
-                                    Text("书源说明、下载管理与常见问题", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                             Icon(
@@ -1341,12 +1332,12 @@ LazyColumn(
                 // Section 8: About
                 item {
                     GlassCard(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag("software-info"),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(
                             modifier = Modifier.fillMaxWidth().padding(20.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            horizontalAlignment = Alignment.Start
                         ) {
                             Text(
                                 "Ciallo Reader",
@@ -1399,37 +1390,14 @@ LazyColumn(
                                     Text(if (appUpdateState.transferring) "查看下载进度" else if (appUpdateState.hasPackage) "继续安装更新" else "查看更新")
                                 }
                             }
-                            Text("检查正式版本，确认后下载并打开系统安装页面。", fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f))
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                "轻量级本地 / 在线小说阅读器",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            )
-                            Spacer(Modifier.height(14.dp))
-                            val githubUriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.09f),
-                            ) {
-                                Row(
-                                    modifier = Modifier.clickable {
-                                        runCatching { githubUriHandler.openUri("https://github.com/roxycon-dev/Ciallo-Reader/releases") }
-                                            .onFailure { AppToast.makeText(context, "暂时打不开 GitHub，稍后再来喵～", Toast.LENGTH_SHORT).show() }
-                                    }.padding(horizontal = 16.dp, vertical = 11.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(7.dp),
-                                ) {
-                                    Icon(Icons.Filled.Star, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                                    Text("狗修金，给颗 Star 好不好喵～", fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline)
-                                }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = { showReleaseHistory = true }) { Text("更新目录") }
+                                val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                                TextButton(onClick = {
+                                    runCatching { uriHandler.openUri(com.example.data.UPDATE_REPOSITORY) }
+                                        .onFailure { AppToast.makeText(context, "无法打开 GitHub", Toast.LENGTH_SHORT).show() }
+                                }) { Text("GitHub") }
                             }
-                            Spacer(Modifier.height(5.dp))
-                            Text("点这里，去 GitHub 摸摸小项目 ฅ^•ﻌ•^ฅ", fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -1633,6 +1601,13 @@ private fun CardTweakSlider(
     endText: String,
     onChange: (Float) -> Unit
 ) {
+    if (com.example.ui.components.LocalRenderQuality.current.minimal) {
+        Column(Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label); Text(valueText) }
+            Slider(value = position.coerceIn(0f, 1f), onValueChange = onChange)
+        }
+        return
+    }
     var dragging by remember { mutableStateOf(false) }
     /*
      * FluidSlider 容器 = 2.5×barH：底部 1×barH 轨道 + 顶部 1.5×barH 气泡预留空区。

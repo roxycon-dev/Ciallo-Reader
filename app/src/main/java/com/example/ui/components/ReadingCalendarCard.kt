@@ -27,6 +27,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -78,7 +79,6 @@ fun ReadingCalendarCard(
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text("阅读日历", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Text("每日阅读热力", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 SegmentedPillSelector(
@@ -129,7 +129,7 @@ fun ReadingCalendarCard(
 
             // 月/年切换：新旧视图交叉淡入淡出 + 轻缩放，替代生硬的清空重绘；
             // 流畅档直接无过渡切换
-            val lowQuality = LocalRenderQuality.current == RenderQuality.LOW
+            val lowQuality = LocalRenderQuality.current <= RenderQuality.LOW
             AnimatedContent(
                 targetState = Triple(showYear, viewYear, viewMonth),
                 transitionSpec = {
@@ -240,7 +240,7 @@ private fun DayCell(
     Box(
         modifier = modifier
             .padding(2.dp)
-            .height(44.dp)
+            .aspectRatio(1f)
             .clip(shape)
             .background(
                 if (seconds > 0) {
@@ -311,6 +311,7 @@ private fun YearHeatmap(
     // 今日高亮仍停在上一次启动的那一天。
     val todayCal = rememberTodayCalendar()
     val todayStr = remember(todayCal) { dateStrOf(todayCal) }
+    val reduce = com.example.ui.feedback.LocalReduceMotion.current
     val cellGap = 3.dp
     val minCell = 16.dp          // 手机上保证可点、视觉舒坦的最小边长
     val weekdayLabelWidth = 20.dp
@@ -341,13 +342,14 @@ private fun YearHeatmap(
             } else {
                 scrollState.maxValue
             }
-            scrollState.animateScrollTo(target.coerceAtMost(scrollState.maxValue))
+            if (reduce) scrollState.scrollTo(target.coerceAtMost(scrollState.maxValue))
+            else scrollState.animateScrollTo(target.coerceAtMost(scrollState.maxValue))
         }
 
         Column {
-            Row(Modifier.horizontalScroll(scrollState)) {
+            Row {
                 // 左侧星期标签：只标 一/三/五/日，避免小屏挤成一团
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(cellGap)) {
                     Spacer(Modifier.height(16.dp)) // 与顶部月份标签行对齐
                     for (r in 0..6) {
                         Box(
@@ -358,6 +360,7 @@ private fun YearHeatmap(
                                 Text(
                                     text = WEEKDAY_LABELS[r],
                                     fontSize = 9.sp,
+                                    lineHeight = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier.width(weekdayLabelWidth)
@@ -367,7 +370,7 @@ private fun YearHeatmap(
                     }
                 }
 
-                Column {
+                Column(Modifier.weight(1f).horizontalScroll(scrollState), verticalArrangement = Arrangement.spacedBy(cellGap)) {
                     // ── 横轴：月份标签。每个横跨约 4 周，宽度足够，看得清 ──
                     Box(Modifier.height(16.dp)) {
                         Row {
@@ -382,6 +385,7 @@ private fun YearHeatmap(
                                         Text(
                                             text = "${m + 1}月",
                                             fontSize = 10.sp,
+                                            lineHeight = 12.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
                                             softWrap = false
@@ -396,7 +400,7 @@ private fun YearHeatmap(
                     for (r in 0..6) {
                         val rowAlpha by animateFloatAsState(
                             targetValue = if (started) 1f else 0f,
-                            animationSpec = tween(durationMillis = 240, delayMillis = r * 45),
+                            animationSpec = tween(durationMillis = if (reduce) 0 else 240, delayMillis = if (reduce) 0 else r * 45),
                             label = "yearRowAlpha"
                         )
                         // 2026-09-21 修复：cellGap 之前只参与 step 计算，却没真正加到布局上，
@@ -436,12 +440,6 @@ private fun YearHeatmap(
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("多", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    "颜色越深 = 当天读得越久",
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
     }
@@ -458,14 +456,14 @@ private fun YearCell(
 ) {
     if (dateStr == null) {
         // 该年 1 月 1 日之前的空位
-        Spacer(modifier = Modifier.size(cell))
+        Spacer(modifier = Modifier.requiredSize(cell))
         return
     }
     val shape = RoundedCornerShape(3.dp)
     val filled = seconds > 0
     Box(
         modifier = Modifier
-            .size(cell)
+            .requiredSize(cell).testTag("year_heat_cell")
             .clip(shape)
             .background(
                 if (filled) {

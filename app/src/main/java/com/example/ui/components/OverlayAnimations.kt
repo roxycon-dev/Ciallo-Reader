@@ -37,7 +37,7 @@ fun DialogEntrance(
     content: @Composable () -> Unit,
 ) {
     val entrance = visibility ?: remember { MutableTransitionState(false).apply { targetState = true } }
-    val reduce = LocalReduceMotion.current
+    val reduce = LocalReduceMotion.current || LocalRenderQuality.current.minimal
     // 2026-09-21：改用 iOS 弹簧（缩放走 spring、淡入走短 easeOut）。
     // 原来是 Material 的 FastOutSlowInEasing 补间，收尾偏“钝”；
     // iOS 的弹窗是 0.92 起跳 + 临界阻尼弹簧，落位干脆且有一点点“吸附”手感。
@@ -64,7 +64,7 @@ fun BottomSheetEntrance(
     content: @Composable () -> Unit,
 ) {
     val entrance = visibility ?: remember { MutableTransitionState(false).apply { targetState = true } }
-    val reduce = LocalReduceMotion.current
+    val reduce = LocalReduceMotion.current || LocalRenderQuality.current.minimal
     AnimatedVisibility(
         visibleState = entrance,
         modifier = modifier,
@@ -90,7 +90,7 @@ fun ScrimEntrance(
     content: @Composable () -> Unit,
 ) {
     val entrance = visibility ?: remember { MutableTransitionState(false).apply { targetState = true } }
-    val reduce = LocalReduceMotion.current
+    val reduce = LocalReduceMotion.current || LocalRenderQuality.current.minimal
     AnimatedVisibility(
         visibleState = entrance,
         modifier = modifier,

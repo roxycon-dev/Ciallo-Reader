@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -97,6 +98,32 @@ fun PageTurnContainer(
     paperColor: Color = Color(0xFFF5F0E6),
     modifier: Modifier = Modifier
 ) {
+    if (com.example.ui.components.LocalRenderQuality.current.minimal) {
+        var origin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+        val next by rememberUpdatedState(onNextPage)
+        val previous by rememberUpdatedState(onPrevPage)
+        val center by rememberUpdatedState(onClickCenter)
+        val left by rememberUpdatedState(onClickLeft)
+        val right by rememberUpdatedState(onClickRight)
+        val imageTap by rememberUpdatedState(onImageTapAt)
+        val menu by rememberUpdatedState(menuVisible)
+        Box(modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInWindow() }
+            .pointerInput(pageKey) {
+                detectTapGestures { point ->
+                    if (menu) center()
+                    else if (imageTap?.invoke(point + origin) != true) {
+                        when { point.x < size.width / 3f -> left(); point.x > size.width * 2f / 3f -> right(); else -> center() }
+                    }
+                }
+            }.pointerInput(pageKey) {
+                var distance = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { distance = 0f }, onDragCancel = { distance = 0f },
+                    onDragEnd = { if (!menu && kotlin.math.abs(distance) > 48.dp.toPx()) { if (distance < 0) next() else previous() } },
+                ) { change, amount -> change.consume(); distance += amount }
+            }) { currentContent() }
+        return
+    }
     val paper = rememberPaperPalette(paperColor)
     val coroutineScope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current

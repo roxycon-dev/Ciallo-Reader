@@ -67,6 +67,7 @@ import java.util.Locale
 import androidx.compose.foundation.layout.widthIn
 import com.example.ui.adaptive.AdaptiveSpec
 import com.example.ui.design.DesignTokens
+
 import com.example.ui.components.AppToast
 
 /** 四类书籍封面目录（漫画/EPUB/FB2/MOBI 解析产物）。 */
@@ -195,7 +196,7 @@ fun CacheManagementScreen(
         "appdata" -> listOf("databases", "shared_prefs", "no_backup").map { File(context.dataDir, it) }
         "other" -> {
             val knownDirs = setOf("downloads", "imports", "epub_images", "mobi_images", "fb2_images",
-                "docx_images", "js_sources", "manga_translate_models") + COVER_DIRS
+                "docx_images", "js_sources", "manga_translate_models", "mangajanai") + COVER_DIRS
             val fileRemainder = context.filesDir.listFiles()?.filter { f ->
                 f.name !in knownDirs && !f.name.startsWith("comics_") &&
                     f.name != "custom_font.ttf" && f.name != "novel_reader_backup.json" &&
@@ -209,6 +210,7 @@ fun CacheManagementScreen(
         "covers" -> COVER_DIRS.map { File(context.filesDir, it) }
         "webview" -> listOf(File(context.dataDir, "app_webview"))
         "manga_tr_cache" -> listOf(com.example.mangatranslate.TranslationCache.dir(context))
+        "mangajanai_models" -> listOf(File(context.filesDir, "mangajanai"))
         "manga_tr_models" -> listOf(com.example.mangatranslate.TranslateModelManager.modelDir(context))
         else -> emptyList()
     }
@@ -326,13 +328,14 @@ fun CacheManagementScreen(
                 val personalFiles = filesDir.listFiles { f -> f.isFile && (f.name == "custom_font.ttf" || f.name.startsWith("custom_poster_") || f.name.startsWith("custom_app_bg_")) }?.toList() ?: emptyList()
                 val personalSize = personalFiles.sumOf { runCatching { it.length() }.getOrDefault(0L) }
                 val sourcesSize = dirSize(File(filesDir, "js_sources")) + (File(filesDir, "novel_reader_backup.json").takeIf { it.exists() }?.length() ?: 0L)
+                val mangaJaNaiSize = dirSize(File(filesDir, "mangajanai"))
                 val trModelsSize = dirSize(File(filesDir, "manga_translate_models"))
                 val webviewSize = dirSize(File(dataDir, "app_webview"))
                 val appDataSize = listOf("databases", "shared_prefs", "no_backup").sumOf { dirSize(File(dataDir, it)) }
 
                 // filesDir 中未归类的杂项（历史遗留示例数据等），归入「其他」让总数自洽
                 filesDir.listFiles()?.forEach { f ->
-                    val known = (f.isDirectory && (f.name == "downloads" || f.name == "imports" || f.name in setOf("epub_images", "mobi_images", "fb2_images", "docx_images") || f.name.startsWith("comics_") || f.name in COVER_DIRS || f.name == "js_sources" || f.name == "manga_translate_models")) ||
+                    val known = (f.isDirectory && (f.name == "downloads" || f.name == "imports" || f.name in setOf("epub_images", "mobi_images", "fb2_images", "docx_images") || f.name.startsWith("comics_") || f.name in COVER_DIRS || f.name == "js_sources" || (f.name == "manga_translate_models" || f.name == "mangajanai"))) ||
                         (f.isFile && (f.name == "custom_font.ttf" || f.name == "novel_reader_backup.json" || f.name.startsWith("custom_poster_") || f.name.startsWith("custom_app_bg_")))
                     if (!known) other += dirSize(f)
                 }
@@ -391,6 +394,10 @@ fun CacheManagementScreen(
                 if (trCacheSize > 0) {
                     rows += StorageRow("manga_tr_cache", "漫画译文缓存", "已翻译页面；清理后需要重新翻译", trCacheSize, 1, true,
                         "清理后再次阅读这些页面需要重新翻译。", if (trCacheCount > 0) "共 $trCacheCount 页" else null)
+                }
+                if (mangaJaNaiSize > 0) {
+                    rows += StorageRow("mangajanai_models", "MangaJaNai 模型", "按需下载", mangaJaNaiSize, 1, true,
+                        "再次增强时会重新下载模型。")
                 }
                 if (trModelsSize > 0) {
                     rows += StorageRow("manga_tr_models", "漫画翻译模型", "离线模型；清理后需要重新下载", trModelsSize, 1, true,

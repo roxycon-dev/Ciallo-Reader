@@ -25,6 +25,10 @@ fun ShimmerBox(
     modifier: Modifier = Modifier,
     cornerRadius: Int = 12
 ) {
+    if (LocalRenderQuality.current.minimal) {
+        Box(modifier.clip(RoundedCornerShape(cornerRadius.dp)).background(MaterialTheme.colorScheme.surfaceVariant))
+        return
+    }
     val transition = rememberInfiniteTransition(label = "shimmer")
     val x by transition.animateFloat(
         initialValue = -300f,

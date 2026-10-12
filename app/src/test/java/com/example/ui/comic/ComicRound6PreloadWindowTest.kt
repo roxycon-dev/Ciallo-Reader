@@ -69,7 +69,8 @@ class ComicRound6PreloadWindowTest {
     fun `估算-各档与实际输出预算一致且不低估大图`() {
         val loader = ComicPageLoader(context)
         for (mode in ComicEnhanceMode.entries) for ((w, h) in listOf(600 to 900, 1200 to 1600, 1200 to 1800, 1801 to 1200, 2800 to 2000)) {
-            val (tw, th) = if (mode == ComicEnhanceMode.WAIFU2X || mode == ComicEnhanceMode.SUPER_RES)
+            val (tw, th) = if (mode == ComicEnhanceMode.MANGAJANAI) MangaJaNai.outputSize(w, h)
+            else if (mode == ComicEnhanceMode.WAIFU2X || mode == ComicEnhanceMode.SUPER_RES)
                 ComicEdgeUpscaler.targetSize(w, h) else w to h
             assertEquals("$mode at ${w}x$h", tw.toLong() * th * 4, loader.estimateProcessedBytes(w, h, mode))
         }

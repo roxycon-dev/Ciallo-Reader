@@ -389,8 +389,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val renderQuality: StateFlow<Int> = _renderQuality.asStateFlow()
 
     fun updateRenderQuality(quality: Int) {
-        prefs.renderQuality = quality
-        _renderQuality.value = quality
+        prefs.renderQuality = quality.coerceIn(-1, 3)
+        _renderQuality.value = prefs.renderQuality
     }
 
     fun updateAutoNightMode(enabled: Boolean) {

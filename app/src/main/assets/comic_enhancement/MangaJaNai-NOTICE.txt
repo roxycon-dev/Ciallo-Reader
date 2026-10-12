@@ -1,0 +1,9 @@
+MangaJaNai V1 2x 1200p ESRGAN (70k)
+Original model: the-database / MangaJaNai
+https://github.com/the-database/MangaJaNai
+ONNX conversion: haesslerian / MangaJaNai_V1_ONNX
+https://huggingface.co/haesslerian/MangaJaNai_V1_ONNX
+Revision: 2f67ff30209f2e0c75b7c55e6f3ffc3adbc960f7
+License: Creative Commons Attribution-NonCommercial 4.0 International
+See MangaJaNai-CC-BY-NC-4.0.txt for the full license.
+The ONNX weights are downloaded on demand, verified and used without modification.

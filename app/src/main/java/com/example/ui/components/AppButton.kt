@@ -124,6 +124,30 @@ fun AppActionButton(
     loading: Boolean = false,
     fullWidth: Boolean = false
 ) {
+    if (LocalRenderQuality.current.minimal) {
+        val cs = MaterialTheme.colorScheme
+        val bg = when (variant) {
+            AppButtonVariant.Primary -> cs.primary
+            AppButtonVariant.Destructive -> cs.error
+            AppButtonVariant.Secondary -> cs.secondaryContainer
+            AppButtonVariant.Tertiary -> Color.Transparent
+        }
+        val ink = when (variant) {
+            AppButtonVariant.Primary -> cs.onPrimary
+            AppButtonVariant.Destructive -> cs.onError
+            AppButtonVariant.Secondary -> cs.onSecondaryContainer
+            AppButtonVariant.Tertiary -> cs.primary
+        }
+        Row(modifier.then(if (fullWidth) Modifier.fillMaxWidth() else Modifier)
+            .height(buttonSize.height).clip(RoundedCornerShape(12.dp))
+            .background(bg).clickable(enabled = enabled && !loading, onClick = onClick)
+            .padding(horizontal = buttonSize.horizontalPadding),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+            icon?.let { Icon(it, null, tint = ink, modifier = Modifier.size(buttonSize.iconSize)); Spacer(Modifier.width(6.dp)) }
+            Text(if (loading) "处理中…" else text, color = ink.copy(alpha = if (enabled) 1f else .4f), fontSize = buttonSize.fontSize)
+        }
+        return
+    }
     val colors = rememberAppButtonColors()
     val glass = LocalLiquidGlassState.current
     val primaryRimColors = remember(colors) {

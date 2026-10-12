@@ -78,6 +78,7 @@ object ComicImagePipeline {
     fun enhanceEstimateSec(mode: ComicEnhanceMode, strength: Int, longEdge: Int): Double {
         if (strength <= 0) return 0.0
         val base = when (mode) {
+            ComicEnhanceMode.MANGAJANAI -> return 0.0 // Device-dependent; never invent an ETA.
             ComicEnhanceMode.OFF -> return 0.0
             ComicEnhanceMode.CAS -> 0.4
             ComicEnhanceMode.ANIME4K -> 1.9
@@ -575,9 +576,10 @@ object ComicImagePipeline {
         // 4c. 各增强档在原始解码尺寸处理；放大预算仅限制输出，不先缩小文字。
         val strength = tone.enhanceStrength.coerceIn(0, 100) / 100f
         step(when (if (tone.enhanceStrength <= 0) ComicEnhanceMode.OFF else tone.enhanceMode) {
+            ComicEnhanceMode.MANGAJANAI -> MangaJaNai.enhance(bmp, strength)
             ComicEnhanceMode.CAS -> ComicEdgeUpscaler.sharpen(bmp, strength)
             ComicEnhanceMode.ANIME4K -> anime4kRestore(bmp, strength)
-            ComicEnhanceMode.WAIFU2X -> anime4kUpscale(bmp, strength)
+            ComicEnhanceMode.WAIFU2X -> superResolution(bmp, strength) // Legacy name, unified engine.
             ComicEnhanceMode.SUPER_RES -> superResolution(bmp, strength)
             ComicEnhanceMode.OFF -> bmp
         })
@@ -885,18 +887,6 @@ object ComicImagePipeline {
         return createBitmap(w, h, out)
     }
 
-    /** Waifu2x 类：2x 边缘保持放大（bilinear 放大 + 双边滤波细化 + 限幅轻锐化） */
-    fun waifu2xLike(src: Bitmap, strength: Float): Bitmap {
-        val scale = if (max(src.width, src.height) * 2 > MAX_EDGE) {
-            MAX_EDGE.toFloat() / max(src.width, src.height)
-        } else 2f
-        if (scale <= 1.05f) return casSharpen(src, 0.3f + 0.3f * strength)
-        val m = Matrix().apply { setScale(scale, scale) }
-        val up = Bitmap.createBitmap(src, 0, 0, src.width, src.height, m, true)
-        val denoised = bilateralLite(up, radius = 2, sigmaColor = 28f * (0.5f + 0.5f * strength))
-        return unsharpMask(denoised, 0.25f + 0.45f * strength)
-    }
-
     /** 轻量档：保边预降噪 → 原始像素 Restore CNN → 亮度细节恢复。 */
     fun anime4kRestore(src: Bitmap, strength: Float): Bitmap {
         if (strength <= 0f) return src
@@ -955,30 +945,6 @@ object ComicImagePipeline {
             }
         }
         return createBitmap(w, h, out)
-    }
-
-    /** 完整档：预算允许时分块 2× CNN，否则原尺寸 Restore + EASU，最后恢复细节。 */
-    fun anime4kUpscale(src: Bitmap, strength: Float): Bitmap {
-        if (strength <= 0f) return src
-        val long = max(src.width, src.height)
-        if (long < 8) return src
-        val (w, h) = ComicEdgeUpscaler.targetSize(src)
-        // Infer at the native source scale. Never shrink text to satisfy the CNN budget.
-        // Restore before enlargement: a one-output-pixel correction largely vanishes
-        // when a 2x image is fitted back to reading size. Native ink restoration survives.
-        val restored = anime4kRestore(src, strength)
-        var up: Bitmap? = null
-        var result: Bitmap? = null
-        try {
-            up = if (w == src.width * 2 && h == src.height * 2) {
-                Anime4KCnn.upscale2x(restored, strength)
-            } else ComicEdgeUpscaler.upscale(restored, w, h)
-            result = ComicEdgeUpscaler.sharpenReconstruction(up, strength)
-            return result
-        } finally {
-            if (restored !== src && restored !== result) restored.recycle()
-            if (up !== src && up !== restored && up !== result) up?.recycle()
-        }
     }
 
     /** 超分辨率：12 tap EASU 重建斜线，局部去振铃后恢复亮度细节。 */

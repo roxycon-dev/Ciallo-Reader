@@ -25,6 +25,13 @@ fun FlowingGradientProgressBar(
     color: Color,
     modifier: Modifier = Modifier
 ) {
+    if (LocalRenderQuality.current.minimal) {
+        Canvas(modifier.fillMaxWidth().height(8.dp)) {
+            drawRect(color.copy(alpha = .15f))
+            drawRect(color, size = Size(size.width * progress.coerceIn(0f, 1f), size.height))
+        }
+        return
+    }
     val infiniteTransition = rememberInfiniteTransition(label = "flow")
     val offset by infiniteTransition.animateFloat(
         initialValue = 0f,

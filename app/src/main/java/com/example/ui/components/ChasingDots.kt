@@ -25,6 +25,10 @@ fun ChasingDots(
     color: Color = MaterialTheme.colorScheme.primary,
     circleRatio: Float = 0.25f
 ) {
+    if (LocalRenderQuality.current.minimal) {
+        Box(modifier.size(size), contentAlignment = Alignment.Center) { androidx.compose.material3.Text("…", color = color) }
+        return
+    }
     val transition = rememberInfiniteTransition()
 
     val pathAngleMultiplier1 = transition.fractionTransition(

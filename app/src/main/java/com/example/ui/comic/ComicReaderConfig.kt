@@ -198,7 +198,7 @@ data class ComicReaderConfig(
 
     /** 滤镜/增强/裁边相关的指纹，用于位图处理缓存键。 */
     fun imagePipelineFingerprint(): String = listOf(
-        "enhance-v3",
+        "enhance-v4-mangajanai1200p",
         cropMode.name, manualCrop?.joinToString(","), bookRotation,
         splitWide, splitPosition,
         enhanceMode.name, enhanceStrength,
@@ -236,7 +236,7 @@ data class ComicReaderConfig(
                 splitWide = json.optBoolean("splitWide", false),
                 splitReverse = json.optBoolean("splitReverse", false),
                 splitPosition = json.optDouble("splitPosition", 0.5).toFloat().coerceIn(0.3f, 0.7f),
-                enhanceMode = safe("enhanceMode", ComicEnhanceMode.OFF, ComicEnhanceMode.entries.toTypedArray()),
+                enhanceMode = safe("enhanceMode", ComicEnhanceMode.OFF, ComicEnhanceMode.entries.toTypedArray()).let { if (it == ComicEnhanceMode.WAIFU2X) ComicEnhanceMode.SUPER_RES else it },
                 enhanceStrength = json.optInt("enhanceStrength", 60).coerceIn(0, 100),
                 filterBrightness = json.optInt("filterBrightness", 0).coerceIn(-100, 100),
                 filterContrast = json.optInt("filterContrast", 0).coerceIn(-100, 100),
@@ -314,10 +314,15 @@ enum class ComicCropMode(val label: String) {
 /** 保留历史枚举值兼容设置；四档分别提供抑噪锐化、CNN 修复、CNN 放大和 EASU 重建。 */
 enum class ComicEnhanceMode(val label: String, val desc: String) {
     OFF("关闭", ""),
-    CAS("锐化增强", "保色锐化，强化线条与小字；抑制平坦噪点与白边，处理最快"),
-    ANIME4K("Anime4K 轻量", "原生分辨率线条修复、保边降噪与细节增强"),
-    WAIFU2X("超分 完整", "分块神经网络重建，最高 2× 放大；保留细线与小字，首次处理较慢"),
-    SUPER_RES("超分辨率", "边缘自适应重建，最高 2× 放大；减少斜线锯齿，抑制白边与噪点"),
+    CAS("锐化", "线条更清晰"),
+    ANIME4K("线条", "轻量修复"),
+    WAIFU2X("旧版超分", "兼容旧设置"),
+    SUPER_RES("超分", "轻量放大"),
+    MANGAJANAI("MangaJaNai", "黑白漫画修复 · 首次下载 64 MB"),
+    ;
+    companion object {
+        val visibleModes = listOf(OFF, CAS, ANIME4K, SUPER_RES, MANGAJANAI)
+    }
 }
 
 /** 阅读背景 */

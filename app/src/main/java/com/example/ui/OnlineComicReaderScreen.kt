@@ -74,6 +74,7 @@ fun OnlineComicReaderScreen(
     onPageChanged: (pageIndex: Int, totalPages: Int) -> Unit = { _, _ -> },
     /** 起始页：「继续阅读 · 第12话 · 第8页」精确回到上次位置 */
     initialPage: Int = 0,
+    onFlushProgress: (Int, Int) -> Unit = { _, _ -> },
     /** 神回上下文（null = 该场景不启用神回；由 MainActivity 用 sourceId::comicId 组装） */
     godContext: com.example.god.GodMomentContext? = null,
     onGodMomentSaved: ((com.example.god.GodMomentEntity) -> Unit)? = null,
@@ -160,6 +161,23 @@ fun OnlineComicReaderScreen(
                 }
                 // 神回：当前读到的页（封面默认选中它）+ 页面引用（页面选择器用）
                 var currentPageIndex by remember(imageUrls) { mutableIntStateOf(initialPage.coerceAtLeast(0)) }
+                val readerLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+                DisposableEffect(bookKey, currentChapterIndex, readerLifecycle, pages) {
+                    val flushProgress = onFlushProgress
+                    var reported = false
+                    fun flush() {
+                        if (!reported) {
+                            flushProgress(currentPageIndex.coerceIn(0, pages.lastIndex), pages.size)
+                            reported = true
+                        }
+                    }
+                    val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                        if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) flush()
+                        if (event == androidx.lifecycle.Lifecycle.Event.ON_START) reported = false
+                    }
+                    readerLifecycle.addObserver(observer)
+                    onDispose { readerLifecycle.removeObserver(observer); flush() }
+                }
                 val godPages = remember(pages) {
                     pages.map { ref ->
                         com.example.god.GodPageRef(

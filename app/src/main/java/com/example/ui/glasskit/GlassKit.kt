@@ -326,6 +326,11 @@ fun GlassKitCard(
     lightweight: Boolean = false,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    if (LocalRenderQuality.current.minimal) {
+        Column(modifier.clip(shape).background(androidx.compose.material3.MaterialTheme.colorScheme.surface)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier), content = content)
+        return
+    }
     val kitBackdrop = LocalGlassKitBackdrop.current
     val fallbackBackdrop = LocalGlassBackdrop.current
     val backdrop = kitBackdrop ?: fallbackBackdrop
@@ -455,6 +460,10 @@ fun GlassTopBarStrip(
     collapsedFraction: Float,
     modifier: Modifier = Modifier
 ) {
+    if (LocalRenderQuality.current.minimal) {
+        Box(modifier.background(androidx.compose.material3.MaterialTheme.colorScheme.surface))
+        return
+    }
     val kitBackdrop = LocalGlassKitBackdrop.current
     val fallbackBackdrop = LocalGlassBackdrop.current
     val backdrop = kitBackdrop ?: fallbackBackdrop

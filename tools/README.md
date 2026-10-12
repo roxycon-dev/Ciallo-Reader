@@ -12,4 +12,7 @@
 - `README.md`
 - `ui-gate-baseline.json`
 - `ui-gate.ps1`
+- `verify-mangajanai.py` — 固定权重校验与桌面 CPU 分块推理验证；不是 Android 性能测试
 - `verify-comic-source-host.cjs`
+
+运行模型验证：`python tools/verify-mangajanai.py MODEL.onnx OUTPUT_DIRECTORY`，依赖 `numpy`、`Pillow`、`onnxruntime`。

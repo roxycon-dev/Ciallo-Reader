@@ -64,7 +64,7 @@ class ComicEnhancementV2Test {
             val out = ComicImagePipeline.superResolution(src, strength)
             assertTrue(pixels(out).all { it == src.getPixel(0, 0) })
         }
-        for (mode in ComicEnhanceMode.entries) {
+        for (mode in ComicEnhanceMode.entries.filter { it != ComicEnhanceMode.MANGAJANAI }) {
             val out = ComicImagePipeline.process(src, ComicImagePipeline.Geometry(),
                 ComicImagePipeline.Toning(enhanceMode = mode, enhanceStrength = 60))
             for (p in pixels(out)) for (shift in listOf(0, 8, 16)) {
@@ -155,7 +155,7 @@ class ComicEnhancementV2Test {
     @Test fun combinedGeometryToningAndEnhancementNeverRecycleOrMutateTheBorrowedSource() {
         val src = pattern(72, 96)
         val before = pixels(src)
-        for (mode in ComicEnhanceMode.entries) {
+        for (mode in ComicEnhanceMode.entries.filter { it != ComicEnhanceMode.MANGAJANAI }) {
             val out = ComicImagePipeline.process(src,
                 ComicImagePipeline.Geometry(half = ComicSplitHalf.LEFT, rotationDeg = 90),
                 ComicImagePipeline.Toning(brightness = 8, saturation = 10, enhanceMode = mode, sharpen = 30))

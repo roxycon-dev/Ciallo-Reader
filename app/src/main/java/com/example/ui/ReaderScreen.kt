@@ -1152,7 +1152,7 @@ fun ReaderScreen(
 
             .fillMaxSize()
 
-            .then(if (showSettingsSheet) Modifier.layerBackdrop(readerSettingsBackdrop) else Modifier)
+            .then(if (showSettingsSheet && com.example.ui.components.LocalRenderQuality.current.realtimeGlass) Modifier.layerBackdrop(readerSettingsBackdrop) else Modifier)
             .background(bgColor.copy(alpha = bgAlpha))
 
     ) {
@@ -2505,7 +2505,7 @@ fun ReaderScreen(
 
 
 
-                                    if (!isScrollMode && pageTurnMode == PageTurnType.SIMULATE.id) {
+                                    if (!isScrollMode && pageTurnMode == PageTurnType.SIMULATE.id && !com.example.ui.components.LocalRenderQuality.current.minimal) {
 
                                         // C1 pagecurl 引擎（SIMULATE 专用）：三页窗口 + 中央点击唤出菜单
 
@@ -3815,7 +3815,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
         com.example.ui.reader.ReadingSettingsPanel(
             themeColor = themeColor,
             contentColor = textColor,
-            backdrop = readerSettingsBackdrop,
+            backdrop = readerSettingsBackdrop.takeIf { com.example.ui.components.LocalRenderQuality.current.realtimeGlass },
             onDismiss = { showSettingsSheet = false },
         ) { closePanel ->
 

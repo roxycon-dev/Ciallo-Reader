@@ -52,6 +52,7 @@ fun Modifier.acrylicPanel(
     shape: Shape = RoundedCornerShape(24.dp),
     surfaceAlpha: Float = 0.50f
 ): Modifier {
+    if (LocalRenderQuality.current.minimal) return clip(shape).background(MaterialTheme.colorScheme.surface)
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
     val prismColors = rememberCrystalPrismColors()
@@ -137,7 +138,7 @@ fun AcrylicDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .radialGlassScrim()
+                            .then(if (LocalRenderQuality.current.minimal) Modifier.background(Color.Black.copy(alpha = .45f)) else Modifier.radialGlassScrim())
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -200,7 +201,7 @@ fun AcrylicBottomOverlay(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .radialGlassScrim()
+                            .then(if (LocalRenderQuality.current.minimal) Modifier.background(Color.Black.copy(alpha = .45f)) else Modifier.radialGlassScrim())
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,

@@ -166,9 +166,9 @@ class ComicImagePipelineTest {
     }
 
     @Test
-    fun `waifu2x doubles small image`() {
+    fun `legacy waifu2x uses unified super resolution engine`() {
         val bmp = solidBitmap(64, 96, Color.DKGRAY)
-        val out = ComicImagePipeline.waifu2xLike(bmp, 0.5f)
+        val out = ComicImagePipeline.process(bmp, ComicImagePipeline.Geometry(), ComicImagePipeline.Toning(enhanceMode = ComicEnhanceMode.WAIFU2X, enhanceStrength = 50))
         assertEquals(128, out.width)
         assertEquals(192, out.height)
     }

@@ -1,5 +1,7 @@
 package com.example.ui.comic
 
+import androidx.compose.runtime.derivedStateOf
+
 import com.example.ui.design.DesignTokens
 import com.example.ui.design.ReadingPalette
 
@@ -96,6 +98,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -208,6 +211,7 @@ fun ComicReaderCore(
     val store = remember { ComicSettingsStore(context) }
 
     /* ── 配置与每漫画状态 ── */
+    val minimal = com.example.ui.components.LocalRenderQuality.current.minimal
     val effective = remember(bookKey) { store.effectiveConfig(bookKey) }
     var config by remember(bookKey) { mutableStateOf(effective.config) }
     var bookState by remember(bookKey, pages.firstOrNull()?.id) {
@@ -259,19 +263,26 @@ fun ComicReaderCore(
     // 滤镜滑条节流：拖动中每个 tick 都改 config 会让阅读页按新指纹逐次重解码+全管线
     // 重算（2800px×数十次）。displayConfig 落后 config 250ms——滑条拖动期间只有
     // 设置面板里的小图预览（loadPreview 540px）实时，松手静止后阅读页才重算一次
-    var displayConfig by remember(bookKey) { mutableStateOf(config) }
+    var requestedDisplayConfig by remember(bookKey) { mutableStateOf(config) }
+    val displayConfig = if (minimal) requestedDisplayConfig.copy(
+        pageAnim = ComicPageAnim.NONE, enhanceMode = ComicEnhanceMode.OFF, filterSharpen = 0,
+        filterBrightness = 0, filterContrast = 0, filterSaturation = 0, filterHue = 0,
+        filterGamma = 1f, filterShadow = 0, filterBW = false, translationEnabled = false,
+        sceneEffect = false, bgType = if (requestedDisplayConfig.bgType == ComicBgType.PAPER || requestedDisplayConfig.bgType == ComicBgType.DYNAMIC) ComicBgType.BLACK else requestedDisplayConfig.bgType,
+    ) else requestedDisplayConfig
     LaunchedEffect(bookKey) {
         snapshotFlow { config }
             .debounce(250)
-            .collect { displayConfig = it }
+            .collect { requestedDisplayConfig = it }
     }
 
     /* ── 加载器与布局 ── */
-    val loader = remember(remoteImageLoader) { ComicPageLoader(context, remoteImageLoader) }
+    val loader = remember(remoteImageLoader, minimal) { ComicPageLoader(context, remoteImageLoader, minimal) }
     DisposableEffect(loader) {
         onDispose {
             loader.clearProcessedCache()
             loader.shutdown()
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch { ComicNeuralBackend.release() }
         }
     }
 
@@ -283,8 +294,8 @@ fun ComicReaderCore(
     // 用户显式选择的引擎（第十八轮）随配置同步；换引擎同页自动重译（缓存 key 含引擎标识）
     translationCoordinator.selectedEngine = config.translationEngine
     val translationScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
-    LaunchedEffect(config.translationEnabled) {
-        if (config.translationEnabled && !TranslateModelManager.isReady(context)) {
+    LaunchedEffect(config.translationEnabled, minimal) {
+        if (!minimal && config.translationEnabled && !TranslateModelManager.isReady(context)) {
             TranslateModelManager.ensureDownloaded(context) { }
         }
     }
@@ -363,19 +374,29 @@ fun ComicReaderCore(
 
     /* ── 当前位置：布局重建时保持原始页（而非 spread 索引） ── */
     // 页级进度恢复：仅当页列表没变（同一章）时才恢复 lastPage；换章回 0
-    val chapterSig = remember(pages) { pages.firstOrNull()?.id }
-    val startRaw = remember(pages, bookKey) {
-        val fromArg = initialPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
-        val sameChapter = bookState.lastChapterSig == null || bookState.lastChapterSig == chapterSig
-        if (fromArg > 0) fromArg
-        else if (sameChapter) bookState.lastPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
-        else 0
+    val chapterSig = toc.getOrNull(currentChapterIndex)?.id ?: pages.firstOrNull()?.id
+    val savedResume = remember(bookKey, chapterSig) {
+        if (bookKey != null && chapterSig != null) store.loadChapterResume(bookKey, chapterSig) else null
     }
-    var lastRawPage by remember(pages, bookKey) { mutableIntStateOf(startRaw) }
-    var currentSpread by remember(pages) {
-        mutableIntStateOf(
-            ComicPageLayout.build(pages, sizes, config, layoutBookState).spreadOfRawPage(startRaw)
-        )
+    var resume by remember(bookKey, chapterSig) { mutableStateOf(savedResume ?: ComicChapterResume()) }
+    val startRaw = remember(bookKey, chapterSig) {
+        val legacy = if (bookState.lastChapterSig == null || bookState.lastChapterSig == chapterSig) bookState.lastPage else 0
+        (savedResume ?: ComicChapterResume(page = legacy)).startPage(initialPage, pages.size, verticalMode)
+    }
+    var lastRawPage by remember(bookKey, chapterSig) { mutableIntStateOf(startRaw) }
+    var currentSpread by remember(bookKey, chapterSig) {
+        mutableIntStateOf(layout.spreadOfRawPage(startRaw))
+    }
+    val resumeLifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(bookKey, chapterSig, resumeLifecycle) {
+        fun flush() {
+            if (bookKey != null && chapterSig != null) store.saveChapterResume(bookKey, chapterSig, resume, flush = true)
+        }
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) flush()
+        }
+        resumeLifecycle.addObserver(observer)
+        onDispose { resumeLifecycle.removeObserver(observer); flush() }
     }
     LaunchedEffect(layout) {
         // 直接以记录的原始页为准（spread 索引在布局变化后语义不同）
@@ -391,6 +412,8 @@ fun ComicReaderCore(
     LaunchedEffect(currentSpread, layout) {
         val raw = layout.spreads.getOrNull(currentSpread)?.firstRawIndex ?: return@LaunchedEffect
         lastRawPage = raw
+        resume = resume.copy(page = raw)
+        if (bookKey != null && chapterSig != null) store.saveChapterResume(bookKey, chapterSig, resume)
         onPageChanged(raw, raw >= totalPages - 1)
         // debug 探针信标：交互矩阵脚本用 logcat 瞬时读取当前页（比 uiautomator 稳定）
         if (com.example.BuildConfig.DEBUG) {
@@ -531,6 +554,7 @@ fun ComicReaderCore(
     /* ── 动态背景主色 ── */
     var dynamicBg by remember { mutableStateOf(Color(0xFF101014)) }
     fun feedDynamicBg(bmp: Bitmap) {
+        if (minimal || config.bgType != ComicBgType.DYNAMIC) return
         scope.launch(Dispatchers.Default) {
             val c = runCatching { ComicImagePipeline.dominantBackground(bmp) }.getOrNull()
             if (com.example.BuildConfig.DEBUG) {
@@ -592,7 +616,7 @@ fun ComicReaderCore(
         if (panel != ComicPanel.NONE) retainPanelGlass = true
         else { delay(240); retainPanelGlass = false }
     }
-    val glassOpen = panel != ComicPanel.NONE || retainPanelGlass
+    val glassOpen = !minimal && (panel != ComicPanel.NONE || retainPanelGlass)
     val nativeGlass = panelGlassSamplingActive(displayConfig.pageAnim, config.direction, config.mode, glassOpen)
     val frozenGlass = glassOpen && curlEngineActive(displayConfig.pageAnim, config.direction, config.mode)
     val panelGlassBackdrop: LayerBackdrop? = if (glassOpen) readerLayerBackdrop else null
@@ -606,7 +630,7 @@ fun ComicReaderCore(
         val containerH = constraints.maxHeight.toFloat()
 
         ComicReaderBackground(
-            bgType = config.bgType,
+            bgType = displayConfig.bgType,
             paperIntensity = config.paperIntensity,
             dynamicColor = if (config.bgType == ComicBgType.DYNAMIC) dynamicBg else null,
         )
@@ -625,7 +649,7 @@ fun ComicReaderCore(
             // 帧计数上限是双保险：Robolectric 冻结 uptime 时挂钟永不超时，靠上限退出保空闲
             val prev = lastEngineSig
             lastEngineSig = engineSig
-            if (prev == null || engineIsGl) return@LaunchedEffect
+            if (prev == null || engineIsGl || minimal) return@LaunchedEffect
             val start = android.os.SystemClock.uptimeMillis()
             var ticks = 0
             while (ticks < 90) {
@@ -642,14 +666,19 @@ fun ComicReaderCore(
         // GL 引擎完全不挂 graphicsLayer（连 alpha=1 的合成层也不给，规避 Surface 异常）
         Box(
             Modifier.fillMaxSize().then(
-                if (engineIsGl) Modifier
+                if (engineIsGl || minimal) Modifier
                 else Modifier.graphicsLayer { alpha = engineFade }
             )
         ) {
         when {
-            verticalMode -> ComicVerticalList(
+            verticalMode -> androidx.compose.runtime.key(bookKey, chapterSig) { ComicVerticalList(
                 layout = layout, config = displayConfig, loader = loader, bookState = bookState,
                 currentSpread = currentSpread,
+                initialScrollOffset = if (savedResume?.scrollPage == startRaw) savedResume.scrollOffset else 0,
+                onScrollPosition = { raw, offset, flush ->
+                    resume = resume.copy(scrollPage = raw, scrollOffset = offset)
+                    if (bookKey != null && chapterSig != null) store.saveChapterResume(bookKey, chapterSig, resume, flush)
+                },
                 onSpreadChanged = { currentSpread = it },
                 translationModelState = translationModelState,
                 onScheduleTranslation = ::scheduleTranslationWindow,
@@ -665,7 +694,7 @@ fun ComicReaderCore(
                 onPreviousChapter = { navigateChapter(next = false) },
                 onNextChapter = { navigateChapter(next = true) },
                 gestureCallbacks = gestureCallbacks,
-            )
+            ) }
             config.mode == ComicMode.MAGNETIC -> ComicMagneticPager(
                 layout = layout, config = displayConfig, loader = loader, bookState = bookState,
                 currentSpread = currentSpread,
@@ -694,7 +723,7 @@ fun ComicReaderCore(
         }
 
         // 场景特效层（与声音独立）
-        if (readerResumed && config.sceneEffect && config.scene != ComicScene.NONE) {
+        if (!minimal && readerResumed && config.sceneEffect && config.scene != ComicScene.NONE) {
             ComicSceneEffectOverlay(scene = config.scene, modifier = Modifier.fillMaxSize())
         }
 
@@ -757,8 +786,8 @@ fun ComicReaderCore(
 
     /* ── 场景环境音（第 21 条：真实录音素材循环播放，合成仅兜底） ── */
     val audio = remember { ComicAmbientAudio.create(context) }
-    LaunchedEffect(config.scene, config.sceneSound, readerResumed) {
-        if (config.scene != ComicScene.NONE && config.sceneSound && readerResumed) {
+    LaunchedEffect(config.scene, config.sceneSound, readerResumed, minimal) {
+        if (!minimal && config.scene != ComicScene.NONE && config.sceneSound && readerResumed) {
             audio.start(config.scene, config.sceneVolume / 100f * 0.6f)
         } else audio.stop()
     }
@@ -1406,6 +1435,8 @@ private fun ComicVerticalList(
     loader: ComicPageLoader,
     bookState: ComicBookState,
     currentSpread: Int,
+    initialScrollOffset: Int,
+    onScrollPosition: (Int, Int, Boolean) -> Unit,
     onSpreadChanged: (Int) -> Unit,
     tapZoneAction: (Offset, Size) -> Unit,
     tapAreaSize: () -> Size,
@@ -1423,7 +1454,35 @@ private fun ComicVerticalList(
     onNextChapter: () -> Unit,
     gestureCallbacks: ComicGestureCallbacks,
 ) {
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = currentSpread)
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = currentSpread, initialFirstVisibleItemScrollOffset = 0)
+    var restoring by remember { mutableStateOf(initialScrollOffset > 0) }
+    val readyPages = remember { androidx.compose.runtime.mutableStateMapOf<Int, Boolean>() }
+    LaunchedEffect(listState) {
+        if (restoring) {
+            snapshotFlow { readyPages[currentSpread] == true }.first { it }
+            withFrameNanos { }
+            listState.scrollToItem(currentSpread, initialScrollOffset)
+            restoring = false
+        }
+    }
+    val latestPosition by rememberUpdatedState(onScrollPosition)
+    LaunchedEffect(listState, layout) {
+        snapshotFlow { if (restoring) null else listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .distinctUntilChanged().debounce(200).filterNotNull().collect { (index, offset) ->
+                layout.spreads.getOrNull(index)?.let { latestPosition(it.firstRawIndex, offset, false) }
+            }
+    }
+    val scrollLifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(listState, layout, scrollLifecycle) {
+        fun flushPosition() {
+            if (!restoring) layout.spreads.getOrNull(listState.firstVisibleItemIndex)?.let {
+                latestPosition(it.firstRawIndex, listState.firstVisibleItemScrollOffset, true)
+            }
+        }
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) flushPosition() }
+        scrollLifecycle.addObserver(observer)
+        onDispose { scrollLifecycle.removeObserver(observer); flushPosition() }
+    }
     val density = LocalDensity.current
     // 条漫 vs 无缝滚动独立策略（第 6 条）：间距/磁吸/预取窗口/进度语义
     val strategy = remember(config.mode, config.pageSpacingDp, config.webtoonSnap) {
@@ -1449,7 +1508,7 @@ private fun ComicVerticalList(
             }?.index ?: listState.firstVisibleItemIndex
         }
             .distinctUntilChanged()
-            .collect { idx -> onSpreadChanged(idx.coerceIn(0, (layout.spreadCount - 1).coerceAtLeast(0))) }
+            .collect { idx -> if (!restoring) onSpreadChanged(idx.coerceIn(0, (layout.spreadCount - 1).coerceAtLeast(0))) }
     }
     LaunchedEffect(currentSpread) {
         // 外部跳转同步：仅当目标项完全不在视口内才滚动定位。
@@ -1585,12 +1644,17 @@ private fun ComicVerticalList(
             flingBehavior = snapFling,
         ) {
             itemsIndexed(layout.spreads, key = { _, s -> "spread_${s.index}_${s.firstRawIndex}" }) { _, spread ->
+                val visible by remember(spread.index) { derivedStateOf {
+                    listState.layoutInfo.visibleItemsInfo.any { it.index == spread.index }
+                } }
                 ComicVerticalItem(
                     spread = spread, config = config, loader = loader, bookState = bookState,
                     // 主色喂入门控：仅"最可见项"（currentSpread 上报源）可喂，多可见项
                     // 并存时不允许后组合项覆盖当前页色调（第 25 条）
                     onBitmapShown = onBitmapShown,
                     isCurrentPage = spread.index == currentSpread,
+                    isVisible = visible,
+                    onReady = { readyPages[spread.index] = true },
                 )
             }
         }
@@ -1608,10 +1672,12 @@ private fun ComicVerticalItem(
     bookState: ComicBookState,
     onBitmapShown: (Bitmap) -> Unit,
     isCurrentPage: Boolean,
+    isVisible: Boolean,
+    onReady: () -> Unit,
 ) {
     val slot = spread.slots.firstOrNull() ?: return
     var retry by remember(slot.ref.id) { mutableIntStateOf(0) }
-    val state by rememberPageBitmap(loader, slot, config, bookState, retry, visible = isCurrentPage)
+    val state by rememberPageBitmap(loader, slot, config, bookState, retry, visible = isVisible)
     // 位图状态按 cacheKey 键控：换页/换管线指纹时旧页位图立即失效——
     // 无 key 的 remember 会在 Loading 期间残留上一页画面（快速滚动闪错帧的根因）。
     // 第六轮族 A：初值同步取播种后的 state（缓存命中 ⇒ 第一帧即内容）。
@@ -1620,6 +1686,7 @@ private fun ComicVerticalItem(
     // effect 键含 isCurrentPage：item 晋升为最可见项时位图早已 Ready 也会补喂主色
     LaunchedEffect(state, isCurrentPage) {
         if (state is PageBitmapState.Ready) {
+            onReady()
             val bmp = (state as PageBitmapState.Ready).bitmap
             if (isCurrentPage) onBitmapShown(bmp)
         }
@@ -1661,7 +1728,7 @@ private fun ComicVerticalItem(
                         modifier = Modifier.fillMaxWidth(),
                         contentScale = ContentScale.FillWidth
                     )
-                    ComicRefinementFeedback(s.refining, s.error, Modifier.align(Alignment.BottomCenter)) { retry++ }
+                    ComicRefinementFeedback(s.refining, s.error, Modifier.align(Alignment.BottomCenter), config.enhanceMode) { retry++ }
                     }
                 }
             }
@@ -1972,7 +2039,7 @@ internal fun SinglePageContent(
                     enhanceHintFor(config, loader.sizes.value[slot.ref.id]?.let { maxOf(it.width, it.height) } ?: 2400),
                     slot.ref,
                 )
-                ComicRefinementFeedback(ready?.refining == true, ready?.error, Modifier.align(Alignment.BottomCenter)) { retry++ }
+                ComicRefinementFeedback(ready?.refining == true, ready?.error, Modifier.align(Alignment.BottomCenter), config.enhanceMode) { retry++ }
                 // 区域高清层：严格覆盖 hiResRect 对应的内容坐标区域（与底层同变换，天然对齐）
                 hiRes?.let { bmp ->
                     val sx = if (intrinsic.width > 0f) zoomState.contentSize.width / intrinsic.width else 1f
@@ -2125,15 +2192,18 @@ internal fun DoubleSpreadContent(
             }
         }
         ComicRefinementFeedback(ready0?.refining == true || ready1?.refining == true,
-            ready0?.error ?: ready1?.error, Modifier.align(Alignment.BottomCenter)) { retry++ }
+            ready0?.error ?: ready1?.error, Modifier.align(Alignment.BottomCenter), config.enhanceMode) { retry++ }
     }
 }
 
 @Composable
-internal fun ComicRefinementFeedback(refining: Boolean, error: Throwable?, modifier: Modifier = Modifier, onRetry: () -> Unit) {
+internal fun ComicRefinementFeedback(refining: Boolean, error: Throwable?, modifier: Modifier = Modifier, mode: ComicEnhanceMode = ComicEnhanceMode.OFF, onRetry: () -> Unit) {
     if (!refining && error == null) return
     Column(modifier.background(ReadingPalette.ScrimStrong).padding(DesignTokens.SpaceSm), horizontalAlignment = Alignment.CenterHorizontally) {
-        if (error == null) Text("高清图加载中…", color = Color.White, fontSize = DesignTokens.TypeCaption)
+        if (error == null) {
+            val modelStatus = if (mode == ComicEnhanceMode.MANGAJANAI) MangaJaNai.status.collectAsStateWithLifecycle().value else ""
+            Text(modelStatus.ifBlank { "高清图加载中…" }, color = Color.White, fontSize = DesignTokens.TypeCaption)
+        }
         else TextButton(onClick = onRetry) { Text("高清图加载失败 · 重试", color = Color.White) }
     }
 }
@@ -2240,6 +2310,7 @@ internal fun ComicLoadingFeedback(ref: ComicPageRef?, onRetry: (() -> Unit)? = n
 /** 增强处理耗时提示文案（null = 未开启增强，不显示） */
 internal fun enhanceHintFor(config: ComicReaderConfig, longEdge: Int): String? {
     if (config.enhanceMode == ComicEnhanceMode.OFF || config.enhanceStrength <= 0) return null
+    if (config.enhanceMode == ComicEnhanceMode.MANGAJANAI) return "MangaJaNai 处理中"
     val sec = ComicImagePipeline.enhanceEstimateSec(config.enhanceMode, config.enhanceStrength, longEdge)
     return "画质增强处理中 · 约 ${if (sec == sec.toLong().toDouble()) sec.toInt().toString() else sec}s"
 }

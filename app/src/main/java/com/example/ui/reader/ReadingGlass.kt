@@ -32,8 +32,9 @@ internal fun Modifier.readingGlass(
 ): Modifier {
     val style = LocalReadingGlass.current
     val quality = LocalRenderQuality.current
+    if (quality.minimal) return clip(shape).background(tint ?: style.tint)
     val surface = tint ?: style.tint.copy(alpha = if (strong) .72f else .60f)
-    val radius = if (quality == RenderQuality.LOW) 10f else if (strong) 22f else 16f
+    val radius = if (quality <= RenderQuality.LOW) 10f else if (strong) 22f else 16f
     val capture = if (style.backdrop != null) Modifier.drawPlainBackdrop(
         backdrop = style.backdrop, shape = { shape },
         effects = { colorControls(saturation = 1.10f); blur(radius.dp.toPx()) },

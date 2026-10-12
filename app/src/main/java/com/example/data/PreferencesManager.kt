@@ -208,7 +208,7 @@ class PreferencesManager(context: Context) {
     /** 界面渲染画质：0=流畅 1=均衡 2=高(默认) 3=极致。 */
     var renderQuality: Int
         get() = prefs.getInt("render_quality", 2)
-        set(value) = prefs.edit().putInt("render_quality", value.coerceIn(0, 3)).apply()
+        set(value) = prefs.edit().putInt("render_quality", value.coerceIn(-1, 3)).apply()
 
     /** 每日阅读目标（分钟）。默认 60 分钟。 */
     var dailyGoalMinutes: Int

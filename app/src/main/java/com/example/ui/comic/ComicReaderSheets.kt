@@ -126,6 +126,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -410,7 +411,7 @@ private fun TranslationTab(
         PanelSectionCard("自定义 AI 接口", Icons.Filled.Cloud) {
             PanelRow("返回引擎列表", Icons.AutoMirrored.Filled.ArrowBack) { engineSubPage = null }
             Spacer(Modifier.height(DesignTokens.SpaceCompact))
-            PanelHint("手机 OCR 识别对白，仅文字发送给云端大模型。无需视觉模型；免费额度是否可用取决于你的账户。")
+            PanelHint("仅发送识别文字；额度由服务商决定")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceCompact)) {
                 TextButton(onClick = { useProvider("https://api.siliconflow.cn/v1", "Qwen/Qwen2.5-7B-Instruct") }) { Text("硅基流动", color = MintPrimary) }
                 TextButton(onClick = { useProvider("https://api.deepseek.com/v1", "deepseek-chat") }) { Text("DeepSeek", color = MintPrimary) }
@@ -428,7 +429,7 @@ private fun TranslationTab(
             }
             SwitchRow(
                 title = "Gemini 接口格式",
-                subtitle = if (llmGemini) "走 Google Gemini generateContent" else "走 OpenAI chat/completions",
+                subtitle = if (llmGemini) "Gemini 接口" else "OpenAI 兼容接口",
                 checked = llmGemini,
             ) { v -> saveLlm(llmUrl, llmKey, llmModel, v) }
             TextButton(enabled = !aiTesting && LlmBubbleTranslator.LlmConfig(llmUrl, llmKey, llmModel, llmGemini).isValid(), onClick = {
@@ -462,7 +463,7 @@ private fun TranslationTab(
                 update { it.copy(translationLang = lang) }
             }
             Spacer(Modifier.height(DesignTokens.SpaceSm))
-            Text("使用手机端 OCR，批量发送对白至腾讯交互翻译，无需填写 Key。此入口是机器翻译；大模型翻译请配置自定义 API。公共网页服务的可用性可能变化。", color = TextSecondary, fontSize = DesignTokens.TypeCaption, lineHeight = DesignTokens.TypeCaptionLineHeight)
+            Text("手机 OCR · 腾讯机翻 · 免 Key", color = TextSecondary, fontSize = DesignTokens.TypeCaption, lineHeight = DesignTokens.TypeCaptionLineHeight)
             TextButton(enabled = !onlineTesting, onClick = {
                 onlineTesting = true
                 onlineTestResult = null
@@ -484,7 +485,7 @@ private fun TranslationTab(
             val aiConfigured = llmUrl.isNotBlank() && llmModel.isNotBlank()
             EngineCard(
                 title = "自定义 AI 接口",
-                desc = "云端大模型 · 整页对白上下文与统一译名",
+                desc = "上下文翻译",
                 state = when {
                     config.translationEngine == "ai" && aiConfigured -> "当前使用 · 已配置"
                     aiConfigured -> "已配置 · 点击选用并配置"
@@ -498,7 +499,7 @@ private fun TranslationTab(
             Spacer(Modifier.height(DesignTokens.SpaceSm))
             EngineCard(
                 title = "免费免 Key 在线机翻",
-                desc = "腾讯交互翻译 · 国内服务 · 无需配置",
+                desc = "免费免配置",
                 state = if (config.translationEngine == "online") "当前使用" else "点击选用",
                 selected = config.translationEngine == "online",
             ) {
@@ -638,19 +639,19 @@ private fun ModeTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> C
             config.pageAnim.ordinal
         ) { i -> update { it.copy(pageAnim = ComicPageAnim.entries[i]) } }
         if (!curlEngineActive(config.pageAnim, config.direction, config.mode) && config.pageAnim == ComicPageAnim.CURL)
-            PanelHint("仿真动画用于横向单页 / 双页；当前模式保留设置，切换后生效。")
+            PanelHint("仿真翻页需横向分页")
         if (config.mode == ComicMode.WEBTOON || config.mode == ComicMode.CONTINUOUS)
-            PanelHint("纵向列表使用连续滚动，翻页动画在单页 / 双页中生效。")
+            PanelHint("翻页动画仅用于分页")
     }
     // 第 6/7 条：条漫模式磁吸到页边界（可关闭）；无缝滚动恒无磁吸且强制 0 间距
     if (config.mode == ComicMode.WEBTOON || config.mode == ComicMode.CONTINUOUS) {
         PanelSectionCard("垂直滚动", Icons.Filled.SwipeVertical) {
             if (config.mode == ComicMode.WEBTOON) {
-                SwitchRow("磁吸到页边界", "松手自动对齐到最近页", config.webtoonSnap) { v ->
+                SwitchRow("磁吸到页边界", null, config.webtoonSnap) { v ->
                     update { it.copy(webtoonSnap = v) }
                 }
             } else {
-                PanelHint("无缝拼接已启用 · 页间距固定为 0，自由滚动")
+                PanelHint("无缝滚动 · 零间距")
             }
         }
     }
@@ -768,7 +769,7 @@ private fun PageTab(
             ComicFit.CUSTOM -> "在基础适配上叠加缩放系数，可保存常用档位。"
         })
         if (config.mode == ComicMode.WEBTOON || config.mode == ComicMode.CONTINUOUS)
-            PanelHint("纵向列表固定适应宽度；以上适配设置用于分页模式。")
+            PanelHint("滚动模式固定适应宽度")
     }
 
     if (config.fit == ComicFit.CUSTOM) {
@@ -842,7 +843,7 @@ private fun PageTab(
     }
 
     PanelSectionCard("间距", Icons.Filled.Height) {
-        if (config.mode == ComicMode.CONTINUOUS) PanelHint("无缝模式固定零间距，切换其他模式后使用保存的间距。")
+        if (config.mode == ComicMode.CONTINUOUS) PanelHint("无缝模式无间距")
         SliderRow(
             "页面间距", config.pageSpacingDp, 0f..40f,
             format = { "${it.toInt()} dp" },
@@ -856,8 +857,8 @@ private fun PageTab(
     }
 
     PanelSectionCard("双页排列", Icons.Filled.Bookmark) {
-        if (config.mode != ComicMode.DOUBLE) PanelHint("用于双页模式或临时合页，参数会保留。")
-        SwitchRow("首页单独显示", "封面页不与正文配对", config.doubleFirstAlone) { v ->
+        if (config.mode != ComicMode.DOUBLE) PanelHint("双页模式生效")
+        SwitchRow("首页单独显示", null, config.doubleFirstAlone) { v ->
             update { it.copy(doubleFirstAlone = v) }
         }
         SegmentRow(
@@ -886,13 +887,13 @@ private fun PageTab(
     }
 
     PanelSectionCard("缩放", Icons.Filled.ZoomIn) {
-        SwitchRow("双击放大", "循环切换适配、放大与原始像素档位", config.doubleTapZoom) { v ->
+        SwitchRow("双击放大", null, config.doubleTapZoom) { v ->
             update { it.copy(doubleTapZoom = v) }
         }
-        SwitchRow("长按放大", "按住临时放大，松手还原", config.longPressZoom) { v ->
+        SwitchRow("长按放大", null, config.longPressZoom) { v ->
             update { it.copy(longPressZoom = v) }
         }
-        SwitchRow("放大状态翻页", "滑动到边缘继续翻页", config.zoomWhileTurn) { v ->
+        SwitchRow("放大状态翻页", null, config.zoomWhileTurn) { v ->
             update { it.copy(zoomWhileTurn = v) }
         }
     }
@@ -951,9 +952,9 @@ private fun ImageTab(
     }
 
     PanelSectionCard("大图拆分", Icons.Filled.VerticalSplit) {
-        PanelHint(if (config.splitWide) "依据宽高比与装订缝识别跨页；位置以检测到的书缝为基准微调。"
-            else "开启宽页拆分后，左右顺序和拆分位置生效。")
-        SwitchRow("宽页自动拆分", "跨页扫描图拆为左右两页", config.splitWide) { v ->
+        PanelHint(if (config.splitWide) "自动识别跨页"
+            else "拆分后生效")
+        SwitchRow("宽页自动拆分", null, config.splitWide) { v ->
             update { it.copy(splitWide = v) }
         }
         SwitchRow("拆分左右反转", null, config.splitReverse) { v ->
@@ -965,7 +966,7 @@ private fun ImageTab(
             onChange = { v -> update { it.copy(splitPosition = v) } }
         )
         TextButton(onClick = { update { it.copy(splitPosition = 0.5f, splitReverse = false) } }) {
-            Text("恢复拆分位置与顺序", color = TextSecondary)
+            Text("重置", color = TextSecondary)
         }
     }
 
@@ -1004,12 +1005,15 @@ private fun ImageTab(
     PanelSectionCard("画质增强", Icons.Filled.AutoAwesome) {
         SegmentRow(
             "增强引擎",
-            ComicEnhanceMode.entries.map { it.ordinal to it.label },
+            ComicEnhanceMode.visibleModes.map { it.ordinal to it.label },
             config.enhanceMode.ordinal
         ) { i -> update { it.copy(enhanceMode = ComicEnhanceMode.entries[i]) } }
         val enh = ComicEnhanceMode.entries[config.enhanceMode.ordinal]
         if (enh != ComicEnhanceMode.OFF) {
-            Text(enh.desc, color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall)
+            if (enh == ComicEnhanceMode.MANGAJANAI) {
+                val state by MangaJaNai.status.collectAsState()
+                Text(state.ifBlank { enh.desc }, color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall)
+            }
             SliderRow(
                 "增强强度", config.enhanceStrength.toFloat(), 0f..100f, steps = 99,
                 format = { "${it.toInt()}" },
@@ -1069,6 +1073,7 @@ private fun ActionChip(text: String, modifier: Modifier = Modifier, enabled: Boo
 /** Compare a shared native detail crop or the whole page; changing modes clears stale previews. */
 @Composable
 internal fun FilterPreview(page: ComicPageRef?, loader: ComicPageLoader, config: ComicReaderConfig, pageRotation: Int) {
+    if (com.example.ui.components.LocalRenderQuality.current.minimal) return
     if (page == null) return
     var detail by remember(page.id) { mutableStateOf(true) }
     var retry by remember(page.id) { mutableIntStateOf(0) }
@@ -1383,10 +1388,10 @@ private fun EffectTab(config: ComicReaderConfig, update: ((ComicReaderConfig) ->
     }
 
     PanelSectionCard("显示", Icons.Filled.Visibility) {
-        SwitchRow("进度缩略图", "拖动进度条时显示页面预览", config.showThumbPreview) { v ->
+        SwitchRow("进度缩略图", null, config.showThumbPreview) { v ->
             update { it.copy(showThumbPreview = v) }
         }
-        SwitchRow("沉浸式", "隐藏系统状态栏 / 导航栏", config.hideSystemBars) { v ->
+        SwitchRow("沉浸式", null, config.hideSystemBars) { v ->
             update { it.copy(hideSystemBars = v) }
         }
     }
@@ -1396,7 +1401,7 @@ private fun EffectTab(config: ComicReaderConfig, update: ((ComicReaderConfig) ->
 
 @Composable
 private fun AutoTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit) {
-    PanelHint("从阅读底栏启动 / 暂停。打开面板、切到后台时暂停，返回阅读后继续。")
+    PanelHint("底栏启停；后台自动暂停")
     PanelSectionCard("自动翻页", Icons.Filled.Schedule) {
         SliderRow(
             "翻页间隔", config.autoPageIntervalSec, 1f..120f, steps = 118,
@@ -1441,13 +1446,13 @@ private fun GestureTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -
 
     PanelSectionCard("手势开关", Icons.Filled.TouchApp) {
         SwitchRow("单指滑动翻页", null, config.gestureSwipe) { v -> update { it.copy(gestureSwipe = v) } }
-        SwitchRow("双指合拢退出", "缩小到阈值时退出阅读", config.gesturePinchClose) { v ->
+        SwitchRow("双指合拢退出", null, config.gesturePinchClose) { v ->
             update { it.copy(gesturePinchClose = v) }
         }
-        SwitchRow("侧边滑动关闭", "从两侧边缘向内滑动；放大查看时不触发", config.gestureEdgeSwipe) { v ->
+        SwitchRow("侧边滑动关闭", null, config.gestureEdgeSwipe) { v ->
             update { it.copy(gestureEdgeSwipe = v) }
         }
-        SwitchRow("长按呼出控制层", "与长按放大互斥（放大优先）", config.gestureLongPressPanel) { v ->
+        SwitchRow("长按呼出控制层", null, config.gestureLongPressPanel) { v ->
             update { it.copy(gestureLongPressPanel = v) }
         }
         // 第 28 条：音量键翻页（方向感知：RTL 下音量上=下一页），仅阅读页拦截

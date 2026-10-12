@@ -273,6 +273,13 @@ fun GlassCard(
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    if (LocalRenderQuality.current.minimal) {
+        val flatShape = shape ?: RoundedCornerShape(16.dp)
+        Column(modifier.clip(flatShape).background(MaterialTheme.colorScheme.surface)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(contentPadding), content = content)
+        return
+    }
     val tweaks = LocalCardTweaks.current
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
@@ -503,7 +510,7 @@ fun GlassCard(
                 }
             )
             .then(
-                if (quality == RenderQuality.LOW) {
+                if (quality <= RenderQuality.LOW) {
                     // 流畅档：单层轻阴影（双层 HWUI 投影是低端机大项），并补一层保持滚动隔离
                     Modifier.graphicsLayer { }
                         .consistentShadow(
@@ -551,7 +558,7 @@ fun GlassCard(
             .then(
                 when {
                     quality <= RenderQuality.MID -> Modifier.background(
-                        if (quality == RenderQuality.LOW) themedTint.copy(alpha = 0.92f)
+                        if (quality <= RenderQuality.LOW) themedTint.copy(alpha = 0.92f)
                         else themedTint.copy(alpha = 0.78f)
                     )
                     preBlurred != null && quality >= RenderQuality.HIGH -> Modifier.liquidGlassStatic(
@@ -872,7 +879,7 @@ fun GlassCard(
             // Layer 5: 微结构噪点纹理（Film Grain）——Overlay 混合依赖下层像素，保持原位直绘；
             // 毛玻璃越厚散射介质感越重，颗粒随之增强；默认 22dp 为中性点
             .then(
-                if (quality != RenderQuality.LOW) {
+                if (quality > RenderQuality.LOW) {
                     val t = ((tweaks.blurRadiusDp - 22f) / 18f).coerceIn(-1f, 1f)
                     Modifier.filmGrain(alpha = 0.032f + 0.03f * t.coerceAtLeast(0f))
                 } else Modifier
@@ -880,7 +887,7 @@ fun GlassCard(
             // Layer 6 + 内倒角：水晶棱镜色散边框 + 物理倒角内凹高光边（共用一次 Outline 创建）
             // 流畅档降级为单色细描边（省掉 sweep 渐变与双层描边录制）
             .then(
-                if (quality == RenderQuality.LOW) {
+                if (quality <= RenderQuality.LOW) {
                     Modifier.border(1.dp, strokeTint.copy(alpha = 0.28f), effectiveShape)
                 } else {
                     Modifier.drawWithContent {

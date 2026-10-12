@@ -46,8 +46,9 @@ class ComicPageLoader(
     private val context: Context,
     /** 在线漫画专用加载器（解密/headers 代理），null 时用全局默认 */
     private val remoteImageLoader: ImageLoader? = null,
+    private val minimal: Boolean = false,
 ) {
-    init { ComicNeuralBackend.configure(context) }
+    init { ComicNeuralBackend.configure(context); MangaJaNai.configure(context) }
 
     companion object {
         /** 解码/处理长边上限 */
@@ -59,23 +60,27 @@ class ComicPageLoader(
         private const val WINDOW_RETAIN_FRACTION = 3
     }
 
+    private val decodeMaxEdge get() = if (minimal) 1600 else DECODE_MAX_EDGE
+
     /** 页 id → 原始内在尺寸（未处理），Compose 可观察 */
     private val _sizes = kotlinx.coroutines.flow.MutableStateFlow<Map<String, SizeI>>(emptyMap())
     val sizes: kotlinx.coroutines.flow.StateFlow<Map<String, SizeI>> = _sizes
     private val sizeMap = ConcurrentHashMap<String, SizeI>()
 
-    private val cacheBaseBytes = (Runtime.getRuntime().maxMemory() / CACHE_FRACTION)
+    private val cacheBaseBytes = if (minimal) 12 shl 20 else (Runtime.getRuntime().maxMemory() / CACHE_FRACTION)
         .toInt().coerceIn(24 shl 20, 96 shl 20)
 
     /**
      * 窗口驻留容量硬上限（5.5 修复）：主缓存可随预载窗口字节量动态扩容到
      * min(堆 1/3, 128MB)，下限恒为基础值——扩容只增不减到基础值以下。
      */
-    private val cacheRetainCeilBytes = maxOf(
+    private val cacheRetainCeilBytes = if (minimal) cacheBaseBytes else maxOf(
         cacheBaseBytes,
         (Runtime.getRuntime().maxMemory() / WINDOW_RETAIN_FRACTION).toInt()
             .coerceAtMost(WINDOW_RETAIN_CEIL_BYTES),
     )
+    @Volatile private var windowRetainBytes = cacheRetainCeilBytes
+    @Volatile private var mangaWindow = false
 
     private val cache = object : LruCache<String, Bitmap>(cacheBaseBytes) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
@@ -101,21 +106,21 @@ class ComicPageLoader(
     }
 
     /** 预览结果独立小缓存（按字节） */
-    private val previewCache = object : LruCache<String, Bitmap>(PREVIEW_CACHE_BYTES) {
+    private val previewCache = object : LruCache<String, Bitmap>(if (minimal) 1 shl 20 else PREVIEW_CACHE_BYTES) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
     }
-    private val previewInputs = object : LruCache<String, Bitmap>(PREVIEW_CACHE_BYTES) {
+    private val previewInputs = object : LruCache<String, Bitmap>(if (minimal) 1 shl 20 else PREVIEW_CACHE_BYTES) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
     }
     private val previewInputMutex = Mutex()
 
     /** 缩略图缓存（进度条/目录） */
-    private val thumbCache = object : LruCache<String, Bitmap>(8 shl 20) {
+    private val thumbCache = object : LruCache<String, Bitmap>(if (minimal) 2 shl 20 else 8 shl 20) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount.coerceAtLeast(1)
     }
 
     /** 高倍缩放区域重解码缓存（字节计量，32MB 上限） */
-    private val regionCache = object : LruCache<String, Bitmap>(32 shl 20) {
+    private val regionCache = object : LruCache<String, Bitmap>(if (minimal) 4 shl 20 else 32 shl 20) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount.coerceAtLeast(1)
     }
 
@@ -124,7 +129,7 @@ class ComicPageLoader(
      * 免去每次重开文件+头解析；逐出/关闭时 recycle。decodeRegion 调用经
      * [regionMutex] 串行（decoder 实例不保证线程安全，且本调用本身低频空闲触发）。
      */
-    private val decoderPool = object : LruCache<String, BitmapRegionDecoder>(4) {
+    private val decoderPool = object : LruCache<String, BitmapRegionDecoder>(if (minimal) 1 else 4) {
         override fun entryRemoved(
             evicted: Boolean,
             key: String?,
@@ -138,7 +143,7 @@ class ComicPageLoader(
 
     /** 预取并发闸门：无界并行时 N 页全尺寸解码+管线峰值内存 = N×数十 MB */
     private val preloadGate = Semaphore(2)
-    private val decodeGate = Semaphore(2)
+    private val decodeGate = Semaphore(if (minimal) 1 else 2)
 
     /** 逐像素增强管线并发闸门：内存护栏（预取+当前页并行处理会数倍放大峰值内存） */
     private val pixelOpGate = Semaphore(1)
@@ -147,7 +152,7 @@ class ComicPageLoader(
     private val terminalLoads = LruCache<String, Boolean>(256)
     private val availabilityEpoch = kotlinx.coroutines.flow.MutableStateFlow(0L)
     @Volatile private var foregroundKeys: Set<String> = emptySet()
-    private val readingPreviews = object : LruCache<String, Bitmap>(8 shl 20) {
+    private val readingPreviews = object : LruCache<String, Bitmap>(if (minimal) 2 shl 20 else 8 shl 20) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
     }
     private val _previewEpoch = kotlinx.coroutines.flow.MutableStateFlow(0L)
@@ -188,7 +193,7 @@ class ComicPageLoader(
         tone: ComicImagePipeline.Toning, visible: Boolean,
     ): PageLoadResult {
         if (visible) return try {
-            comicDisplayLoadWithTimeout { load(ref, cacheKey, geo, tone) }
+            comicDisplayLoadWithTimeout(if (tone.enhanceMode == ComicEnhanceMode.MANGAJANAI) 20 * 60_000L else 90_000L) { load(ref, cacheKey, geo, tone) }
         } catch (error: IOException) {
             // Our own deadline cancels load internally; still release foreground priority
             // so neighbors cannot wait forever for an already failed visible request.
@@ -197,6 +202,7 @@ class ComicPageLoader(
             throw error
         }
         cachedOrPinned(cacheKey)?.let { return PageLoadResult(it, true) }
+        if (minimal || tone.enhanceMode == ComicEnhanceMode.MANGAJANAI) kotlinx.coroutines.awaitCancellation()
         if (ref is ComicPageRef.Remote && appPrefs.preloadWifiOnly && !wifiConnectedOrUnmetered()) {
             // Promotion to a visible page restarts its producer and bypasses this wait.
             kotlinx.coroutines.awaitCancellation()
@@ -550,7 +556,8 @@ class ComicPageLoader(
 
     /** 按 windowKeys 优先级序重建驻留表，预算超限从尾部（最低优先级）丢弃 */
     private fun rebuildPinnedInPriorityOrder() {
-        var budget = cacheRetainCeilBytes.toLong()
+        val limit = windowRetainBytes.toLong()
+        var budget = limit
         val rebuilt = LinkedHashMap<String, Bitmap>()
         for (k in windowKeys) {
             val b = pinned[k] ?: continue
@@ -559,7 +566,7 @@ class ComicPageLoader(
                 budget -= b.byteCount
             }
         }
-        pinnedBytes = cacheRetainCeilBytes.toLong() - budget
+        pinnedBytes = limit - budget
         pinned.clear()
         pinned.putAll(rebuilt)
     }
@@ -623,7 +630,7 @@ class ComicPageLoader(
     suspend fun decodeRegion(
         ref: ComicPageRef,
         rect: RectF,
-        targetEdge: Int = DECODE_MAX_EDGE,
+        targetEdge: Int = decodeMaxEdge,
         cacheTag: String = "",
     ): Bitmap? {
         if (ref !is ComicPageRef.Local) return null
@@ -773,7 +780,8 @@ class ComicPageLoader(
      */
     fun preloadWindow(entries: List<WindowEntry>, tone: ComicImagePipeline.Toning) {
         // 仅 Wi-Fi 预加载：非 Wi-Fi 且是计费网络时，跳过在线页的提前下载
-        val effective = if (appPrefs.preloadWifiOnly && !wifiConnectedOrUnmetered()) {
+        val effective = if (minimal || tone.enhanceMode == ComicEnhanceMode.MANGAJANAI) entries.filter { it.visible }
+        else if (appPrefs.preloadWifiOnly && !wifiConnectedOrUnmetered()) {
             entries.filter { it.visible || it.ref !is ComicPageRef.Remote }
         } else entries
         val newForeground = effective.filter { it.visible }.mapTo(HashSet()) { it.cacheKey }
@@ -801,12 +809,35 @@ class ComicPageLoader(
             rebuildPinnedInPriorityOrder()
         }
         val batchKeys = HashSet<String>(effective.size)
+        // Curl still needs a readable neighbor texture. Decode only tiny originals,
+        // never enqueue another MangaJaNai session for speculative pages.
+        if (!minimal && tone.enhanceMode == ComicEnhanceMode.MANGAJANAI) {
+            entries.filter { !it.visible }.take(4).forEach { e ->
+                batchKeys.add(e.cacheKey)
+                if (peekProcessed(e.cacheKey) == null && peekReadingPreview(e.cacheKey) == null && !preloadJobs.containsKey(e.cacheKey)) {
+                    val job = scope.launch(start = CoroutineStart.LAZY) {
+                        try {
+                            preloadGate.withPermit {
+                                val raw = decodeRaw(e.ref, maxEdge = 480) ?: return@withPermit
+                                val preview = runInterruptible { ComicImagePipeline.process(raw, e.geo, ComicImagePipeline.Toning()) }
+                                currentCoroutineContext().ensureActive()
+                                if (peekProcessed(e.cacheKey) == null) {
+                                    readingPreviews.put(e.cacheKey, preview)
+                                    _previewEpoch.update { it + 1 }
+                                }
+                            }
+                        } finally { preloadJobs.remove(e.cacheKey, coroutineContext[Job]) }
+                    }
+                    if (preloadJobs.putIfAbsent(e.cacheKey, job) == null) job.start() else job.cancel()
+                }
+            }
+        }
         effective.forEach { e ->
             batchKeys.add(e.cacheKey)
             val probeHit = cachedOrPinned(e.cacheKey)
             cacheDbg { "probe key=${e.ref.id} hit=${probeHit != null}" }
             // Visible pages have their own foreground producer and never wait for this gate.
-            if (probeHit == null && !e.visible && !preloadJobs.containsKey(e.cacheKey)) {
+            if (!minimal && tone.enhanceMode != ComicEnhanceMode.MANGAJANAI && probeHit == null && !e.visible && !preloadJobs.containsKey(e.cacheKey)) {
                 val job = scope.launch(start = CoroutineStart.LAZY) {
                     try {
                         // 并发闸门：最多 2 页同时解码+处理（无界并行峰值内存 = N×数十 MB）
@@ -840,6 +871,9 @@ class ComicPageLoader(
      * 目标值钳在 [基础上限, 窗口驻留硬上限]——超限部分照常 LRU 淘汰，内存安全。
      */
     internal fun ensureWindowCapacity(entries: List<WindowEntry>, tone: ComicImagePipeline.Toning) {
+        mangaWindow = tone.enhanceMode == ComicEnhanceMode.MANGAJANAI
+        windowRetainBytes = if (mangaWindow) minOf(cacheRetainCeilBytes, 20 shl 20) else cacheRetainCeilBytes
+        readingPreviews.resize(if (minimal) 2 shl 20 else if (mangaWindow) 6 shl 20 else 8 shl 20)
         var needed = 0L
         entries.forEach { e ->
             needed += pageBytes[e.ref.id] ?: run {
@@ -847,8 +881,8 @@ class ComicPageLoader(
                 estimateProcessedBytes(s?.width ?: 0, s?.height ?: 0, tone.enhanceMode)
             }
         }
-        val target = needed.coerceAtLeast(cacheBaseBytes.toLong())
-            .coerceAtMost(cacheRetainCeilBytes.toLong()).toInt()
+        val target = needed.coerceAtLeast(minOf(cacheBaseBytes, windowRetainBytes).toLong())
+            .coerceAtMost(windowRetainBytes.toLong()).toInt()
         if (target != cache.maxSize()) {
             cacheDbg { "resize needed=$needed target=$target from=${cache.maxSize()}" }
             cache.resize(target)
@@ -875,6 +909,10 @@ class ComicPageLoader(
             short = short * DECODE_MAX_EDGE / long
             long = DECODE_MAX_EDGE.toLong()
         }
+        if (enhanceMode == ComicEnhanceMode.MANGAJANAI) {
+            val (a, b) = MangaJaNai.outputSize(long.toInt(), short.toInt().coerceAtLeast(1))
+            return a.toLong() * b * 4
+        }
         if (enhanceMode == ComicEnhanceMode.WAIFU2X || enhanceMode == ComicEnhanceMode.SUPER_RES) {
             val target = ComicEdgeUpscaler.targetSize(long.toInt(), short.toInt().coerceAtLeast(1))
             long = target.first.toLong()
@@ -898,7 +936,7 @@ class ComicPageLoader(
         }
     }
 
-    private suspend fun decodeRaw(ref: ComicPageRef, maxEdge: Int = DECODE_MAX_EDGE, onPreview: ((Bitmap) -> Unit)? = null): Bitmap? =
+    private suspend fun decodeRaw(ref: ComicPageRef, maxEdge: Int = decodeMaxEdge, onPreview: ((Bitmap) -> Unit)? = null): Bitmap? =
         withContext(Dispatchers.IO) { decodeGate.withPermit {
             suspend fun decode(edge: Int) = when (ref) {
                 is ComicPageRef.Local -> decodeLocal(ref.path, edge)
@@ -954,6 +992,7 @@ class ComicPageLoader(
             .data(ref.url)
             .tag(ComicStreamPreview::class.java, streamPreview)
             .memoryCacheKey(comicRemoteCacheKey(ref.url, ref.headers, ref.referer))
+            .memoryCachePolicy(if (minimal || mangaWindow) coil.request.CachePolicy.DISABLED else coil.request.CachePolicy.ENABLED)
             .diskCacheKey(comicRemoteCacheKey(ref.url, ref.headers, ref.referer))
             .size(maxEdge)
             // Bound the LONG edge at decode time. FILL can decode huge portrait/webtoon

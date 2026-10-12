@@ -71,7 +71,7 @@ internal fun KeywordSearchPreview(
 ) {
     val reduce = LocalReduceMotion.current
     var expanded by rememberSaveable(words.firstOrNull()) { mutableStateOf(false) }
-    val arrow by animateFloatAsState(if (expanded) 180f else 0f, tween(if (reduce) 0 else AppMotion.CONTENT_MS), label = "keywordArrow")
+    val arrow by animateFloatAsState(if (expanded) 0f else -90f, tween(if (reduce) 0 else AppMotion.CONTENT_MS), label = "keywordArrow")
     GlassKitCard(modifier = modifier.fillMaxWidth().animateContentSize(tween(if (reduce) 0 else 220, easing = AppMotion.easeOutCubic)).testTag("keyword_search_preview")) {
         Column(Modifier.padding(DesignTokens.SpaceMd), verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
             Row(Modifier.fillMaxWidth().heightIn(min = DesignTokens.SpaceXxl * 2)

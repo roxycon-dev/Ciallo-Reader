@@ -263,6 +263,16 @@ class ComicSettingsStore(context: Context) {
         prefs.edit().putString("book_state_$bookKey", state.toJson().toString()).apply()
     }
 
+    internal fun loadChapterResume(bookKey: String, chapter: String): ComicChapterResume? =
+        prefs.getString("resume_${bookKey}_$chapter", null)?.let {
+            runCatching { ComicChapterResume.fromJson(JSONObject(it)) }.getOrNull()
+        }
+
+    internal fun saveChapterResume(bookKey: String, chapter: String, resume: ComicChapterResume, flush: Boolean = false) {
+        val edit = prefs.edit().putString("resume_${bookKey}_$chapter", resume.toJson().toString())
+        if (flush) edit.commit() else edit.apply()
+    }
+
     /** 阅读器启动时的有效配置：本漫画覆盖 > 全局。hasOverride 用于 UI 提示。 */
     data class EffectiveConfig(val config: ComicReaderConfig, val hasOverride: Boolean)
 

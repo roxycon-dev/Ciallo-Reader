@@ -252,7 +252,7 @@ private fun TrendLineChart(
     val peakIndex = series.indices.maxByOrNull { series[it].second }
 
     // 先纸后墨：数据自左向右描绘进场；流畅档直接定格终态
-    val lowQuality = LocalRenderQuality.current == RenderQuality.LOW
+    val lowQuality = LocalRenderQuality.current <= RenderQuality.LOW
     val reveal = remember { Animatable(1f) }
     val reduce = com.example.ui.feedback.LocalReduceMotion.current
     LaunchedEffect(lowQuality, reduce) {

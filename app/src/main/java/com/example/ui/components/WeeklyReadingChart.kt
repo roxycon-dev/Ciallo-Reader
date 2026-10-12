@@ -77,7 +77,7 @@ fun WeeklyReadingChart(
     val chartPrimary = MaterialTheme.colorScheme.primary
     val chartSecondary = MaterialTheme.colorScheme.secondary
     // 本周峰值日（阅读时长最长的一天）：金色强调，让"重点"第一眼可见
-    val lowQuality = LocalRenderQuality.current == RenderQuality.LOW
+    val lowQuality = LocalRenderQuality.current <= RenderQuality.LOW
     // 系统「动画缩放」被关掉 / 开启减少动态效果时也要跳过生长动画：
     // 否则用户眼里动画根本不播，柱子却要等 320+400ms 才定格，看着像"卡了一下"。
     val reduceMotion = LocalReduceMotion.current
@@ -411,7 +411,7 @@ private fun DayCoverCarousel(
     val listState = rememberLazyListState()
     // 5 秒无操作后自动平滑滚动；用户拖动时暂停。
     // 流畅档（渲染画质=低）：关闭自动轮播，只保留手动滑动。
-    val carouselAutoScroll = LocalRenderQuality.current != RenderQuality.LOW
+    val carouselAutoScroll = LocalRenderQuality.current > RenderQuality.LOW
     LaunchedEffect(records.size, carouselAutoScroll) {
         if (records.size <= 1 || !carouselAutoScroll) return@LaunchedEffect
         while (true) {

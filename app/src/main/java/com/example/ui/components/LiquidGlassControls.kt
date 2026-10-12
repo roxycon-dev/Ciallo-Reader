@@ -36,6 +36,10 @@ fun DialogLiquidGlass(
     fillMaxSize: Boolean = true,
     content: @Composable () -> Unit
 ) {
+    if (LocalRenderQuality.current.minimal) {
+        CompositionLocalProvider(LocalLiquidGlassState provides null) { content() }
+        return
+    }
     val glass = rememberLiquidGlassProviderState()
     CompositionLocalProvider(LocalLiquidGlassState provides glass) {
         Box(

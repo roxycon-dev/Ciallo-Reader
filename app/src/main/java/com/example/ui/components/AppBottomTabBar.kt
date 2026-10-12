@@ -143,6 +143,23 @@ fun AppBottomTabBar(
     collapseState: TabBarCollapseState = rememberTabBarCollapseState(),
     backdrop: Backdrop? = null
 ) {
+    if (LocalRenderQuality.current.minimal) {
+        Row(modifier.fillMaxWidth().navigationBarsPadding().background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            items.forEachIndexed { index, item ->
+                Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
+                    .background(if (index == selectedIndex) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                    .clickable { onTabSelected(index) }.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box {
+                        Icon(if (index == selectedIndex) item.selectedIcon else item.icon, null, modifier = Modifier.size(24.dp))
+                        item.badgeCount?.takeIf { it > 0 }?.let { Text(it.toString(), fontSize = 9.sp, modifier = Modifier.align(Alignment.TopEnd)) }
+                    }
+                    Text(item.label, fontSize = 11.sp)
+                }
+            }
+        }
+        return
+    }
     val colors = rememberAppButtonColors()
     // 主题色跟随设置主色调平滑过渡（不固化在 remember 里）
     val animatedPrimary by animateColorAsState(
@@ -201,7 +218,7 @@ fun AppBottomTabBar(
      * 主色只通过【选中项图标+文字】表达。
      *
      * 流畅档（LOW）**不引入**任何新渐变层：维持单层近实心底 + 中性描边。 */
-    val glassTintModifier = if (quality == RenderQuality.LOW) {
+    val glassTintModifier = if (quality <= RenderQuality.LOW) {
         Modifier.background(animatedPrimary.copy(alpha = 0.06f), shape)
     } else {
         Modifier.tabBarGlassTint(primary = animatedPrimary)
@@ -259,7 +276,7 @@ fun AppBottomTabBar(
                     .fillMaxWidth()
                     .height(barHeight)
                     .then(
-                        if (quality == RenderQuality.LOW) {
+                        if (quality <= RenderQuality.LOW) {
                             // 流畅档：单层阴影
                             Modifier.consistentShadow(
                                 elevation = 8.dp,
@@ -310,7 +327,7 @@ fun AppBottomTabBar(
                     // ① 玻璃底分层（渐变 / 顶部高光 / 外圈细描边）
                     .then(glassTintModifier)
                     .then(
-                        if (quality != RenderQuality.LOW) {
+                        if (quality > RenderQuality.LOW) {
                             // 主色虹彩描边加回（与 tint 的主色混色配套）
                             Modifier.iridescentBorder(
                                 shape = shape,
