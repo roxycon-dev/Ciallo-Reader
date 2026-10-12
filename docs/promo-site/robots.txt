@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://roxycon-dev.github.io/Ciallo-Reader/sitemap.xml
