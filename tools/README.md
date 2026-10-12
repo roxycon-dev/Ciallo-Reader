@@ -16,3 +16,5 @@
 - `verify-comic-source-host.cjs`
 
 运行模型验证：`python tools/verify-mangajanai.py MODEL.onnx OUTPUT_DIRECTORY`，依赖 `numpy`、`Pillow`、`onnxruntime`。
+
+- `benchmark-mangajanai.py`：对比原 CPU 与优化后 CPU 的完整输入图耗时、输出误差；不把小块、磁盘命中或桌面数据当作手机整页 5 秒结果。`python tools/benchmark-mangajanai.py MODEL.onnx OUTPUT_DIR --image PAGE.png`（依赖 onnxruntime、numpy、Pillow）。

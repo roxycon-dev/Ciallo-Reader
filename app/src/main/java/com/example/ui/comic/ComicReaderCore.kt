@@ -282,7 +282,7 @@ fun ComicReaderCore(
         onDispose {
             loader.clearProcessedCache()
             loader.shutdown()
-            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch { ComicNeuralBackend.release() }
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch { ComicNeuralBackend.release(); MangaJaNai.release() }
         }
     }
 

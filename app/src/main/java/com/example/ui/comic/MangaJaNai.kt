@@ -2,7 +2,6 @@ package com.example.ui.comic
 
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
-import ai.onnxruntime.OrtSession
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -11,7 +10,8 @@ import android.graphics.Rect
 import android.graphics.RectF
 import java.io.File
 import java.io.IOException
-import java.nio.FloatBuffer
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.security.MessageDigest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,8 +20,8 @@ import kotlin.math.sqrt
 import kotlin.math.roundToInt
 
 /** Official MangaJaNai V1 weights, community ONNX conversion. No extra inference runtime.
- * One page/session at a time, reusable tiny RGB tiles, no full-page float tensors or 2x intermediate.
- * Weight memory is unavoidable (~64 MiB); sessions and native activations close after every page.
+ * One page at a time, fixed original RGB tiles and FP32 weights; optimized CPU or validated hardware.
+ * One warm session is shared while reading, then released after 15 idle seconds or reader exit.
  */
 internal object MangaJaNai {
     const val MODEL_BYTES = 67_191_396L
@@ -35,7 +35,41 @@ internal object MangaJaNai {
     @Volatile private var context: Context? = null
     private val _status = MutableStateFlow("")
     val status = _status.asStateFlow()
-    fun configure(context: Context) { this.context = context.applicationContext }
+    private var runtime: MangaJaNaiRuntime? = null
+    private var verifiedStamp: String? = null
+    private var generation = 0L
+    private var idleRelease: java.util.concurrent.ScheduledFuture<*>? = null
+    private val cleanup = java.util.concurrent.ScheduledThreadPoolExecutor(1) { task ->
+        Thread(task, "mangajanai-release").apply { isDaemon = true }
+    }.apply { removeOnCancelPolicy = true }
+    fun configure(context: Context) {
+        val app = context.applicationContext
+        if (this.context === app) return
+        this.context = app
+        app.registerComponentCallbacks(object : android.content.ComponentCallbacks2 {
+            override fun onConfigurationChanged(config: android.content.res.Configuration) = Unit
+            override fun onLowMemory() { cleanup.execute { release() } }
+            override fun onTrimMemory(level: Int) {
+                if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) cleanup.execute { release() }
+            }
+        })
+    }
+
+    fun release() {
+        lock.lock()
+        try { generation++; idleRelease?.cancel(false); runtime?.close(); runtime = null }
+        finally { lock.unlock() }
+    }
+
+    private fun releaseWhenIdle() {
+        val expected = generation
+        idleRelease = cleanup.schedule({
+            if (lock.tryLock()) {
+                try { if (generation == expected) { runtime?.close(); runtime = null } }
+                finally { lock.unlock() }
+            }
+        }, 15, java.util.concurrent.TimeUnit.SECONDS)
+    }
 
     private fun checkCancelled() {
         if (Thread.currentThread().isInterrupted) throw InterruptedException("MangaJaNai cancelled")
@@ -61,7 +95,8 @@ internal object MangaJaNai {
         val app = context ?: throw IOException("MangaJaNai 尚未初始化")
         val directory = File(app.filesDir, "mangajanai").apply { mkdirs() }
         val file = File(directory, "2x-1200p-v1.onnx")
-        if (verify(file)) return file
+        val stamp = "${file.absolutePath}:${file.lastModified()}:${file.length()}"
+        if (verifiedStamp == stamp || verify(file)) { verifiedStamp = stamp; return file }
         val part = File(directory, "model.part")
         val client = com.example.source.SharedHttpTransport.builder()
             .readTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
@@ -91,6 +126,7 @@ internal object MangaJaNai {
             if (!verify(part)) throw IOException("模型校验失败，请重试")
             if (file.exists() && !file.delete()) throw IOException("无法替换模型")
             if (!part.renameTo(file)) throw IOException("无法保存模型")
+            verifiedStamp = "${file.absolutePath}:${file.lastModified()}:${file.length()}"
             return file
         } catch (error: Exception) {
             _status.value = "模型下载失败，点击重试"
@@ -106,34 +142,37 @@ internal object MangaJaNai {
     fun enhance(src: Bitmap, strength: Float): Bitmap {
         lock.lockInterruptibly()
         return try {
+            generation++
+            idleRelease?.cancel(false)
             checkCancelled()
+            val started = System.nanoTime()
             val file = model()
+            val engine = runtime ?: MangaJaNaiRuntime(checkNotNull(context)).also { runtime = it }
             val environment = OrtEnvironment.getEnvironment()
-            // Create from file path: avoid another 64 MB Java byte[] copy of weights.
-            OrtSession.SessionOptions().use { options ->
-                options.setIntraOpNumThreads(1)
-                options.setInterOpNumThreads(1)
-                options.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.NO_OPT)
-                options.setMemoryPatternOptimization(false)
-                options.setCPUArenaAllocator(false)
-                environment.createSession(file.absolutePath, options).use { session ->
-                    val (width, height) = outputSize(src.width, src.height)
-                    val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                    val canvas = Canvas(output)
-                    val paint = Paint(Paint.FILTER_BITMAP_FLAG)
-                    val area = SIDE * SIDE
-                    val input = FloatBuffer.allocate(area * 3)
-                    val row = IntArray(SIDE)
-                    val pixels = IntArray(TILE * 2 * TILE * 2)
-                    val tile = Bitmap.createBitmap(TILE * 2, TILE * 2, Bitmap.Config.ARGB_8888)
-                    val sx = width.toFloat() / src.width
-                    val sy = height.toFloat() / src.height
-                    try {
+            val (width, height) = outputSize(src.width, src.height)
+            val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(output)
+            val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+            val area = SIDE * SIDE
+            // Direct buffers and pinned tensors are allocated once per page, not once per tile.
+            val input = ByteBuffer.allocateDirect(area * 3 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+            val buffer = ByteBuffer.allocateDirect(area * 12 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+            val row = IntArray(SIDE)
+            val pixels = IntArray(TILE * 2 * TILE * 2)
+            val tile = Bitmap.createBitmap(TILE * 2, TILE * 2, Bitmap.Config.ARGB_8888)
+            val sx = width.toFloat() / src.width
+            val sy = height.toFloat() / src.height
+            try {
+                OnnxTensor.createTensor(environment, input, longArrayOf(1, 3, SIDE.toLong(), SIDE.toLong())).use { tensor ->
+                    OnnxTensor.createTensor(environment, buffer, longArrayOf(1, 3, (SIDE * 2).toLong(), (SIDE * 2).toLong())).use { tensorOut ->
+                        val inputs = mapOf("input" to tensor)
+                        val outputs = mapOf("output" to tensorOut)
                         val total = ((src.width + TILE - 1) / TILE) * ((src.height + TILE - 1) / TILE)
                         var completed = 0
+                        var lastPercent = -1
                         for (y in 0 until src.height step TILE) for (x in 0 until src.width step TILE) {
                             checkCancelled()
-                            // Replicated-edge halo: every tile has exactly the same inference shape.
+                            // Same edge replication, same 48 px cores and 16 px halo as 1.3.2.
                             for (ty in 0 until SIDE) {
                                 val sourceY = (y + ty - HALO).coerceIn(0, src.height - 1)
                                 val left = (x - HALO).coerceAtLeast(0)
@@ -147,47 +186,46 @@ internal object MangaJaNai {
                                     input.put(area * 2 + i, (p and 255) / 255f)
                                 }
                             }
+                            if (completed == 0) {
+                                _status.value = "引擎准备中…"
+                                engine.prepare(file, tensor, tensorOut, buffer)
+                            }
+                            engine.run(file, inputs, outputs)
                             val tw = min(TILE, src.width - x) * 2
                             val th = min(TILE, src.height - y) * 2
-                            OnnxTensor.createTensor(environment, input, longArrayOf(1, 3, SIDE.toLong(), SIDE.toLong())).use { tensor ->
-                                session.run(mapOf("input" to tensor)).use { result ->
-                                    checkCancelled()
-                                    val tensorOut = result[0] as OnnxTensor
-                                    val shape = tensorOut.info.shape
-                                    check(shape.contentEquals(longArrayOf(1, 3, (SIDE * 2).toLong(), (SIDE * 2).toLong()))) { "MangaJaNai 输出格式不符" }
-                                    val buffer = tensorOut.floatBuffer
-                                    val outArea = area * 4
-                                    for (ty in 0 until th) {
-                                        src.getPixels(row, 0, tw / 2, x, y + ty / 2, tw / 2, 1)
-                                        for (tx in 0 until tw) {
-                                            val i = (ty + HALO * 2) * SIDE * 2 + tx + HALO * 2
-                                            val original = row[tx / 2]
-                                            fun channel(c: Int): Int {
-                                                val from = (original shr ((2 - c) * 8)) and 255
-                                                val to = buffer.get(c * outArea + i).coerceIn(0f, 1f) * 255f
-                                                return (from + (to - from) * strength.coerceIn(0f, 1f)).roundToInt().coerceIn(0, 255)
-                                            }
-                                            pixels[ty * TILE * 2 + tx] = (original and -0x1000000) or (channel(0) shl 16) or (channel(1) shl 8) or channel(2)
-                                        }
+                            val outArea = area * 4
+                            for (ty in 0 until th) {
+                                src.getPixels(row, 0, tw / 2, x, y + ty / 2, tw / 2, 1)
+                                for (tx in 0 until tw) {
+                                    val i = (ty + HALO * 2) * SIDE * 2 + tx + HALO * 2
+                                    val original = row[tx / 2]
+                                    fun channel(c: Int): Int {
+                                        val from = (original shr ((2 - c) * 8)) and 255
+                                        val to = buffer.get(c * outArea + i).coerceIn(0f, 1f) * 255f
+                                        return (from + (to - from) * strength.coerceIn(0f, 1f)).roundToInt().coerceIn(0, 255)
                                     }
+                                    pixels[ty * TILE * 2 + tx] = (original and -0x1000000) or (channel(0) shl 16) or (channel(1) shl 8) or channel(2)
                                 }
                             }
                             tile.setPixels(pixels, 0, TILE * 2, 0, 0, tw, th)
                             canvas.drawBitmap(tile, Rect(0, 0, tw, th), RectF(x * sx, y * sy, (x + tw / 2) * sx, (y + th / 2) * sy), paint)
-                            _status.value = "增强 ${++completed * 100 / total}%"
+                            val percent = ++completed * 100 / total
+                            if (percent != lastPercent) { lastPercent = percent; _status.value = "增强 $percent%" }
                         }
                         _status.value = ""
+                        android.util.Log.i("MangaJaNai", "page=${src.width}x${src.height} tiles=$total totalMs=${(System.nanoTime() - started) / 1_000_000}")
                         output
-                    } catch (error: Throwable) {
-                        output.recycle()
-                        _status.value = "增强失败，点击重试"
-                        throw error
-                    } finally { tile.recycle() }
+                    }
                 }
-            }
+            } catch (error: Throwable) {
+                output.recycle()
+                _status.value = "增强失败，点击重试"
+                if (error !is InterruptedException) { engine.close(); runtime = null }
+                throw error
+            } finally { tile.recycle() }
         } catch (error: LinkageError) {
             _status.value = "增强失败，点击重试"
             throw IOException("当前设备无法加载增强引擎", error)
-        } finally { lock.unlock() }
+        } finally { releaseWhenIdle(); lock.unlock() }
     }
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.3 · 2026-10-12
+
+- 设置软件信息卡：统一间距、字号、图标和按钮。
+- MangaJaNai：图优化、多核 CPU、硬件后端择优、会话和固定缓冲复用；保持原模型与 FP32 算法。
+- 桌面 CPU 测试样图约提速 4.9 倍，手机整页 5 秒尚未验证。
+
+
 All notable changes to Ciallo Reader are documented in this file.
 
 ## [1.3.2] — 2026-10-12

@@ -1330,33 +1330,29 @@ LazyColumn(
                 }
 
                 // Section 8: About
+                item { SettingsSectionHeader("关于") }
                 item {
                     GlassCard(
                         modifier = Modifier.fillMaxWidth().testTag("software-info"),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(
-                            modifier = Modifier.fillMaxWidth().padding(20.dp),
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
                             horizontalAlignment = Alignment.Start
                         ) {
-                            Text(
-                                "Ciallo Reader",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
                             val versionName = remember {
                                 try {
                                     context.packageManager.getPackageInfo(context.packageName, 0)?.versionName ?: BuildConfig.VERSION_NAME
                                 } catch (_: Exception) { BuildConfig.VERSION_NAME }
                             }
-                            Text(
-                                "版本 $versionName",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(Modifier.height(10.dp))
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Filled.AutoStories, null, tint = MintPrimary, modifier = Modifier.size(24.dp))
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text("Ciallo Reader", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                                    Text("版本 $versionName", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Spacer(Modifier.width(8.dp))
                             AppActionButton(
                                 text = if (updateChecking) "检查中…" else "检查更新",
                                 enabled = !updateChecking,
@@ -1373,9 +1369,10 @@ LazyColumn(
                                     }
                                 }
                             )
+                            }
                             updateMessage?.let { message ->
-                                Spacer(Modifier.height(6.dp))
-                                Text(message, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.height(10.dp))
+                                Text(message, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             val updateUriHandler = androidx.compose.ui.platform.LocalUriHandler.current
                             if (updateMessage != null && appUpdateState.release == null && !updateMessage!!.contains("最新版本")) {
@@ -1390,13 +1387,19 @@ LazyColumn(
                                     Text(if (appUpdateState.transferring) "查看下载进度" else if (appUpdateState.hasPackage) "继续安装更新" else "查看更新")
                                 }
                             }
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                TextButton(onClick = { showReleaseHistory = true }) { Text("更新目录") }
+                            Spacer(Modifier.height(12.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            Spacer(Modifier.height(12.dp))
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                AppActionButton("更新目录", onClick = { showReleaseHistory = true },
+                                    modifier = Modifier.weight(1f), variant = AppButtonVariant.Secondary,
+                                    buttonSize = AppButtonSize.Small, fullWidth = true, icon = Icons.Filled.History)
                                 val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-                                TextButton(onClick = {
+                                AppActionButton("GitHub", onClick = {
                                     runCatching { uriHandler.openUri(com.example.data.UPDATE_REPOSITORY) }
                                         .onFailure { AppToast.makeText(context, "无法打开 GitHub", Toast.LENGTH_SHORT).show() }
-                                }) { Text("GitHub") }
+                                }, modifier = Modifier.weight(1f), variant = AppButtonVariant.Secondary,
+                                    buttonSize = AppButtonSize.Small, fullWidth = true, icon = Icons.Filled.OpenInNew)
                             }
                         }
                     }
