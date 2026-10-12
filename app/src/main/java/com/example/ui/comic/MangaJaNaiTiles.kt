@@ -2,8 +2,8 @@ package com.example.ui.comic
 
 import android.graphics.Bitmap
 
-/** Exact input matches only. Stores FP32 network cores before strength/alpha composition.
- * Eight entries use 1,089,536 bytes of array payload; no page-sized cache or second session.
+/** Exact input matches only. Stores FP32 network cores before strength/detail composition.
+ * Mobile caller keeps one entry (910,336 B); no page-sized cache or second session.
  * Access is serialized by MangaJaNai's page lock.
  */
 internal class MangaJaNaiTileCache(private val capacity: Int = 8) {

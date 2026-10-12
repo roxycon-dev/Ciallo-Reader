@@ -582,7 +582,9 @@ fun ComicReaderCore(
             // 同页双份处理；displayConfig 入 key 后指纹落定即自动重预载并重建驻留，
             // 旧指纹驻留项随之解除——同时消解 F4 的陈旧驻留残留）。
             val online = pages.any { it is ComicPageRef.Remote }
-            val order = if (online) intArrayOf(currentSpread, currentSpread + 1, currentSpread + 2, currentSpread - 1)
+            val order = if (displayConfig.enhanceMode == ComicEnhanceMode.MANGAJANAI)
+                intArrayOf(currentSpread, currentSpread + 1, currentSpread + 2, currentSpread + 3, currentSpread - 1)
+                else if (online) intArrayOf(currentSpread, currentSpread + 1, currentSpread + 2, currentSpread - 1)
                 else intArrayOf(currentSpread, currentSpread + 1, currentSpread - 1)
             order.filter { it in layout.spreads.indices }.forEach { si ->
                 layout.spreads[si].slots.forEach { slot ->
@@ -591,6 +593,7 @@ fun ComicReaderCore(
                         ComicPageLoader.WindowEntry(
                             ref = slot.ref,
                             visible = si == currentSpread,
+                            ahead = si > currentSpread,
                             cacheKey = "${slot.ref.id}|${slot.half}|${displayConfig.imagePipelineFingerprint()}|r$rot",
                             geo = ComicImagePipeline.Geometry(
                                 half = slot.half,
@@ -1529,13 +1532,15 @@ private fun ComicVerticalList(
         // verticalPreloadIndices 已返回驻留优先级序（当前 → 前瞻近→远 → 上一页）。
         // config（=防抖 displayConfig）入 key：指纹落定自动重预载并重建驻留。
         val entries = ArrayList<ComicPageLoader.WindowEntry>(8)
-        verticalPreloadIndices(currentSpread, strategy.prefetchWindow, layout.spreadCount).forEach { si ->
+        val prefetch = if (config.enhanceMode == ComicEnhanceMode.MANGAJANAI) maxOf(3, strategy.prefetchWindow) else strategy.prefetchWindow
+        verticalPreloadIndices(currentSpread, prefetch, layout.spreadCount).forEach { si ->
             layout.spreads[si].slots.forEach { slot ->
                 val rot = ((config.bookRotation + (bookState.pageRotations[slot.ref.id] ?: 0)) % 360 + 360) % 360
                 entries.add(
                     ComicPageLoader.WindowEntry(
                         ref = slot.ref,
                         visible = si == currentSpread,
+                        ahead = si > currentSpread,
                         cacheKey = "${slot.ref.id}|${slot.half}|${config.imagePipelineFingerprint()}|r$rot",
                         geo = ComicImagePipeline.Geometry(
                             half = slot.half,

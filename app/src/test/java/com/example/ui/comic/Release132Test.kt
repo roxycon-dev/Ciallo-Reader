@@ -72,8 +72,8 @@ class Release132Test {
         assertFalse(MangaJaNai.verify(invalid))
     }
 
-    @Test fun minimalAndMangaWindowsStayBoundedAndDoNotStartInvisibleLoads() = kotlinx.coroutines.runBlocking {
-        for ((minimal, mode, limit) in listOf(Triple(true, ComicEnhanceMode.OFF, 12 shl 20), Triple(false, ComicEnhanceMode.MANGAJANAI, 20 shl 20))) {
+    @Test fun minimalAndMangaWindowsStayBoundedAndIgnoreUnscheduledInvisibleLoads() = kotlinx.coroutines.runBlocking {
+        for ((minimal, mode, limit) in listOf(Triple(true, ComicEnhanceMode.OFF, 12 shl 20), Triple(false, ComicEnhanceMode.MANGAJANAI, 64 shl 20))) {
             val loader = ComicPageLoader(context, minimal = minimal)
             val tone = ComicImagePipeline.Toning(enhanceMode = mode)
             val ref = ComicPageRef.Local("invisible132", "/missing")
@@ -85,7 +85,7 @@ class Release132Test {
         }
     }
 
-    @Test fun mangaNeighborsGetSmallOriginalPreviewsWithoutEnhancedResults() = kotlinx.coroutines.runBlocking {
+    @Test fun mangaPreviousPageGetsSmallOriginalPreviewWithoutNeuralPrefetch() = kotlinx.coroutines.runBlocking {
         val file = File(context.cacheDir, "manga-neighbor132.png")
         Bitmap.createBitmap(600, 900, Bitmap.Config.ARGB_8888).apply {
             eraseColor(android.graphics.Color.BLUE)
@@ -96,7 +96,7 @@ class Release132Test {
         val geo = ComicImagePipeline.Geometry()
         val tone = ComicImagePipeline.Toning(enhanceMode = ComicEnhanceMode.MANGAJANAI)
         try {
-            loader.preloadWindow(listOf(ComicPageLoader.WindowEntry(next, "manga-small-preview132", geo)), tone)
+            loader.preloadWindow(listOf(ComicPageLoader.WindowEntry(next, "manga-small-preview132", geo, ahead = false)), tone)
             kotlinx.coroutines.withTimeout(5000) {
                 while (loader.peekReadingPreview("manga-small-preview132") == null) kotlinx.coroutines.delay(20)
             }

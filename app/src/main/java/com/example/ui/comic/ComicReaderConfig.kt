@@ -198,7 +198,7 @@ data class ComicReaderConfig(
 
     /** 滤镜/增强/裁边相关的指纹，用于位图处理缓存键。 */
     fun imagePipelineFingerprint(): String = listOf(
-        "enhance-v4-mangajanai1200p",
+        if (enhanceMode == ComicEnhanceMode.MANGAJANAI) "enhance-v5-janai-span-mobile-residual" else "enhance-v4-mangajanai1200p",
         cropMode.name, manualCrop?.joinToString(","), bookRotation,
         splitWide, splitPosition,
         enhanceMode.name, enhanceStrength,
@@ -318,7 +318,7 @@ enum class ComicEnhanceMode(val label: String, val desc: String) {
     ANIME4K("线条", "轻量修复"),
     WAIFU2X("旧版超分", "兼容旧设置"),
     SUPER_RES("超分", "轻量放大"),
-    MANGAJANAI("MangaJaNai", "黑白漫画修复 · 首次下载 64 MB"),
+    MANGAJANAI("JaNai 极速", "轻量修复 · 预生成"),
     ;
     companion object {
         val visibleModes = listOf(OFF, CAS, ANIME4K, SUPER_RES, MANGAJANAI)

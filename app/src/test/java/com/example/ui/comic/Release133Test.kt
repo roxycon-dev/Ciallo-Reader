@@ -30,8 +30,8 @@ class Release133Test {
 
     @Test fun driverWithWrongOrNonFiniteOutputIsRejected() {
         assertTrue(MangaJaNaiRuntime.acceptableError(0.000002f, 0.0000003))
-        assertFalse(MangaJaNaiRuntime.acceptableError(0.02f, 0.0000003))
-        assertFalse(MangaJaNaiRuntime.acceptableError(0.001f, 0.001))
+        assertFalse(MangaJaNaiRuntime.acceptableError(0.05f, 0.0000003))
+        assertFalse(MangaJaNaiRuntime.acceptableError(0.001f, 0.01))
         assertFalse(MangaJaNaiRuntime.acceptableError(Float.NaN, 0.0))
         assertFalse(MangaJaNaiRuntime.acceptableError(0f, Double.POSITIVE_INFINITY))
     }

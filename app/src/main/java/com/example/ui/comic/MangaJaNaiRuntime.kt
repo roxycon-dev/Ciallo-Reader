@@ -4,24 +4,24 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtException
 import ai.onnxruntime.OrtSession
-import ai.onnxruntime.providers.NNAPIFlags
 import android.content.Context
 import android.os.Build
 import android.util.Log
 import java.io.File
 import java.nio.FloatBuffer
-import java.util.EnumSet
 
-/** FP32 execution only. Model, input resolution, 48 px cores and 16 px halos stay unchanged.
+/** Mobile SPAN model. FP32 CPU with measured XNNPACK.
  * All calls are protected by MangaJaNai's page lock. At most one native session is alive.
  */
 internal class MangaJaNaiRuntime(private val context: Context) : AutoCloseable {
-    enum class Backend { CPU, CPU_BALANCED, XNNPACK, NNAPI }
+    enum class Backend { CPU, CPU_BALANCED, XNNPACK }
     private var session: OrtSession? = null
     private var backend = Backend.CPU
     private var modelPath = ""
     private val preferences = context.getSharedPreferences("mangajanai-runtime", Context.MODE_PRIVATE)
-    private val deviceKey = "fp32-80-v2:${Build.FINGERPRINT}:${MangaJaNai.SHA256}"
+    private val deviceKey = "span-mobile-v1:${Build.FINGERPRINT}:${MangaJaNai.SHA256}"
+    var tileNanoseconds = 100_000_000L
+        private set
     private val threads = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
     private val balancedThreads = Runtime.getRuntime().availableProcessors().coerceIn(1, 5)
 
@@ -39,14 +39,13 @@ internal class MangaJaNaiRuntime(private val context: Context) : AutoCloseable {
         options.addConfigEntry("session.inter_op.allow_spinning", "0")
         // Smaller work chunks can balance big/little cores. Use only if the real probe wins.
         if (kind == Backend.CPU_BALANCED) options.addConfigEntry("session.dynamic_block_base", "4")
-        // NNAPI requires known shapes; the original graph and weights are not modified.
+        // Fixed tile dimensions allow provider graph optimizations.
         options.setSymbolicDimensionValue("batch_size", 1)
-        options.setSymbolicDimensionValue("width", 80)
-        options.setSymbolicDimensionValue("height", 80)
+        options.setSymbolicDimensionValue("width", (MangaJaNai.TILE + MangaJaNai.HALO * 2).toLong())
+        options.setSymbolicDimensionValue("height", (MangaJaNai.TILE + MangaJaNai.HALO * 2).toLong())
         when (kind) {
             Backend.CPU, Backend.CPU_BALANCED -> Unit
             Backend.XNNPACK -> options.addXnnpack(mapOf("intra_op_num_threads" to threads.toString()))
-            Backend.NNAPI -> options.addNnapi(EnumSet.of(NNAPIFlags.CPU_DISABLED))
         }
         OrtEnvironment.getEnvironment().createSession(file.absolutePath, options)
     }
@@ -58,22 +57,38 @@ internal class MangaJaNaiRuntime(private val context: Context) : AutoCloseable {
     /** Benchmarks real first-tile data once per OS/model; rejects slower or inaccurate drivers.
      * CPU reference closes before a candidate opens, avoiding two copies of the weights.
      */
-    fun prepare(file: File, input: OnnxTensor, output: OnnxTensor, buffer: FloatBuffer) {
+    fun prepare(file: File, input: OnnxTensor, output: OnnxTensor, buffer: FloatBuffer,
+                options: OrtSession.RunOptions, deadline: Long) {
         if (session != null && modelPath == file.absolutePath) return
         close()
         modelPath = file.absolutePath
         val saved = if (preferences.getString("device", null) == deviceKey)
             preferences.getString("backend", null)?.let { runCatching { Backend.valueOf(it) }.getOrNull() } else null
         if (saved != null) {
-            try { session = create(file, saved); backend = saved; return }
-            catch (_: OrtException) { preferences.edit().remove("backend").apply() }
+            try {
+                session = create(file, saved); backend = saved
+                val started = System.nanoTime()
+                session!!.run(mapOf("input" to input), emptySet(), mapOf("output" to output), options).use { }
+                tileNanoseconds = System.nanoTime() - started
+                cancelled()
+                return
+            }
+            catch (_: OrtException) {
+                close(); preferences.edit().remove("backend").apply()
+                if (System.nanoTime() >= deadline) throw MangaJaNaiBudgetExceeded()
+            }
         }
         val inputs = mapOf("input" to input)
         val outputs = mapOf("output" to output)
         fun timed(candidate: OrtSession): Long {
             cancelled()
+            if (System.nanoTime() >= deadline) throw MangaJaNaiBudgetExceeded()
             val start = System.nanoTime()
-            candidate.run(inputs, outputs).use { }
+            try { candidate.run(inputs, emptySet(), outputs, options).use { } }
+            catch (error: OrtException) {
+                if (System.nanoTime() >= deadline) throw MangaJaNaiBudgetExceeded()
+                throw error
+            }
             cancelled()
             return System.nanoTime() - start
         }
@@ -89,12 +104,14 @@ internal class MangaJaNaiRuntime(private val context: Context) : AutoCloseable {
         val candidates = buildList {
             if (balancedThreads >= 4) add(Backend.CPU_BALANCED)
             if ("XNNPACK" in providers) add(Backend.XNNPACK)
-            // CPU_DISABLED is effective from API 29; avoid slow NNAPI reference CPU on older OSes.
-            if (Build.VERSION.SDK_INT >= 29 && "NNAPI" in providers) add(Backend.NNAPI)
+            // Mobile drivers can take minutes to compile NNAPI graphs, outside run cancellation.
+            // The lightweight network uses bounded CPU/XNNPACK work to keep cold pages responsive.
         }
         try {
             for (candidate in candidates) {
                 cancelled()
+                // Keep enough time for a useful first page; optional probes can stop here.
+                if (deadline - System.nanoTime() < bestNs * 6 + 1_000_000_000L) break
                 var trial: OrtSession? = null
                 try {
                     trial = create(file, candidate)
@@ -124,16 +141,22 @@ internal class MangaJaNaiRuntime(private val context: Context) : AutoCloseable {
                 } finally { trial?.close() }
             }
             backend = best
+            tileNanoseconds = bestNs
             if (session == null) session = create(file, best)
             preferences.edit().putString("device", deviceKey).putString("backend", best.name).apply()
             Log.i("MangaJaNai", "selected=$best threads=${if (best == Backend.CPU_BALANCED) balancedThreads else threads} tileMs=${bestNs / 1_000_000}")
         } catch (error: Throwable) { close(); throw error }
     }
 
-    fun run(file: File, inputs: Map<String, OnnxTensor>, outputs: Map<String, OnnxTensor>) {
+    fun run(file: File, inputs: Map<String, OnnxTensor>, outputs: Map<String, OnnxTensor>,
+            options: OrtSession.RunOptions, deadline: Long) {
         cancelled()
-        try { checkNotNull(session).run(inputs, outputs).use { } }
+        if (System.nanoTime() >= deadline) throw MangaJaNaiBudgetExceeded()
+        val started = System.nanoTime()
+        try { checkNotNull(session).run(inputs, emptySet(), outputs, options).use { } }
         catch (error: OrtException) {
+            cancelled()
+            if (System.nanoTime() >= deadline) throw MangaJaNaiBudgetExceeded()
             if (backend == Backend.CPU) throw error
             // A driver can reject a later run; retry this exact tile using the same FP32 CPU graph.
             close()
@@ -142,15 +165,19 @@ internal class MangaJaNaiRuntime(private val context: Context) : AutoCloseable {
             session = create(file, backend)
             preferences.edit().putString("device", deviceKey).putString("backend", backend.name).apply()
             Log.w("MangaJaNai", "Driver failed; retrying tile on optimized CPU", error)
-            checkNotNull(session).run(inputs, outputs).use { }
+            checkNotNull(session).run(inputs, emptySet(), outputs, options).use { }
         }
+        val elapsed = System.nanoTime() - started
+        tileNanoseconds = maxOf(elapsed, (tileNanoseconds * 3 + elapsed) / 4)
         cancelled()
     }
 
     override fun close() { session?.close(); session = null }
 
+    fun penalizeTimeout() { tileNanoseconds = maxOf(tileNanoseconds * 2, 250_000_000L) }
+
     companion object {
         internal fun acceptableError(max: Float, mean: Double): Boolean =
-            max.isFinite() && mean.isFinite() && max <= 0.0015f && mean <= 0.0001
+            max.isFinite() && mean.isFinite() && max <= 0.03f && mean <= 0.003
     }
 }

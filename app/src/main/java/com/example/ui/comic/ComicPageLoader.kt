@@ -47,6 +47,7 @@ class ComicPageLoader(
     /** 在线漫画专用加载器（解密/headers 代理），null 时用全局默认 */
     private val remoteImageLoader: ImageLoader? = null,
     private val minimal: Boolean = false,
+    private val processImage: (Bitmap, ComicImagePipeline.Geometry, ComicImagePipeline.Toning) -> Bitmap = ComicImagePipeline::process,
 ) {
     init { ComicNeuralBackend.configure(context); MangaJaNai.configure(context) }
 
@@ -143,6 +144,7 @@ class ComicPageLoader(
 
     /** 预取并发闸门：无界并行时 N 页全尺寸解码+管线峰值内存 = N×数十 MB */
     private val preloadGate = Semaphore(2)
+    private val mangaPreloadGate = Semaphore(1)
     private val decodeGate = Semaphore(if (minimal) 1 else 2)
 
     /** 逐像素增强管线并发闸门：内存护栏（预取+当前页并行处理会数倍放大峰值内存） */
@@ -193,7 +195,7 @@ class ComicPageLoader(
         tone: ComicImagePipeline.Toning, visible: Boolean,
     ): PageLoadResult {
         if (visible) return try {
-            comicDisplayLoadWithTimeout(if (tone.enhanceMode == ComicEnhanceMode.MANGAJANAI) 20 * 60_000L else 90_000L) { load(ref, cacheKey, geo, tone) }
+            comicDisplayLoadWithTimeout(if (tone.enhanceMode == ComicEnhanceMode.MANGAJANAI) 15_000L else 90_000L) { load(ref, cacheKey, geo, tone) }
         } catch (error: IOException) {
             // Our own deadline cancels load internally; still release foreground priority
             // so neighbors cannot wait forever for an already failed visible request.
@@ -202,14 +204,16 @@ class ComicPageLoader(
             throw error
         }
         cachedOrPinned(cacheKey)?.let { return PageLoadResult(it, true) }
-        if (minimal || tone.enhanceMode == ComicEnhanceMode.MANGAJANAI) kotlinx.coroutines.awaitCancellation()
+        if (minimal || (tone.enhanceMode == ComicEnhanceMode.MANGAJANAI &&
+                !synchronized(pinnedLock) { windowKeys.contains(cacheKey) })) kotlinx.coroutines.awaitCancellation()
         if (ref is ComicPageRef.Remote && appPrefs.preloadWifiOnly && !wifiConnectedOrUnmetered()) {
             // Promotion to a visible page restarts its producer and bypasses this wait.
             kotlinx.coroutines.awaitCancellation()
         }
-        return preloadGate.withPermit {
-            if (ref is ComicPageRef.Remote) awaitForeground()
-            load(ref, cacheKey, geo, tone)
+        val gate = if (tone.enhanceMode == ComicEnhanceMode.MANGAJANAI) mangaPreloadGate else preloadGate
+        return gate.withPermit {
+            if (tone.enhanceMode == ComicEnhanceMode.MANGAJANAI || ref is ComicPageRef.Remote) awaitForeground()
+            load(ref, cacheKey, geo, tone, background = true)
         }
     }
 
@@ -379,6 +383,7 @@ class ComicPageLoader(
         cacheKey: String,
         geo: ComicImagePipeline.Geometry,
         tone: ComicImagePipeline.Toning,
+        background: Boolean = false,
     ): PageLoadResult = withContext(Dispatchers.Default) {
         cachedOrPinned(cacheKey)?.let { return@withContext PageLoadResult(it, true) }
         terminalLoads.remove(cacheKey)
@@ -471,7 +476,7 @@ class ComicPageLoader(
                         // 新增调色字段时漂移成"有调色不进闸门"回归
                         val heavy = ComicImagePipeline.toningHasWork(tone)
                         suspend fun process(): Bitmap? = try {
-                            runInterruptible { ComicImagePipeline.process(raw, geo, tone) }
+                            runInterruptible { MangaJaNai.withSilentStatus(background) { processImage(raw, geo, tone) } }
                         } catch (ce: CancellationException) {
                             throw ce
                         } catch (error: Exception) {
@@ -747,6 +752,7 @@ class ComicPageLoader(
         val cacheKey: String,
         val geo: ComicImagePipeline.Geometry,
         val visible: Boolean = false,
+        val ahead: Boolean = true,
     )
 
     /**
@@ -780,10 +786,13 @@ class ComicPageLoader(
      */
     fun preloadWindow(entries: List<WindowEntry>, tone: ComicImagePipeline.Toning) {
         // 仅 Wi-Fi 预加载：非 Wi-Fi 且是计费网络时，跳过在线页的提前下载
-        val effective = if (minimal || tone.enhanceMode == ComicEnhanceMode.MANGAJANAI) entries.filter { it.visible }
-        else if (appPrefs.preloadWifiOnly && !wifiConnectedOrUnmetered()) {
+        val networkEligible = if (appPrefs.preloadWifiOnly && !wifiConnectedOrUnmetered()) {
             entries.filter { it.visible || it.ref !is ComicPageRef.Remote }
         } else entries
+        val effective = if (minimal) entries.filter { it.visible }
+        else if (tone.enhanceMode == ComicEnhanceMode.MANGAJANAI) {
+            networkEligible.filter { it.visible } + networkEligible.filter { !it.visible && it.ahead }.take(3)
+        } else networkEligible
         val newForeground = effective.filter { it.visible }.mapTo(HashSet()) { it.cacheKey }
         if (newForeground != foregroundKeys) {
             newForeground.forEach { terminalLoads.remove(it) }
@@ -809,10 +818,9 @@ class ComicPageLoader(
             rebuildPinnedInPriorityOrder()
         }
         val batchKeys = HashSet<String>(effective.size)
-        // Curl still needs a readable neighbor texture. Decode only tiny originals,
-        // never enqueue another MangaJaNai session for speculative pages.
+        // Tiny originals keep curl readable while serial enhancement prepares the forward pages.
         if (!minimal && tone.enhanceMode == ComicEnhanceMode.MANGAJANAI) {
-            entries.filter { !it.visible }.take(4).forEach { e ->
+            entries.filter { !it.visible && effective.none { candidate -> candidate.cacheKey == it.cacheKey } }.take(2).forEach { e ->
                 batchKeys.add(e.cacheKey)
                 if (peekProcessed(e.cacheKey) == null && peekReadingPreview(e.cacheKey) == null && !preloadJobs.containsKey(e.cacheKey)) {
                     val job = scope.launch(start = CoroutineStart.LAZY) {
@@ -837,20 +845,27 @@ class ComicPageLoader(
             val probeHit = cachedOrPinned(e.cacheKey)
             cacheDbg { "probe key=${e.ref.id} hit=${probeHit != null}" }
             // Visible pages have their own foreground producer and never wait for this gate.
-            if (!minimal && tone.enhanceMode != ComicEnhanceMode.MANGAJANAI && probeHit == null && !e.visible && !preloadJobs.containsKey(e.cacheKey)) {
-                val job = scope.launch(start = CoroutineStart.LAZY) {
+            if (!minimal && probeHit == null && !e.visible && !preloadJobs.containsKey(e.cacheKey)) {
+                val manga = tone.enhanceMode == ComicEnhanceMode.MANGAJANAI
+                // Undispatched acquisition preserves next-page order before waiting for foreground.
+                val job = scope.launch(start = if (manga) CoroutineStart.UNDISPATCHED else CoroutineStart.LAZY) {
                     try {
                         // 并发闸门：最多 2 页同时解码+处理（无界并行峰值内存 = N×数十 MB）
-                        preloadGate.withPermit {
-                            if (e.ref is ComicPageRef.Remote) awaitForeground()
-                            runCatching { load(e.ref, e.cacheKey, e.geo, tone) }
+                        (if (manga) mangaPreloadGate else preloadGate).withPermit {
+                            if (manga || e.ref is ComicPageRef.Remote) awaitForeground()
+                            try { load(e.ref, e.cacheKey, e.geo, tone, background = true) }
+                            catch (cancel: CancellationException) { throw cancel }
+                            catch (_: Exception) { /* Retry on foreground; do not cache an error. */ }
                         }
                     } finally {
                         // 条件移除：仅当映射仍是自己（被新任务顶替时不误删）
                         preloadJobs.remove(e.cacheKey, coroutineContext[Job])
                     }
                 }
-                if (preloadJobs.putIfAbsent(e.cacheKey, job) == null) job.start() else job.cancel()
+                if (preloadJobs.putIfAbsent(e.cacheKey, job) == null) {
+                    job.invokeOnCompletion { preloadJobs.remove(e.cacheKey, job) }
+                    if (!manga) job.start()
+                } else job.cancel()
             }
         }
         // 取消已不在当前窗口的等待中任务（快速翻页旧页预取）
@@ -872,7 +887,7 @@ class ComicPageLoader(
      */
     internal fun ensureWindowCapacity(entries: List<WindowEntry>, tone: ComicImagePipeline.Toning) {
         mangaWindow = tone.enhanceMode == ComicEnhanceMode.MANGAJANAI
-        windowRetainBytes = if (mangaWindow) minOf(cacheRetainCeilBytes, 20 shl 20) else cacheRetainCeilBytes
+        windowRetainBytes = if (mangaWindow) minOf(cacheRetainCeilBytes, 64 shl 20) else cacheRetainCeilBytes
         readingPreviews.resize(if (minimal) 2 shl 20 else if (mangaWindow) 6 shl 20 else 8 shl 20)
         var needed = 0L
         entries.forEach { e ->

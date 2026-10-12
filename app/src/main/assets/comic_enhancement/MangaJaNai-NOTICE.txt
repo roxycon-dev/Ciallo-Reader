@@ -1,9 +1,17 @@
-MangaJaNai V1 2x 1200p ESRGAN (70k)
-Original model: the-database / MangaJaNai
+JaNai mobile: IllustrationJaNai V3denoise SPAN-S 2x (30k)
+Original model: the-database / MangaJaNai, IllustrationJaNai family
 https://github.com/the-database/MangaJaNai
-ONNX conversion: haesslerian / MangaJaNai_V1_ONNX
-https://huggingface.co/haesslerian/MangaJaNai_V1_ONNX
-Revision: 2f67ff30209f2e0c75b7c55e6f3ffc3adbc960f7
+Source release: 3.0.0 (d2f8f92)
+https://github.com/the-database/MangaJaNai/releases/tag/3.0.0
+Source archive: IllustrationJaNai_V3denoise_onnx.zip
+Source weights: 2x_IllustrationJaNai_V3denoise_SPAN_S_30k_fp16_1x3xHxW_dyn-HW_strong_fp16_op23.onnx
+Source SHA256: cd0344ebae36281206827954b730e0f944ce961dbbe059a41a083014f3e7c03a
+Mobile conversion by Ciallo Reader: FP16 values converted to FP32, equivalent operator definitions
+at opset 18, corrected symbolic 2x output shape names. No retraining or INT8 quantization.
+Bundled file: janai-span-mobile.onnx, 1673288 bytes
+Bundled SHA256: 718b8670ab396a5174e5b4b38f9d3947beaac3afbe9647d494d65925180a2a7b
 License: Creative Commons Attribution-NonCommercial 4.0 International
 See MangaJaNai-CC-BY-NC-4.0.txt for the full license.
-The ONNX weights are downloaded on demand, verified and used without modification.
+Changes to the image processing: bounded neural input with original-detail residual fusion.
+This lightweight color/illustration model replaces the previous V1 black-and-white ESRGAN model.
+The derivative weights and this attribution are bundled in the APK for offline operation.

@@ -8,7 +8,7 @@
 
 Kotlin · Jetpack Compose (Material 3) · MVVM · 单 Activity
 
-[下载 1.3.4 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.4/Ciallo-Reader-v1.3.4.apk) ·
+[下载 1.3.5 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.5/Ciallo-Reader-v1.3.5.apk) ·
 [功能](#功能) ·
 [安装](#安装) ·
 [使用说明](#使用说明) ·
@@ -16,7 +16,7 @@ Kotlin · Jetpack Compose (Material 3) · MVVM · 单 Activity
 [提交 Issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
 
 ![Android](https://img.shields.io/badge/Android-API%2024%2B-green)
-![Release](https://img.shields.io/badge/Release-v1.3.4-orange)
+![Release](https://img.shields.io/badge/Release-v1.3.5-orange)
 ![Architecture](https://img.shields.io/badge/Architecture-MVVM-blue)
 ![UI](https://img.shields.io/badge/UI-Compose%20M3-8A2BE2)
 ![License](https://img.shields.io/badge/License-All%20Rights%20Reserved-lightgrey)
@@ -31,22 +31,22 @@ Android 端小说 / 漫画阅读器，内置多书源在线聚合搜索与下载
 
 | 项目                     | 内容                                                                  |
 | ---------------------- | ------------------------------------------------------------------- |
-| 当前版本                   | 1.3.4                                                               |
+| 当前版本                   | 1.3.5                                                               |
 | 开发状态                   | 个人项目 · 活跃开发中                                                        |
 | 最低系统                   | Android 7.0（API 24）                                                 |
 | compileSdk / targetSdk | 35                                                                  |
 | 技术栈                    | Kotlin 2.0 + Jetpack Compose（Material 3）+ MVVM + Room + WorkManager |
 | 架构                     | MVVM + StateFlow + Repository，单 Activity + Navigation Compose       |
-| 测试 | 51 个套件、366 项 JVM / Robolectric 回归通过，覆盖书架动效、阅读设置玻璃、弹层、主题、导航及漫画；见 [1.3.4 发布验证](docs/release-1.3.4-2026-10-12.md)，未进行真机测试 |
-| 正式安装包 | 1.3.4 / 215，arm64-v8a；见 [v1.3.4 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.3.4) |
+| 测试 | 53 个套件、374 项 JVM / Robolectric 回归通过，覆盖书架动效、阅读设置玻璃、弹层、主题、导航及漫画；见 [1.3.5 发布验证](docs/release-1.3.5-2026-10-12.md)，未进行真机测试 |
+| 正式安装包 | 1.3.5 / 216，arm64-v8a；见 [v1.3.5 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.3.5) |
 
 ***
 
 ## 功能
 
-1.3.4 加快 MangaJaNai：完全相同的图块复用原始浮点结果，批量读取像素，自动比较大小核调度方案。[发布验证](docs/release-1.3.4-2026-10-12.md)。
+1.3.5：**JaNai 极速**，轻量模型离线可用，提前生成后续最多 3 页。[发布验证](docs/release-1.3.5-2026-10-12.md)。
 
-MangaJaNai 面向黑白漫画，复用现有 ONNX Runtime。首次下载约 64 MiB 模型；保留原模型、输入分辨率、FP32 和 48 px 分块算法。图优化、多核、固定缓冲与单会话复用；NNAPI / XNNPACK 和最多 5 线程的动态任务调度均须通过速度与输出校验，失败退回 CPU。完全相同的图块逐像素核对后复用 FP32 结果，8 块缓存数组约 1.04 MiB，空闲 15 秒、退出阅读或内存压力时释放；不跳过未计算过的空白。整页结果另存现有磁盘缓存。桌面 300×450 合成留白样图由 10.05 秒降到 2.12 秒，密集线条样图约 10 秒、无明显提速；没有荣耀 200 Pro 或《别当欧尼酱了》实页 5 秒达标数据。旧“超分辨率”已合并到“超分”，原设置自动迁移。[模型来源与 CC BY-NC 4.0 许可](docs/vendor-licenses/MangaJaNai/README.md)。
+改用原作者 JaNai 系列 SPAN-S，模型约 1.6 MiB；按设备速度调整计算量，融合原图文字和细线，超时保留原图。模型与旧 ESRGAN 的效果不同。桌面完整页测试约 1.9–3.4 秒；荣耀 200 Pro 的 5 秒目标尚未真机验证。[模型来源与许可](docs/vendor-licenses/MangaJaNai/README.md)。
 
 弱性能设备可在「设置 → 渲染画质」选择 **极简**：关闭玻璃采样、装饰动效、卷页、漫画增强、翻译和场景特效；限制图片解码、缓存与预取。支持 Android 7.0+、arm64-v8a；没有真机帧率测试，不承诺所有旧设备都能满帧。
 
@@ -83,7 +83,7 @@ MangaJaNai 面向黑白漫画，复用现有 ONNX Runtime。首次下载约 64 M
 - 仿真拖动按手指位移跟随；短滑 / 快速滑动在松手后判定，收尾动画从实际抓取点继续
 - 翻页引擎：无 / 平移 / 渐变 / 仿真卷页（含双页书脊、刚体封面、透纸背面）
 - 缩放：双击三档、长按临时放大、双指缩放平移，大图按可视区域局部解码
-- 图像处理：自动裁边、跨页拆片、色调调整；锐化 / 线条 / 超分 / MangaJaNai。前三项直接可用，MangaJaNai 按需下载模型
+- 图像处理：自动裁边、跨页拆片、色调调整；锐化 / 线条 / 超分 / JaNai 极速，均离线可用
 - 阅读背景：纯色 / 纸张纹理 / 随当前页取色的沉浸模式
 - 预设系统：内置日漫 / 条漫 / 老漫画，可自建与收藏；每本漫画独立配置
 - 自动翻页 / 自动滚动、整本或单页旋转、音量键翻页
@@ -122,7 +122,7 @@ MangaJaNai 面向黑白漫画，复用现有 ONNX Runtime。首次下载约 64 M
 - OCR 与译文分别缓存，网络重试复用已识别对白；翻回已译页直接显示，译名表按漫画隔离，关闭翻译释放模型内存
 - 大模型瞬时故障可降级腾讯机翻并提示原因；降级结果不冒充 AI 译文缓存。免费免 Key 大模型的稳定调用源尚未核实
 
-[1.2.5 跟手翻页与翻译链路重构记录](docs/comic-translation-rebuild-1.2.5-2026-10-07.md)。这是 1.2.5 历史优化记录；当前版本为 1.3.4。
+[1.2.5 跟手翻页与翻译链路重构记录](docs/comic-translation-rebuild-1.2.5-2026-10-07.md)。这是 1.2.5 历史优化记录；当前版本为 1.3.5。
 
 [1.2.5 阅读体验优化与验证](docs/reader-polish-1.2.5-2026-10-07.md)。
 
@@ -202,7 +202,7 @@ echo "sdk.dir=/你的/Android/Sdk/路径" > local.properties
 ./gradlew :app:assembleRelease
 ```
 
-2026-10-12 发布 1.3.4 / 215：可从 [GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.4/Ciallo-Reader-v1.3.4.apk) 下载；使用 Release 构建、R8 混淆与资源精简，原始输出在 `app/build/outputs/apk/release/app-release.apk`。当前包沿用 1.3.3 签名，可覆盖安装。GitHub 旧 1.2.1 包使用另一证书：若出现签名冲突，先在设置中导出备份，再安装新版并恢复；未备份前不要卸载旧版。
+2026-10-12 发布 1.3.5 / 216：可从 [GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.5/Ciallo-Reader-v1.3.5.apk) 下载；使用 Release 构建、R8 混淆与资源精简，原始输出在 `app/build/outputs/apk/release/app-release.apk`。当前包沿用 1.3.4 签名，可覆盖安装。GitHub 旧 1.2.1 包使用另一证书：若出现签名冲突，先在设置中导出备份，再安装新版并恢复；未备份前不要卸载旧版。
 
 ***
 
@@ -324,6 +324,7 @@ Release 包只含 arm64 库，x86_64 模拟器转译运行会崩溃；Debug 包�
 
 | 版本    | 日期         | 主要内容                              |
 | ----- | ---------- | --------------------------------- |
+| 1.3.5 | 2026-10-12 | 极速增强 · 后续预生成 |
 | 1.3.4 | 2026-10-12 | 漫画增强提速 |
 | 1.3.3 | 2026-10-12 | 增强加速 · 设置卡片统一 |
 | 1.3.2 | 2026-10-12 | 漫画增强 · 精确续读 · 极简渲染 |
