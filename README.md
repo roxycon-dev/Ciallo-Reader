@@ -28,14 +28,36 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 ## 界面预览
 
+### 阅读设置与排版
+
+1.2.5 同版本逐项打磨实拍：[完整功能记录与四种屏幕截图](docs/comic-feature-polish-1.2.5-2026-10-07.md)。下图来自 Android 模拟器，正文及漫画为生成的验证样例。
+
 <table>
 <tr>
-<td align="center"><strong>小说阅读设置</strong><br><img src="./docs/screenshots/shot-reader125-novel-phone.jpg" width="260" alt="Android 小说阅读器的字体、行距、亮度和排版设置"/></td>
-<td align="center"><strong>漫画阅读设置</strong><br><img src="./docs/screenshots/shot-reader125-comic-polish-phone.jpg" width="260" alt="Android 漫画阅读器的翻页、显示、图像和翻译设置"/></td>
+<td align="center"><img src="./docs/screenshots/shot-reader125-comic-polish-tablet.jpg" width="760" alt="漫画阅读设置的平板主题分类"/></td>
+</tr>
+<tr>
+<td align="center"><strong>小说阅读设置 · 手机</strong><br><img src="./docs/screenshots/shot-reader125-novel-phone.jpg" width="280" alt="Android 小说阅读器的字体、行距、亮度和排版设置"/></td>
+<td align="center"><strong>小说阅读设置 · 平板</strong><br><img src="./docs/screenshots/shot-reader125-novel-tablet.jpg" width="760" alt="Android 平板横屏小说排版设置"/></td>
+</tr>
+<tr>
+<td align="center"><strong>漫画阅读设置 · 平板</strong><br><img src="./docs/screenshots/shot-reader125-comic-tablet.jpg" width="760" alt="Android 平板横屏漫画设置侧栏"/></td>
+<td align="center"><strong>漫画阅读设置 · 手机</strong><br><img src="./docs/screenshots/shot-reader125-comic-polish-phone.jpg" width="280" alt="Android 漫画阅读器的翻页、显示、图像和翻译设置"/></td>
 </tr>
 </table>
 
-> 以上为功能界面示例，部分截图来自较早版本的 Android 模拟器；应用仍在持续更新，当前界面可能已有调整。演示正文为样例内容。
+### 更多应用界面
+
+以下 12 张为此前版本的实际界面截图，展示书源管理、书库、书架、阅读、详情、统计与设置。
+
+<table>
+<tr><td align="center"><strong>书源管理</strong><br><img src="./promo/readme-screenshots/01-source-management.jpg" width="180" alt="书源管理截图"/></td><td align="center"><strong>书库搜索</strong><br><img src="./promo/readme-screenshots/02-library-search.jpg" width="180" alt="书库搜索截图"/></td><td align="center"><strong>主题与屏幕方向</strong><br><img src="./promo/readme-screenshots/03-theme-and-display.jpg" width="180" alt="主题与屏幕方向截图"/></td></tr>
+<tr><td align="center"><strong>阅读日历与趋势</strong><br><img src="./promo/readme-screenshots/04-reading-calendar.jpg" width="180" alt="阅读日历与趋势截图"/></td><td align="center"><strong>阅读统计与排行榜</strong><br><img src="./promo/readme-screenshots/05-reading-insights.jpg" width="180" alt="阅读统计与排行榜截图"/></td><td align="center"><strong>书架与继续阅读</strong><br><img src="./promo/readme-screenshots/06-bookshelf.jpg" width="180" alt="书架与继续阅读截图"/></td></tr>
+<tr><td align="center"><strong>漫画仿真翻页</strong><br><img src="./promo/readme-screenshots/07-comic-page-turn.jpg" width="180" alt="漫画仿真翻页截图"/></td><td align="center"><strong>小说仿真翻页</strong><br><img src="./promo/readme-screenshots/08-novel-page-turn.jpg" width="180" alt="小说仿真翻页截图"/></td><td align="center"><strong>漫画详情与标签</strong><br><img src="./promo/readme-screenshots/09-comic-details.jpg" width="180" alt="漫画详情与标签截图"/></td></tr>
+<tr><td align="center"><strong>章节、神回与书签</strong><br><img src="./promo/readme-screenshots/10-chapters-bookmarks.jpg" width="180" alt="章节、神回与书签截图"/></td><td align="center"><strong>神回排行榜</strong><br><img src="./promo/readme-screenshots/11-god-chapter-ranking.jpg" width="180" alt="神回排行榜截图"/></td><td align="center"><strong>阅读器设置</strong><br><img src="./promo/readme-screenshots/12-reader-settings.jpg" width="180" alt="阅读器设置截图"/></td></tr>
+</table>
+
+> 部分旧截图来自较早版本；应用仍在持续更新，当前界面可能已有调整。演示正文为样例内容。
 
 ## 功能亮点
 

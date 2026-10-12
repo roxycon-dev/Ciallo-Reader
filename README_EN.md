@@ -26,14 +26,36 @@ Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader
 
 ## Screenshots
 
+### Reading settings and layouts
+
+The screenshots below are from Android emulator builds. Reading text and comic pages are generated sample content. See the [v1.2.5 refinement notes and four screen-size examples](docs/comic-feature-polish-1.2.5-2026-10-07.md).
+
 <table>
 <tr>
-<td align="center"><strong>Novel reading settings</strong><br><img src="./docs/screenshots/shot-reader125-novel-phone.jpg" width="260" alt="Android ebook reader controls for font, line spacing, brightness, and page layout"/></td>
-<td align="center"><strong>Manga reading settings</strong><br><img src="./docs/screenshots/shot-reader125-comic-polish-phone.jpg" width="260" alt="Android manga reader controls for page turns, display, image processing, and translation"/></td>
+<td align="center"><img src="./docs/screenshots/shot-reader125-comic-polish-tablet.jpg" width="760" alt="Manga reader settings categories on a tablet"/></td>
+</tr>
+<tr>
+<td align="center"><strong>Novel settings · phone</strong><br><img src="./docs/screenshots/shot-reader125-novel-phone.jpg" width="280" alt="Android ebook reader controls for font, line spacing, brightness, and page layout"/></td>
+<td align="center"><strong>Novel settings · tablet</strong><br><img src="./docs/screenshots/shot-reader125-novel-tablet.jpg" width="760" alt="Landscape tablet layout for novel reader settings"/></td>
+</tr>
+<tr>
+<td align="center"><strong>Manga settings · tablet</strong><br><img src="./docs/screenshots/shot-reader125-comic-tablet.jpg" width="760" alt="Landscape tablet sidebar for manga settings"/></td>
+<td align="center"><strong>Manga settings · phone</strong><br><img src="./docs/screenshots/shot-reader125-comic-polish-phone.jpg" width="280" alt="Android manga reader controls for page turns, display, image processing, and translation"/></td>
 </tr>
 </table>
 
-> Screenshots show feature examples; some are from an earlier Android emulator build. The app continues to evolve, so the current interface may differ. Reading pages use sample content.
+### More app screens
+
+These 12 earlier screenshots show source management, library search, the bookshelf, reading, comic details, reading statistics, and settings.
+
+<table>
+<tr><td align="center"><strong>Source management</strong><br><img src="./promo/readme-screenshots/01-source-management.jpg" width="180" alt="Book source management"/></td><td align="center"><strong>Library search</strong><br><img src="./promo/readme-screenshots/02-library-search.jpg" width="180" alt="Online library search"/></td><td align="center"><strong>Themes and orientation</strong><br><img src="./promo/readme-screenshots/03-theme-and-display.jpg" width="180" alt="Theme and screen orientation settings"/></td></tr>
+<tr><td align="center"><strong>Reading calendar and trends</strong><br><img src="./promo/readme-screenshots/04-reading-calendar.jpg" width="180" alt="Reading calendar and trends"/></td><td align="center"><strong>Reading insights and rankings</strong><br><img src="./promo/readme-screenshots/05-reading-insights.jpg" width="180" alt="Reading insights and rankings"/></td><td align="center"><strong>Bookshelf and continue reading</strong><br><img src="./promo/readme-screenshots/06-bookshelf.jpg" width="180" alt="Bookshelf with continue-reading section"/></td></tr>
+<tr><td align="center"><strong>Manga page turn</strong><br><img src="./promo/readme-screenshots/07-comic-page-turn.jpg" width="180" alt="Manga page-turn effect"/></td><td align="center"><strong>Novel page turn</strong><br><img src="./promo/readme-screenshots/08-novel-page-turn.jpg" width="180" alt="Novel page-turn effect"/></td><td align="center"><strong>Manga details and tags</strong><br><img src="./promo/readme-screenshots/09-comic-details.jpg" width="180" alt="Manga details and tags"/></td></tr>
+<tr><td align="center"><strong>Chapters, highlights, and bookmarks</strong><br><img src="./promo/readme-screenshots/10-chapters-bookmarks.jpg" width="180" alt="Chapters, highlights, and bookmarks"/></td><td align="center"><strong>Highlight ranking</strong><br><img src="./promo/readme-screenshots/11-god-chapter-ranking.jpg" width="180" alt="Saved highlights ranking"/></td><td align="center"><strong>Reader settings</strong><br><img src="./promo/readme-screenshots/12-reader-settings.jpg" width="180" alt="Reader settings"/></td></tr>
+</table>
+
+> Some older screenshots may differ from the current interface. Reading text and comic pages are sample content.
 
 ## Features
 
