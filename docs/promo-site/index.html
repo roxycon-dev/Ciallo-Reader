@@ -2,8 +2,8 @@
 <html lang="zh-Hans">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f7f6f2">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f3f8">
   <meta name="robots" content="index,follow,max-image-preview:large">
   <title>Ciallo Reader｜Android 小说阅读器、漫画阅读器与 EPUB 电子书</title>
   <meta name="description" content="Ciallo Reader 是一款 Android 小说、漫画与电子书阅读器。导入 TXT、EPUB、MOBI、CBZ、PDF 等文件，管理书架，搜索在线书源并下载离线阅读。">
@@ -40,156 +40,308 @@
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
-  <header class="site-header wrap">
-    <a class="brand" href="./" aria-label="Ciallo Reader 首页">
-      <img src="./media/icon.webp" width="42" height="42" alt="">
-      <span>Ciallo <b>Reader</b></span>
-    </a>
-    <nav class="header-nav" aria-label="主导航">
+
+  <!-- 背景：彩色光斑（为玻璃提供可折射的内容） -->
+  <div class="blobs" aria-hidden="true"><span class="b1"></span><span class="b2"></span><span class="b3"></span></div>
+  <!-- 背景：随鼠标变形的流动曲线（内容由 JS 生成） -->
+  <svg id="curves" aria-hidden="true"></svg>
+
+  <!-- 倾斜的悬浮玻璃导航 -->
+  <header class="nav-wrap">
+    <nav class="nav glass" id="nav" data-lens="nav" aria-label="主导航">
+      <a class="nav-brand" href="./" aria-label="Ciallo Reader 首页">
+        <img src="./media/icon.webp" width="26" height="26" alt="">
+        <span>Ciallo Reader</span>
+      </a>
+      <div class="nav-links">
+        <span class="nav-slider" id="navSlider" aria-hidden="true"></span>
+        <a href="#features">阅读体验</a>
+        <a href="#formats">支持格式</a>
+        <a href="#faq">常见问题</a>
+      </div>
+      <div class="nav-actions">
+        <a class="lang-link" href="./en/" lang="en">EN</a>
+        <button class="theme-btn glass" id="themeBtn" data-lens="pill" aria-label="切换深浅色主题">
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5 5l1.6 1.6M17.4 17.4L19 19M19 5l-1.6 1.6M6.6 17.4L5 19"/></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13.2A8.2 8.2 0 0 1 10.8 4 8.4 8.4 0 1 0 20 13.2z"/></svg>
+        </button>
+        <a class="nav-dl" href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">下载</a>
+        <button class="menu-btn" id="menuBtn" aria-label="打开菜单" aria-expanded="false" aria-controls="mobilePanel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+      </div>
+    </nav>
+    <div class="mobile-panel glass" id="mobilePanel" data-lens="nav">
       <a href="#features">阅读体验</a>
       <a href="#formats">支持格式</a>
       <a href="#faq">常见问题</a>
-      <a class="language-link" href="./en/" lang="en">English</a>
-    </nav>
+      <a href="./en/" lang="en">English</a>
+    </div>
   </header>
 
   <main id="main">
-    <section class="hero wrap">
-      <div class="hero-copy">
-        <p class="eyebrow"><span class="eyebrow-dot"></span> ANDROID · NOVEL · MANGA · EBOOK</p>
-        <h1>小说、漫画与电子书，<br><em>放进同一个书架。</em></h1>
-        <p class="hero-lede">Ciallo Reader 是一款 Android 阅读器。导入自己的书，按习惯调整阅读方式；联网搜索或下载之后，也可以回到书架继续离线阅读。</p>
-        <div class="hero-actions">
-          <a class="button button-primary" href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">下载最新版 APK <span aria-hidden="true">↗</span></a>
-          <a class="button button-secondary" href="https://github.com/roxycon-dev/Ciallo-Reader">查看项目与源码</a>
+    <!-- 英雄区：曲线在文字后方流动 -->
+    <section class="hero" id="top">
+      <div class="hero-inner">
+        <h1><span class="line">小说、漫画与电子书，</span><span class="line">放进同一个书架。</span></h1>
+        <p class="hero-sub">下一页，按你的方式。</p>
+        <p class="hero-lede">Ciallo Reader 是一款 Android 阅读器。导入自己的书，按习惯调整阅读方式；联网搜索、下载之后，回到书架继续离线阅读。</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">下载最新版</a>
+          <a class="btn btn-glass glass" data-lens="pill" href="https://github.com/roxycon-dev/Ciallo-Reader">查看源码</a>
         </div>
-        <ul class="quick-facts" aria-label="应用信息">
-          <li>Android 7.0+</li>
-          <li>arm64 手机和平板</li>
-          <li>支持本地文件</li>
+        <ul class="hero-tags" aria-label="应用信息">
+          <li class="tag glass" data-lens="pill">Android 7.0+</li>
+          <li class="tag glass" data-lens="pill">arm64-v8a</li>
+          <li class="tag glass" data-lens="pill">支持本地文件</li>
         </ul>
       </div>
-      <figure class="hero-art">
-        <div class="art-index"><span>READ AT YOUR PACE</span><span>01 / 03</span></div>
-        <img src="./media/ciallo-cover.png" width="2048" height="1152" alt="Ciallo Reader 的原创品牌封面：书页线条围绕应用图标，配有‘下一页，按你的方式’标语">
-        <figcaption>下一页，按你的方式。</figcaption>
-      </figure>
-      <div class="hero-bottom" aria-hidden="true"><span>一个书架，多种阅读方式</span><span>SCROLL TO EXPLORE ↓</span></div>
     </section>
 
-    <section class="intro-band">
-      <div class="wrap intro-grid">
-        <p class="section-kicker">为你的书而做</p>
-        <h2>自己的文件、<br>自己的阅读节奏。</h2>
-        <p>从本地导入开始，也可以连接在线书源、搜索作品并下载。小说和漫画有各自的阅读控制；书架集中显示本地书与阅读进度。</p>
+    <!-- 产品展示：sticky 滚动叙事，手机画面随滚动切换 -->
+    <section class="showcase" id="showcase" aria-label="产品展示">
+      <div class="showcase-sticky">
+        <div class="wrap showcase-grid">
+          <div class="scenes">
+            <div class="scene on">
+              <span class="scene-tag glass" data-lens="pill">书架</span>
+              <h2>所有格式，<br>收进同一个书架。</h2>
+              <p>TXT、EPUB、MOBI、CBZ、PDF……收藏、书签与阅读进度，都集中在手边。</p>
+            </div>
+            <div class="scene">
+              <span class="scene-tag glass" data-lens="pill">小说</span>
+              <h2>每个细节，<br>都听你安排。</h2>
+              <p>字号、字体、行距、主题与翻页方式，随你调整。</p>
+            </div>
+            <div class="scene">
+              <span class="scene-tag glass" data-lens="pill">漫画</span>
+              <h2>按漫画的方式，<br>读漫画。</h2>
+              <p>单页、双页、条漫或滚动，阅读方向也由你决定。</p>
+            </div>
+          </div>
+          <div class="phone glass" data-lens="card" aria-hidden="true">
+            <div class="phone-screen-clip">
+              <!-- 书架示意 -->
+              <div class="phone-screen s0 on">
+                <div class="shelf-row">
+                  <span class="book" style="height:64px;background:linear-gradient(180deg,#7c6bff,#5a4de0)"></span>
+                  <span class="book" style="height:52px;background:linear-gradient(180deg,#35c2ff,#1f9fe0)"></span>
+                  <span class="book" style="height:70px;background:linear-gradient(180deg,#ff7ab8,#e0559a)"></span>
+                  <span class="book" style="height:58px;background:linear-gradient(180deg,#9d8cff,#7c6bff)"></span>
+                  <span class="book" style="height:66px;background:linear-gradient(180deg,#67d4ff,#35c2ff)"></span>
+                </div>
+                <div class="shelf-row">
+                  <span class="book" style="height:60px;background:linear-gradient(180deg,#ff9ccb,#ff7ab8)"></span>
+                  <span class="book" style="height:72px;background:linear-gradient(180deg,#8f7dff,#6a58f0)"></span>
+                  <span class="book" style="height:54px;background:linear-gradient(180deg,#4fc9ff,#28aae8)"></span>
+                  <span class="book" style="height:68px;background:linear-gradient(180deg,#b3a5ff,#8f7dff)"></span>
+                  <span class="book" style="height:56px;background:linear-gradient(180deg,#ff8fc0,#e86aa8)"></span>
+                </div>
+                <div class="shelf-row">
+                  <span class="book" style="height:66px;background:linear-gradient(180deg,#35c2ff,#7c6bff)"></span>
+                  <span class="book" style="height:58px;background:linear-gradient(180deg,#ff7ab8,#c85af0)"></span>
+                  <span class="book" style="height:62px;background:linear-gradient(180deg,#7c6bff,#35c2ff)"></span>
+                  <span class="book" style="height:50px;background:linear-gradient(180deg,#67d4ff,#4fb0f0)"></span>
+                  <span class="book" style="height:70px;background:linear-gradient(180deg,#9d8cff,#ff7ab8)"></span>
+                </div>
+              </div>
+              <!-- 小说阅读示意 -->
+              <div class="phone-screen s1">
+                <div class="nov-title"></div>
+                <div class="nov-line" style="width:100%"></div>
+                <div class="nov-line" style="width:96%"></div>
+                <div class="nov-line" style="width:88%"></div>
+                <div class="nov-line" style="width:100%"></div>
+                <div class="nov-line" style="width:72%"></div>
+                <div class="nov-line" style="width:94%"></div>
+                <div class="nov-line" style="width:100%"></div>
+                <div class="nov-line" style="width:64%"></div>
+                <div class="nov-line" style="width:90%"></div>
+                <div class="nov-line" style="width:78%"></div>
+              </div>
+              <!-- 漫画阅读示意 -->
+              <div class="phone-screen s2">
+                <div class="manga-grid">
+                  <span class="panel"></span><span class="panel"></span>
+                  <span class="panel"></span><span class="panel"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="showcase-dots" aria-hidden="true"><i class="on"></i><i></i><i></i></div>
       </div>
     </section>
 
+    <!-- 特色：三张玻璃卡片 -->
     <section class="features wrap" id="features">
-      <div class="section-heading">
-        <p class="section-kicker">阅读体验</p>
+      <div class="sec-head">
         <h2>从打开一本书开始，<br>每一步都留给你选择。</h2>
       </div>
-      <div class="feature-grid">
-        <article class="feature-card feature-card-main">
-          <span class="feature-number">01</span>
-          <div class="feature-symbol symbol-stack" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="cards">
+        <article class="card glass" data-lens="card">
+          <div class="card-icon ci-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V6a2 2 0 0 1 2-2h13v13H6a2 2 0 0 0-2 2zm0 0a2 2 0 0 0 2 2h13"/><path d="M9 8h6"/></svg>
+          </div>
           <h3>一个书架，收好不同格式</h3>
           <p>导入 TXT、EPUB、MOBI、AZW、AZW3、PRC、DOCX、FB2、CBZ、ZIP 或 PDF。收藏、书签和阅读进度集中管理。</p>
-          <a class="text-link" href="#formats">查看支持格式 <span aria-hidden="true">→</span></a>
         </article>
-        <article class="feature-card">
-          <span class="feature-number">02</span>
-          <div class="feature-symbol symbol-page" aria-hidden="true"><i></i><i></i></div>
+        <article class="card glass" data-lens="card">
+          <div class="card-icon ci-2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h4M12 16h8"/><circle cx="16" cy="8" r="2"/><circle cx="10" cy="16" r="2"/></svg>
+          </div>
           <h3>按自己的方式阅读</h3>
           <p>小说可调字号、字体、行距、主题和翻页方式；漫画支持单页、双页、条漫、滚动以及阅读方向设置。</p>
         </article>
-        <article class="feature-card">
-          <span class="feature-number">03</span>
-          <div class="feature-symbol symbol-download" aria-hidden="true"><i></i><i></i></div>
+        <article class="card glass" data-lens="card">
+          <div class="card-icon ci-3">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4-4m4 4l4-4"/><path d="M4 17v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1"/></svg>
+          </div>
           <h3>下载到书架，离线接着读</h3>
-          <p>联网搜索并下载小说或漫画章节，完成后从本地书架继续阅读。在线来源与翻译服务由相应第三方提供。</p>
+          <p>联网搜索在线书源并下载小说或漫画章节，完成后从本地书架继续阅读，无需网络。</p>
         </article>
       </div>
     </section>
 
-    <section class="formats-section" id="formats">
-      <div class="wrap formats-grid">
-        <div>
-          <p class="section-kicker">文件与兼容性</p>
-          <h2>你的阅读材料，<br>有自己的入口。</h2>
-          <p class="formats-copy">用设备文件选择器导入已有书籍。应用版本 1.3.6 面向 Android 7.0 及以上；当前 Release 提供 arm64-v8a APK。</p>
-          <a class="text-link" href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">查看发行说明与校验信息 <span aria-hidden="true">→</span></a>
-        </div>
-        <div class="format-list" aria-label="支持的文件格式">
-          <span>TXT <small>文本 / 章节识别</small></span>
-          <span>EPUB <small>目录 / 封面 / 元数据</small></span>
-          <span>MOBI · AZW · AZW3 · PRC <small>电子书</small></span>
-          <span>DOCX · FB2 <small>文本提取</small></span>
-          <span>CBZ · ZIP <small>图片漫画</small></span>
-          <span>PDF <small>按页阅读</small></span>
-        </div>
+    <!-- 支持格式：磁吸玻璃胶囊 -->
+    <section class="formats wrap" id="formats">
+      <div class="sec-head">
+        <h2>你的阅读材料，<br>都有自己的入口。</h2>
+        <p>用设备文件选择器导入已有书籍。应用版本 1.3.6 面向 Android 7.0 及以上，当前 Release 提供 arm64-v8a APK。</p>
       </div>
-    </section>
-
-    <section class="sources-note wrap">
-      <div class="note-mark" aria-hidden="true">i</div>
-      <div>
-        <h2>关于在线来源与作品内容</h2>
-        <p>应用是阅读和书库管理工具，不代表在线来源、搜索结果或作品内容的提供方。来源的可用性和条款由相应服务决定；请遵守所在地法律及作品版权要求。下载的本地文件可在离线时阅读。</p>
-      </div>
-    </section>
-
-    <section class="faq-section" id="faq">
-      <div class="wrap faq-grid">
-        <div class="section-heading">
-          <p class="section-kicker">常见问题</p>
-          <h2>下载前，<br>先了解几件事。</h2>
+      <div class="fmt-groups">
+        <div class="fmt-group">
+          <h3>电子书</h3>
+          <div class="caps">
+            <span class="cap glass" data-lens="cap">TXT<small>文本 / 章节识别</small></span>
+            <span class="cap glass" data-lens="cap">EPUB<small>目录 / 封面 / 元数据</small></span>
+            <span class="cap glass" data-lens="cap">MOBI<small>电子书</small></span>
+            <span class="cap glass" data-lens="cap">AZW<small>电子书</small></span>
+            <span class="cap glass" data-lens="cap">AZW3<small>电子书</small></span>
+            <span class="cap glass" data-lens="cap">PRC<small>电子书</small></span>
+            <span class="cap glass" data-lens="cap">DOCX<small>文本提取</small></span>
+            <span class="cap glass" data-lens="cap">FB2<small>文本提取</small></span>
+          </div>
         </div>
-        <div class="faq-list">
-          <details open>
-            <summary>可以离线阅读吗？</summary>
-            <p>可以阅读已导入的本地文件，也可以阅读已下载完成的小说或漫画章节。在线搜索、在线阅读和联网翻译仍需要网络。</p>
-          </details>
-          <details>
-            <summary>下载包里包含小说或漫画吗？</summary>
-            <p>不包含。你可以导入自己的文件，或按自己选择的在线来源搜索。网络内容和来源条款由提供方决定。</p>
-          </details>
-          <details>
-            <summary>漫画翻译如何工作？</summary>
-            <p>OCR 和气泡检测在设备上完成；生成译文时会使用你选择的翻译服务或自定义 API。发送前请了解所选服务的数据和隐私条款。</p>
-          </details>
-          <details>
-            <summary>MIT 许可证是否涵盖所有资源？</summary>
-            <p>MIT 适用于项目原创源代码。第三方模型、词库及其他注明独立许可的资源仍受各自条款约束。<a href="https://github.com/roxycon-dev/Ciallo-Reader/blob/main/docs/vendor-licenses/README.md">查看第三方许可记录</a>。</p>
-          </details>
+        <div class="fmt-group">
+          <h3>漫画与文档</h3>
+          <div class="caps">
+            <span class="cap glass" data-lens="cap">CBZ<small>图片漫画</small></span>
+            <span class="cap glass" data-lens="cap">ZIP<small>图片漫画</small></span>
+            <span class="cap glass" data-lens="cap">PDF<small>按页阅读</small></span>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="closing wrap">
-      <div class="closing-copy">
-        <p class="section-kicker">CIALLO READER · ANDROID</p>
-        <h2>挑一本书，<br><em>从下一页开始。</em></h2>
+    <!-- 漫画翻译：设备端识别，翻译服务由你选择 -->
+    <section class="flow wrap" aria-label="漫画翻译流程">
+      <div class="flow-panel glass" data-lens="card">
+        <h2>漫画翻译，<br>识别在设备上完成。</h2>
+        <p>OCR 与气泡检测不离开你的手机；译文由你选择的翻译服务或自定义 API 生成。</p>
+        <div class="flow-steps">
+          <svg class="flow-line" viewBox="0 0 100 4" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="flowGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="#7c6bff"/><stop offset=".5" stop-color="#35c2ff"/><stop offset="1" stop-color="#ff7ab8"/>
+              </linearGradient>
+            </defs>
+            <path d="M0 2 H100" vector-effect="non-scaling-stroke"/>
+          </svg>
+          <span class="flow-vline" aria-hidden="true"></span>
+          <div class="flow-step">
+            <div class="flow-dot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h4M7 14h7"/></svg>
+            </div>
+            <div><h3>设备端 OCR</h3><p>在手机上识别漫画画面中的文字。</p></div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-dot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5z"/></svg>
+            </div>
+            <div><h3>气泡检测</h3><p>自动定位对白气泡与文字区域。</p></div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-dot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M8.5 4v2c0 4-2.5 7.5-5.5 9M5 10c1.5 3 4.5 5.5 8 6"/><path d="M13 21l4.5-10L22 21M14.8 17h5.4"/></svg>
+            </div>
+            <div><h3>你的翻译服务</h3><p>使用你选择的翻译服务或自定义 API 生成译文。</p></div>
+          </div>
+        </div>
       </div>
-      <a class="button button-light" href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">前往下载 <span aria-hidden="true">↗</span></a>
+    </section>
+
+    <!-- 声明 -->
+    <section class="notice wrap" aria-label="内容与版权声明">
+      <div class="notice-bar glass" data-lens="card">
+        <h2>关于内容与版权</h2>
+        <p>Ciallo Reader 只是阅读与书库管理工具，不提供在线来源与作品内容；来源的可用性与条款由相应服务决定。MIT 许可证仅覆盖项目原创源代码，第三方模型、词库及其他注明独立许可的资源仍受各自条款约束。请遵守当地法律与版权要求。</p>
+      </div>
+    </section>
+
+    <!-- 常见问题 -->
+    <section class="faq wrap" id="faq">
+      <div class="sec-head">
+        <h2>下载前，<br>先了解几件事。</h2>
+      </div>
+      <div class="faq-list">
+        <details class="faq-item glass" data-lens="pill" open>
+          <summary>可以离线阅读吗？<span class="faq-plus" aria-hidden="true"></span></summary>
+          <div class="faq-body"><div class="faq-in"><p>可以阅读已导入的本地文件，也可以阅读已下载完成的小说或漫画章节。在线搜索、在线阅读和联网翻译仍需要网络。</p></div></div>
+        </details>
+        <details class="faq-item glass" data-lens="pill">
+          <summary>安装包里包含小说或漫画吗？<span class="faq-plus" aria-hidden="true"></span></summary>
+          <div class="faq-body"><div class="faq-in"><p>不包含。你可以导入自己的文件，或按自己选择的在线来源搜索。网络内容和来源条款由提供方决定。</p></div></div>
+        </details>
+        <details class="faq-item glass" data-lens="pill">
+          <summary>漫画翻译如何工作？<span class="faq-plus" aria-hidden="true"></span></summary>
+          <div class="faq-body"><div class="faq-in"><p>OCR 和气泡检测在设备上完成；生成译文时会使用你选择的翻译服务或自定义 API。发送前请了解所选服务的数据和隐私条款。</p></div></div>
+        </details>
+        <details class="faq-item glass" data-lens="pill">
+          <summary>MIT 许可证是否涵盖所有资源？<span class="faq-plus" aria-hidden="true"></span></summary>
+          <div class="faq-body"><div class="faq-in"><p>MIT 适用于项目原创源代码。第三方模型、词库及其他注明独立许可的资源仍受各自条款约束。<a href="https://github.com/roxycon-dev/Ciallo-Reader/blob/main/docs/vendor-licenses/README.md">查看第三方许可记录</a>。</p></div></div>
+        </details>
+      </div>
+    </section>
+
+    <!-- 结尾 CTA：一束收敛的曲线 -->
+    <section class="closing">
+      <svg class="closing-curves" viewBox="0 0 1200 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <linearGradient id="endGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#7c6bff"/><stop offset=".5" stop-color="#35c2ff"/><stop offset="1" stop-color="#ff7ab8"/>
+          </linearGradient>
+        </defs>
+        <g fill="none" stroke="url(#endGrad)" stroke-linecap="round" opacity=".18">
+          <path stroke-width="1.4" d="M-20 330 Q 300 300 600 240 T 1220 120"/>
+          <path stroke-width="1.8" d="M-20 280 Q 320 260 620 210 T 1220 150"/>
+          <path stroke-width="2.2" d="M-20 230 Q 340 220 640 185 T 1220 180"/>
+          <path stroke-width="1.8" d="M-20 180 Q 320 180 620 160 T 1220 210"/>
+          <path stroke-width="1.4" d="M-20 130 Q 300 140 600 135 T 1220 240"/>
+          <path stroke-width="1" d="M-20 80 Q 280 100 580 110 T 1220 270"/>
+        </g>
+      </svg>
+      <h2>挑一本书，<br>从下一页开始。</h2>
+      <a class="btn btn-primary" href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">下载 Ciallo Reader</a>
     </section>
   </main>
 
   <footer class="site-footer wrap">
-    <a class="brand footer-brand" href="./">
-      <img src="./media/icon.webp" width="34" height="34" alt="">
-      <span>Ciallo <b>Reader</b></span>
+    <a class="footer-brand" href="./">
+      <img src="./media/icon.webp" width="28" height="28" alt="">
+      <span>Ciallo Reader</span>
     </a>
-    <p>Android 小说、漫画与电子书阅读器。</p>
+    <p>Android 小说、漫画与电子书阅读器。MIT 开源。</p>
     <nav aria-label="相关链接">
       <a href="https://github.com/roxycon-dev/Ciallo-Reader">GitHub</a>
       <a href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">下载</a>
       <a href="https://github.com/roxycon-dev/Ciallo-Reader/issues">反馈</a>
-      <a href="https://github.com/roxycon-dev/Ciallo-Reader/blob/main/LICENSE">MIT 与第三方许可范围</a>
+      <a href="https://github.com/roxycon-dev/Ciallo-Reader/blob/main/LICENSE">许可</a>
       <a href="./en/" lang="en">English</a>
     </nav>
-    <small>版本、格式及可用功能可能随发布更新；请以发行说明为准。</small>
+    <small>版本、格式及可用功能可能随发布更新，请以发行说明为准。应用不提供在线来源与作品内容；MIT 仅覆盖原创源代码，第三方模型与词库另有许可。</small>
   </footer>
+
+  <script src="./site.js" defer></script>
 </body>
 </html>
