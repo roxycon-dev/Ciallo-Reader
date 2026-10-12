@@ -17,7 +17,7 @@
 [![Latest release](https://img.shields.io/github/v/release/roxycon-dev/Ciallo-Reader?display_name=tag)](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)
 ![Android 7.0+](https://img.shields.io/badge/Android-7.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
-![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
 
@@ -117,5 +117,5 @@ Windows 可使用 gradlew.bat :app:assembleDebug。遇到问题或想提出功�
 
 Ciallo Reader 是阅读与书库管理工具，在线书源和翻译服务由第三方提供，其内容、可用性及服务条款由对应提供方决定。请遵守所在地法律、来源站点规则及作品版权要求。
 
-本仓库未附带开源许可证，项目源码与应用保留所有权利；第三方组件各自遵循其许可证，详见上方许可说明。
+项目原创源代码采用 [MIT 许可证](LICENSE)。第三方源码、模型权重、数据集、字体、图片、音频及其他带有独立许可或署名要求的内容不包含在该授权内，仍按各自条款使用。请查看[第三方许可与来源记录](docs/vendor-licenses/README.md)；其中 MangaJaNai 模型为 CC BY-NC 4.0，多语言搜索词库为 CC BY-NC-SA 3.0 中国大陆。MIT 许可不改变这些内容原有的限制。
 

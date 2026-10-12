@@ -17,7 +17,7 @@ Read local ebooks, novels, and comics in one Android app.
 [![Latest release](https://img.shields.io/github/v/release/roxycon-dev/Ciallo-Reader?display_name=tag)](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)
 ![Android 7.0+](https://img.shields.io/badge/Android-7.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
-![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
 
@@ -117,5 +117,5 @@ On Windows, use gradlew.bat :app:assembleDebug. For bugs and feature requests, o
 
 Ciallo Reader is a reading and library-management app. Online sources and translation services are provided by third parties; their content, availability, and terms are controlled by those providers. Please follow local laws, source-site rules, and copyright requirements.
 
-This repository does not include an open-source license. All rights to the project source and app are reserved. Third-party components retain their respective licenses; see the license notes above.
+Original source code written for this project is released under the [MIT License](LICENSE). Third-party source code, model weights, datasets, fonts, images, audio, and other materials with separate license or attribution terms are excluded and remain under their respective terms. See the [third-party license and source records](docs/vendor-licenses/README.md). In particular, the MangaJaNai models are CC BY-NC 4.0 and the multilingual search keyword database is CC BY-NC-SA 3.0 China Mainland; the MIT license does not remove those restrictions.
 
