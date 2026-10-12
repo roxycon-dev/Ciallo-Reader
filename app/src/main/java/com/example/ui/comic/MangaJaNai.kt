@@ -36,6 +36,7 @@ internal object MangaJaNai {
     private val _status = MutableStateFlow("")
     val status = _status.asStateFlow()
     private var runtime: MangaJaNaiRuntime? = null
+    private val tileCache = MangaJaNaiTileCache()
     private var verifiedStamp: String? = null
     private var generation = 0L
     private var idleRelease: java.util.concurrent.ScheduledFuture<*>? = null
@@ -57,7 +58,7 @@ internal object MangaJaNai {
 
     fun release() {
         lock.lock()
-        try { generation++; idleRelease?.cancel(false); runtime?.close(); runtime = null }
+        try { generation++; idleRelease?.cancel(false); runtime?.close(); runtime = null; tileCache.clear() }
         finally { lock.unlock() }
     }
 
@@ -65,7 +66,7 @@ internal object MangaJaNai {
         val expected = generation
         idleRelease = cleanup.schedule({
             if (lock.tryLock()) {
-                try { if (generation == expected) { runtime?.close(); runtime = null } }
+                try { if (generation == expected) { runtime?.close(); runtime = null; tileCache.clear() } }
                 finally { lock.unlock() }
             }
         }, 15, java.util.concurrent.TimeUnit.SECONDS)
@@ -157,7 +158,11 @@ internal object MangaJaNai {
             // Direct buffers and pinned tensors are allocated once per page, not once per tile.
             val input = ByteBuffer.allocateDirect(area * 3 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
             val buffer = ByteBuffer.allocateDirect(area * 12 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
-            val row = IntArray(SIDE)
+            val sourceTile = IntArray(area)
+            val inputValues = FloatArray(area * 3)
+            val coreSide = TILE * 2
+            val coreArea = coreSide * coreSide
+            val coreValues = FloatArray(coreArea * 3)
             val pixels = IntArray(TILE * 2 * TILE * 2)
             val tile = Bitmap.createBitmap(TILE * 2, TILE * 2, Bitmap.Config.ARGB_8888)
             val sx = width.toFloat() / src.width
@@ -169,39 +174,50 @@ internal object MangaJaNai {
                         val outputs = mapOf("output" to tensorOut)
                         val total = ((src.width + TILE - 1) / TILE) * ((src.height + TILE - 1) / TILE)
                         var completed = 0
+                        var inferred = 0
+                        var cacheHits = 0
                         var lastPercent = -1
                         for (y in 0 until src.height step TILE) for (x in 0 until src.width step TILE) {
                             checkCancelled()
-                            // Same edge replication, same 48 px cores and 16 px halo as 1.3.2.
-                            for (ty in 0 until SIDE) {
-                                val sourceY = (y + ty - HALO).coerceIn(0, src.height - 1)
-                                val left = (x - HALO).coerceAtLeast(0)
-                                val right = (x + TILE + HALO).coerceAtMost(src.width)
-                                src.getPixels(row, 0, right - left, left, sourceY, right - left, 1)
-                                for (tx in 0 until SIDE) {
-                                    val p = row[(x + tx - HALO).coerceIn(0, src.width - 1) - left]
-                                    val i = ty * SIDE + tx
-                                    input.put(i, ((p shr 16) and 255) / 255f)
-                                    input.put(area + i, ((p shr 8) and 255) / 255f)
-                                    input.put(area * 2 + i, (p and 255) / 255f)
+                            readMangaJaNaiTile(src, x, y, sourceTile)
+                            val cached = tileCache.find(sourceTile)
+                            val core = if (cached != null) {
+                                cacheHits++
+                                cached
+                            } else {
+                                for (i in sourceTile.indices) {
+                                    val p = sourceTile[i]
+                                    inputValues[i] = ((p shr 16) and 255) / 255f
+                                    inputValues[area + i] = ((p shr 8) and 255) / 255f
+                                    inputValues[area * 2 + i] = (p and 255) / 255f
                                 }
+                                input.position(0)
+                                input.put(inputValues)
+                                input.position(0)
+                                if (inferred == 0) {
+                                    _status.value = "引擎准备中…"
+                                    engine.prepare(file, tensor, tensorOut, buffer)
+                                }
+                                engine.run(file, inputs, outputs)
+                                inferred++
+                                // Copy only the unchanged 96x96 FP32 core, using bulk reads.
+                                for (c in 0..2) for (ty in 0 until coreSide) {
+                                    buffer.position(c * area * 4 + (ty + HALO * 2) * SIDE * 2 + HALO * 2)
+                                    buffer.get(coreValues, c * coreArea + ty * coreSide, coreSide)
+                                }
+                                buffer.position(0)
+                                tileCache.put(sourceTile, coreValues)
+                                coreValues
                             }
-                            if (completed == 0) {
-                                _status.value = "引擎准备中…"
-                                engine.prepare(file, tensor, tensorOut, buffer)
-                            }
-                            engine.run(file, inputs, outputs)
                             val tw = min(TILE, src.width - x) * 2
                             val th = min(TILE, src.height - y) * 2
-                            val outArea = area * 4
                             for (ty in 0 until th) {
-                                src.getPixels(row, 0, tw / 2, x, y + ty / 2, tw / 2, 1)
                                 for (tx in 0 until tw) {
-                                    val i = (ty + HALO * 2) * SIDE * 2 + tx + HALO * 2
-                                    val original = row[tx / 2]
+                                    val i = ty * coreSide + tx
+                                    val original = sourceTile[(ty / 2 + HALO) * SIDE + tx / 2 + HALO]
                                     fun channel(c: Int): Int {
                                         val from = (original shr ((2 - c) * 8)) and 255
-                                        val to = buffer.get(c * outArea + i).coerceIn(0f, 1f) * 255f
+                                        val to = core[c * coreArea + i].coerceIn(0f, 1f) * 255f
                                         return (from + (to - from) * strength.coerceIn(0f, 1f)).roundToInt().coerceIn(0, 255)
                                     }
                                     pixels[ty * TILE * 2 + tx] = (original and -0x1000000) or (channel(0) shl 16) or (channel(1) shl 8) or channel(2)
@@ -213,14 +229,14 @@ internal object MangaJaNai {
                             if (percent != lastPercent) { lastPercent = percent; _status.value = "增强 $percent%" }
                         }
                         _status.value = ""
-                        android.util.Log.i("MangaJaNai", "page=${src.width}x${src.height} tiles=$total totalMs=${(System.nanoTime() - started) / 1_000_000}")
+                        android.util.Log.i("MangaJaNai", "page=${src.width}x${src.height} tiles=$total inferred=$inferred exactReuse=$cacheHits totalMs=${(System.nanoTime() - started) / 1_000_000}")
                         output
                     }
                 }
             } catch (error: Throwable) {
                 output.recycle()
                 _status.value = "增强失败，点击重试"
-                if (error !is InterruptedException) { engine.close(); runtime = null }
+                if (error !is InterruptedException) { engine.close(); runtime = null; tileCache.clear() }
                 throw error
             } finally { tile.recycle() }
         } catch (error: LinkageError) {

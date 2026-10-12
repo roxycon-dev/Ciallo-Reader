@@ -1,6 +1,7 @@
 package com.example.ui.comic
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -25,11 +26,17 @@ class MangaJaNaiPerformanceDeviceTest {
         val args = InstrumentationRegistry.getArguments()
         val width = args.getString("mangaWidth", "1200")!!.toInt().coerceIn(48, 2800)
         val height = args.getString("mangaHeight", "1800")!!.toInt().coerceIn(48, 2800)
-        val input = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(input)
-        canvas.drawColor(Color.WHITE)
-        val ink = Paint().apply { color = Color.BLACK; strokeWidth = 2f }
-        for (y in 20 until height step 21) canvas.drawLine(10f, y.toFloat(), width - 10f, y - 15f, ink)
+        val pageName = args.getString("mangaPage")
+        val input = if (pageName != null) {
+            val page = File(context.filesDir, pageName).canonicalFile
+            require(page.toPath().startsWith(context.filesDir.canonicalFile.toPath()))
+            checkNotNull(BitmapFactory.decodeFile(page.absolutePath)) { "Cannot read mangaPage" }
+        } else Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->
+            val canvas = Canvas(bitmap)
+            canvas.drawColor(Color.WHITE)
+            val ink = Paint().apply { color = Color.BLACK; strokeWidth = 2f }
+            for (y in 20 until height step 21) canvas.drawLine(10f, y.toFloat(), width - 10f, y - 15f, ink)
+        }
         MangaJaNai.configure(context)
         MangaJaNai.release()
         try {
@@ -37,11 +44,11 @@ class MangaJaNaiPerformanceDeviceTest {
                 val started = System.nanoTime()
                 val output = MangaJaNai.enhance(input, 1f)
                 val ms = (System.nanoTime() - started) / 1_000_000
-                val expected = MangaJaNai.outputSize(width, height)
+                val expected = MangaJaNai.outputSize(input.width, input.height)
                 assertEquals(expected.first, output.width)
                 assertEquals(expected.second, output.height)
                 output.recycle()
-                Log.i("MangaJaNaiBenchmark", "run=$run input=${width}x$height totalMs=$ms within5Seconds=${ms <= 5000}")
+                Log.i("MangaJaNaiBenchmark", "run=$run source=${pageName ?: "synthetic"} input=${input.width}x${input.height} totalMs=$ms within5Seconds=${ms <= 5000}")
             }
         } finally { input.recycle(); MangaJaNai.release() }
     }

@@ -16,28 +16,35 @@ import java.util.EnumSet
  * All calls are protected by MangaJaNai's page lock. At most one native session is alive.
  */
 internal class MangaJaNaiRuntime(private val context: Context) : AutoCloseable {
-    enum class Backend { CPU, XNNPACK, NNAPI }
+    enum class Backend { CPU, CPU_BALANCED, XNNPACK, NNAPI }
     private var session: OrtSession? = null
     private var backend = Backend.CPU
     private var modelPath = ""
     private val preferences = context.getSharedPreferences("mangajanai-runtime", Context.MODE_PRIVATE)
-    private val deviceKey = "fp32-80-v1:${Build.FINGERPRINT}:${MangaJaNai.SHA256}"
+    private val deviceKey = "fp32-80-v2:${Build.FINGERPRINT}:${MangaJaNai.SHA256}"
     private val threads = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
+    private val balancedThreads = Runtime.getRuntime().availableProcessors().coerceIn(1, 5)
 
     private fun create(file: File, kind: Backend): OrtSession = OrtSession.SessionOptions().use { options ->
         options.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
-        options.setIntraOpNumThreads(if (kind == Backend.XNNPACK) 1 else threads)
+        options.setIntraOpNumThreads(when (kind) {
+            Backend.XNNPACK -> 1
+            Backend.CPU_BALANCED -> balancedThreads
+            else -> threads
+        })
         options.setInterOpNumThreads(1)
         options.setMemoryPatternOptimization(true)
         options.setCPUArenaAllocator(true)
         options.addConfigEntry("session.intra_op.allow_spinning", "0")
         options.addConfigEntry("session.inter_op.allow_spinning", "0")
+        // Smaller work chunks can balance big/little cores. Use only if the real probe wins.
+        if (kind == Backend.CPU_BALANCED) options.addConfigEntry("session.dynamic_block_base", "4")
         // NNAPI requires known shapes; the original graph and weights are not modified.
         options.setSymbolicDimensionValue("batch_size", 1)
         options.setSymbolicDimensionValue("width", 80)
         options.setSymbolicDimensionValue("height", 80)
         when (kind) {
-            Backend.CPU -> Unit
+            Backend.CPU, Backend.CPU_BALANCED -> Unit
             Backend.XNNPACK -> options.addXnnpack(mapOf("intra_op_num_threads" to threads.toString()))
             Backend.NNAPI -> options.addNnapi(EnumSet.of(NNAPIFlags.CPU_DISABLED))
         }
@@ -80,6 +87,7 @@ internal class MangaJaNaiRuntime(private val context: Context) : AutoCloseable {
         }
         val providers = OrtEnvironment.getAvailableProviders().map { it.name }.toSet()
         val candidates = buildList {
+            if (balancedThreads >= 4) add(Backend.CPU_BALANCED)
             if ("XNNPACK" in providers) add(Backend.XNNPACK)
             // CPU_DISABLED is effective from API 29; avoid slow NNAPI reference CPU on older OSes.
             if (Build.VERSION.SDK_INT >= 29 && "NNAPI" in providers) add(Backend.NNAPI)
@@ -118,7 +126,7 @@ internal class MangaJaNaiRuntime(private val context: Context) : AutoCloseable {
             backend = best
             if (session == null) session = create(file, best)
             preferences.edit().putString("device", deviceKey).putString("backend", best.name).apply()
-            Log.i("MangaJaNai", "selected=$best threads=$threads tileMs=${bestNs / 1_000_000}")
+            Log.i("MangaJaNai", "selected=$best threads=${if (best == Backend.CPU_BALANCED) balancedThreads else threads} tileMs=${bestNs / 1_000_000}")
         } catch (error: Throwable) { close(); throw error }
     }
 

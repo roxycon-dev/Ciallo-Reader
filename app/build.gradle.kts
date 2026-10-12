@@ -35,8 +35,8 @@ android {
     applicationId = "com.aistudio.novelreader.kxmpzq"
     minSdk = 24
     targetSdk = 35
-    versionCode = 214
-    versionName = "1.3.3"
+    versionCode = 215
+    versionName = "1.3.4"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
