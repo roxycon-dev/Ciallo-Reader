@@ -1,353 +1,121 @@
 <div align="center">
 
-<img src="./app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp" width="110" alt="Ciallo Reader 应用图标"/>
+<img src="./app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp" width="96" alt="Ciallo Reader 图标"/>
 
-# Ciallo Reader
+[简体中文](README.md) · [English](README_EN.md)
 
-**Android 阅读器 / 在线书库聚合下载器**
+# Ciallo Reader｜Android 小说、漫画与电子书阅读器
 
-Kotlin · Jetpack Compose (Material 3) · MVVM · 单 Activity
+**在线找书，本地管理，随时离线阅读。**  
+把小说、漫画和个人电子书放进同一个 Android 书架。
 
-[下载 1.3.6 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.6/Ciallo-Reader-v1.3.6.apk) ·
-[功能](#功能) ·
-[安装](#安装) ·
-[使用说明](#使用说明) ·
-[FAQ](#faq) ·
-[提交 Issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
+[⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
+[查看截图](#界面预览) ·
+[全部功能](#功能亮点) ·
+[提交问题或建议](https://github.com/roxycon-dev/Ciallo-Reader/issues)
 
-![Android](https://img.shields.io/badge/Android-API%2024%2B-green)
-![Release](https://img.shields.io/badge/Release-v1.3.6-orange)
-![Architecture](https://img.shields.io/badge/Architecture-MVVM-blue)
-![UI](https://img.shields.io/badge/UI-Compose%20M3-8A2BE2)
-![License](https://img.shields.io/badge/License-All%20Rights%20Reserved-lightgrey)
+[![Latest release](https://img.shields.io/github/v/release/roxycon-dev/Ciallo-Reader?display_name=tag)](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)
+![Android 7.0+](https://img.shields.io/badge/Android-7.0%2B-3DDC84?logo=android&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
+![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey)
 
 </div>
 
-***
+Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电子书阅读器**。你可以导入本地书籍，也可以通过内置或自定义书源搜索内容、下载到书架，再使用可调排版、翻页和阅读进度继续阅读。
 
-## 简介
+**English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
 
-Android 端小说 / 漫画阅读器，内置多书源在线聚合搜索与下载：本地阅读、在线找书、离线管理一体化，搜到的书可以直接下载到书架离线看。
-
-| 项目                     | 内容                                                                  |
-| ---------------------- | ------------------------------------------------------------------- |
-| 当前版本                   | 1.3.6                                                               |
-| 开发状态                   | 个人项目 · 活跃开发中                                                        |
-| 最低系统                   | Android 7.0（API 24）                                                 |
-| compileSdk / targetSdk | 35                                                                  |
-| 技术栈                    | Kotlin 2.0 + Jetpack Compose（Material 3）+ MVVM + Room + WorkManager |
-| 架构                     | MVVM + StateFlow + Repository，单 Activity + Navigation Compose       |
-| 测试 | 55 个套件、381 项 JVM / Robolectric 回归通过，覆盖书架动效、阅读设置玻璃、弹层、主题、导航及漫画；见 [1.3.6 发布验证](docs/release-1.3.6-2026-10-12.md)，未进行真机测试 |
-| 正式安装包 | 1.3.6 / 217，arm64-v8a；见 [v1.3.6 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.3.6) |
-
-***
-
-## 功能
-
-1.3.6：新增 **MangaJaNai 完整版**，保留 **JaNai 极速**；提前生成后续最多 3 页。[发布验证](docs/release-1.3.6-2026-10-12.md)。
-
-完整版保留原 ESRGAN 权重和 FP32，模型包无损压缩，Vulkan GPU 实测通过后启用。桌面 637×900 页约 1.7 秒，1275×1800 页约 6.8 秒；荣耀 200 Pro 的 5 秒目标尚未真机验证。首次选择完整版下载约 76 MB；轻量档继续离线可用。[模型来源与许可](docs/vendor-licenses/MangaJaNai/README.md)。
-
-弱性能设备可在「设置 → 渲染画质」选择 **极简**：关闭玻璃采样、装饰动效、卷页、漫画增强、翻译和场景特效；限制图片解码、缓存与预取。支持 Android 7.0+、arm64-v8a；没有真机帧率测试，不承诺所有旧设备都能满帧。
-
-### 文件格式
-
-| 格式                      | 支持情况     | 说明                                |
-| ----------------------- | -------- | --------------------------------- |
-| TXT                     | 完整       | 大文件分段加载、自动章节识别、多编码自适应             |
-| EPUB                    | 完整       | 目录 / 封面 / 元数据、内嵌插图显示与文件名编码回退       |
-| MOBI / AZW3 / AZW / PRC | 完整，自研解析  | PDB / KF8 容器，Kindle 压缩算法，封面提取     |
-| DOCX / FB2              | 完整       | 段落抽取 / 章节切分                       |
-| CBZ / ZIP 漫画            | 完整       | 自然排序，GBK 文件名回退                    |
-| PDF                     | 按页渲染     | 逐页位图走漫画管线，文本层解析在计划中               |
-
-### 阅读
-
-**文字阅读**
-
-- 五种翻页动画：仿真卷页 / 覆盖 / 平移 / 渐变 / 上下滚动
-- 串珠快速翻页：长按 1s 唤出圆柱式页面环，拖动跟手，松手磁吸，甩动按力度连翻
-- 真实行边界分页，超大章节分块测量 + 缓存，首屏打开快
-- 字号 / 行距 / 页边距 / 首行缩进可调，五套阅读主题，字体可换可导入 TTF
-- 分层毛玻璃排版面板：分组、字号步进器和翻页选项统一材质，调整参数实时预览正文；手机底部、平板与横屏右侧布局
-- 章节书签、划线高亮、全文搜索、目录自动定位；漫画神回收藏与多种排行榜陈列
-- 自动滚屏、TTS 朗读、护眼模式、定时休息
-- 阅读进度按章保存，重开续读
-
-**漫画阅读**
-
-- 神回选封面优先复用阅读缓存，可见缩略图独立加载、支持渐进 JPEG 与失败重试；点选不打断下载，已加载图片固定在原位置。
-- 阅读模式：单页 / 双页 / 条漫 / 无缝滚动 / 磁吸；方向支持左→右 / 右→左 / 上→下
-- 设置七分类适配手机、平板及短横屏，分组、分类导航、选项和开关统一毛玻璃；仿真卷页设置采样当前已处理页，外部点按不误关
-- 漫画按话续读，条漫恢复页内滚动位置；退出与切到后台立即保存进度
-- 仿真拖动按手指位移跟随；短滑 / 快速滑动在松手后判定，收尾动画从实际抓取点继续
-- 翻页引擎：无 / 平移 / 渐变 / 仿真卷页（含双页书脊、刚体封面、透纸背面）
-- 缩放：双击三档、长按临时放大、双指缩放平移，大图按可视区域局部解码
-- 图像处理：自动裁边、跨页拆片、色调调整；锐化 / 线条 / 超分 / JaNai 极速，均离线可用；MangaJaNai 完整版首次下载后离线使用
-- 阅读背景：纯色 / 纸张纹理 / 随当前页取色的沉浸模式
-- 预设系统：内置日漫 / 条漫 / 老漫画，可自建与收藏；每本漫画独立配置
-- 自动翻页 / 自动滚动、整本或单页旋转、音量键翻页
-- 七套氛围场景（雨夜 / 落雪 / 樱花等），环境音与特效可独立开关
-
-### 书源与搜索
-
-- 内置书源：Z-Library、MangaDex、Venera 社区 JS 源、Legado JSON 书源、ehentai，以及中文轻小说 / 网文资源
-- 聚合搜索：多源并发，逐源出结果即展示；每源 6 条预览可展开；繁简与变体匹配
-- Z-Library：多节点内置与自动容灾、节点管理、验证自动处理、多格式下载
-- 自定义书源：支持 Legado `@css:` / `@json:` 规则，本地文件或网络导入
-- 在线小说：文字源搜索结果可直接阅读正文
-- 小说整本下载与更新：支持轻小说中文文库、中文机翻 Web 连载、国内网文 TXT 等来源；更新时保留阅读位置和书签
-- 漫画详情显示来源提供的标签、别名及章节信息
-- 详情标签搜索支持多层导航，每层保留搜索结果、关键词和书源选择，返回时恢复上一层
-- 书源调试日志：查看请求记录与失败原因
-- 书源管理页：快捷入口 + 小说 / 漫画分组 + 导入入口，逐源开关与登录
-
-### 下载
-
-- 后台下载队列，切页锁屏不中断；漫画任务可在进程重启后恢复，支持暂停 / 继续 / 取消 / 重试
-- 断点续传
-- 按文件内容校验真实格式，错误页不入库
-- 下载卡片显示封面、进度、速度；完成后自动入库并缓存封面
-- 漫画单章 / 批量下载；当前阅读页优先加载，预览图可先显示、高清图随后替换，并有失败重试
-- 书架单本 / 多选直接分享本地原文件；收藏分享作品详情链接，支持来源身份匹配与离线链接缓存
-- 本地漫画导入保留 PDF / CBZ / ZIP 原文件；在线逐页下载或旧导入缺少原归档时按页序打包 CBZ
-- 删除书籍会按资源身份清理关联数据和文件
-
-### 漫画翻译
-
-- 本地 OCR（PP-OCRv6）与气泡分割（YOLO-seg），模型按需下载
-- 双引擎：自定义云端大模型 API（OpenAI / Gemini 兼容）或免费免 Key 腾讯机翻；提供国内服务地址预填，仍需填写该服务的 Key
-- 译文按气泡形状渲染并落在原文位置，支持译名表跨页一致
-- 腾讯在线批量翻译，无 Google 请求；重复对白缓存、限时重试与具体失败原因，永久拒绝不反复请求
-- OCR 与译文分别缓存，网络重试复用已识别对白；翻回已译页直接显示，译名表按漫画隔离，关闭翻译释放模型内存
-- 大模型瞬时故障可降级腾讯机翻并提示原因；降级结果不冒充 AI 译文缓存。免费免 Key 大模型的稳定调用源尚未核实
-
-[1.2.5 跟手翻页与翻译链路重构记录](docs/comic-translation-rebuild-1.2.5-2026-10-07.md)。这是 1.2.5 历史优化记录；当前版本为 1.3.6。
-
-[1.2.5 阅读体验优化与验证](docs/reader-polish-1.2.5-2026-10-07.md)。
-
-[1.2.5 漫画七个设置分类、54 个配置字段与操作的逐项打磨记录](docs/comic-feature-polish-1.2.5-2026-10-07.md)：补齐双页适配、首次缩放手势、自动阅读暂停、全局与本书配置隔离、原图 / 效果对照、缓存清除与预设更新。所有功能保留，不把配置往返测试等同于竞品评测。
-
-### 书架与数据
-
-- 书架分类（支持 PIN 锁）、导入、排序；卡片显示章节进度
-- 删除可见书卡时由实际书卡碎裂，其他书平滑补位；排序、筛选和收藏网格使用稳定条目的位置与淡入淡出动画，排序保留视口
-- 「我喜欢的」：爱心按钮收藏，书架卡片红色角标标记，书架内「我的书架 / 我喜欢的」分段切换；换书源时收藏、进度与已读状态可迁移
-- 阅读统计：周 / 月 / 年总览、日历热力图、趋势图、时段分布、连续打卡、阅读目标
-- 存储管理：缓存 / 用户数据 / 书籍数据分区展示，缓存可逐项清理
-
-### 界面与交互
-
-- 阅读设置采用分层毛玻璃与独立强调色，内外层直接采样阅读内容，文字和图标保持清晰；手机底部、平板横屏右侧展示
-- 漫画七类设置支持分类过渡和按压动效，调节时不会因点击空白区误关闭
-- 小说与漫画阅读界面复用设计字号、圆角、间距与叠色；原有 UI 字面量基线检查全部通过
-- 漫画翻页结合位移与速度，点按仿真翻页包含完整揭页动画；阅读背景保持静止
-
-- 统一排版与动效：字号层级、过渡曲线、按压反馈全局一致
-- 触觉反馈分级（轻 / 中 / 重 / 等），可在设置中关闭
-- 玻璃卡片按压缩放、随滚动轻微摆动，可调卡片与玻璃参数
-- 渲染画质五档：极简 / 流畅 / 均衡 / 高 / 极致，按机型选择
-- 底部安全区、字体缩放、平板断点统一适配，不同机型显示一致
-- 列表与图片加载补齐动画与稳定 key，减少跳位
-- 页面前进 / 返回、共享封面、弹层退出和插图双击缩放统一节奏；下载进度单向增长，完成勾号仅播放一次
-- 日夜主题平滑过渡；实时响应系统减少动态效果设置，书架碎裂和位移等效果随之降级
-- 输入法弹出 / 收起不挤压页面内容，搜索与滚动保持跟手
-- 吉祥物 Roxy：按场景切换姿态与微动效
-
-### 个性化
-
-- 主题主色 / 强调色自由搭配，切换即时生效
-- 屏幕方向锁定、自定义开屏海报或纯净模式
-- 软件背景：主题色或自定义图片
-- 设置项集中，护眼、夜间模式、画质与动效统一管理；软件信息卡提供检查更新、更新目录和 GitHub 入口
-
-***
-
-## 截图
-
-1.2.5 同版本逐项打磨实拍：[完整功能记录与四种屏幕截图](docs/comic-feature-polish-1.2.5-2026-10-07.md)。
-
-<img src="./docs/screenshots/shot-reader125-comic-polish-tablet.jpg" width="760" alt="漫画设置逐项打磨后的平板主题分类"/>
-
-1.2.5 首次发布阅读设置实拍：手机主题玻璃排版、平板小说排版与漫画侧栏。下图来自 Android 模拟器，正文及漫画为生成的验证样例。
-
-<img src="./docs/screenshots/shot-reader125-novel-phone.jpg" width="280" alt="1.2.5 手机小说排版设置"/>
-
-<img src="./docs/screenshots/shot-reader125-novel-tablet.jpg" width="760" alt="1.2.5 平板横屏小说排版设置"/>
-
-<img src="./docs/screenshots/shot-reader125-comic-tablet.jpg" width="760" alt="1.2.5 平板横屏漫画设置侧栏"/>
-
-
-以下 12 张为此前版本的实际界面截图，完整展示书源管理、书库、书架、阅读、详情、统计与设置。
+## 界面预览
 
 <table>
-<tr><td align="center"><strong>书源管理</strong><br><img src="./promo/readme-screenshots/01-source-management.jpg" width="180" alt="书源管理截图"/></td><td align="center"><strong>书库搜索</strong><br><img src="./promo/readme-screenshots/02-library-search.jpg" width="180" alt="书库搜索截图"/></td><td align="center"><strong>主题与屏幕方向</strong><br><img src="./promo/readme-screenshots/03-theme-and-display.jpg" width="180" alt="主题与屏幕方向截图"/></td></tr>
-<tr><td align="center"><strong>阅读日历与趋势</strong><br><img src="./promo/readme-screenshots/04-reading-calendar.jpg" width="180" alt="阅读日历与趋势截图"/></td><td align="center"><strong>阅读统计与排行榜</strong><br><img src="./promo/readme-screenshots/05-reading-insights.jpg" width="180" alt="阅读统计与排行榜截图"/></td><td align="center"><strong>书架与继续阅读</strong><br><img src="./promo/readme-screenshots/06-bookshelf.jpg" width="180" alt="书架与继续阅读截图"/></td></tr>
-<tr><td align="center"><strong>漫画仿真翻页</strong><br><img src="./promo/readme-screenshots/07-comic-page-turn.jpg" width="180" alt="漫画仿真翻页截图"/></td><td align="center"><strong>小说仿真翻页</strong><br><img src="./promo/readme-screenshots/08-novel-page-turn.jpg" width="180" alt="小说仿真翻页截图"/></td><td align="center"><strong>漫画详情与标签</strong><br><img src="./promo/readme-screenshots/09-comic-details.jpg" width="180" alt="漫画详情与标签截图"/></td></tr>
-<tr><td align="center"><strong>章节、神回与书签</strong><br><img src="./promo/readme-screenshots/10-chapters-bookmarks.jpg" width="180" alt="章节、神回与书签截图"/></td><td align="center"><strong>神回排行榜</strong><br><img src="./promo/readme-screenshots/11-god-chapter-ranking.jpg" width="180" alt="神回排行榜截图"/></td><td align="center"><strong>阅读器设置</strong><br><img src="./promo/readme-screenshots/12-reader-settings.jpg" width="180" alt="阅读器设置截图"/></td></tr>
+<tr>
+<td align="center"><strong>小说阅读设置</strong><br><img src="./docs/screenshots/shot-reader125-novel-phone.jpg" width="260" alt="Android 小说阅读器的字体、行距、亮度和排版设置"/></td>
+<td align="center"><strong>漫画阅读设置</strong><br><img src="./docs/screenshots/shot-reader125-comic-polish-phone.jpg" width="260" alt="Android 漫画阅读器的翻页、显示、图像和翻译设置"/></td>
+</tr>
 </table>
 
-***
+> 以上为功能界面示例，部分截图来自较早版本的 Android 模拟器；应用仍在持续更新，当前界面可能已有调整。演示正文为样例内容。
+
+## 功能亮点
+
+### 小说、漫画和电子书，一个书架管理
+
+- 导入并阅读 **TXT、EPUB、MOBI、AZW、AZW3、PRC、DOCX、FB2、CBZ、ZIP、PDF** 等文件。
+- 在线搜索结果可以直接阅读；支持把小说整本或漫画章节下载到本地，断点续传并在书架中管理。
+- 书源搜索支持多源并发、自定义 Legado JSON 书源，以及 @css: / @json: 规则导入。
+- 本地进度、章节书签、收藏和阅读统计集中管理；换源时可迁移支持的阅读记录。
+
+### 可按习惯调整的阅读体验
+
+- 小说支持仿真卷页、覆盖、平移、渐变和滚动等翻页方式，可调字号、字体、行距、页边距、主题，并支持 TTS 朗读。
+- 漫画支持单页、双页、条漫和无缝滚动，可设置阅读方向、缩放、裁边、跨页拆分与页面背景。
+- 手机、平板和横屏均有适配；提供多个阅读预设、夜间主题和低性能设备的「极简」画质选项。
+
+### 漫画画质增强与翻译
+
+- 内置锐化、线条增强和 JaNai 极速处理；**MangaJaNai 完整版**可在首次下载模型后离线使用。
+- 漫画翻译使用本地 OCR 和气泡检测，译文由所选在线翻译服务或自定义 AI 接口生成。
+- 完整版增强模型按需下载，首次使用约 **76 MB**；不需要时可继续使用轻量选项。
+
+## 支持格式
+
+| 格式 | 阅读方式 |
+| --- | --- |
+| TXT | 分段加载、章节识别与多编码适配 |
+| EPUB | 目录、封面、元数据及内嵌插图 |
+| MOBI、AZW、AZW3、PRC | Kindle/PDB/KF8 文件解析 |
+| DOCX、FB2 | 文本提取与章节切分 |
+| CBZ、ZIP | 漫画图片排序与阅读 |
+| PDF | 按页显示；PDF 文本层解析尚未支持 |
 
 ## 安装
 
-**直接安装**：前往 [Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases) 下载 APK（arm64-v8a），允许「安装未知来源应用」后安装。
+- **系统要求：** Android 7.0（API 24）及以上。
+- **当前 Release：** 提供 arm64-v8a APK，适用于大多数 Android 手机和平板；Release 暂不包含 x86_64 模拟器版本。
+- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.3.6](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.6/Ciallo-Reader-v1.3.6.apk)。
+- 下载后按 Android 提示允许安装该来源的应用，再打开 APK 安装。
 
-**源码编译**：需要 JDK 17+ 与 Android SDK（compileSdk 35），网络可访问 Google Maven。
+## 快速开始
 
-```bash
+**导入本地书：** 打开书架，点「导入新书」，选择设备中的支持格式。
+
+**搜索在线内容：** 打开「书库」，选择小说、漫画或聚合搜索；可在「设置 → 书源管理」启用、管理或导入书源。在线书源由第三方提供，搜索结果和可用性会随来源变化。
+
+**离线阅读：** 在在线作品页下载整本小说或漫画章节，完成后从书架打开。在线阅读和搜索需要网络。
+
+## 常见问题
+
+**为什么搜索结果为空？**  
+检查网络和书源开关，再尝试聚合搜索或更换关键词。部分来源需要登录、验证或特定网络环境；来源站点调整也可能暂时影响搜索。
+
+**下载后的书可以离线读吗？**  
+可以。下载完成后从本地书架阅读；在线搜索、在线阅读和网络翻译仍需要连接相应服务。
+
+**漫画翻译会把哪些内容发送到网络？**  
+OCR 与气泡检测在设备上完成；生成译文时会通过你选择的在线翻译服务或自定义 API。请先查看所用服务的隐私条款。
+
+**完整画质增强为什么要下载模型？**  
+MangaJaNai 完整版模型较大，因此按需下载；下载完成后可离线使用。不需要额外模型时可使用其他处理选项。
+
+## 开发与反馈
+
+项目使用 **Kotlin、Jetpack Compose、Material 3、Room 和 WorkManager**。本地构建需要 JDK 17、Android SDK 35、NDK 29.0.14206865 与 CMake 3.22.1：
+
+~~~bash
 git clone https://github.com/roxycon-dev/Ciallo-Reader.git
 cd Ciallo-Reader
-echo "sdk.dir=/你的/Android/Sdk/路径" > local.properties
-./gradlew :app:assembleRelease
-```
+./gradlew :app:assembleDebug
+~~~
 
-构建完整版 GPU 引擎需要 Android NDK 29.0.14206865 和 CMake 3.22.1，Android Studio SDK Manager 可安装。
+Windows 可使用 gradlew.bat :app:assembleDebug。遇到问题或想提出功能建议，请到 [GitHub Issues](https://github.com/roxycon-dev/Ciallo-Reader/issues) 附上应用版本、设备型号和复现步骤。
 
-2026-10-12 发布 1.3.6 / 217：可从 [GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.6/Ciallo-Reader-v1.3.6.apk) 下载；使用 Release 构建、R8 混淆与资源精简，原始输出在 `app/build/outputs/apk/release/app-release.apk`。当前包沿用 1.3.5 签名，可覆盖安装。GitHub 旧 1.2.1 包使用另一证书：若出现签名冲突，先在设置中导出备份，再安装新版并恢复；未备份前不要卸载旧版。
+- [发布版本与更新记录](CHANGELOG.md)
+- [v1.3.6 发布说明与验证记录](docs/release-1.3.6-2026-10-12.md)
+- [第三方组件与模型许可说明](docs/vendor-licenses/README.md)
 
-***
+## 内容来源与许可
 
-## 使用说明
+Ciallo Reader 是阅读与书库管理工具，在线书源和翻译服务由第三方提供，其内容、可用性及服务条款由对应提供方决定。请遵守所在地法律、来源站点规则及作品版权要求。
 
-**添加书源**：底部 Tab「书库」顶部切换书源；更多漫画源在设置 → 书源管理 →「更新 Venera 源」；自定义规则走导入入口（支持 Legado JSON 格式）。
+本仓库未附带开源许可证，项目源码与应用保留所有权利；第三方组件各自遵循其许可证，详见上方许可说明。
 
-**开启成人漫画源**：进入「设置」标签页，连续点击六次「主色按钮实时联动效果」，页面出现「高级内容」后，打开其中的「带你登大郎~~~」。等待 Venera 源列表更新后，返回「书库」，在漫画书源选择器中选择对应来源。关闭该开关会隐藏成人源。
-
-**导入本地书**：书架页「+ 导入新书」，支持 TXT / EPUB / MOBI / AZW3 / CBZ。
-
-**使用「我喜欢的」**：点书籍爱心按钮收藏，书架顶部切到「我喜欢的」查看；换书源时收藏与进度会一并迁移。
-
-**阅读设置**：阅读器内点屏幕中央 →「阅读排版」，可调字号、行距、边距、亮度、主题与翻页模式。
-
-**Z-Library**：书源管理 → Z-Library 登录（账号密码或 Cookie）→ 搜索 → 下载，断点续传自动接管。
-
-**漫画翻译**：阅读器设置 → 翻译 → 选择引擎 → 开启整页翻译，首次使用按提示下载 OCR 模型。
-
-***
-
-## 项目结构
-
-```text
-app/src/main/java/com/example/
-├── MainActivity.kt / MainViewModel.kt   # 入口与全局状态
-├── data/                                # Room、各格式解析器、TTS
-│   └── favorite/                        # 「我喜欢的」实体与 DAO
-├── download/                            # 下载队列、断点续传、格式校验
-├── library/                             # 书库 UI、下载中心、Z-Library 集成
-├── mangatranslate/                      # OCR、气泡分割、翻译引擎、缓存
-├── source/                              # 书源体系（parser / zlibrary / js / anilist）
-└── ui/
-    ├── comic/ pageturn/                 # 漫画与文字阅读引擎
-    ├── components/ glasskit/            # 玻璃组件（通用 / 书源与搜索历史专用）
-    ├── favorite/ shelf/ feedback/       # 收藏、书架交互、动效与触觉令牌
-    ├── mascot/ adaptive/                # 吉祥物、宽度断点
-    └── source/                          # 书源管理
-
-backdrop/ · liquidglass-core/ · liquidglass-compose/   # 玻璃渲染（vendored）
-fi/harism/curl/ · eu/wewox/pagecurl/ · net/engawapg/lib/zoomable/   # 翻页与缩放（vendored）
-```
-
-书源实现 `BookSource` / `ComicSource` 接口即可接入；`backdrop` 与 `liquidglass-*` 为仓库内 vendored 源码，无需额外仓库。
-
-***
-
-## FAQ
-
-**Q：开了 VPN，检查更新仍失败？**
-1.2.3 已统一系统代理处理，并在 API 查询失败时使用 GitHub 官方发布页补查；失败时显示具体原因。VPN 分应用模式需要包含 Ciallo Reader，检查更新不需要 GitHub 登录。
-
-**Q：搜索不到结果？**
-确认书源已启用、网络正常；Z-Library 首次搜索需要先过验证；漫画建议用「聚合漫画（全部）」；也可换节点或关键词。
-
-**Q：Z-Library 提示需验证或 503？**
-应用会自动处理验证，失败时自动切换节点，也可在节点管理页手动切换。保持代理 / VPN 状态与浏览器一致。
-
-**Q：下载失败或文件打不开？**
-下载会校验真实格式，错误页不入库；失败任务保留在下载中心可重试。未登录时每日下载次数有限。
-
-**Q：漫画翻译需要联网吗？**
-OCR 与气泡分割全本地（模型首次下载约 31MB）；在线翻译需联网，配置自定义 AI 接口后走自己的 API。
-
-**Q：模拟器上开翻译闪退？**
-Release 包只含 arm64 库，x86_64 模拟器转译运行会崩溃；Debug 包加 `-PincludeX86` 构建后可用。
-
-**Q：收藏会丢吗？**
-收藏单独存库，换书源可迁移；数据在应用私有目录，卸载即清除。
-
-**Q：怎么反馈崩溃？**
-到 Issues 提供版本号、机型与复现步骤，可附 `adb logcat -b crash` 的日志。
-
-***
-
-## Roadmap
-
-- [x] MOBI / AZW3 支持、自定义字体导入、漫画音量键翻页、「我喜欢的」
-- [ ] 收藏与阅读记录导出 / 导入
-- [ ] WebDAV 云同步
-- [ ] PDF 文本层解析
-- [ ] 文字阅读器音量键翻页、屏幕常亮开关
-- [ ] 电子墨水模式、全局手势自定义
-- [ ] 更多内置漫画源
-
-***
-
-## 贡献
-
-- Issue：标题写 `[模块] 问题描述`，正文附版本号、机型、复现步骤与日志
-- PR：从 `main` 拉分支，提交前跑通 `./gradlew :app:assembleRelease`；动效与触觉请使用 `ui/feedback/AppMotion` 的既有令牌
-
-***
-
-## 免责声明与许可
-
-本项目仅用于技术学习与交流。所有在线书源均为第三方服务，内容版权归对应方所有；请勿用于商业用途或传播侵权内容。
-
-仓库未附带开源许可证（All Rights Reserved），如需商用或二次分发请联系作者。第三方组件遵循各自许可证（明细见 `docs/vendor-licenses/`）。
-
-***
-
-## 鸣谢
-
-- 玻璃渲染：[Kashif-E/KMPLiquidGlass](https://github.com/Kashif-E/KMPLiquidGlass)、[Abdullajon1881/LiquidGlass](https://github.com/Abdullajon1881/LiquidGlass)
-- 翻译管线：[jedzqer/manga-translator-android](https://github.com/jedzqer/manga-translator-android)
-- 仿真卷页：[harism/android-pagecurl](https://github.com/harism/android-pagecurl)
-- 缩放组件：[usuiat/Zoomable](https://github.com/usuiat/Zoomable)
-- 漫画画质增强：[AMD FidelityFX FSR1](https://github.com/GPUOpen-Effects/FidelityFX-FSR)、[bloc97/Anime4K](https://github.com/bloc97/Anime4K)，MIT 许可随安装包保留
-- 底部弹窗：[skydoves/FlexibleBottomSheet](https://github.com/skydoves/FlexibleBottomSheet)
-- Venera 源：[venera-app/venera-configs](https://github.com/venera-app/venera-configs)
-- 环境音素材：CC0（明细见 `app/src/main/assets/ambient/CREDITS.md`）
-
-***
-
-## 版本历史
-
-逐项变更见 [CHANGELOG.md](CHANGELOG.md)。
-
-| 版本    | 日期         | 主要内容                              |
-| ----- | ---------- | --------------------------------- |
-| 1.3.6 | 2026-10-12 | 完整增强 · GPU 加速 |
-| 1.3.5 | 2026-10-12 | 极速增强 · 后续预生成 |
-| 1.3.4 | 2026-10-12 | 漫画增强提速 |
-| 1.3.3 | 2026-10-12 | 增强加速 · 设置卡片统一 |
-| 1.3.2 | 2026-10-12 | 漫画增强 · 精确续读 · 极简渲染 |
-| 1.3.1 | 2026-10-11 | 动效与玻璃 · 导航修复 |
-| 1.3.0 | 2026-10-09 | 增强翻页无空白 |
-| 1.2.9 | 2026-10-09 | 增强细线与小字 |
-| 1.2.8 | 2026-10-09 | 画质增强重构 |
-| 1.2.7 | 2026-10-07 | 翻页与导航修复 |
-| 1.2.6 | 2026-10-07 | 分享与原归档 |
-| 1.2.5（同版本更新） | 2026-10-07 | 阅读体验与翻译 |
-| 1.2.5 | 2026-10-07 | 阅读体验与翻译 |
-| 1.2.4 | 2026-10-06 | 章节顺序修复 |
-| 1.2.3 | 2026-10-05 | 神回封面 · 应用更新 |
-| 1.2.2 | 2026-10-05 | 多语言搜索 · 更新修复 |
-| 1.2.1 | 2026-10-05 | 书源与界面修复 |
-| 1.2.0 | 2026-10-03 | 小说与漫画阅读升级 |
-| 1.1.5 | 2026-10-02 | 聚合搜索 · 连续搜索 |
-| 1.1.0 | 2026-09-24 | 书源与键盘交互 |
-| 1.0.7 | 2026-09-21 | 界面适配 · 安装包瘦身 |
-| 1.0.6 | 2026-09-08 | 串珠翻页 · 漫画加载 |
-| 1.0.5 | 2026-09-05 | 漫画阅读 · 整页翻译 |
-| 1.0.1 | 2026-08-29 | 在线小说 · 聚合搜索 |
-| 1.0.0 | 2026-08-28 | 首次发布 |
