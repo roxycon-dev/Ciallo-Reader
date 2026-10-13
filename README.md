@@ -95,7 +95,7 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 - **系统要求：** Android 7.0（API 24）及以上。
 - **当前 Release：** 提供 arm64-v8a APK，适用于大多数 Android 手机和平板；Release 暂不包含 x86_64 模拟器版本。
-- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.3.6](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.6/Ciallo-Reader-v1.3.6.apk)。
+- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.3.7](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.7/Ciallo-Reader-v1.3.7.apk)。
 - 下载后按 Android 提示允许安装该来源的应用，再打开 APK 安装。
 
 ## 快速开始
@@ -132,7 +132,10 @@ cd Ciallo-Reader
 
 Windows 可使用 gradlew.bat :app:assembleDebug。遇到问题或想提出功能建议，请到 [GitHub Issues](https://github.com/roxycon-dev/Ciallo-Reader/issues) 附上应用版本、设备型号和复现步骤。
 
+调试版使用独立包名，可与正式版并存。正式发布必须沿用固定签名密钥，禁止用临时调试签名发布；构建、备份与覆盖升级校验见 [签名说明](docs/app-signing.md)。
+
 - [发布版本与更新记录](CHANGELOG.md)
+- [v1.3.7 发布说明与验证记录](docs/release-1.3.7-2026-10-13.md)
 - [v1.3.6 发布说明与验证记录](docs/release-1.3.6-2026-10-12.md)
 - [第三方组件与模型许可说明](docs/vendor-licenses/README.md)
 

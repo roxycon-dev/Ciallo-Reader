@@ -47,9 +47,7 @@ class Wenku8LibrarySource(
             .header("Referer", baseUrl.toString()).build()
         return http.newCall(request).executeCancellable().use { response ->
             if (!response.isSuccessful) throw SourceException.NetworkError("中文文库返回 HTTP ${response.code}")
-            val bytes = response.body?.byteStream()?.use { it.readImportBytes(2 * 1024 * 1024) }
-                ?: throw SourceException.ParseError("中文文库返回空响应")
-            JSONObject(bytes.toString(Charsets.UTF_8))
+            SourceResponse.jsonObject(response.readSourceText())
         }
     }
     private fun book(data: JSONObject): SearchBook {

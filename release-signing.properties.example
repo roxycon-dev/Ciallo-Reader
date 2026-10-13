@@ -1,0 +1,6 @@
+# 复制为 release-signing.properties（已忽略，切勿提交密钥或密码）。
+# 使用本机已配置的固定密钥，或者从私有备份恢复同一份密钥。
+storeFile=.signing/release.keystore
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=YOUR_EXISTING_KEY_ALIAS
+keyPassword=YOUR_KEY_PASSWORD

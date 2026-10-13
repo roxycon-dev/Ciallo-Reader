@@ -59,9 +59,7 @@ class AutoNovelSource(
         return http.newCall(request).executeCancellable().use { response ->
             if (response.code == 401) throw SourceException.LoginRequired
             if (!response.isSuccessful) throw SourceException.NetworkError("轻小说源返回 HTTP ${response.code}")
-            val body = response.body?.byteStream()?.use { it.readImportBytes(2 * 1024 * 1024) }
-                ?: throw SourceException.ParseError("轻小说源返回空响应")
-            JSONObject(body.toString(Charsets.UTF_8))
+            SourceResponse.jsonObject(response.readSourceText())
         }
     }
 

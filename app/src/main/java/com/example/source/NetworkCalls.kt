@@ -40,6 +40,13 @@ internal object SharedHttpTransport {
     fun builder():okhttp3.OkHttpClient.Builder=okhttp3.OkHttpClient.Builder()
         .connectionPool(pool)
         .dispatcher(dispatcher)
+        // Let OkHttp negotiate/decode gzip. Script-supplied br/zstd prevented its
+        // transparent decoding and exposed compressed bytes to text/JSON parsers.
+        .addInterceptor { chain ->
+            val request = chain.request()
+            chain.proceed(if (request.header("Accept-Encoding").equals("identity", true)) request
+                else request.newBuilder().removeHeader("Accept-Encoding").build())
+        }
 }
 
 internal object SourceNetworkPolicy {

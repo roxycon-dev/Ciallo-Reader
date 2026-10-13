@@ -11,6 +11,10 @@ local.properties
 *.aab
 debug.keystore
 *.jks
+*.keystore
+__pycache__/
+/.signing/
+/release-signing.properties
 captures/
 .externalNativeBuild/
 .cxx/

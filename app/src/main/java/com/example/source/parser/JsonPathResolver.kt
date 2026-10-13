@@ -9,10 +9,12 @@ object JsonPathResolver {
      * Resolves a JSON path string like "data.books"、"items" 或 "data.books[].info"
      * on a root JSON string/object/array. Supports wildcard array traversal "[]".
      */
-    fun resolveArray(jsonStr: String, path: String): List<JSONObject> {
+    fun resolveArray(jsonStr: String, path: String, required: Boolean = false): List<JSONObject> {
         if (jsonStr.isBlank()) return emptyList()
         val root = parseRoot(jsonStr) ?: return emptyList()
         val targets = resolveAll(listOf(root), parseSegments(path))
+        if (required && (targets.isEmpty() || targets.any { it !is JSONArray && it !is JSONObject }))
+            throw com.example.source.SourceException.ParseError("源站未返回规则所需的搜索列表，请检查或更新书源规则")
         val resultList = mutableListOf<JSONObject>()
 
         for (target in targets) {
@@ -30,6 +32,8 @@ object JsonPathResolver {
                 }
             }
         }
+        if (required && resultList.isEmpty() && targets.any { it is JSONArray && it.length() > 0 })
+            throw com.example.source.SourceException.ParseError("源站搜索列表条目格式异常，请更新书源规则")
         return resultList
     }
 
