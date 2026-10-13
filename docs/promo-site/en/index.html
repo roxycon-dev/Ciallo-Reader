@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#f4f3f8">
   <meta name="robots" content="index,follow,max-image-preview:large">
   <title>Ciallo Reader — Android Novel, Manga & Ebook Reader</title>
@@ -13,6 +14,7 @@
   <link rel="alternate" hreflang="x-default" href="https://roxycon-dev.github.io/Ciallo-Reader/en/">
   <link rel="icon" href="../media/icon.webp" type="image/webp">
   <link rel="stylesheet" href="../site.css">
+  <link rel="stylesheet" href="../experience.css">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Ciallo Reader">
   <meta property="og:title" content="Ciallo Reader — novels, manga, and ebooks in one Android library">
@@ -37,429 +39,73 @@
     "image": "https://roxycon-dev.github.io/Ciallo-Reader/media/ciallo-cover.png"
   }
   </script>
+
+  <script>try{const t=localStorage.getItem('ciallo-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
-
-  <!-- Background: color blobs (something for the glass to refract) -->
-  <div class="blobs" aria-hidden="true"><span class="b1"></span><span class="b2"></span><span class="b3"></span></div>
-  <!-- Background: shared streamlines with blurred and pointer-revealed layers -->
-  <div class="flow-field" id="flowField" aria-hidden="true">
-    <canvas class="flow-layer flow-heavy" id="flowHeavy"></canvas>
-    <canvas class="flow-layer flow-soft" id="flowSoft"></canvas>
-    <canvas class="flow-layer flow-sharp" id="flowSharp"></canvas>
-  </div>
-
-  <!-- Tilted floating glass navigation -->
+<div class="ambient-blobs" aria-hidden="true"><span class="blob-a"></span><span class="blob-b"></span><span class="blob-c"></span></div>
+  <div class="flow-field" id="flowField" aria-hidden="true"><canvas id="flowHeavy" class="flow-layer flow-heavy"></canvas><canvas id="flowSoft" class="flow-layer flow-soft"></canvas><canvas id="flowSharp" class="flow-layer flow-sharp"></canvas></div>
   <header class="nav-wrap">
-    <nav class="nav glass" id="nav" data-lens="nav" aria-label="Main navigation">
-      <a class="nav-brand" href="./" aria-label="Ciallo Reader home">
-        <img src="../media/icon.webp" width="26" height="26" decoding="async" alt="">
-        <span>Ciallo Reader</span>
-      </a>
-      <div class="nav-links">
-        <span class="nav-slider" id="navSlider" aria-hidden="true"></span>
-        <a href="#feature-tour">Features</a>
-        <a href="#formats">Formats</a>
-        <a href="#faq">FAQ</a>
-      </div>
-      <div class="nav-actions">
-        <a class="lang-link" href="../" lang="zh-Hans">中文</a>
-        <button class="theme-btn glass" id="themeBtn" data-lens="pill" aria-label="Toggle dark mode">
-          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5 5l1.6 1.6M17.4 17.4L19 19M19 5l-1.6 1.6M6.6 17.4L5 19"/></svg>
-          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13.2A8.2 8.2 0 0 1 10.8 4 8.4 8.4 0 1 0 20 13.2z"/></svg>
-        </button>
-        <a class="nav-dl" href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">Download</a>
-        <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobilePanel">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-        </button>
-      </div>
+    <nav class="nav glass" aria-label="Main navigation">
+      <a class="brand" href="#top"><img class="" src="../media/icon.webp" width="192" height="192" alt="" decoding="async" loading="eager"><span>Ciallo Reader</span></a>
+      <div class="nav-links"><span class="nav-slider glass" aria-hidden="true"></span><a href="#experience">Experience</a><a href="#formats">Formats</a><a href="#faq">FAQ</a></div>
+      <div class="nav-actions"><a class="language" href="../" lang="zh-Hans">中文</a><button class="theme-btn glass" type="button" id="themeBtn" aria-label="Toggle color theme" aria-pressed="false"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6L19 19M5 19l1.4-1.4M17.6 6.4L19 5"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M20.4 13.4A8.4 8.4 0 0 1 10.6 3.6a8.4 8.4 0 1 0 9.8 9.8Z"/></svg></button><a class="nav-download" href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">Download <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><button class="menu-btn" type="button" id="menuBtn" aria-label="Open menu" aria-controls="mobilePanel" aria-expanded="false"><span></span><span></span></button></div>
     </nav>
-    <div class="mobile-panel glass" id="mobilePanel" data-lens="nav">
-      <a href="#feature-tour">Features</a>
-      <a href="#formats">Formats</a>
-      <a href="#faq">FAQ</a>
-      <a href="../" lang="zh-Hans">中文</a>
-    </div>
+    <div class="mobile-panel glass" id="mobilePanel" hidden><a href="#experience">Experience</a><a href="#features">Features</a><a href="#formats">Formats</a><a href="#faq">FAQ</a><a href="../">简体中文</a></div>
   </header>
-
   <main id="main">
-    <!-- Hero: curves flow behind the text -->
     <section class="hero" id="top">
-      <div class="hero-inner">
-        <h1><span class="line">Novels, manga,<br class="mobile-break"> and ebooks,</span><span class="line">on a single shelf.</span></h1>
-        <p class="hero-sub">The next page, your way.</p>
-        <p class="hero-lede">Bring in your own ebooks, search novels and manga through sources you choose, then tune the reader, save your progress, and continue offline on your Android phone or tablet.</p>
-        <div class="hero-cta">
-          <a class="btn btn-primary" href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">Download latest</a>
-          <a class="btn btn-glass glass" data-lens="pill" href="https://github.com/roxycon-dev/Ciallo-Reader">View source</a>
-        </div>
-        <ul class="hero-tags" aria-label="App information">
-          <li class="tag glass" data-lens="pill">Android 7.0+</li>
-          <li class="tag glass" data-lens="pill">arm64-v8a</li>
-          <li class="tag glass" data-lens="pill">Local files</li>
-        </ul>
+      <div class="hero-copy">
+        <a class="release-link" href="https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.3.6"><span class="release-dot"></span>Ciallo Reader 1.3.6 · Now available <span aria-hidden="true">↗</span></a>
+        <h1><span class="hero-line">Novels. Manga. Ebooks.</span><span class="hero-line">One beautiful home.</span></h1>
+        <p class="hero-sub">The next page. Your way.</p>
+        <p class="hero-lede">From finding a story to getting lost in it.<br>Make reading feel like you.</p>
+        <div class="hero-actions"><a class="button button-primary" href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">Download the latest <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="button button-glass glass" href="https://github.com/roxycon-dev/Ciallo-Reader">View source ↗</a></div>
+        <div class="hero-meta"><span class="glass">Android 7.0+</span><span class="glass">arm64-v8a</span><span class="glass">Local files welcome</span></div>
+      </div>
+      <a class="hero-scroll" href="#experience"><span class="scroll-mouse" aria-hidden="true"></span>Scroll to open your reading world<span aria-hidden="true">↓</span></a>
+      <p class="pointer-hint">Move your pointer. Let the light gather around you.</p>
+    </section>
+
+    <section class="experience section wrap" id="experience">
+      <div class="section-heading"><h2>Open your<br>reading world.</h2><p>Scroll through your library, novels, and manga.<br>Or choose a scene and explore the details.</p></div>
+      <div class="journey-track" id="readingJourney"><div class="journey-pin">
+        <div class="journey-heading"><span class="journey-word">Start with your library</span><span class="journey-instruction">Scroll. The story continues. ↓</span></div>
+        <div class="experience-display glass"><article class="experience-panel" id="panel-shelf" aria-labelledby="tab-shelf" data-panel="shelf"><div class="experience-copy"><h3>All your stories.<br>One lovely home.</h3><p>Local ebooks, online favorites, and downloads meet on one shelf. Pick up exactly where you left off.</p><ul class="benefits"><li><strong>11</strong><span>local file formats</span></li><li><span class="benefit-dot"></span><span>Categories · Favorites · Bookmarks</span></li><li><span class="benefit-dot"></span><span>Your place, remembered</span></li></ul></div><div class="experience-visual visual-shelf"><div class="visual-halo"></div><div class="device "><div class="device-screen"><img class="" src="../media/product-shelf.webp" width="816" height="1800" alt="Bookshelf and reading progress" decoding="async" loading="lazy"></div></div><div class="detail-float"><img class="" src="../media/feature-resume.webp" width="432" height="510" alt="Actual resume card" decoding="async" loading="lazy"></div><button class="screen-hotspot glass" type="button" data-detail="shelf" aria-label="Pick up your story"><span aria-hidden="true">+</span><em>Pick up your story</em></button></div></article><article class="experience-panel" id="panel-novel" aria-labelledby="tab-novel" data-panel="novel"><div class="experience-copy"><h3>Make every page<br>feel like yours.</h3><p>From type to whitespace, from daylight to late nights. Tune the page to your eyes and settle into the story.</p><ul class="benefits"><li><span class="benefit-dot"></span><span>Fonts · Size · Spacing · Margins</span></li><li><strong>5</strong><span>page-turn styles, including curl</span></li><li><span class="benefit-dot"></span><span>Reading themes and TTS</span></li></ul></div><div class="experience-visual visual-novel"><div class="visual-halo"></div><div class="device "><div class="device-screen"><img class="" src="../media/feature-novel-layout.jpg" width="1080" height="1920" alt="Actual novel typography settings" decoding="async" loading="lazy"></div></div><button class="screen-hotspot glass" type="button" data-detail="novel" aria-label="Type & whitespace"><span aria-hidden="true">+</span><em>Type & whitespace</em></button></div></article><article class="experience-panel" id="panel-comic" aria-labelledby="tab-comic" data-panel="comic"><div class="experience-copy"><h3>Every panel.<br>Your way to read.</h3><p>Single pages, spreads, webtoons, or seamless scrolling. Set your direction, zoom, and gestures, then follow the panels.</p><ul class="benefits"><li><span class="benefit-dot"></span><span>Single · Spread · Webtoon · Scroll</span></li><li><span class="benefit-dot"></span><span>Horizontal and vertical directions</span></li><li><span class="benefit-dot"></span><span>Trim · Split spreads · Auto-turn</span></li></ul></div><div class="experience-visual visual-comic"><div class="visual-halo"></div><div class="device "><div class="device-screen"><img class="" src="../media/product-comic.webp" width="816" height="1800" alt="Actual manga reader" decoding="async" loading="lazy"></div></div><button class="screen-hotspot glass" type="button" data-detail="comic" aria-label="Pages & direction"><span aria-hidden="true">+</span><em>Pages & direction</em></button></div></article></div>
+        <div class="journey-floor"><div class="reader-tabs glass" role="tablist" aria-label="Choose a reading experience"><button id="tab-shelf" type="button" role="tab" aria-controls="panel-shelf" aria-selected="true" data-tab="shelf">Library</button><button id="tab-novel" type="button" role="tab" aria-controls="panel-novel" aria-selected="false" data-tab="novel">Novels</button><button id="tab-comic" type="button" role="tab" aria-controls="panel-comic" aria-selected="false" data-tab="comic">Manga</button></div><button class="journey-detail glass" type="button" data-detail="current">Explore this scene <span aria-hidden="true">+</span></button></div>
+      </div></div>
+    </section>
+
+<section class="core-features section wrap" aria-label="Core reading features"><div class="core-cards"><a class="core-card glass" data-tilt href="#formats"><span class="core-icon core-icon-0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V6a2 2 0 0 1 2-2h13v13H6a2 2 0 0 0 0 4h13M8 8h7M8 11h5"/></svg></span><h3>One shelf.<br>All your favorites.</h3><p>11 local formats. Categories, favorites, bookmarks, and progress, close at hand.</p><span class="core-link">Explore formats <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a><a class="core-card glass" data-tilt href="#experience"><span class="core-icon core-icon-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h3M11 17h9"/><circle cx="16" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></span><h3>Every detail.<br>Just as you like it.</h3><p>Novel typography, manga modes, and reading directions. Make every page feel right.</p><span class="core-link">Enter the reading studio <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a><a class="core-card glass" data-tilt href="#features"><span class="core-icon core-icon-2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span><h3>Keep the story.<br>Read it anywhere.</h3><p>Download novels or manga chapters, pause and resume, then read them offline.</p><span class="core-link">Discover offline reading <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a></div></section>
+    <section class="features section wrap" id="features">
+      <div class="section-heading align-left"><h2>A good story.<br>With you all the way.</h2></div>
+      <div class="discovery-grid">
+        <article class="feature-card glass source-card"><div class="feature-copy"><span class="feature-symbol" aria-hidden="true">⌕</span><h3>One search.<br>More stories.</h3><p>Search your enabled novel and manga sources together. Multilingual search helps you find works by their names in different languages.</p><div class="feature-tags"><span>Aggregate search</span><span>Multilingual keywords</span><span>Custom sources</span></div></div><div class="source-visual"><div class="device "><div class="device-screen"><img class="" src="../media/product-search.webp" width="816" height="1800" alt="Actual aggregate manga search results" decoding="async" loading="lazy"></div></div></div><details class="card-details"><summary>About source support <span aria-hidden="true">+</span></summary><p>Import Legado JSON sources with @css: / @json: rules. Enabled sources determine search coverage; online sources are third-party services.</p></details></article>
+        <article class="feature-card glass offline-card"><span class="feature-symbol" aria-hidden="true">↓</span><h3>Bring the story.<br>Leave the signal behind.</h3><p>Download a whole novel or selected manga chapters to your shelf. Keep reading on your commute, on a trip, or in a quiet moment.</p><div class="offline-points"><span>Pause & resume</span><span>Resumable downloads</span></div><div class="download-visual"><img class="" src="../media/feature-download-paused.webp" width="1224" height="520" alt="Actual resumable download panel" decoding="async" loading="lazy"></div></article>
+      </div>
+      <div class="intelligence-grid">
+        <article class="feature-card glass enhance-card"><div class="enhance-copy"><p class="small-label">Manga image enhancement</p><h3>Give every line<br>a little more clarity.</h3><p>Choose sharpening, line enhancement, JaNai fast processing, or MangaJaNai full models to suit your page and device.</p><div class="enhance-chips"><span>JaNai</span><span>MangaJaNai</span><span>On-device</span></div><p class="fine-print">Full model: about 76 MB on first download. Then available offline.</p></div><div class="enhance-art"><img class="" src="../media/product-comic.webp" width="816" height="1800" alt="Actual manga page; not a before/after comparison" decoding="async" loading="lazy"></div></article>
+        <article class="feature-card glass translate-card"><div class="translate-copy"><h3>Let the translation<br>follow the dialogue.</h3><p>Your service, custom API, and automatic translation have their own place in the reading settings.</p><button class="settings-peek glass" type="button" data-settings="translate">Explore translation settings +</button></div><div class="translate-preview"><img src="../media/feature-comic-translate.webp" width="1224" height="1950" loading="lazy" decoding="async" alt="Actual manga translation settings"></div></article>
       </div>
     </section>
 
-    <!-- Sticky scroll narrative: the phone screen changes as you scroll -->
-    <section class="showcase" id="showcase" aria-label="Product tour">
-      <div class="showcase-sticky">
-        <div class="wrap showcase-grid">
-          <div class="scenes">
-            <div class="scene on">
-              <span class="scene-tag glass" data-lens="pill">Library</span>
-              <h2>Every format,<br>on one shelf.</h2>
-              <p>TXT, EPUB, MOBI, CBZ, PDF… Favorites, bookmarks, and reading progress stay in one place.</p>
-            </div>
-            <div class="scene">
-              <span class="scene-tag glass" data-lens="pill">Novels</span>
-              <h2>Every detail,<br>tuned by you.</h2>
-              <p>Font size, typeface, line spacing, themes, and page-turn styles — all adjustable.</p>
-            </div>
-            <div class="scene">
-              <span class="scene-tag glass" data-lens="pill">Manga</span>
-              <h2>Read manga<br>like manga.</h2>
-              <p>Single page, double page, webtoon, or scrolling — reading direction included.</p>
-            </div>
-          </div>
-          <div class="phone glass" data-lens="card" aria-hidden="true">
-            <div class="phone-screen-clip">
-              <!-- Bookshelf illustration -->
-              <div class="phone-screen s0 on">
-                <div class="shelf-row">
-                  <span class="book" style="height:64px;background:linear-gradient(180deg,#7c6bff,#5a4de0)"></span>
-                  <span class="book" style="height:52px;background:linear-gradient(180deg,#35c2ff,#1f9fe0)"></span>
-                  <span class="book" style="height:70px;background:linear-gradient(180deg,#ff7ab8,#e0559a)"></span>
-                  <span class="book" style="height:58px;background:linear-gradient(180deg,#9d8cff,#7c6bff)"></span>
-                  <span class="book" style="height:66px;background:linear-gradient(180deg,#67d4ff,#35c2ff)"></span>
-                </div>
-                <div class="shelf-row">
-                  <span class="book" style="height:60px;background:linear-gradient(180deg,#ff9ccb,#ff7ab8)"></span>
-                  <span class="book" style="height:72px;background:linear-gradient(180deg,#8f7dff,#6a58f0)"></span>
-                  <span class="book" style="height:54px;background:linear-gradient(180deg,#4fc9ff,#28aae8)"></span>
-                  <span class="book" style="height:68px;background:linear-gradient(180deg,#b3a5ff,#8f7dff)"></span>
-                  <span class="book" style="height:56px;background:linear-gradient(180deg,#ff8fc0,#e86aa8)"></span>
-                </div>
-                <div class="shelf-row">
-                  <span class="book" style="height:66px;background:linear-gradient(180deg,#35c2ff,#7c6bff)"></span>
-                  <span class="book" style="height:58px;background:linear-gradient(180deg,#ff7ab8,#c85af0)"></span>
-                  <span class="book" style="height:62px;background:linear-gradient(180deg,#7c6bff,#35c2ff)"></span>
-                  <span class="book" style="height:50px;background:linear-gradient(180deg,#67d4ff,#4fb0f0)"></span>
-                  <span class="book" style="height:70px;background:linear-gradient(180deg,#9d8cff,#ff7ab8)"></span>
-                </div>
-              </div>
-              <!-- Novel reading illustration -->
-              <div class="phone-screen s1">
-                <div class="nov-title"></div>
-                <div class="nov-line" style="width:100%"></div>
-                <div class="nov-line" style="width:96%"></div>
-                <div class="nov-line" style="width:88%"></div>
-                <div class="nov-line" style="width:100%"></div>
-                <div class="nov-line" style="width:72%"></div>
-                <div class="nov-line" style="width:94%"></div>
-                <div class="nov-line" style="width:100%"></div>
-                <div class="nov-line" style="width:64%"></div>
-                <div class="nov-line" style="width:90%"></div>
-                <div class="nov-line" style="width:78%"></div>
-              </div>
-              <!-- Manga reading illustration -->
-              <div class="phone-screen s2">
-                <div class="manga-grid">
-                  <span class="panel"></span><span class="panel"></span>
-                  <span class="panel"></span><span class="panel"></span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="showcase-dots" aria-hidden="true"><i class="on"></i><i></i><i></i></div>
-      </div>
+    <section class="personal section wrap">
+      <article class="personal-panel glass"><div class="personal-copy"><h2>Every page read.<br>A story of your own.</h2><p>Reading time, streaks, calendars, and trends keep track of your reading life. Mark a favorite chapter as a “God-tier moment” and return to it anytime.</p><div class="personal-benefits"><span>Goals & reading stats</span><span>Favorite chapter rankings</span><span>Progress & bookmarks</span></div></div><div class="personal-visual"><div class="stats-shot"><img class="" src="../media/product-stats.webp" width="432" height="960" alt="Actual reading stats with example activity" decoding="async" loading="lazy"></div><div class="ranking-shot"><img class="" src="../media/product-ranking.webp" width="816" height="1693" alt="Actual favorite chapter ranking" decoding="async" loading="lazy"></div></div></article>
     </section>
 
-    <!-- Features: three glass cards -->
-    <section class="features wrap" id="features">
-      <div class="sec-head">
-        <h2>Make every part of reading<br>fit your habits.</h2>
-      </div>
-      <div class="cards">
-        <article class="card glass" data-lens="card">
-          <div class="card-icon ci-1">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V6a2 2 0 0 1 2-2h13v13H6a2 2 0 0 0-2 2zm0 0a2 2 0 0 0 2 2h13"/><path d="M9 8h6"/></svg>
-          </div>
-          <h3>One shelf for different formats</h3>
-          <p>Import TXT, EPUB, MOBI, AZW, AZW3, PRC, DOCX, FB2, CBZ, ZIP, or PDF. Sort books into categories, save favorites, and continue from your last position.</p>
-        </article>
-        <article class="card glass" data-lens="card">
-          <div class="card-icon ci-2">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h4M12 16h8"/><circle cx="16" cy="8" r="2"/><circle cx="10" cy="16" r="2"/></svg>
-          </div>
-          <h3>Read it your way</h3>
-          <p>Adjust novel fonts, spacing, margins, themes, and page turns, or use TTS. Choose manga layouts such as single page, double page, webtoon, or scrolling, with a reading direction to match.</p>
-        </article>
-        <article class="card glass" data-lens="card">
-          <div class="card-icon ci-3">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4-4m4 4l4-4"/><path d="M4 17v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1"/></svg>
-          </div>
-          <h3>Download to your shelf, read offline</h3>
-          <p>Search sources you have enabled and download novels or manga chapters. Once downloaded, open them from your shelf without a connection.</p>
-        </article>
-      </div>
-    </section>
+    <section class="customization section wrap"><div class="customization-visual"><div class="theme-preview theme-orange"><img class="" src="../media/product-theme-orange.webp" width="816" height="1800" alt="Actual orange accent theme settings" decoding="async" loading="lazy"></div><div class="theme-preview theme-green"><img class="" src="../media/product-theme-green.webp" width="816" height="1800" alt="Actual green accent theme settings" decoding="async" loading="lazy"></div></div><div class="customization-copy"><h2>Your reader.<br>Make it feel like you.</h2><p>Choose your theme and accent colors in a light, glass-inspired interface. Adapted for phones, tablets, and landscape, with a minimal rendering option for less powerful devices.</p><div class="color-dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><p class="fine-print">Personal themes · Reading presets · Adaptive layouts</p></div></section>
 
-    <section class="feature-tour wrap" id="feature-tour">
-      <div class="sec-head">
-        <h2>Find a story, make it yours,<br>and come back to it later.</h2>
-        <p>Search, organize, read, translate, and reflect — Ciallo Reader brings these everyday tools together in one Android app.</p>
-      </div>
-      <div class="story-list">
-        <article class="story-row">
-          <figure class="story-media glass story-media--source" data-lens="card">
-            <img src="../media/feature-source-picker.webp" width="1224" height="1430" loading="lazy" decoding="async" alt="Source picker showing aggregated manga and novel searches and the multilingual search option">
-            <figcaption>Source selection and search settings</figcaption>
-          </figure>
-          <div class="story-copy">
-            <h3>You choose where to search.</h3>
-            <p>Search for novels or manga in the library. You can query several enabled sources at once, or switch to a single source to see its results.</p>
-            <ul>
-              <li>Novel and manga sources have separate aggregated search options.</li>
-              <li>When multilingual search is enabled, common names in other languages can expand a query.</li>
-              <li>Import Legado JSON sources and <code>@css:</code> or <code>@json:</code> rules.</li>
-            </ul>
-            <p class="story-note">Online sources come from third parties. Their availability, content, and terms are set by their providers.</p>
-          </div>
-        </article>
+    <section class="formats section wrap" id="formats"><div class="formats-inner glass"><div class="format-intro"><span class="format-number">11<span>↗</span></span><h2>Different formats.<br>The same love of reading.</h2><p>Bring your ebooks, manga, and documents<br>together in Ciallo Reader.</p></div><div class="format-groups"><h3>Text & ebooks</h3><div class="format-list format-dock"><span class="format-cap glass">TXT</span><span class="format-cap glass">EPUB</span><span class="format-cap glass">MOBI</span><span class="format-cap glass">AZW</span><span class="format-cap glass">AZW3</span><span class="format-cap glass">PRC</span><span class="format-cap glass">DOCX</span><span class="format-cap glass">FB2</span></div><h3>Manga & documents</h3><div class="format-list format-dock"><span class="format-cap glass">CBZ</span><span class="format-cap glass">ZIP</span><span class="format-cap glass">PDF</span></div></div><div class="format-footnotes"><p>TXT chapter detection & encodings · EPUB contents, covers & images · Kindle parsing · DOCX / FB2 text extraction</p><p>CBZ / ZIP ordered image reading · PDF page display; text-layer parsing is not supported</p></div></div></section>
 
-        <article class="story-row">
-          <figure class="story-media glass story-media--stack" data-lens="card">
-            <img class="story-screen story-screen--main" src="../media/feature-resume.webp" width="432" height="510" loading="lazy" decoding="async" alt="Bookshelf card with a currently reading title, author, reading progress, and a continue button">
-            <img class="story-screen story-screen--detail" src="../media/feature-download-paused.webp" width="1224" height="520" loading="lazy" decoding="async" alt="Manga chapter download panel showing a paused task that can be resumed">
-            <figcaption>Continue reading and manage downloads</figcaption>
-          </figure>
-          <div class="story-copy">
-            <h3>Your downloads, favorites, and progress each have a place.</h3>
-            <p>Books from local files and online sources come together on your shelf. Categories, saved works, and a continue-reading entry help you keep track of what you are reading; supported reading records can also move with you when you change a source.</p>
-            <ul>
-              <li>Import ebooks, comic archives, and PDFs with Android’s system file picker.</li>
-              <li>Download complete novels or individual manga chapters; tasks support pause, resume, and continuing after an interruption.</li>
-              <li>Read downloads offline, with progress, history, and chapter bookmarks managed from your shelf.</li>
-            </ul>
-            <p class="story-note">Online search, online reading, and network translation still need their respective services.</p>
-          </div>
-        </article>
+    <section class="translation-section section wrap"><div class="translation-wide glass"><div class="translation-copy"><h2>Across languages.<br>Into the story.</h2><p>Recognition stays on your device. Translation comes from the service you choose.</p></div><div class="wide-steps"><svg class="translation-line" viewBox="0 0 600 12" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="translationGrad"><stop stop-color="#7c6bff"/><stop offset=".5" stop-color="#35c2ff"/><stop offset="1" stop-color="#ff7ab8"/></linearGradient></defs><path d="M0 6H600" stroke="url(#translationGrad)" stroke-width="1.5" fill="none"/></svg><div><span class="step-orb glass">Aa</span><h3>On-device OCR</h3><p>Read text in the image</p></div><div><span class="step-orb glass">▤</span><h3>Bubble detection</h3><p>Locate dialogue locally</p></div><div><span class="step-orb glass">译</span><h3>Your translation service</h3><p>Online service or custom API</p></div></div></div></section>
+<section class="notice wrap"><div class="notice-bar glass"><h2>Content & copyright</h2><p>Ciallo Reader is a reading and library management tool and does not provide online sources or works. MIT covers original source code; third-party models, dictionaries, and other assets retain their own licenses. Follow local laws and respect copyright.</p></div></section>
+<section class="faq section wrap" id="faq"><div class="faq-heading"><h2>A few things<br>you might wonder.</h2><a class="text-link" href="https://github.com/roxycon-dev/Ciallo-Reader/issues">Feedback & ideas <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div><div class="faq-list"><details><summary>Can I read offline?<span class="faq-plus" aria-hidden="true"></span></summary><div class="faq-answer"><p>Yes. Imported files and fully downloaded novels or manga chapters work offline. Online search, online reading, and network translation require the relevant services.</p></div></details><details><summary>Does the app include novels or manga?<span class="faq-plus" aria-hidden="true"></span></summary><div class="faq-answer"><p>The installation package does not include books or manga. Import your own files or configure third-party sources you choose. Their content, availability, and terms are determined by the providers.</p></div></details><details><summary>How does manga translation work?<span class="faq-plus" aria-hidden="true"></span></summary><div class="faq-answer"><p>OCR and bubble detection run on your device. Translated text comes from your chosen online service or custom API. MangaJaNai full enhancement requires an initial model download of about 76 MB, then runs offline; lighter options are also available.</p></div></details><details><summary>Does MIT cover every resource?<span class="faq-plus" aria-hidden="true"></span></summary><div class="faq-answer"><p>MIT applies to the original project source code. Third-party models, dictionaries, fonts, and other assets retain their own licenses. <a href="https://github.com/roxycon-dev/Ciallo-Reader/blob/main/docs/vendor-licenses/README.md">View third-party licenses <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></p></div></details></div></section>
 
-        <article class="story-row">
-          <figure class="story-media glass story-media--reader" data-lens="card">
-            <img src="../media/feature-novel-layout.jpg" width="1080" height="1920" loading="lazy" decoding="async" alt="Novel layout panel with brightness, font size, typeface, line spacing, page margins, and reading themes">
-            <figcaption>Novel typography settings</figcaption>
-          </figure>
-          <div class="story-copy">
-            <h3>Shape the page until it feels right.</h3>
-            <p>Adjust a novel’s layout to fit your screen, preferred typeface, and reading environment. Page movement can follow your pace, too.</p>
-            <ul>
-              <li>Set font size and typeface, line spacing, paragraph indentation, page margins, and brightness.</li>
-              <li>Choose white, paper, night, and eye-care themes, with curl, cover, slide, fade, or scrolling page turns.</li>
-              <li>Use TTS, jump from the chapter list, and manage reading presets.</li>
-            </ul>
-            <p class="story-note">Layouts adapt to phones, tablets, and landscape use. Switch reading presets or night themes, with a minimal image-quality option for lower-powered devices.</p>
-          </div>
-        </article>
-
-        <article class="story-row">
-          <figure class="story-media glass story-media--reader" data-lens="card">
-            <img src="../media/feature-comic-settings.jpg" width="1080" height="1920" loading="lazy" decoding="async" alt="Comic display settings showing single-page layout, scaling options, page spacing, and per-comic settings">
-            <figcaption>Comic reading and display settings</figcaption>
-          </figure>
-          <div class="story-copy">
-            <h3>Read each page in the direction it was made for.</h3>
-            <p>Choose a page layout and controls to match the original, your device orientation, and the way you browse.</p>
-            <ul>
-              <li>Choose single page, double page, webtoon, or seamless scrolling, with left-to-right, right-to-left, or vertical reading.</li>
-              <li>Adjust scaling and spacing, and set page backgrounds, cropping, split-page handling, and auto page turns.</li>
-              <li>Save settings for each comic and combine them with gestures, page-turn animations, and reading presets.</li>
-              <li>Save standout chapters as highlights, then revisit them in the highlights ranking.</li>
-            </ul>
-          </div>
-        </article>
-
-        <article class="story-row">
-          <figure class="story-media glass story-media--reader story-media--dark" data-lens="card">
-            <img src="../media/feature-comic-translate.webp" width="1224" height="1950" loading="lazy" decoding="async" alt="Comic translation settings showing an online translation service, automatic translation, and offline model options">
-            <figcaption>Comic translation and image tools</figcaption>
-          </figure>
-          <div class="story-copy">
-            <h3>Use the right tool for image quality and translation.</h3>
-            <p>Image processing can improve line detail. Translation keeps text recognition and translated output as separate steps, so it is clear which parts happen on-device and which use a network service.</p>
-            <ul>
-              <li>Image options include sharpening, line enhancement, and JaNai quick processing.</li>
-              <li>The full MangaJaNai model is optional, about 76 MB for the first download, and can run offline after download.</li>
-              <li>OCR and speech-bubble detection run on-device; translations use the online service or custom API you choose.</li>
-            </ul>
-            <p class="story-note">Third-party models have separate licenses. Review the privacy terms of a translation service before sending requests.</p>
-          </div>
-        </article>
-
-        <article class="story-row">
-          <figure class="story-media glass story-media--stats" data-lens="card">
-            <img src="../media/feature-reading-stats.webp" width="432" height="960" loading="lazy" decoding="async" alt="Reading statistics page with reading time, daily goal, consecutive reading days, and a reading calendar">
-            <figcaption>Reading statistics and calendar</figcaption>
-          </figure>
-          <div class="story-copy">
-            <h3>Keep a record you can look back on.</h3>
-            <p>The statistics page gathers your reading activity, from recent sessions to a longer view of your habits.</p>
-            <ul>
-              <li>Review total and weekly reading time, finished works, and consecutive reading days.</li>
-              <li>Use a daily goal, monthly calendar, and year view to revisit when you read.</li>
-              <li>Switch between weekly, monthly, and yearly trends to see how your reading changes.</li>
-            </ul>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <!-- Supported formats: magnetic glass capsules -->
-    <section class="formats wrap" id="formats">
-      <div class="sec-head">
-        <h2>Your reading material<br>has its own way in.</h2>
-        <p>Import TXT, EPUB, Kindle ebooks, comic archives, and PDFs with the system file picker. Ciallo Reader 1.3.6 targets Android 7.0 and later; the current release ships an arm64-v8a APK.</p>
-      </div>
-      <div class="fmt-groups">
-        <div class="fmt-group">
-          <h3>Ebooks</h3>
-          <div class="caps">
-            <span class="cap glass" data-lens="cap">TXT<small>Text / chapters</small></span>
-            <span class="cap glass" data-lens="cap">EPUB<small>TOC / cover / metadata</small></span>
-            <span class="cap glass" data-lens="cap">MOBI<small>Ebook</small></span>
-            <span class="cap glass" data-lens="cap">AZW<small>Ebook</small></span>
-            <span class="cap glass" data-lens="cap">AZW3<small>Ebook</small></span>
-            <span class="cap glass" data-lens="cap">PRC<small>Ebook</small></span>
-            <span class="cap glass" data-lens="cap">DOCX<small>Text extraction</small></span>
-            <span class="cap glass" data-lens="cap">FB2<small>Text extraction</small></span>
-          </div>
-        </div>
-        <div class="fmt-group">
-          <h3>Manga &amp; documents</h3>
-          <div class="caps">
-            <span class="cap glass" data-lens="cap">CBZ<small>Image manga</small></span>
-            <span class="cap glass" data-lens="cap">ZIP<small>Image manga</small></span>
-            <span class="cap glass" data-lens="cap">PDF<small>Page by page</small></span>
-          </div>
-        </div>
-      </div>
-      <div class="format-notes">
-        <p><strong>Text and ebooks</strong> TXT supports chapter detection and multiple encodings. EPUB can read its table of contents, cover, metadata, and embedded images. MOBI, AZW, AZW3, and PRC use their ebook parsers; DOCX and FB2 extract text.</p>
-        <p><strong>Comics and documents</strong> CBZ and ZIP are read in image order. PDF is displayed page by page; PDF text-layer parsing is not currently supported.</p>
-      </div>
-    </section>
-
-    <!-- Manga translation: recognition stays on-device -->
-    <section class="flow wrap" aria-label="How manga translation works">
-      <div class="flow-panel glass" data-lens="card">
-        <h2>Manga translation,<br>recognized on-device.</h2>
-        <p>OCR and bubble detection never leave your phone; translations come from the service you choose, or your own API.</p>
-        <div class="flow-steps">
-          <svg class="flow-line" viewBox="0 0 100 4" preserveAspectRatio="none" aria-hidden="true">
-            <defs>
-              <linearGradient id="flowGrad" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0" stop-color="#7c6bff"/><stop offset=".5" stop-color="#35c2ff"/><stop offset="1" stop-color="#ff7ab8"/>
-              </linearGradient>
-            </defs>
-            <path d="M0 2 H100" vector-effect="non-scaling-stroke"/>
-          </svg>
-          <span class="flow-vline" aria-hidden="true"></span>
-          <div class="flow-step">
-            <div class="flow-dot">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h4M7 14h7"/></svg>
-            </div>
-            <div><h3>On-device OCR</h3><p>Text in manga pages is recognized right on your phone.</p></div>
-          </div>
-          <div class="flow-step">
-            <div class="flow-dot">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5z"/></svg>
-            </div>
-            <div><h3>Bubble detection</h3><p>Speech bubbles and text regions are located automatically.</p></div>
-          </div>
-          <div class="flow-step">
-            <div class="flow-dot">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M8.5 4v2c0 4-2.5 7.5-5.5 9M5 10c1.5 3 4.5 5.5 8 6"/><path d="M13 21l4.5-10L22 21M14.8 17h5.4"/></svg>
-            </div>
-            <div><h3>Your translation service</h3><p>Translations are generated by the service you pick, or a custom API.</p></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Notice -->
-    <section class="notice wrap" aria-label="Content and copyright notice">
-      <div class="notice-bar glass" data-lens="card">
-        <h2>About content &amp; copyright</h2>
-        <p>Ciallo Reader is a reading and library-management tool; it does not provide online sources or any works. Availability and terms of sources belong to their providers. The MIT license covers only the project's original source code — third-party models, dictionaries, and other separately licensed resources remain under their own terms. Please comply with local laws and copyright requirements.</p>
-      </div>
-    </section>
-
-    <!-- FAQ -->
-    <section class="faq wrap" id="faq">
-      <div class="sec-head">
-        <h2>A few things to know<br>before you download.</h2>
-      </div>
-      <div class="faq-list">
-        <details class="faq-item glass" data-lens="pill" open>
-          <summary>Can I read offline?<span class="faq-plus" aria-hidden="true"></span></summary>
-          <div class="faq-body"><div class="faq-in"><p>Yes — imported local files and fully downloaded novel or manga chapters all work offline. Online search, online reading, and online translation still need a connection.</p></div></div>
-        </details>
-        <details class="faq-item glass" data-lens="pill">
-          <summary>Does the app include any novels or manga?<span class="faq-plus" aria-hidden="true"></span></summary>
-          <div class="faq-body"><div class="faq-in"><p>No. You import your own files, or search through the online sources you choose. Content and source terms are determined by their providers.</p></div></div>
-        </details>
-        <details class="faq-item glass" data-lens="pill">
-          <summary>How does manga translation work?<span class="faq-plus" aria-hidden="true"></span></summary>
-          <div class="faq-body"><div class="faq-in"><p>OCR and bubble detection run on your device. Translations are produced by the translation service you select, or your custom API — check its data and privacy terms before sending content.</p></div></div>
-        </details>
-        <details class="faq-item glass" data-lens="pill">
-          <summary>Does the MIT license cover every resource?<span class="faq-plus" aria-hidden="true"></span></summary>
-          <div class="faq-body"><div class="faq-in"><p>MIT applies to the project's original source code. Third-party models, dictionaries, and other separately licensed resources remain under their own terms. <a href="https://github.com/roxycon-dev/Ciallo-Reader/blob/main/docs/vendor-licenses/README.md">See the third-party license record</a>.</p></div></div>
-        </details>
-      </div>
-    </section>
-
-    <!-- Closing CTA: a fainter bundle of converging curves -->
-    <section class="closing">
-      <svg class="closing-curves" viewBox="0 0 1200 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-        <defs>
-          <linearGradient id="endGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stop-color="#7c6bff"/><stop offset=".5" stop-color="#35c2ff"/><stop offset="1" stop-color="#ff7ab8"/>
-          </linearGradient>
-        </defs>
-        <g fill="none" stroke="url(#endGrad)" stroke-linecap="round" opacity=".18">
-          <path stroke-width="1.4" d="M-20 330 Q 300 300 600 240 T 1220 120"/>
-          <path stroke-width="1.8" d="M-20 280 Q 320 260 620 210 T 1220 150"/>
-          <path stroke-width="2.2" d="M-20 230 Q 340 220 640 185 T 1220 180"/>
-          <path stroke-width="1.8" d="M-20 180 Q 320 180 620 160 T 1220 210"/>
-          <path stroke-width="1.4" d="M-20 130 Q 300 140 600 135 T 1220 240"/>
-          <path stroke-width="1" d="M-20 80 Q 280 100 580 110 T 1220 270"/>
-        </g>
-      </svg>
-      <h2>Pick a book,<br>start from the next page.</h2>
-      <a class="btn btn-primary" href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">Download Ciallo Reader</a>
-    </section>
+    <section class="closing"><svg class="closing-curves" viewBox="0 0 1200 500" fill="none" aria-hidden="true"><defs><linearGradient id="closingGrad"><stop stop-color="#7c6bff"/><stop offset=".5" stop-color="#35c2ff"/><stop offset="1" stop-color="#ff7ab8"/></linearGradient></defs><g stroke="url(#closingGrad)" stroke-linecap="round"><path d="M-50 150C350 50 750 450 1250 240" stroke-width="1.0"/><path d="M-50 185C350 75 750 425 1250 225" stroke-width="1.4"/><path d="M-50 220C350 100 750 400 1250 210" stroke-width="1.8"/><path d="M-50 255C350 125 750 375 1250 195" stroke-width="1.0"/><path d="M-50 290C350 150 750 350 1250 180" stroke-width="1.4"/><path d="M-50 325C350 175 750 325 1250 165" stroke-width="1.8"/></g></svg><div class="closing-halo" aria-hidden="true"></div><img class="closing-icon" src="../media/icon.webp" width="192" height="192" alt="" decoding="async" loading="lazy"><h2>Pick a story.<br>Turn the next page.</h2><a class="button button-primary" href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">Get Ciallo Reader <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><p class="closing-meta">Android 7.0+ · arm64-v8a · MIT open source</p><a class="text-link" href="https://github.com/roxycon-dev/Ciallo-Reader">Explore the source on GitHub <span aria-hidden="true">↗</span></a></section>
   </main>
-
-  <footer class="site-footer wrap">
-    <a class="footer-brand" href="./">
-      <img src="../media/icon.webp" width="28" height="28" loading="lazy" decoding="async" alt="">
-      <span>Ciallo Reader</span>
-    </a>
-    <p>An Android reader for novels, manga, and ebooks. Open source under MIT.</p>
-    <nav aria-label="Related links">
-      <a href="https://github.com/roxycon-dev/Ciallo-Reader">GitHub</a>
-      <a href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">Download</a>
-      <a href="https://github.com/roxycon-dev/Ciallo-Reader/issues">Feedback</a>
-      <a href="https://github.com/roxycon-dev/Ciallo-Reader/blob/main/LICENSE">License</a>
-      <a href="../" lang="zh-Hans">中文</a>
-    </nav>
-    <small>Versions, formats, and features may change between releases — check the release notes. The app provides no online sources or works; MIT covers only original source code, and third-party models and dictionaries carry their own licenses.</small>
-  </footer>
-
+  <footer class="footer wrap"><div class="footer-top"><a class="brand" href="#top"><img class="" src="../media/icon.webp" width="192" height="192" alt="" decoding="async" loading="lazy"><span>Ciallo Reader</span></a><nav aria-label="Related links"><a href="https://github.com/roxycon-dev/Ciallo-Reader">GitHub</a><a href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">Download</a><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues">Feedback</a><a href="https://github.com/roxycon-dev/Ciallo-Reader/blob/main/LICENSE">License</a><a href="../">简体中文</a></nav></div><p>An Android novel, manga, and ebook reader. The next page. Your way.</p><div class="legal"><p>Ciallo Reader is a reading and library management tool and does not provide online sources or copyrighted works. Third-party content, availability, and terms are set by their providers. Follow local laws and respect copyright.</p><p>MIT covers original source code only; third-party models, dictionaries, and other assets retain their own licenses. Interfaces and features may change between releases; consult the release notes for current details. <a href="https://github.com/roxycon-dev/Ciallo-Reader/blob/main/docs/vendor-licenses/README.md">Third-party licenses ↗</a></p></div><div class="footer-bottom"><span>Ciallo Reader</span><span>Made for the love of reading.</span><a href="#top">Back to top ↑</a></div></footer>
+<dialog class="detail-dialog glass" id="detailDialog" aria-labelledby="detailTitle"><button type="button" class="dialog-close glass" aria-label="Close details">×</button><div class="dialog-layout"><div class="dialog-image"><img id="detailImage" alt="" width="816" height="1800"></div><div class="dialog-copy"><p class="dialog-label">Ciallo Reader</p><h2 id="detailTitle"></h2><p id="detailDescription"></p><ul id="detailBenefits"></ul><p class="dialog-note">Actual app interface · Content is illustrative</p><a class="button button-primary" href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">Download and start reading <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></div></dialog>
   <script src="../site.js" defer></script>
 </body>
 </html>
