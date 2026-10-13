@@ -1,0 +1,7 @@
+{
+  "name": "ciallo-reader-site-build",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "node build.mjs", "check": "node check.mjs" },
+  "devDependencies": { "esbuild": "0.28.2" }
+}
