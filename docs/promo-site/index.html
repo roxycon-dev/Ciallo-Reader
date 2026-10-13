@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f4f3f8">
   <meta name="robots" content="index,follow,max-image-preview:large">
   <title>Ciallo Reader｜Android 小说阅读器、漫画阅读器与 EPUB 电子书</title>
-  <meta name="description" content="Ciallo Reader 是一款 Android 小说、漫画与电子书阅读器。导入 TXT、EPUB、MOBI、CBZ、PDF 等文件，管理书架，搜索在线书源并下载离线阅读。">
+  <meta name="description" content="Android 小说、漫画与电子书阅读器：导入 11 种格式，管理书架和阅读记录；自选书源搜索下载，支持个性化排版、漫画增强、翻译与离线续读。">
   <link rel="canonical" href="https://roxycon-dev.github.io/Ciallo-Reader/">
   <link rel="alternate" hreflang="zh-Hans" href="https://roxycon-dev.github.io/Ciallo-Reader/">
   <link rel="alternate" hreflang="en" href="https://roxycon-dev.github.io/Ciallo-Reader/en/">
@@ -16,7 +16,7 @@
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Ciallo Reader">
   <meta property="og:title" content="Ciallo Reader｜小说、漫画与电子书，一个 Android 书架">
-  <meta property="og:description" content="导入本地书籍，按自己的习惯阅读；在线搜索和下载后，也能继续离线阅读。">
+  <meta property="og:description" content="把 11 种电子书、漫画与 PDF 收进同一书架。自选书源搜索下载，调整小说与漫画阅读方式，并回看阅读统计。">
   <meta property="og:url" content="https://roxycon-dev.github.io/Ciallo-Reader/">
   <meta property="og:image" content="https://roxycon-dev.github.io/Ciallo-Reader/media/ciallo-cover.png">
   <meta property="og:image:width" content="2048">
@@ -31,7 +31,7 @@
     "applicationCategory": "BooksApplication",
     "operatingSystem": "Android 7.0 and later",
     "softwareVersion": "1.3.6",
-    "description": "Android novel, manga, and ebook reader for local files and configurable online sources, with library management and offline reading.",
+    "description": "Android 小说、漫画与电子书阅读器，支持本地文件、自选书源、书架管理、个性化阅读和离线续读。",
     "downloadUrl": "https://github.com/roxycon-dev/Ciallo-Reader/releases/latest",
     "codeRepository": "https://github.com/roxycon-dev/Ciallo-Reader",
     "image": "https://roxycon-dev.github.io/Ciallo-Reader/media/ciallo-cover.png"
@@ -43,19 +43,23 @@
 
   <!-- 背景：彩色光斑（为玻璃提供可折射的内容） -->
   <div class="blobs" aria-hidden="true"><span class="b1"></span><span class="b2"></span><span class="b3"></span></div>
-  <!-- 背景：随鼠标变形的流动曲线（内容由 JS 生成） -->
-  <svg id="curves" aria-hidden="true"></svg>
+  <!-- 背景：同一组流场分别经过重模糊、过渡模糊与鼠标清晰显影 -->
+  <div class="flow-field" id="flowField" aria-hidden="true">
+    <canvas class="flow-layer flow-heavy" id="flowHeavy"></canvas>
+    <canvas class="flow-layer flow-soft" id="flowSoft"></canvas>
+    <canvas class="flow-layer flow-sharp" id="flowSharp"></canvas>
+  </div>
 
   <!-- 倾斜的悬浮玻璃导航 -->
   <header class="nav-wrap">
     <nav class="nav glass" id="nav" data-lens="nav" aria-label="主导航">
       <a class="nav-brand" href="./" aria-label="Ciallo Reader 首页">
-        <img src="./media/icon.webp" width="26" height="26" alt="">
+        <img src="./media/icon.webp" width="26" height="26" decoding="async" alt="">
         <span>Ciallo Reader</span>
       </a>
       <div class="nav-links">
         <span class="nav-slider" id="navSlider" aria-hidden="true"></span>
-        <a href="#features">阅读体验</a>
+        <a href="#feature-tour">功能详览</a>
         <a href="#formats">支持格式</a>
         <a href="#faq">常见问题</a>
       </div>
@@ -72,7 +76,7 @@
       </div>
     </nav>
     <div class="mobile-panel glass" id="mobilePanel" data-lens="nav">
-      <a href="#features">阅读体验</a>
+      <a href="#feature-tour">功能详览</a>
       <a href="#formats">支持格式</a>
       <a href="#faq">常见问题</a>
       <a href="./en/" lang="en">English</a>
@@ -83,9 +87,9 @@
     <!-- 英雄区：曲线在文字后方流动 -->
     <section class="hero" id="top">
       <div class="hero-inner">
-        <h1><span class="line">小说、漫画与电子书，</span><span class="line">放进同一个书架。</span></h1>
+        <h1><span class="line">小说、漫画<br class="mobile-break">与电子书，</span><span class="line">放进同一个书架。</span></h1>
         <p class="hero-sub">下一页，按你的方式。</p>
-        <p class="hero-lede">Ciallo Reader 是一款 Android 阅读器。导入自己的书，按习惯调整阅读方式；联网搜索、下载之后，回到书架继续离线阅读。</p>
+        <p class="hero-lede">导入本地电子书，配置书源搜索小说与漫画；下载到本机、个性化排版、记录阅读进度，在手机和平板上把阅读安排成自己的节奏。</p>
         <div class="hero-cta">
           <a class="btn btn-primary" href="https://github.com/roxycon-dev/Ciallo-Reader/releases/latest">下载最新版</a>
           <a class="btn btn-glass glass" data-lens="pill" href="https://github.com/roxycon-dev/Ciallo-Reader">查看源码</a>
@@ -176,7 +180,7 @@
     <!-- 特色：三张玻璃卡片 -->
     <section class="features wrap" id="features">
       <div class="sec-head">
-        <h2>从打开一本书开始，<br>每一步都留给你选择。</h2>
+        <h2>阅读的每一步，<br>都可以按你的习惯来。</h2>
       </div>
       <div class="cards">
         <article class="card glass" data-lens="card">
@@ -184,21 +188,131 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V6a2 2 0 0 1 2-2h13v13H6a2 2 0 0 0-2 2zm0 0a2 2 0 0 0 2 2h13"/><path d="M9 8h6"/></svg>
           </div>
           <h3>一个书架，收好不同格式</h3>
-          <p>导入 TXT、EPUB、MOBI、AZW、AZW3、PRC、DOCX、FB2、CBZ、ZIP 或 PDF。收藏、书签和阅读进度集中管理。</p>
+          <p>导入 TXT、EPUB、MOBI、AZW、AZW3、PRC、DOCX、FB2、CBZ、ZIP 或 PDF。分类整理藏书、收藏作品，并从上次的进度继续阅读。</p>
         </article>
         <article class="card glass" data-lens="card">
           <div class="card-icon ci-2">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h4M12 16h8"/><circle cx="16" cy="8" r="2"/><circle cx="10" cy="16" r="2"/></svg>
           </div>
           <h3>按自己的方式阅读</h3>
-          <p>小说可调字号、字体、行距、主题和翻页方式；漫画支持单页、双页、条漫、滚动以及阅读方向设置。</p>
+          <p>小说可调字体、字号、行距、页边距、主题和翻页方式，也能使用 TTS 朗读；漫画可选单页、双页、条漫、滚动和阅读方向。</p>
         </article>
         <article class="card glass" data-lens="card">
           <div class="card-icon ci-3">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4-4m4 4l4-4"/><path d="M4 17v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1"/></svg>
           </div>
           <h3>下载到书架，离线接着读</h3>
-          <p>联网搜索在线书源并下载小说或漫画章节，完成后从本地书架继续阅读，无需网络。</p>
+          <p>从已启用的在线书源搜索并下载小说或漫画章节；下载完成后，回到书架即可离线阅读。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="feature-tour wrap" id="feature-tour">
+      <div class="sec-head">
+        <h2>从发现一本书，<br>到读完后再回看。</h2>
+        <p>搜索、整理、阅读、翻译与统计，Ciallo Reader 把常用的阅读工具放在同一款 Android 应用里。</p>
+      </div>
+      <div class="story-list">
+        <article class="story-row">
+          <figure class="story-media glass story-media--source" data-lens="card">
+            <img src="./media/feature-source-picker.webp" width="1224" height="1430" loading="lazy" decoding="async" alt="书源选择界面展示聚合漫画搜索、聚合小说搜索和多语言搜索开关">
+            <figcaption>书源选择与搜索设置</figcaption>
+          </figure>
+          <div class="story-copy">
+            <h3>把书源选择权留给你。</h3>
+            <p>在书库里搜索小说或漫画，可以一次查询已启用的多个来源，也可以切换到单个来源查看结果。</p>
+            <ul>
+              <li>小说、漫画分别聚合搜索；搜索范围由你管理的书源决定。</li>
+              <li>开启多语言搜索后，可用作品名称的常见语言写法扩展关键词。</li>
+              <li>支持导入 Legado JSON 书源，以及 <code>@css:</code>、<code>@json:</code> 规则。</li>
+            </ul>
+            <p class="story-note">在线来源由第三方提供；来源状态、内容与使用条款以服务方为准。</p>
+          </div>
+        </article>
+
+        <article class="story-row">
+          <figure class="story-media glass story-media--stack" data-lens="card">
+            <img class="story-screen story-screen--main" src="./media/feature-resume.webp" width="432" height="510" loading="lazy" decoding="async" alt="书架中的正在阅读作品卡片，显示作者、阅读进度和继续阅读按钮">
+            <img class="story-screen story-screen--detail" src="./media/feature-download-paused.webp" width="1224" height="520" loading="lazy" decoding="async" alt="漫画章节下载面板显示任务已暂停并可继续">
+            <figcaption>书架续读与下载管理</figcaption>
+          </figure>
+          <div class="story-copy">
+            <h3>下载、收藏、记下进度，都有自己的位置。</h3>
+            <p>本地文件和在线下载的作品汇入书架。分类、收藏与续读入口帮助你整理正在看的内容；更换在线来源时，也可以迁移受支持的阅读记录。</p>
+            <ul>
+              <li>通过 Android 系统文件选择器导入设备中的电子书、漫画压缩包或 PDF。</li>
+              <li>在线小说支持整本下载，漫画支持按章节下载；任务可暂停、继续，并支持断点续传。</li>
+              <li>下载后可离线阅读；阅读进度、历史和章节书签都可在书架中继续管理。</li>
+            </ul>
+            <p class="story-note">在线搜索、在线阅读和网络翻译仍需要连接相应服务。</p>
+          </div>
+        </article>
+
+        <article class="story-row">
+          <figure class="story-media glass story-media--reader" data-lens="card">
+            <img src="./media/feature-novel-layout.jpg" width="1080" height="1920" loading="lazy" decoding="async" alt="小说阅读排版面板，包含亮度、字号、字体、行间距、页边距和阅读主题设置">
+            <figcaption>小说阅读排版设置</figcaption>
+          </figure>
+          <div class="story-copy">
+            <h3>把一页文字，调成舒服的样子。</h3>
+            <p>阅读小说时，可以按屏幕大小、字体习惯和环境光线调整页面。页面布局和翻页效果也能配合自己的阅读节奏。</p>
+            <ul>
+              <li>字号、字体、行距、段落缩进、页边距与亮度可分别调整。</li>
+              <li>提供白底、羊皮、夜间、护眼等主题；支持卷页、覆盖、平移、渐变和滚动等方式。</li>
+              <li>支持 TTS 朗读、章节目录跳转，以及阅读预设管理。</li>
+            </ul>
+            <p class="story-note">手机、平板与横屏均有适配；可切换夜间主题与阅读预设，低性能设备也能选择极简画质选项。</p>
+          </div>
+        </article>
+
+        <article class="story-row">
+          <figure class="story-media glass story-media--reader" data-lens="card">
+            <img src="./media/feature-comic-settings.jpg" width="1080" height="1920" loading="lazy" decoding="async" alt="漫画阅读设置面板，展示单页显示、缩放方式、页面间距和独立漫画设置">
+            <figcaption>漫画阅读与显示设置</figcaption>
+          </figure>
+          <div class="story-copy">
+            <h3>按页面方向和漫画排版来读。</h3>
+            <p>漫画阅读器提供多种页面组织和翻页控制。可以根据原作版式、设备方向和个人手势，调整显示与浏览方式。</p>
+            <ul>
+              <li>支持单页、双页、条漫、无缝滚动等模式，以及从左到右、从右到左或纵向阅读。</li>
+              <li>可调整缩放与页面间距，设置页面背景、裁边、跨页拆分和自动翻页。</li>
+              <li>按漫画保存独立设置，配合手势区域、翻页动画和阅读预设。</li>
+              <li>把喜欢的章节标记为「神回」，之后可在神回排行榜中回看。</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="story-row">
+          <figure class="story-media glass story-media--reader story-media--dark" data-lens="card">
+            <img src="./media/feature-comic-translate.webp" width="1224" height="1950" loading="lazy" decoding="async" alt="漫画阅读设置中的翻译选项，包含在线翻译、自动翻译和离线模型设置">
+            <figcaption>漫画翻译与图像处理选项</figcaption>
+          </figure>
+          <div class="story-copy">
+            <h3>图像增强与翻译，各用合适的工具。</h3>
+            <p>漫画画质处理可以改善线条观感；翻译流程则把文字识别与译文生成分开，便于了解哪些步骤在本机、哪些步骤需要网络服务。</p>
+            <ul>
+              <li>提供锐化、线条增强和 JaNai 极速处理等图像选项。</li>
+              <li>MangaJaNai 完整版模型可按需下载，首次下载约 76 MB；下载后可离线使用。</li>
+              <li>OCR 和气泡检测在设备端完成；译文通过你选择的在线翻译服务或自定义 API 生成。</li>
+            </ul>
+            <p class="story-note">第三方模型有独立许可；发送翻译请求前，请查看所选服务的数据与隐私条款。</p>
+          </div>
+        </article>
+
+        <article class="story-row">
+          <figure class="story-media glass story-media--stats" data-lens="card">
+            <img src="./media/feature-reading-stats.webp" width="432" height="960" loading="lazy" decoding="async" alt="阅读统计页面展示阅读时长、每日目标、连续阅读天数和阅读日历">
+            <figcaption>阅读统计与日历</figcaption>
+          </figure>
+          <div class="story-copy">
+            <h3>把阅读留成看得见的记录。</h3>
+            <p>统计页汇总个人阅读情况，让最近的阅读节奏与长期积累都能回顾。</p>
+            <ul>
+              <li>查看总阅读时长、本周时长、已读作品和连续阅读天数。</li>
+              <li>通过每日阅读目标、月历和年历回看阅读日期与频率。</li>
+              <li>切换周、月、年趋势，查看不同时段的阅读变化。</li>
+            </ul>
+          </div>
         </article>
       </div>
     </section>
@@ -207,7 +321,7 @@
     <section class="formats wrap" id="formats">
       <div class="sec-head">
         <h2>你的阅读材料，<br>都有自己的入口。</h2>
-        <p>用设备文件选择器导入已有书籍。应用版本 1.3.6 面向 Android 7.0 及以上，当前 Release 提供 arm64-v8a APK。</p>
+        <p>从设备文件选择器导入 TXT、EPUB、Kindle 电子书、漫画压缩包与 PDF。Ciallo Reader 1.3.6 面向 Android 7.0 及以上，当前 Release 提供 arm64-v8a APK。</p>
       </div>
       <div class="fmt-groups">
         <div class="fmt-group">
@@ -231,6 +345,10 @@
             <span class="cap glass" data-lens="cap">PDF<small>按页阅读</small></span>
           </div>
         </div>
+      </div>
+      <div class="format-notes">
+        <p><strong>文字与电子书</strong> TXT 支持章节识别与多种编码；EPUB 可读取目录、封面、元数据和内嵌插图。MOBI、AZW、AZW3、PRC 使用对应电子书解析器；DOCX 与 FB2 提取正文文本。</p>
+        <p><strong>漫画与文档</strong> CBZ、ZIP 按图片顺序阅读。PDF 按页显示；目前尚不解析 PDF 文本层。</p>
       </div>
     </section>
 
@@ -328,7 +446,7 @@
 
   <footer class="site-footer wrap">
     <a class="footer-brand" href="./">
-      <img src="./media/icon.webp" width="28" height="28" alt="">
+      <img src="./media/icon.webp" width="28" height="28" loading="lazy" decoding="async" alt="">
       <span>Ciallo Reader</span>
     </a>
     <p>Android 小说、漫画与电子书阅读器。MIT 开源。</p>

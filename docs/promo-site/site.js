@@ -7,19 +7,26 @@
 /* ---------- 集中配置 ---------- */
 const CONFIG = {
   curves: {
-    countDesktop: 20,        // 桌面端曲线条数
-    countMobile: 13,         // 手机端曲线条数
-    pointsMobile: 7,         // 手机端控制点数（省性能）
-    gapDesktop: 64,          // 桌面端控制点间距（px）
-    bandHeight: 0.42,        // 曲线带占屏高度比例
-    bandCenter: 0.6,         // 曲线带中心垂直位置
-    sigmaXMin: 150, sigmaXMax: 300, // 鼠标影响半径 σx 上下限
-    sigmaXRatio: 0.14,       // σx = 窗口宽 × 此值
-    sigmaYRatio: 0.2,        // σy = 窗口高 × 此值
-    attract: 0.78,           // 吸附强度
-    ease: 0.12,              // 鼠标缓动系数（液体拖拽感）
-    idleDelay: 2500,         // 无输入多久后进入自动游走（ms）
-    flowDur: 22              // 渐变横向流动周期（s）
+    countDesktop: 84,         // 桌面端目标线数
+    countMobile: 40,          // 手机端目标线数
+    stepsDesktop: 40,         // 每个方向积分步数
+    stepsMobile: 28,
+    stepSize: 8,
+    bandTop: 0.13,
+    bandHeight: 0.74,
+    fieldX: 0.0014,
+    fieldY: 0.0018,
+    fieldTime: 0.00012,
+    sigmaRatio: 0.13,
+    sigmaMin: 170,
+    sigmaMax: 280,
+    ease: 0.14,
+    idleDelay: 2500,
+    clearRadius: 240,
+    clearRadiusMax: 340,
+    blurHeavy: 18,
+    blurSoft: 5,
+    scrollFps: 30
   },
   lens: {                    // 液态玻璃边缘折射参数（bezel 宽度 / 位移强度）
     nav:  { bezel: 26, scale: 64 },
@@ -62,134 +69,273 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 })();
 
 /* ============================================================
-   2. 流动曲线背景：随鼠标局部变形（吸附 + 涟漪）
+   2. 流场背景：向量场流线 + 三层渐隐显影
    ============================================================ */
-(function curves(){
-  const svg = $('#curves');
-  if (!svg) return;
+(function flowField(){
+  const field = $('#flowField');
+  if (!field) return;
   const C = CONFIG.curves;
-  const NS = 'http://www.w3.org/2000/svg';
-  let W = 0, H = 0, lines = [], paths = [], nPts = 0, gap = 0;
-  let grad, anim1, anim2;
-  let mx = -9999, my = -9999, tx = -9999, ty = -9999, vel = 0, lastMove = 0;
-  let running = true, rafId = 0;
+  const layers = [$('#flowHeavy'), $('#flowSoft'), $('#flowSharp')].filter(Boolean);
+  const source = document.createElement('canvas');
+  const sourceCtx = source.getContext('2d', { alpha: true });
+  let W = 0, H = 0, dpr = 1, seeds = [], rafId = 0, lastFrame = 0;
+  let visible = !document.hidden, heroVisible = true, touchEndAt = 0, virtualActive = false, virtualFadeAt = 0, lowPower = false;
+  let mx = innerWidth * .5, my = innerHeight * .45;
+  let tx = mx, ty = my, speed = 0, lastInput = performance.now();
+  const reduceMotion = RM;
+  field.style.setProperty('--flow-blur-heavy', C.blurHeavy + 'px');
+  field.style.setProperty('--flow-blur-soft', C.blurSoft + 'px');
+  field.style.setProperty('--flow-opacity', '1');
 
-  function build(){
-    W = window.innerWidth; H = window.innerHeight;
-    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const hash = (x, y) => {
+    const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+    return n - Math.floor(n);
+  };
+  const densityAt = (x, y, mobile) => {
+    const noise = .5 + .5 * Math.sin(x * .0022 + Math.cos(y * .0026));
+    return (mobile ? .82 : .66) + noise * (mobile ? .18 : .34);
+  };
+
+  function buildSeeds(){
     const mobile = W < 700;
-    const count = mobile ? C.countMobile : C.countDesktop;
-    nPts = mobile ? C.pointsMobile : Math.ceil(W / C.gapDesktop) + 2;
-    gap = W / (nPts - 1);
-    svg.innerHTML =
-      `<defs><linearGradient id="curveGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${W}" y2="0">
-        <stop offset="0" stop-color="#7c6bff"/><stop offset=".5" stop-color="#35c2ff"/><stop offset="1" stop-color="#ff7ab8"/>
-        <animate id="cgA1" attributeName="x1" values="${-W};${W}" dur="${C.flowDur}s" repeatCount="indefinite"/>
-        <animate id="cgA2" attributeName="x2" values="0;${W * 2}" dur="${C.flowDur}s" repeatCount="indefinite"/>
-      </linearGradient></defs><g id="curveGroup" fill="none" stroke="url(#curveGrad)" stroke-linecap="round"></g>`;
-    const g = $('#curveGroup', svg);
-    const mid = (count - 1) / 2;
-    lines = []; paths = [];
-    for (let i = 0; i < count; i++){
-      const t = 1 - Math.abs(i - mid) / (mid || 1);   // 中间 1 → 两端 0
-      const p = document.createElementNS(NS, 'path');
-      p.setAttribute('stroke-width', (0.8 + 1.3 * t).toFixed(2));  // 0.8 → 2.1
-      p.setAttribute('opacity', (0.22 + 0.65 * t).toFixed(2));     // 0.22 → 0.87
-      g.appendChild(p);
-      paths.push(p);
-      lines.push({ i, off: (i / (count - 1) - 0.5) * H * C.bandHeight });
+    const gap = mobile ? 110 : 90;
+    const y0 = H * (mobile ? .04 : C.bandTop);
+    const y1 = H * (mobile ? .96 : Math.min(.96, C.bandTop + C.bandHeight));
+    const candidates = [];
+    let index = 0;
+    for (let y = y0; y <= y1; y += gap){
+      for (let x = -gap * .4; x < W + gap * .4; x += gap){
+        const jx = (hash(index + 11, 2) - .5) * gap * .38;
+        const jy = (hash(index + 7, 13) - .5) * gap * .38;
+        const px = x + gap * .45 + jx;
+        const py = y + jy;
+        if (hash(index + 31, 23) < densityAt(px, py, mobile)) candidates.push({ x: px, y: py, i: index });
+        index++;
+      }
     }
+    const target = mobile ? C.countMobile : C.countDesktop;
+    if (candidates.length > target){
+      const stride = candidates.length / target;
+      seeds = Array.from({ length: target }, (_, i) => candidates[Math.floor((i + .5) * stride)]);
+    } else seeds = candidates;
   }
 
-  // Q 二次贝塞尔中点平滑：控制点=当前点，终点=与下一点的中点
-  function pathFrom(ys){
-    let d = `M 0 ${ys[0].toFixed(1)}`;
-    for (let k = 1; k < ys.length - 1; k++){
-      const cx = k * gap;
-      const ex = (cx + (k + 1) * gap) / 2;
-      const ey = (ys[k] + ys[k + 1]) / 2;
-      d += ` Q ${cx.toFixed(1)} ${ys[k].toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`;
+  function resize(){
+    W = window.innerWidth; H = window.innerHeight;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    source.width = Math.max(1, Math.round(W * dpr));
+    source.height = Math.max(1, Math.round(H * dpr));
+    sourceCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    lowPower = W < 700 && navigator.hardwareConcurrency > 0 && navigator.hardwareConcurrency <= 4;
+    field.classList.toggle('flow-low-power', lowPower);
+    layers.forEach(canvas => {
+      const factor = canvas.id === 'flowSharp' ? 1 : W < 700 ? 1 / 3 : canvas.id === 'flowHeavy' ? .5 : .66;
+      canvas.width = Math.max(1, Math.round(W * dpr * factor));
+      canvas.height = Math.max(1, Math.round(H * dpr * factor));
+    });
+    buildSeeds();
+    tx = clamp(tx, 0, W); ty = clamp(ty, 0, H);
+    mx = clamp(mx, 0, W); my = clamp(my, 0, H);
+    draw(performance.now());
+  }
+
+  function fieldAngle(x, y, now, scroll){
+    const t = reduceMotion ? 0 : now * C.fieldTime;
+    const sy = y + (reduceMotion ? 0 : scroll * .25);
+    return Math.sin(x * C.fieldX + t) * 1.05
+      + Math.cos(sy * C.fieldY - t * 1.22) * .78
+      + Math.sin((x + sy) * .0012 + t * .84) * .62
+      + Math.cos((x - sy) * .00145 - t * .65) * .34;
+  }
+
+  function direction(x, y, now, sign, sigma, vortexBoost, scroll){
+    const angle = fieldAngle(x, y, now, scroll);
+    let vx = Math.cos(angle), vy = Math.sin(angle);
+    const dx = x - mx, dy = y - my, r2 = dx * dx + dy * dy;
+    const weight = Math.exp(-r2 / (2 * sigma * sigma));
+    if (r2 > 1){
+      const swirl = weight * 3.2 * vortexBoost;
+      const r = Math.sqrt(r2);
+      vx -= swirl * dy / r;
+      vy += swirl * dx / r;
     }
-    d += ` L ${((ys.length - 1) * gap).toFixed(1)} ${ys[ys.length - 1].toFixed(1)}`;
-    return d;
+    const length = Math.hypot(vx, vy) || 1;
+    return { x: vx / length * sign, y: vy / length * sign };
+  }
+
+  function trace(seed, sign, steps, now, sigma, vortexBoost, scroll){
+    const points = [{ x: seed.x, y: seed.y }];
+    let x = seed.x, y = seed.y;
+    for (let n = 0; n < steps; n++){
+      const v = direction(x, y, now, sign, sigma, vortexBoost, scroll);
+      const mid = direction(x + v.x * C.stepSize * .5, y + v.y * C.stepSize * .5,
+        now, sign, sigma, vortexBoost, scroll);
+      x += mid.x * C.stepSize;
+      y += mid.y * C.stepSize;
+      points.push({ x, y });
+    }
+    points.reverse();
+    return points;
+  }
+
+  function smoothPath(ctx, points){
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length - 1; i++){
+      const midX = (points[i].x + points[i + 1].x) * .5;
+      const midY = (points[i].y + points[i + 1].y) * .5;
+      ctx.quadraticCurveTo(points[i].x, points[i].y, midX, midY);
+    }
+    const last = points[points.length - 1];
+    ctx.lineTo(last.x, last.y);
+  }
+
+  function maskAt(x, y, radius, fade){
+    const r = Math.max(1, radius);
+    const px = `${x.toFixed(1)}px`, py = `${y.toFixed(1)}px`;
+    const stops = [0, .20, .38, .56, .74, .88, 1].map(v => (r * v).toFixed(1) + 'px');
+    const sharp = [1, .94, .72, .42, .18, .05, 0].map(a => a * fade);
+    const heavy = sharp.map(a => 1 - a);
+    const gradient = values => `radial-gradient(circle ${r.toFixed(1)}px at ${px} ${py}, ${values.map((a, i) => `rgba(0,0,0,${a.toFixed(3)}) ${stops[i]}`).join(',')})`;
+    const soft = [0, 0, .38, .62, .30, 0, 0].map(a => a * fade);
+    field.style.setProperty('--mx', px);
+    field.style.setProperty('--my', py);
+    field.style.setProperty('--r', r.toFixed(1) + 'px');
+    field.style.setProperty('--flow-mask-sharp', gradient(sharp));
+    field.style.setProperty('--flow-mask-heavy', gradient(heavy));
+    field.style.setProperty('--flow-mask-soft', gradient(soft));
+  }
+
+  function copyLayers(){
+    layers.forEach(canvas => {
+      if (lowPower && canvas.id === 'flowSoft') return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+    });
+  }
+
+  function draw(now){
+    const mobile = W < 700;
+    const steps = mobile ? C.stepsMobile : C.stepsDesktop;
+    const lightTheme = document.documentElement.dataset.theme === 'light'
+      || (!document.documentElement.dataset.theme && !matchMedia('(prefers-color-scheme: dark)').matches);
+    sourceCtx.clearRect(0, 0, W, H);
+    sourceCtx.globalCompositeOperation = lightTheme ? 'source-over' : 'lighter';
+    sourceCtx.lineCap = 'round';
+    const sigma = clamp(W * C.sigmaRatio, C.sigmaMin, C.sigmaMax);
+    const scroll = reduceMotion ? 0 : window.scrollY;
+    const vortexBoost = reduceMotion ? 0 : 1 + Math.min(speed / 55, .6);
+    const colors = [
+      ['124,107,255', '53,194,255'],
+      ['53,194,255', '76,240,176'],
+      ['76,240,176', '255,122,184'],
+      ['255,122,184', '124,107,255']
+    ];
+    for (const seed of seeds){
+      const back = trace(seed, -1, steps, now, sigma, vortexBoost, scroll);
+      const forward = trace(seed, 1, steps, now, sigma, vortexBoost, scroll);
+      const points = back.concat(forward.slice(1));
+      const first = points[0], last = points[points.length - 1];
+      const colorIndex = (seed.i + Math.floor((seed.x / W + seed.y / H) * 2) + colors.length) % colors.length;
+      const pair = colors[colorIndex];
+      const grad = sourceCtx.createLinearGradient(first.x, first.y, last.x, last.y);
+      grad.addColorStop(0, `rgba(${pair[0]},0)`);
+      grad.addColorStop(.25, `rgba(${pair[0]},.8)`);
+      grad.addColorStop(.60, `rgba(${pair[1]},.9)`);
+      grad.addColorStop(1, `rgba(${pair[1]},0)`);
+      let near = 0;
+      for (let n = 0; n < points.length; n += 5){
+        const dx = points[n].x - mx, dy = points[n].y - my;
+        near = Math.max(near, Math.exp(-(dx * dx + dy * dy) / (2 * sigma * sigma)));
+      }
+      const rarity = hash(seed.i + 91, 7);
+      const baseWidth = rarity > .985 ? 3 : 1 + rarity * 1.6;
+      sourceCtx.strokeStyle = grad;
+      sourceCtx.globalAlpha = (lightTheme ? .70 : .50) * (1 + .2 * near);
+      sourceCtx.lineWidth = baseWidth * (1 + .35 * near);
+      smoothPath(sourceCtx, points);
+      sourceCtx.stroke();
+    }
+    sourceCtx.globalAlpha = 1;
+    sourceCtx.globalCompositeOperation = 'source-over';
+    copyLayers();
   }
 
   function frame(now){
-    if (!running) return;
-    const t = now;
-    // 无输入 2.5s 后：虚拟光点沿李萨如轨迹自动游走
-    if (now - lastMove > C.idleDelay){
-      tx = W / 2 + W * 0.32 * Math.sin(t * 0.00043);
-      ty = H * 0.6 + H * 0.18 * Math.sin(t * 0.00061 + 1.3);
+    rafId = 0;
+    if (!visible) return;
+    if (!reduceMotion && !heroVisible && now - lastFrame < 1000 / C.scrollFps){ schedule(); return; }
+    const touchReady = touchEndAt && now - touchEndAt >= 1200;
+    const useVirtual = !reduceMotion && (virtualActive || now - lastInput > C.idleDelay || touchReady);
+    if (useVirtual){
+      virtualActive = true;
+      tx = W * (.5 + .33 * Math.sin(now * .00031));
+      ty = H * (.45 + .22 * Math.sin(now * .00047 + 1));
     }
-    const pmx = mx, pmy = my;
-    mx += (tx - mx) * C.ease;
-    my += (ty - my) * C.ease;
-    const inst = Math.hypot(mx - pmx, my - pmy);
-    vel = vel * 0.85 + inst * 0.15;
-
-    const sx = clamp(W * C.sigmaXRatio, C.sigmaXMin, C.sigmaXMax);
-    const sy = H * C.sigmaYRatio;
-    const cy = H * C.bandCenter;
-    const scrollDrift = window.scrollY;
-
-    for (let li = 0; li < lines.length; li++){
-      const L = lines[li];
-      const ys = new Array(nPts);
-      for (let k = 0; k < nPts; k++){
-        const x = k * gap;
-        // 基础形状：多个慢速正弦叠加
-        let y = cy + L.off
-          + Math.sin(x * 0.004 + t * 0.00028 + L.i * 0.7) * 14
-          + Math.sin(x * 0.0016 - t * 0.00019 + L.i * 1.3) * 22
-          + Math.sin(scrollDrift * 0.0022 + L.i * 0.35) * 26;  // 滚动联动
-        // 鼠标局部变形：高斯权重
-        const dx = x - mx, dy = y - my;
-        const w = Math.exp(-(dx * dx) / (2 * sx * sx)) * Math.exp(-(dy * dy) / (2 * sy * sy));
-        y += (my - y) * C.attract * w;                                  // 吸附
-        y += Math.sin(dx * 0.022 - t * 0.005) * (10 + vel * 1.4) * w;   // 涟漪
-        ys[k] = y;
-      }
-      paths[li].setAttribute('d', pathFrom(ys));
-    }
-    rafId = requestAnimationFrame(frame);
+    const dt = Math.hypot(tx - mx, ty - my);
+    const ease = reduceMotion ? C.ease * .5 : C.ease;
+    mx += (tx - mx) * ease;
+    my += (ty - my) * ease;
+    speed = speed * .84 + dt * .16;
+    const touchFade = touchEndAt
+      ? clamp(1 - (now - touchEndAt) / 1200, 0, 1)
+      : virtualFadeAt ? clamp((now - virtualFadeAt) / 450, 0, 1) : 1;
+    const radius = (C.clearRadius + Math.min(C.clearRadiusMax - C.clearRadius, speed * 2.2)) * touchFade;
+    maskAt(mx, my, radius, touchFade);
+    draw(now);
+    if (touchReady){ touchEndAt = 0; virtualFadeAt = now; }
+    if (virtualFadeAt && now - virtualFadeAt >= 450) virtualFadeAt = 0;
+    lastFrame = now;
+    if (!reduceMotion || (touchEndAt && now - touchEndAt < 1200)) schedule();
   }
 
-  window.addEventListener('pointermove', (e) => {
-    tx = e.clientX; ty = e.clientY; lastMove = performance.now();
-    if (mx < -999){ mx = tx; my = ty; }
+  function schedule(){ if (!rafId && visible) rafId = requestAnimationFrame(frame); }
+  function input(e){
+    tx = e.clientX; ty = e.clientY;
+    lastInput = performance.now();
+    touchEndAt = 0;
+    virtualActive = false;
+    virtualFadeAt = 0;
+    if (reduceMotion){
+      mx += (tx - mx) * .5;
+      my += (ty - my) * .5;
+      maskAt(mx, my, C.clearRadius, 1);
+      draw(performance.now());
+    }
+    else schedule();
+  }
+
+  window.addEventListener('pointermove', input, { passive: true });
+  window.addEventListener('pointerup', e => {
+    if (e.pointerType === 'touch'){
+      touchEndAt = lastInput = performance.now();
+      if (reduceMotion) schedule();
+    }
   }, { passive: true });
-
-  document.addEventListener('visibilitychange', () => {
-    running = !document.hidden;
-    if (running && !RM){ cancelAnimationFrame(rafId); rafId = requestAnimationFrame(frame); }
-  });
-
+  window.addEventListener('scroll', () => { if (reduceMotion) draw(performance.now()); else schedule(); }, { passive: true });
+  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 140); }, { passive: true });
   let resizeTimer = 0;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      build();
-      if (RM) drawStatic();
-    }, 160);
+  document.addEventListener('visibilitychange', () => {
+    visible = !document.hidden;
+    if (!visible && rafId) cancelAnimationFrame(rafId);
+    if (visible){ lastFrame = 0; if (reduceMotion) draw(performance.now()); else schedule(); }
   });
-
-  function drawStatic(){ // 减少动态：只画一帧静态曲线
-    const cy = H * C.bandCenter;
-    for (let li = 0; li < lines.length; li++){
-      const L = lines[li];
-      const ys = new Array(nPts);
-      for (let k = 0; k < nPts; k++){
-        const x = k * gap;
-        ys[k] = cy + L.off + Math.sin(x * 0.004 + L.i * 0.7) * 14 + Math.sin(x * 0.0016 + L.i * 1.3) * 22;
-      }
-      paths[li].setAttribute('d', pathFrom(ys));
-    }
+  const hero = $('.hero');
+  if (hero && 'IntersectionObserver' in window){
+    new IntersectionObserver(entries => {
+      heroVisible = entries[0].isIntersecting;
+      field.style.setProperty('--flow-opacity', heroVisible ? '1' : '.7');
+      if (!reduceMotion) schedule();
+    }, { threshold: 0 }).observe(hero);
   }
 
-  build();
-  if (RM) drawStatic();
-  else rafId = requestAnimationFrame(frame);
+  resize();
+  maskAt(mx, my, C.clearRadius, 1);
+  $('#themeBtn')?.addEventListener('click', () => { if (reduceMotion) draw(performance.now()); });
+  if (!reduceMotion) schedule();
 })();
 
 /* ============================================================
@@ -375,14 +521,22 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   // 移动端汉堡面板
   const menuBtn = $('#menuBtn'), panel = $('#mobilePanel');
   if (menuBtn && panel){
-    menuBtn.addEventListener('click', () => {
-      const open = panel.classList.toggle('open');
-      menuBtn.setAttribute('aria-expanded', open);
+    const isChinese = document.documentElement.lang.toLowerCase().startsWith('zh');
+    function setOpen(open){
+      panel.classList.toggle('open', open);
+      menuBtn.setAttribute('aria-expanded', String(open));
+      menuBtn.setAttribute('aria-label', open
+        ? (isChinese ? '关闭菜单' : 'Close menu')
+        : (isChinese ? '打开菜单' : 'Open menu'));
       $$('a', panel).forEach((a, i) => { a.style.transitionDelay = open ? (60 + i * 45) + 'ms' : '0ms'; });
+    }
+    menuBtn.addEventListener('click', () => {
+      setOpen(!panel.classList.contains('open'));
     });
     panel.addEventListener('click', (e) => {
-      if (e.target.closest('a')) panel.classList.remove('open');
+      if (e.target.closest('a')) setOpen(false);
     });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') setOpen(false); });
   }
 })();
 

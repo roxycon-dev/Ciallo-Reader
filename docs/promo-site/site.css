@@ -66,6 +66,7 @@ body{
   line-height:1.6;
   -webkit-font-smoothing:antialiased;
   overflow-x:hidden;
+  isolation:isolate;
   transition:background .4s var(--ease),color .4s var(--ease);
 }
 img{max-width:100%;display:block}
@@ -99,8 +100,29 @@ a:focus-visible,button:focus-visible,summary:focus-visible{
 @keyframes drift2{to{transform:translate(-6vmax,7vmax) scale(.94)}}
 @keyframes drift3{to{transform:translate(5vmax,-6vmax) scale(1.06)}}
 
-/* 流动曲线画布：文字后、光斑上 */
-#curves{position:fixed;inset:0;width:100%;height:100%;z-index:-2;pointer-events:none}
+/* 流场叠层：互补的径向遮罩把模糊背景平滑擦亮 */
+.flow-field{
+  position:fixed;inset:0;z-index:-2;overflow:hidden;pointer-events:none;
+  opacity:var(--flow-opacity,1);transition:opacity .4s var(--ease);
+}
+.flow-layer{position:absolute;inset:0;width:100%;height:100%;display:block}
+.flow-heavy{
+  filter:blur(var(--flow-blur-heavy,18px));opacity:.55;
+  -webkit-mask-image:var(--flow-mask-heavy,none);mask-image:var(--flow-mask-heavy,none);
+}
+.flow-soft{
+  filter:blur(var(--flow-blur-soft,5px));opacity:.8;
+  -webkit-mask-image:var(--flow-mask-soft,none);mask-image:var(--flow-mask-soft,none);
+}
+.flow-sharp{
+  opacity:1;
+  -webkit-mask-image:var(--flow-mask-sharp,none);mask-image:var(--flow-mask-sharp,none);
+}
+.flow-low-power .flow-soft{display:none}
+@supports not ((mask-image:radial-gradient(circle,#000,transparent)) or (-webkit-mask-image:radial-gradient(circle,#000,transparent))){
+  .flow-soft,.flow-sharp{display:none}
+  .flow-heavy{filter:blur(6px);opacity:.55}
+}
 
 /* ---------- 液态玻璃材质（6 层） ---------- */
 .glass{
@@ -172,8 +194,8 @@ a:focus-visible,button:focus-visible,summary:focus-visible{
 .nav-brand img{width:26px;height:26px;border-radius:7px}
 .nav-links{position:relative;display:flex;align-items:center}
 .nav-links a{
-  position:relative;z-index:1;
-  padding:7px 13px;font-size:14px;color:var(--ink2);
+  position:relative;z-index:1;display:flex;align-items:center;min-height:36px;
+  padding:8px 13px;font-size:14px;line-height:1.5;color:var(--ink2);
   border-radius:999px;transition:color .25s var(--ease);
   white-space:nowrap;
 }
@@ -219,12 +241,12 @@ a:focus-visible,button:focus-visible,summary:focus-visible{
   position:absolute;top:calc(100% + 10px);left:12px;right:12px;
   border-radius:28px;padding:14px;
   display:none;flex-direction:column;gap:2px;
-  opacity:0;transform:translateY(-8px);
-  transition:opacity .3s var(--ease),transform .3s var(--ease);
+  opacity:0;visibility:hidden;pointer-events:none;transform:translateY(-8px);
+  transition:opacity .3s var(--ease),transform .3s var(--ease),visibility 0s linear .3s;
 }
-.mobile-panel.open{opacity:1;transform:translateY(0)}
+.mobile-panel.open{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0);transition:opacity .3s var(--ease),transform .3s var(--ease),visibility 0s}
 .mobile-panel a{
-  padding:13px 16px;border-radius:16px;font-size:16px;font-weight:600;
+  padding:13px 16px;border-radius:16px;font-size:16px;font-weight:600;line-height:1.5;
   opacity:0;transform:translateY(6px);
   transition:opacity .3s var(--ease),transform .3s var(--ease),background .2s;
 }
@@ -237,7 +259,12 @@ a:focus-visible,button:focus-visible,summary:focus-visible{
   display:flex;align-items:center;justify-content:center;
   text-align:center;padding:120px 24px 60px;
 }
-.hero-inner{max-width:880px}
+.hero-inner{max-width:880px;position:relative;isolation:isolate}
+.hero-inner::before{
+  content:"";position:absolute;z-index:-1;inset:-46px -72px;border-radius:50%;
+  background:radial-gradient(ellipse at center,color-mix(in srgb,var(--bg) 36%,transparent),transparent 72%);
+  pointer-events:none;
+}
 .hero h1{
   font-size:clamp(40px,8.2vw,92px);
   font-weight:700;letter-spacing:-.035em;line-height:1.04;
@@ -246,6 +273,7 @@ a:focus-visible,button:focus-visible,summary:focus-visible{
   -webkit-text-fill-color:transparent;color:transparent;
 }
 .hero h1 .line{display:block}
+.hero h1 .mobile-break{display:none}
 .hero h1 .line:nth-child(1){animation:rise .8s var(--ease) .05s backwards}
 .hero h1 .line:nth-child(2){animation:rise .8s var(--ease) .18s backwards}
 @keyframes rise{from{opacity:0;transform:translateY(16px)}}
@@ -287,7 +315,7 @@ a:focus-visible,button:focus-visible,summary:focus-visible{
   pointer-events:none;
 }
 .scene.on{opacity:1;transform:none;pointer-events:auto}
-.scene h2{font-size:clamp(30px,4.4vw,52px)}
+.scene h2{font-size:clamp(30px,4.4vw,52px);line-height:1.18;overflow:visible;padding-block:.06em}
 .scene .scene-tag{
   display:inline-block;margin-bottom:16px;padding:7px 16px;border-radius:999px;
   font-size:13px;font-weight:600;color:var(--ink2);
@@ -362,6 +390,42 @@ section{padding:110px 0}
 .ci-2{background:linear-gradient(135deg,var(--acc2),var(--acc3))}
 .ci-3{background:linear-gradient(135deg,var(--acc3),var(--acc1))}
 
+/* ---------- 功能详览：真实界面与编辑式长文 ---------- */
+.feature-tour>.sec-head{max-width:720px;margin:0 auto 52px;text-align:center}
+.story-list{display:flex;flex-direction:column;gap:0}
+.story-row{
+  display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);align-items:center;gap:clamp(28px,5vw,64px);
+  padding:clamp(40px,6vw,72px) 0;border-bottom:1px solid var(--hairline);
+}
+.story-row:last-child{border-bottom:0}
+.story-row:nth-child(even) .story-media{order:2}
+.story-row:nth-child(even) .story-copy{order:1}
+.story-copy{position:relative;z-index:3;max-width:500px;padding:8px 0}
+.story-copy h3{font-size:clamp(24px,3vw,34px);line-height:1.18}
+.story-copy>p{margin-top:16px;color:var(--ink2);font-size:16px}
+.story-copy ul{margin-top:20px;list-style:none;display:grid;gap:12px}
+.story-copy li{position:relative;padding-left:22px;color:var(--ink2);font-size:15px}
+.story-copy li::before{content:"";position:absolute;left:1px;top:.66em;width:7px;height:7px;border-radius:50%;background:linear-gradient(135deg,var(--acc1),var(--acc2),var(--acc3));box-shadow:0 0 12px rgba(124,107,255,.35)}
+.story-copy code{font-family:inherit;font-size:.92em;padding:2px 6px;border-radius:6px;background:rgba(124,107,255,.1);color:var(--ink)}
+.story-copy .story-note{font-size:13px;line-height:1.55;opacity:.82}
+.story-media{
+  position:relative;z-index:1;min-height:410px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  padding:26px;border:1px solid var(--hairline);border-radius:26px;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 38%,rgba(255,255,255,.36),transparent 65%),linear-gradient(145deg,rgba(124,107,255,.09),rgba(53,194,255,.08) 52%,rgba(255,122,184,.09));
+}
+.story-media img{position:relative;z-index:1;width:auto;max-width:100%;height:auto;max-height:410px;object-fit:contain;border-radius:20px;box-shadow:0 20px 52px rgba(30,25,70,.22)}
+.story-media figcaption{position:relative;z-index:2;color:var(--ink2);font-size:12px;text-align:center}
+.story-media--source img{max-height:380px}
+.story-media--stack{min-height:440px}
+.story-media--stack .story-screen--main{max-height:340px}
+.story-media--stack .story-screen--detail{position:absolute;right:18px;bottom:40px;width:min(66%,340px);max-height:none;border:5px solid var(--bg);border-radius:16px;transform:rotate(-2deg)}
+.story-media--reader{min-height:500px}
+.story-media--reader img{max-height:438px}
+.story-media--dark{background:linear-gradient(150deg,#171821,#262633 55%,#14151d)}
+.story-media--dark figcaption{color:rgba(255,255,255,.72)}
+.story-media--dark img{box-shadow:0 20px 52px rgba(0,0,0,.4)}
+.story-media--stats img{max-height:440px}
+
 /* ---------- 支持格式：磁吸胶囊 ---------- */
 .fmt-groups{display:flex;flex-direction:column;gap:34px}
 .fmt-group h3{font-size:15px;font-weight:600;color:var(--ink2);margin-bottom:14px;letter-spacing:.01em}
@@ -373,6 +437,9 @@ section{padding:110px 0}
   will-change:transform;cursor:default;
 }
 .cap small{display:block;font-size:11px;font-weight:500;color:var(--ink2);letter-spacing:0}
+.format-notes{margin-top:38px;padding-top:26px;border-top:1px solid var(--hairline);display:grid;grid-template-columns:1fr 1fr;gap:26px 42px}
+.format-notes p{color:var(--ink2);font-size:14px}
+.format-notes strong{display:block;margin-bottom:5px;color:var(--ink);font-size:14px}
 
 /* ---------- 漫画翻译流程 ---------- */
 .flow-panel{border-radius:32px;padding:56px 48px;overflow:hidden}
@@ -453,7 +520,8 @@ section{padding:110px 0}
 /* ---------- 响应式 ---------- */
 @media (max-width:1099px){
   .showcase-grid{gap:34px}
-  .cards{grid-template-columns:1fr;max-width:560px}
+  .cards{grid-template-columns:repeat(2,minmax(0,1fr));max-width:820px}
+  .story-row{gap:28px}
 }
 @media (max-width:860px){
   .showcase-grid{grid-template-columns:1fr;justify-items:center;text-align:center;gap:26px}
@@ -463,10 +531,19 @@ section{padding:110px 0}
   .showcase{height:300vh}
 }
 @media (max-width:700px){
+  .hero h1 .mobile-break{display:block}
   .nav-links,.lang-link{display:none}
   .menu-btn{display:flex}
   .nav-actions{margin-left:auto}
   .mobile-panel{display:flex}
+  .cards{grid-template-columns:1fr;max-width:560px}
+  .story-row{grid-template-columns:1fr;gap:22px;padding:34px 0;border-radius:0}
+  .story-row:nth-child(even) .story-media,.story-row:nth-child(even) .story-copy{order:initial}
+  .story-media,.story-media--reader,.story-media--stack{min-height:320px;padding:18px;border-radius:21px}
+  .story-media img,.story-media--source img,.story-media--reader img,.story-media--stats img{max-height:320px}
+  .story-media--stack .story-screen--main{max-height:270px}
+  .story-media--stack .story-screen--detail{right:8px;bottom:38px;width:min(68%,290px)}
+  .format-notes{grid-template-columns:1fr;gap:18px}
   section{padding:80px 0}
   .flow-panel{padding:40px 26px}
   .flow-steps{grid-template-columns:1fr;gap:30px;padding-left:26px}
@@ -484,9 +561,26 @@ section{padding:110px 0}
   .closing{padding:110px 24px 120px}
 }
 
+/* 矮视口下缩小 sticky 展示，避免手机模型把场景标题挤出屏幕 */
+@media (max-height:820px){
+  .showcase-sticky{align-items:flex-start;padding-top:clamp(20px,4svh,34px)}
+  .showcase-grid{min-height:0}
+  .phone{width:min(260px,calc((100svh - 140px) * .49))}
+  .showcase-dots{bottom:14px}
+}
+@media (max-width:860px) and (max-height:820px){
+  .showcase-sticky{padding-top:clamp(18px,3.5svh,30px)}
+  .showcase-grid{gap:16px}
+  .scenes{min-height:240px}
+  .scene h2{font-size:clamp(27px,7vw,42px);line-height:1.08}
+  .scene p{margin-top:12px;font-size:15px;line-height:1.45}
+  .phone{width:min(190px,max(130px,calc((100svh - 400px) * .48)))}
+}
+
 /* ---------- 减少动态 ---------- */
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
   html{scroll-behavior:auto}
   .blobs span{animation:none}
+  .flow-field{transition:none}
 }
