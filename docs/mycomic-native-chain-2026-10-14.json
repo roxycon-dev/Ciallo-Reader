@@ -20,13 +20,23 @@
     }
   ],
   "date": "2026-10-14",
+  "versionName": "1.3.8",
+  "versionCode": 219,
   "androidApi": 35,
+  "applicationId": "com.aistudio.novelreader.kxmpzq.debug",
   "webView": "124.0.6367.219",
   "test": "MyComicVerificationDeviceTest.verificationCatalogueDetailsChapterAndDecodedImages",
   "instrumentationResult": "OK (1 test)",
-  "seconds": 62.675,
+  "seconds": 63.889,
   "imageDecoder": "production ComicPageLoader / Coil",
-  "scope": "One real catalogue/detail/chapter chain; first and last images decoded",
   "credentialsInjected": false,
-  "automatedCaptchaClicks": false
+  "automatedCaptchaClicks": false,
+  "sourceInputsStable": true,
+  "sourceSnapshotSha256": "27d140fd004529eefc7f5e1f8810b8349987491457e595dc82c5277d02c0ce19",
+  "scope": "Merged production sources; one catalogue/detail/chapter chain and first/last decoded images",
+  "earlierDeviceRun": {
+    "seconds": 62.675,
+    "complete": true,
+    "beforeUpstreamMerge": true
+  }
 }

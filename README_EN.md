@@ -61,10 +61,12 @@ These 12 earlier screenshots show source management, library search, the bookshe
 
 ### Discover comics
 
+Version 1.3.8 is pending release. The changes below are in source and validated; publishing the APK requires the existing fixed signing key. The current published version remains 1.3.7.
+
 - Browse one source or merge sources with separate update, discussion, ranking, and view dimensions. Missing statistics are shown explicitly.
 - Standard categories coexist with native source categories, with saved filters, three layouts, pagination, quick following, and random reading.
-- Version 1.3.7 repairs discovery feeds, metadata, and pagination, and restores Aiman's public reading path through the HTTPS origin declared by its publisher.
-- MYCOMIC reads public pages with the same in-app WebView engine and session used for site verification. Its real Android verification → catalogue → detail → chapter → reader image decoding chain passed: 30 catalogue entries, 16 chapters, 61 pages, and decoded first/last images. See [validation details](docs/release-1.3.7-2026-10-14.md).
+- Version 1.3.8 repairs discovery feeds, metadata, and pagination, and restores Aiman's public reading path through the HTTPS origin declared by its publisher.
+- MYCOMIC reads public pages with the same in-app WebView engine and session used for site verification. Its real Android verification → catalogue → detail → chapter → reader image decoding chain passed: 30 catalogue entries, 16 chapters, 61 pages, and decoded first/last images. See [validation details](docs/release-1.3.8-2026-10-14.md).
 
 ### One library for novels, ebooks, and comics
 

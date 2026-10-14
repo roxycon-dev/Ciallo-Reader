@@ -4,10 +4,13 @@ async function cialloJmGet(url) {
     const local = url.startsWith(current + '/');
     const path = local ? url.slice(current.length) : '';
     const sourceType = Object.getPrototypeOf(this).constructor;
-    const routes = local ? [current, ...Array.from(new Set(sourceType.apiDomains || sourceType.fallbackServers || []))
-        .map(domain => 'https://' + domain).filter(origin => origin !== current)] : [''];
+    const routes = local ? Array.from(new Set([current,
+        ...(sourceType.apiDomains || []).map(domain => 'https://' + domain),
+        ...(sourceType.fallbackServers || []).map(domain => 'https://' + domain)])).slice(0, 5) : [''];
     let lastError;
+    const started = Date.now();
     for (const route of routes) {
+        if (lastError && Date.now() - started > 18000) break;
         const time = Math.floor(Date.now() / 1000);
         try {
             const response = await Network.get(local ? route + path : url, this.getApiHeaders(time));
@@ -22,6 +25,11 @@ async function cialloJmGet(url) {
             }
             if (response.status !== 200) throw new Error('源站返回 HTTP ' + response.status);
             const envelope = CialloSourceResponse.object(response.body);
+            if (envelope.code === 401) {
+                const error = new Error('Login expired');
+                error.noRetry = true;
+                throw error;
+            }
             if (typeof envelope.data !== 'string' || !envelope.data.trim())
                 throw new Error('源站接口未返回有效数据，请稍后重试');
             const decoded = this.convertData(envelope.data, String(time) + '185Hcomic3PAPP7R');

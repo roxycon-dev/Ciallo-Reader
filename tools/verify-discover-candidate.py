@@ -9,24 +9,23 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 root = Path(__file__).resolve().parents[1]
-out = root / 'artifacts/release-1.3.7'
+out = root / 'artifacts/release-1.3.8'
 out.mkdir(parents=True, exist_ok=True)
-assert 'BUILD SUCCESSFUL' in (root / 'artifacts/discover-final-repair/final-build-and-tests.log').read_text(encoding='utf-8')
-snapshot = json.loads((root / 'artifacts/discover-final-repair/source-snapshot-final.json').read_text(encoding='utf-8'))
+assert 'BUILD SUCCESSFUL' in (out / 'release-build.log').read_text(encoding='utf-8')
+snapshot = json.loads((out / 'source-snapshot.json').read_text(encoding='utf-8'))
 changed = [p for p, value in snapshot.items()
            if hashlib.sha256((root / p).read_bytes()).hexdigest() != value]
-# Only the device fixture path/report hash changed after the Release build.
-# Its final test APK was rebuilt and executed; all production inputs stay exact.
-assert changed == ['app/src/androidTest/java/com/example/source/js/MyComicVerificationDeviceTest.kt'], changed
-chain = json.loads((root / 'artifacts/discover-final-repair/mycomic-verification-chain.json').read_text(encoding='utf-8'))
+assert not changed, changed
+chain = json.loads((out / 'mycomic-verification-chain.json').read_text(encoding='utf-8'))
 assert chain['source'] == 'mycomic' and chain['complete'] and chain['stage'] == 'passed'
 assert chain['verificationPassed'] and chain['catalogueCount'] > 0 and chain['chapters'] > 0 and chain['pages'] > 1
 assert len(chain['decodedImages']) == 2 and all(i['width'] > 0 and i['height'] > 0 for i in chain['decodedImages'])
 assert chain['scriptSha256'] == hashlib.sha256((root / 'artifacts/discover-live/patched/mycomic.js').read_bytes()).hexdigest()
-assert 'OK (1 test)' in (root / 'artifacts/discover-final-repair/mycomic-device-run-2.log').read_text(encoding='utf-8')
-assert 'BUILD SUCCESSFUL' in (root / 'artifacts/discover-final-repair/mycomic-device-build-2.log').read_text(encoding='utf-8')
+assert 'OK (1 test)' in (out / 'mycomic-device-run.log').read_text(encoding='utf-8')
+assert 'BUILD SUCCESSFUL' in (out / 'debug-build.log').read_text(encoding='utf-8')
 tests = [ET.parse(p).getroot().attrib for p in (root / 'app/build/test-results/testDebugUnitTest').glob('TEST-*.xml')]
-assert sum(int(t['tests']) for t in tests) == 96
+test_count = sum(int(t['tests']) for t in tests)
+assert test_count == 109
 assert all(int(t[k]) == 0 for t in tests for k in ['failures', 'errors', 'skipped'])
 apk = root / 'app/build/outputs/apk/release/app-release.apk'
 assets = {}
@@ -51,7 +50,7 @@ with zipfile.ZipFile(apk) as archive:
             header = offset + index * size
             if struct.unpack_from('<I', data, header)[0] == 1:
                 assert struct.unpack_from('<Q', data, header + 48)[0] >= 16384
-destination = out / 'Ciallo-Reader-v1.3.7.apk'
+destination = out / 'Ciallo-Reader-v1.3.8.apk'
 shutil.copy2(apk, destination)
 build_tools = Path('C:/Users/GuanXingRen/AppData/Local/Android/Sdk/build-tools/36.1.0')
 for tool, arguments, filename in [
@@ -61,14 +60,14 @@ for tool, arguments, filename in [
 ]:
     result = subprocess.run([str(build_tools / tool), *arguments, str(destination)], capture_output=True, text=True, check=True)
     (out / filename).write_text(result.stdout + result.stderr, encoding='utf-8')
-assert "versionCode='218' versionName='1.3.7'" in (out / 'apk-package.txt').read_text(encoding='utf-8')
-certificate = 'd2115e3cc5880b210a120558aaab03eb30ee5de2952a80f3376dda7e45501146'
+assert "versionCode='219' versionName='1.3.8'" in (out / 'apk-package.txt').read_text(encoding='utf-8')
+certificate = (root / 'signing/release-cert.sha256').read_text().strip()
 assert certificate in (out / 'apk-signature.txt').read_text(encoding='utf-8')
 assert 'Verification successful' in (out / 'apk-alignment.txt').read_text(encoding='utf-8')
-report = {'version': '1.3.7', 'versionCode': 218, 'bytes': destination.stat().st_size,
+report = {'version': '1.3.8', 'versionCode': 219, 'bytes': destination.stat().st_size,
           'sha256': hashlib.sha256(destination.read_bytes()).hexdigest(), 'abis': abis,
           'certificateSha256': certificate, 'zipCrc': True, 'zipAlignment16KB': True,
-          'nativeElfAlignment16KB': True, 'packagedAssets': assets, 'testsPassed': 96,
+          'nativeElfAlignment16KB': True, 'packagedAssets': assets, 'testsPassed': test_count,
           'sourceSnapshotCount': len(snapshot), 'sourceInputsStable': True,
           'postBuildDeviceTestChanges': changed,
           'deviceTestCompiled': True, 'deviceTestExecuted': True,

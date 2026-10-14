@@ -55,6 +55,11 @@ function host(meta,sourceOverride) {
  }
  function convert(m){
   const data=buffer(m.value);
+  if(m.type==='response_text'){
+   const contentType=Object.entries(m.headers||{}).find(([key])=>key.toLowerCase()==='content-type')?.[1]||'';
+   const declared=/charset\s*=\s*["']?\s*([\w-]+)/i.exec(contentType)?.[1];
+   return iconv.decode(data,declared&&iconv.encodingExists(declared)?declared:'utf8').replace(/^\uFEFF/,'');
+  }
   if(m.type==='utf8'||m.type==='gbk')return m.isEncode ? arrayBuffer(iconv.encode(String(m.value),m.type)) : iconv.decode(data,m.type);
   if(m.type==='base64')return m.isEncode ? data.toString('base64') : arrayBuffer(Buffer.from(String(m.value),'base64'));
   if(m.type==='hex')return data.toString('hex');
@@ -101,7 +106,10 @@ function host(meta,sourceOverride) {
  context=vm.createContext({sendMessage:message,sendMessageSync:sync,APP:{locale:'zh-CN',version:'1.6.0'},console:{log(){},warn(){},error(){}},URL,URLSearchParams,TextDecoder,TextEncoder});
  const code=sourceOverride||fs.readFileSync(path.join(sourceDir,meta.fileName),'utf8'),className=/class\s+(\w+)\s+extends\s+ComicSource/.exec(code)?.[1];
  if(!className)throw Error('Source class not found');
- vm.runInContext(runtime+'\n'+override+'\nAPP={locale:"zh-CN",version:"1.7.0",platform:"android"};globalThis.appVersion="1.7.0";\n'+code+'\n'+bridge+'\n globalThis.src=new '+className+'();',context,{timeout:3000});
+ const responseRuntime=fs.readFileSync(path.join(root,'app/src/main/assets/venera/source_responses.js'),'utf8');
+ const key=meta.key||meta.fileName.replace(/\.js$/,'');
+ const adapter=['wnacg','jm'].includes(key)?fs.readFileSync(path.join(root,'app/src/main/assets/venera',key==='wnacg'?'wnacg_info.js':'jm_response.js'),'utf8'):'';
+ vm.runInContext(runtime+'\n'+responseRuntime+'\n'+override+'\nAPP={locale:"zh-CN",version:"1.7.0",platform:"android"};globalThis.appVersion="1.7.0";\n'+code+'\n'+adapter+'\n'+bridge+'\n globalThis.src=new '+className+'();CialloSourceResponse.install(src,'+JSON.stringify(key)+');',context,{timeout:3000});
  for(const [key,definition] of Object.entries(vm.runInContext('src.settings||{}',context)))settings.set(key,definition.default??definition.defaultValue??null);
  const result={context,evidence,backgroundErrors:[],setStage(value){stage=value;},close(){closed=true;},async run(code){return vm.runInContext(code,context,{timeout:5000});}};auditHosts.push(result);return result;
 }
@@ -154,9 +162,9 @@ async function main(){
    JM.apiDomains=[...routes];JM.fallbackServers=[];let calls=[];
    Network.get=async url=>{calls.push(url);return calls.length===1?{status:200,body:'proxy error'}:calls.length===2?{status:200,body:JSON.stringify({data:'invalid decoded JSON'})}:{status:200,body:JSON.stringify({data:'{"ok":true}'})};};
    const path='/categories?page=2';const result=await src.get(src.baseUrl+path);
-   if(!JSON.parse(result).ok||calls.length!==3||!calls.every(url=>url.endsWith(path))||JM.apiDomains[0]!==routes[2])throw Error('JM_GET_VALIDATED_FAILOVER');
+   if(!JSON.parse(result).ok||calls.length!==3||!calls.every(url=>url.endsWith(path))||src.baseUrl!=='https://'+routes[2])throw Error('JM_GET_VALIDATED_FAILOVER');
    JM.apiDomains=[...routes];calls=[];Network.get=async url=>{calls.push(url);return {status:401};};
-   try{await src.get(src.baseUrl+path);throw Error('JM_AUTH_ACCEPTED');}catch(e){if(!/Login expired/.test(String(e))||calls.length!==1)throw Error('JM_AUTH_MUST_NOT_RETRY');}
+   try{await src.get(src.baseUrl+path);throw Error('JM_AUTH_ACCEPTED');}catch(e){if(!/Login expired|登录/.test(String(e))||calls.length!==1)throw Error('JM_AUTH_MUST_NOT_RETRY');}
    calls=[];Network.get=async url=>{calls.push(url);throw Error('offline');};
    try{await src.get(src.baseUrl+path);}catch(e){}
    if(calls.length!==5)throw Error('JM_RETRY_ROUTE_CAP');

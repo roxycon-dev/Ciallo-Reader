@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
-const {parseHTML} = require(path.join(root, '.tools/dom/node_modules/linkedom'));
+const {parseHTML} = require(process.env.CIALLO_DOM_MODULE || path.join(root, '.tools/dom/node_modules/linkedom'));
 const acorn = require(path.join(root, 'app/src/main/assets/js_safety/acorn.js'));
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const assets = 'app/src/main/assets/venera/';
@@ -168,6 +168,25 @@ async function main() {
     const {ctx} = context({Network: {get: async () => {calls++; return {status: 401, body: '{"errorMsg":"請先登入會員"}'};}}});
     const src = new JM(); ctx.CialloSourceResponse.install(src, 'jm');
     await assert.rejects(src.get(src.baseUrl + '/album?id=1'), /登入/); assert.equal(calls, 1);
+  });
+  await check('JM merged adapter caps routes and elapsed retry budget', async () => {
+    for (const expire of [false, true]) {
+      let calls = 0, elapsed = 0;
+      class JM {static apiDomains = Array.from({length: 12}, (_, i) => i + '.invalid'); get() {} loadSetting() {return '1';} getApiHeaders() {return {};} convertData(v) {return v;}}
+      const {ctx} = context({Date: {now: () => elapsed}, Network: {get: async () => {
+        calls++; if (expire) elapsed = 19000; throw new Error('transport failure');
+      }}});
+      const src = new JM(); ctx.CialloSourceResponse.install(src, 'jm');
+      await assert.rejects(src.get(src.baseUrl + '/album?id=1'));
+      assert.equal(calls, expire ? 1 : 5);
+    }
+  });
+  await check('JM JSON authorization rejection never rotates', async () => {
+    let calls = 0;
+    class JM {static apiDomains = ['one.invalid','two.invalid']; get() {} loadSetting() {return '1';} getApiHeaders() {return {};} convertData(v) {return v;}}
+    const {ctx} = context({Network: {get: async () => {calls++; return {status: 200, body: '{"code":401}'};}}});
+    const src = new JM(); ctx.CialloSourceResponse.install(src, 'jm');
+    await assert.rejects(src.get(src.baseUrl + '/album?id=1'), /Login expired/); assert.equal(calls, 1);
   });
   console.log('Passed ' + passed + ' source response checks');
 }
