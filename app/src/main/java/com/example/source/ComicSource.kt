@@ -4,6 +4,9 @@ package com.example.source
  * A book source that can browse online comics chapter by chapter.
  */
 interface ComicSource : BookSource {
+    val supportsDiscoverMetadata: Boolean get() = false
+    suspend fun getDiscoverMetadata(bookId: String): SourceResult<SearchBook> =
+        SourceResult.Error(SourceException.ParseError("书源没有轻量元数据接口"))
     suspend fun discoverCatalog(resolveDynamic: Boolean = false): SourceResult<com.example.discover.DiscoverCatalog> =
         SourceResult.Success(com.example.discover.DiscoverCatalog())
     suspend fun discover(query: com.example.discover.DiscoverQuery): SourceResult<com.example.discover.DiscoverPage> =

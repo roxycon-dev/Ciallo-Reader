@@ -73,6 +73,15 @@ class JsComicSource(
 ) : ComicSource {
 
     override val id: String get() = "js_$sourceKey"
+    override val supportsDiscoverMetadata: Boolean get() = sourceKey == "aimanhua"
+    override suspend fun getDiscoverMetadata(bookId: String): SourceResult<SearchBook> = withContext(Dispatchers.IO) {
+        try {
+            val result = callJsWithRetry("src.discoverMetadata(${q(bookId)})")
+            if (result?.optBoolean("ok") != true) SourceResult.Error(SourceException.ParseError("轻量元数据暂时不可用"))
+            else SourceResult.Success(JsComicMetadata.book(result.optJSONObject("data") ?: JSONObject(), id, bookId))
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { SourceResult.Error(SourceException.Unknown("轻量元数据加载失败", e)) }
+    }
 
     private val discoverBridge by lazy { context.assets.open("venera/discover_bridge.js").bufferedReader().use { it.readText() } }
     private suspend fun discoverCall(request: JSONObject): JSONObject? = callJsWithRetry(
@@ -95,7 +104,7 @@ class JsComicSource(
                 val request = JSONObject().put("dimension", query.dimension.name.lowercase()).put("range", query.range)
                     .put("page", query.page).put("cursor", query.cursor).put("offset", query.offset)
                     .put("feedId", query.feedId).put("categoryId", query.categoryId).put("includeAdult", query.includeAdult)
-                    .put("categoryIds", org.json.JSONArray(query.categoryIds))
+                    .put("categoryIds", org.json.JSONArray(query.categoryIds)).put("status", query.status)
                 val result = discoverCall(request) ?: return@withContext SourceResult.Error(SourceException.ParseError("书源无响应"))
                 if (!result.optBoolean("ok")) return@withContext SourceResult.Error(SourceException.ParseError(friendlyJsSourceError(result.optString("error"))))
                 SourceResult.Success(JsDiscoverAdapter.page(result.optJSONObject("data") ?: JSONObject(), id, query))

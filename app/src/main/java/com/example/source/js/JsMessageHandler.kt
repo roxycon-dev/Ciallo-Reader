@@ -497,7 +497,7 @@ class JsMessageHandler(
                     (res.error != null || res.status == 403 || res.status == 429 || res.status >= 500)
                 val responseProblem = if (!bytes && httpMethod == "GET" && res.status == 200)
                     com.example.source.SourceResponse.problem(com.example.source.SourceResponse.text(res.body ?: ByteArray(0), res.headers),
-                        sourceKey == "jm" || effectiveHeaders.any { it.key.equals("Accept", true) && it.value.contains("json", true) } ||
+                        sourceKey == "jm" || com.example.source.SourceResponse.expectsJson(effectiveHeaders) ||
                             res.headers.any { it.key.equals("Content-Type", true) && it.value.contains("json", true) })
                     else null
                 val retryViaHttp = httpMethod == "GET" && (responseProblem != null ||
@@ -561,7 +561,7 @@ class JsMessageHandler(
                     )
                 } else {
                     val text = decoded?.let { com.example.source.SourceResponse.text(it, respHeaders) } ?: ""
-                    val expectJson = sourceKey == "jm" || effectiveHeaders.any { header -> header.key.equals("Accept", true) && header.value.contains("json", true) } ||
+                    val expectJson = sourceKey == "jm" || com.example.source.SourceResponse.expectsJson(effectiveHeaders) ||
                         it.header("Content-Type").orEmpty().contains("json", true)
                     if (it.code == 200 && httpMethod != "HEAD" && (text.isNotBlank() || expectJson)) com.example.source.SourceResponse.problem(text, expectJson)
                         ?.let { reason -> throw com.example.source.SourceException.ParseError(reason) }

@@ -458,6 +458,8 @@ class MainActivity : ComponentActivity() {
                     }
 
                     var selectedTab by rememberSaveable { mutableIntStateOf(2) }
+                    var discoverRefreshRequest by rememberSaveable { mutableIntStateOf(0) }
+                    var lastDiscoverTap by remember { mutableLongStateOf(0L) }
                     val favoriteAddRequest by viewModel.favoriteAddRequest.collectAsStateWithLifecycle()
                     val favoriteActionMessage by viewModel.favoriteActionMessage.collectAsStateWithLifecycle()
                     val favoriteSourceNames by libraryViewModel.availableSources.collectAsStateWithLifecycle()
@@ -730,28 +732,12 @@ class MainActivity : ComponentActivity() {
                                             1 -> com.example.discover.DiscoverScreen(
                                                 readingTitles = readingRecords.map { it.bookTitle }.toSet(),
                                                 manager = libraryViewModel.sourceManager,
+                                                refreshRequest = discoverRefreshRequest,
                                                 favorites = if (viewModel.favoritesProtected.collectAsStateWithLifecycle().value) emptyList() else favoriteItems,
                                                 favoriteKeys = favoriteKeys,
                                                 onFollow = { book, next -> viewModel.toggleFavorite(book, next) },
                                                 onOpen = { book -> discoverReadJob?.cancel(); libraryViewModel.openComic(book); navController.navigate("comic_chapters") },
-                                                onLatest = { book ->
-                                                    discoverReadJob?.cancel()
-                                                    libraryViewModel.openComic(book)
-                                                    discoverReadJob = homeScope.launch {
-                                                        val result = kotlinx.coroutines.withTimeoutOrNull(30_000) {
-                                                            kotlinx.coroutines.flow.combine(libraryViewModel.comicChaptersLoading, libraryViewModel.comicChapters,
-                                                                libraryViewModel.comicChaptersError) { loading, chapters, error -> Triple(loading, chapters, error) }
-                                                                .first { !it.first && (it.second.isNotEmpty() || it.third != null) }
-                                                        }
-                                                        if (libraryViewModel.comicBook.value?.id != book.id || libraryViewModel.comicBook.value?.sourceId != book.sourceId) return@launch
-                                                        val latest = result?.second?.let { com.example.data.favorite.ComicReadingLogic.ordered(it).lastOrNull()?.chapter }
-                                                        if (latest != null) {
-                                                            ComicJumpState.startPage = 0
-                                                            libraryViewModel.loadChapterImages(latest)
-                                                            navController.navigate("comic_reader_online")
-                                                        } else navController.navigate("comic_chapters")
-                                                    }
-                                                },
+                                                onLatest = {},
                                                 onSourceManagement = { navController.navigate("source_management") },
                                             )
                                             2 -> HomeScreen(
@@ -1051,7 +1037,14 @@ class MainActivity : ComponentActivity() {
                                 AppBottomTabBar(
                                     items = tabItems,
                                     selectedIndex = selectedTab,
-                                    onTabSelected = { selectedTab = it },
+                                    onTabSelected = { tab ->
+                                        if (tab == 1) {
+                                            val now = android.os.SystemClock.elapsedRealtime()
+                                            if (lastDiscoverTap > 0L && now - lastDiscoverTap in 1..400) { discoverRefreshRequest++; lastDiscoverTap = 0L }
+                                            else lastDiscoverTap = now
+                                        } else lastDiscoverTap = 0L
+                                        selectedTab = tab
+                                    },
                                     collapseState = tabBarCollapseState,
                                     backdrop = tabBackdrop.takeIf { renderQuality.realtimeGlass },
                                 )

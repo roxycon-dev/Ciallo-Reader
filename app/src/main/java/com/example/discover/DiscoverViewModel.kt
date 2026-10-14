@@ -30,7 +30,14 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
     private var selectedSource = "aggregate"
     private var cacheKey = ""
     private var diskCacheKey = ""
-    private val slots = Semaphore(3)
+    private val slots = Semaphore(20)
+    private val directorySlots = Semaphore(20)
+    private var handledRefreshRequest = 0
+    fun consumeRefreshRequest(request: Int): Boolean {
+        if (request <= handledRefreshRequest) return false
+        handledRefreshRequest = request
+        return true
+    }
     private data class Session(val state: DiscoverState, val pages: Map<String, Int>, val cursors: Map<String, String?>,
         val history: Map<String, Set<String>>, val progress: Map<String, Int>)
     private val sessions = LinkedHashMap<String, Session>(16, .75f, true)
@@ -40,6 +47,35 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
     private val categoryLoading = mutableSetOf<String>()
     private val catalogLocks = mutableMapOf<String, Mutex>()
     private val viewports = mutableMapOf<String, Pair<Int, Int>>()
+    private val metadataJobs = mutableMapOf<String, Job>()
+    private fun enrich(source: ComicSource, entries: List<DiscoverEntry>, key: String) {
+        if (!source.supportsDiscoverMetadata) return
+        val previous = metadataJobs[source.id]
+        metadataJobs[source.id] = viewModelScope.launch {
+            previous?.join()
+            for (entry in entries) {
+                ensureActive()
+                if (key != cacheKey) return@launch
+                val result = try { withTimeout(15_000) { source.getDiscoverMetadata(entry.book.id) } }
+                    catch (e: TimeoutCancellationException) { continue }
+                    catch (e: CancellationException) { throw e }
+                if (result is SourceResult.Success && key == cacheKey) {
+                    val detail = result.data
+                    _state.update { state -> state.copy(entries = state.entries.map { row ->
+                        if (row.book.sourceId == source.id && row.book.id == entry.book.id) row.copy(
+                            book = row.book.copy(author = detail.author.ifBlank { row.book.author },
+                                comicInfo = detail.comicInfo?.copy(tags = (row.book.comicInfo?.tags.orEmpty() + detail.comicInfo.tags).distinct())),
+                            updatedAt = DiscoverEngine.parseDate(detail.comicInfo?.updatedAt) ?: row.updatedAt)
+                        else row
+                    }) }
+                }
+            }
+            if (key == cacheKey) {
+                rememberSession()
+                if (store.flag("cache")) withContext(Dispatchers.IO) { store.writeCache(diskCacheKey, _state.value.entries) }
+            }
+        }
+    }
     fun saveViewport(key: String, index: Int, offset: Int) { viewports[key] = index to offset }
     fun viewport(key: String): Pair<Int, Int>? = viewports[key]
     fun loadCategories(sourceId: String) {
@@ -49,7 +85,7 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
         categoryLoading.add(sourceId)
         viewModelScope.launch {
             try {
-                val result = slots.withPermit { catalogFor(source, true) }
+                val result = directorySlots.withPermit { catalogFor(source, true) }
                 if (result is SourceResult.Success && manager.availableSources.value.any { it === source })
                     _state.update { it.copy(catalogs = catalogs.toMap()) }
             } catch (_: TimeoutCancellationException) {
@@ -84,20 +120,21 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
     }
 
     fun configure(sourceId: String, dimension: DiscoverDimension, range: String, feedId: String? = null,
-        categoryId: String? = null, standardCategories: Set<String> = emptySet(), force: Boolean = false) {
+        categoryId: String? = null, standardCategories: Set<String> = emptySet(), force: Boolean = false, status: String? = null) {
         val nextSources = manager.availableSources.value.filterIsInstance<ComicSource>().filter {
             it.isComicSource && (sourceId == "aggregate" || it.id == sourceId) }
-        val signature = nextSources.sortedBy { it.id }.joinToString { "${it.id}@${System.identityHashCode(it)}" }
-        val nextKey = "$sourceId:${dimension.name}:$range:${feedId.orEmpty()}:${categoryId.orEmpty()}:${standardCategories.sorted()}:$signature:v2"
-        if (!force && nextKey == cacheKey) return
+        val signature = nextSources.sortedBy { it.id }.joinToString { "${it.id}@${(it as? com.example.source.js.JsComicSource)?.version.orEmpty()}" }
+        val nextKey = "$sourceId:${dimension.name}:$range:${feedId.orEmpty()}:${categoryId.orEmpty()}:${standardCategories.sorted()}:$signature:$status:v3"
+        if (!force && nextKey == cacheKey) { sources = nextSources; return }
         rememberSession()
         job?.cancel()
+        metadataJobs.values.forEach { it.cancel() }; metadataJobs.clear()
         sources = nextSources
         selectedSource = sourceId
         query = DiscoverQuery(dimension, range, feedId = feedId, categoryId = categoryId, includeAdult = true,
-            standardCategories = standardCategories)
+            standardCategories = standardCategories, status = status)
         cacheKey = nextKey
-        diskCacheKey = "$sourceId:${dimension.name}:$range:${feedId.orEmpty()}:${categoryId.orEmpty()}:${standardCategories.sorted()}:${nextSources.map { it.id }.sorted()}:${com.example.BuildConfig.VERSION_CODE}:v3"
+        diskCacheKey = "$sourceId:${dimension.name}:$range:${feedId.orEmpty()}:${categoryId.orEmpty()}:${standardCategories.sorted()}:${nextSources.map { it.id }.sorted()}:${com.example.BuildConfig.VERSION_CODE}:$status:v4"
         pages.clear(); cursors.clear(); cursorHistory.clear(); noProgress.clear()
         val session = sessions[nextKey]
         if (!force && session != null) {
@@ -126,7 +163,7 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
         val now = System.currentTimeMillis()
         if (now - (refreshTimes[cacheKey] ?: 0L) < 3000) return
         refreshTimes[cacheKey] = now
-        configure(selectedSource, query.dimension, query.range, query.feedId, query.categoryId, query.standardCategories, force = true)
+        configure(selectedSource, query.dimension, query.range, query.feedId, query.categoryId, query.standardCategories, force = true, status = query.status)
     }
     fun more() {
         if (_state.value.loading || _state.value.more.isEmpty()) return
@@ -147,19 +184,19 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
         val completed = Channel<Triple<String, Int, SourceResult<DiscoverPage>>>(Channel.UNLIMITED)
         targets.forEach { source -> launch {
             val page = (pages[source.id] ?: 0) + 1
-            val result = try { slots.withPermit {
+            val result = try {
                 val dynamic = requested.standardCategories.isNotEmpty() || requested.categoryId?.startsWith("dynamic:") == true
                 if (catalogOwners[source.id] !== source || (dynamic && source.id !in dynamicResolved && catalogs[source.id]?.dynamicCategories == true)) {
-                    catalogFor(source, dynamic)
+                    directorySlots.withPermit { catalogFor(source, dynamic) }
                 }
                 val catalog = catalogs[source.id]
                 val routes = if (requested.categoryId == null) catalog?.routes(requested.standardCategories).orEmpty() else emptyList()
-                if (requested.feedId == null && requested.categoryId == null && routes.isEmpty() &&
+                if (requested.feedId == null && requested.categoryId == null &&
                     catalog?.supports(requested.dimension, requested.range) == false)
                     SourceResult.Success(DiscoverPage(supported = false, catalog = catalog))
-                else withTimeout(50_000) { source.discover(requested.copy(page = page, cursor = cursors[source.id], categoryIds = routes,
-                    offset = if (append) _state.value.entries.count { it.book.sourceId == source.id } else 0)) }
-            } }
+                else slots.withPermit { withTimeout(50_000) { source.discover(requested.copy(page = page, cursor = cursors[source.id], categoryIds = routes,
+                    offset = if (append) _state.value.entries.count { it.book.sourceId == source.id } else 0)) } }
+            }
                 catch (_: TimeoutCancellationException) { SourceResult.Error(SourceException.NetworkError("连接较慢，请稍后重试")) }
                 catch (e: CancellationException) { throw e }
                 catch (e: Exception) { SourceResult.Error(SourceException.Unknown(e.message ?: "网络异常", e)) }
@@ -205,7 +242,10 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
                         .distinctBy { it.book.sourceId to it.book.id }
                 }
             }
+            val enriched = _state.value.entries.associateBy { it.book.sourceId to it.book.id }
+            rows = rows.map { row -> enriched[row.book.sourceId to row.book.id]?.takeIf { row.book.sourceId != id && it.updatedAt != null } ?: row }
             _state.value = DiscoverState(rows, true, more.toSet(), errors.toMap(), notices.toMap(), errors.isNotEmpty(), catalogs.toMap())
+            if (result is SourceResult.Success) sources.firstOrNull { it.id == id }?.let { enrich(it, result.data.entries, key) }
         }
         completed.close()
         _state.update { it.copy(loading = false) }

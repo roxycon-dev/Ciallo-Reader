@@ -10,7 +10,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.ui.components.*
 
-/** Discover owns its settings window; nothing is appended to the global Settings tab. */
+/** Discover owns its settings window; shared by the Discover and global Settings entries. */
 @Composable
 fun DiscoverSettings(onDismissRequest: () -> Unit) {
     val (store, revision) = rememberDiscoverStore()
@@ -27,7 +27,7 @@ fun DiscoverSettings(onDismissRequest: () -> Unit) {
                         { store.put("layout", DiscoverLayout.entries[it].name) })
                 }
                 GlassCard(contentPadding = PaddingValues(16.dp)) {
-                    DiscoverSettingToggle("个性化推荐", "结合追漫与阅读记录", store.flag("personalization")) { store.put("personalization", it) }
+                    DiscoverSettingToggle("个性化推荐", "结合喜欢的作品与阅读记录", store.flag("personalization")) { store.put("personalization", it) }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .4f))
                     DiscoverSettingToggle("绿涨红跌", "关闭时为红涨绿跌", store.flag("green_rise", false)) { store.put("green_rise", it) }
                 }

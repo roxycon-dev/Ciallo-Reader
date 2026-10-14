@@ -23,7 +23,8 @@ internal object JsDiscoverAdapter {
     }
     fun page(data: JSONObject, sourceId: String, query: DiscoverQuery, now: Long = System.currentTimeMillis()): DiscoverPage {
         val rows = data.optJSONArray("entries") ?: data.optJSONArray("comics") ?: JSONArray()
-        val native = data.optBoolean("native") || query.feedId != null || query.categoryId != null
+        val native = query.feedId != null || query.categoryId != null ||
+            (data.optBoolean("native") && query.categoryIds.isEmpty())
         val start = if (!native && query.dimension == DiscoverDimension.UPDATES) DiscoverEngine.rangeStart(query.range, now) else null
         var dated = false
         val entries = (0 until rows.length()).mapNotNull { index ->
@@ -57,7 +58,10 @@ internal object JsDiscoverAdapter {
                 rankChange = number("rankChange")?.takeIf { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }?.toInt(),
                 newEntry = row.optBoolean("newEntry"), hotComment = text("hotComment"), canonicalId = text("canonicalId"),
                 nativeOrder = number("nativeOrder")?.toInt() ?: query.offset + index + 1,
-                origin = text("origin") ?: data.optString("origin").takeIf { it.isNotBlank() }, subtitle = text("subtitle", "subTitle"), native = native)
+                origin = text("origin") ?: data.optString("origin").takeIf { it.isNotBlank() }, subtitle = text("subtitle", "subTitle"), native = native,
+                statistic = text("statistic")?.let { label -> Regex("^(关注|收藏)\\s+(\\d+)$").matchEntire(label)?.let { match ->
+                    match.groupValues[2].toLongOrNull()?.let { "${match.groupValues[1]} ${DiscoverEngine.compact(it)}" }
+                } ?: label })
         }
         val notice = data.optString("notice").takeUnless { it.isBlank() || it == "null" }
         return DiscoverPage(entries.distinctBy { it.book.id }, data.optBoolean("hasMore"), data.optBoolean("supported", true), notice,

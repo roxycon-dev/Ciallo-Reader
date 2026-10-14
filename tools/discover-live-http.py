@@ -59,7 +59,7 @@ def perform(message):
                     headers['Content-Type'] = 'application/json; charset=utf-8'
                 data = json.dumps(data, ensure_ascii=False)
             options = {'impersonate': 'firefox144'} if actual_backend == 'curl' and any('Firefox/144' in v for k, v in headers.items() if k.lower() == 'user-agent') else {}
-            if actual_backend == 'curl' and key.replace('.js', '') not in ('mycomic', 'nhentai', 'pufei', 'bilimanga', 'goda'):
+            if actual_backend == 'curl' and key.replace('.js', '') not in ('mycomic', 'nhentai', 'pufei', 'bilimanga', 'goda', 'comick'):
                 options['http_version'] = CurlHttpVersion.V1_1
             r = session.request(method, url, headers=headers, data=data, timeout=(10, 18), stream=True, **options)
             payload = bytearray()

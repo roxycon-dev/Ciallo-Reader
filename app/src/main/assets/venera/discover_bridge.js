@@ -9,10 +9,10 @@ function __cialloDiscoverOption(raw) {
 }
 function __cialloDiscoverKind(label) {
     const text = String(label || '');
-    if (/更新|最新|最近上架|newest|latest|recent|new releases|新着|新刊/i.test(text)) return 'updates';
+    if (/更新|latest updates|recent updates/i.test(text)) return 'updates';
     if (/热议|熱議|讨论|討論|discussion|comments/i.test(text)) return 'discussion';
     if (/点击|點擊|阅读量|閱讀量|views|clicks/i.test(text)) return 'clicks';
-    if (/榜|排行|热门|熱門|人气|人氣|飙升|飆升|popular|ranking|trending|hot/i.test(text)) return 'ranking';
+    if (/榜|排行|热门|熱門|人气|人氣|飙升|飆升|完结|完結|新作|新书|新書|上架|popular|ranking|trending|hot|completed|new releases|recently added/i.test(text)) return 'ranking';
     return null;
 }
 function __cialloCategoryKey(part, target) {
@@ -29,9 +29,9 @@ function __cialloDiscoverCapabilities(feeds) {
         const text = String(f.label || '');
         if (f.kind === 'updates') add('updates', '最新');
         if (f.kind === 'ranking') {
-            add('ranking', '热门');
+            if (/热门|熱門|人气|人氣|popular|hot|总|總|all/i.test(text) || !/飙升|飆升|rising|trending|新作|新书|新書|上架|new|完结|完結|completed/i.test(text)) add('ranking', '热门');
             if (/飙升|飆升|rising|trending/i.test(text)) add('ranking', '飙升');
-            if (/新作|新书|新書|new/i.test(text)) add('ranking', '新作');
+            if (/新作|新书|新書|上架|new|recent add/i.test(text)) add('ranking', '新作');
             if (/完结|完結|completed/i.test(text)) add('ranking', '完结');
         }
         if (['discussion', 'clicks'].includes(f.kind)) {
@@ -83,7 +83,7 @@ function __cialloDiscoverCatalog(src) {
         ['其他','同人志','漫画','画师CG','游戏CG','图集','Cosplay','写真','全年龄','欧美'].forEach((label,index)=>
             categories.push({id:'eh:category:'+index,label,group:'内容形式',category:'',itemType:'search',options:[JSON.stringify([String(index)]),null,null]}));
     }
-    return { feeds, categories, capabilities: __cialloDiscoverCapabilities(feeds), dynamicCategories: dynamic, hasCategoryLoader: !!(src.categoryComics &&
+    return { feeds, categories, capabilities: { ...__cialloDiscoverCapabilities(feeds), ...(src.discover?.capabilities || {}) }, dynamicCategories: dynamic, hasCategoryLoader: !!(src.categoryComics &&
         (typeof src.categoryComics.load === 'function' || typeof src.categoryComics.loadNext === 'function')),
         explicit: !!(src.discover && typeof src.discover.load === 'function') };
 }
@@ -123,7 +123,7 @@ function __cialloDiscoverParts(value, fallback) {
 }
 function __cialloDiscoverPagination(value, q, paged) {
     const next = value && value.next != null ? String(value.next) : null;
-    if (paged === 'cursor') return { nextCursor: next, hasMore: next != null && next !== String(q.cursor ?? '') };
+    if (paged === 'cursor' || (paged && value?.__cialloCursorAware)) return { nextCursor: next, hasMore: next != null && next !== String(q.cursor ?? '') };
     if (!paged) return { nextCursor: null, hasMore: false };
     const max = value && value.maxPage;
     // Venera: null maxPage means unknown / keep requesting until an empty page.
@@ -152,6 +152,12 @@ async function __cialloDiscover(src, q) {
         return { ...result, catalog };
     }
     let result, label, paged, kind, categoryTags = [];
+    // Request native status routes before filtering; an unknown status is never treated as completed/ongoing.
+    if (q.status && !q.categoryId && !(src.discover && !q.feedId)) {
+        const pattern = q.status === '完结' ? /^(完结|完結|已完结|已完結|completed|finished)$/i : /^(连载|連載|连载中|連載中|ongoing|publishing)$/i;
+        const route = catalog.categories.find(c => pattern.test(c.label));
+        if (route) q = {...q,feedId:null,categoryId:route.id};
+    }
     if (q.categoryId) {
         if (String(q.categoryId).startsWith('dynamic:')) await __cialloDiscoverDynamicCategories(src, catalog);
         const category = catalog.categories.find(c => c.id === q.categoryId || c.legacyId === q.categoryId);
@@ -161,10 +167,27 @@ async function __cialloDiscover(src, q) {
             return { supported: false, entries: [], catalog, notice: '该书源未实现分类加载接口' };
         const optionDefinitions = typeof api.optionLoader === 'function' ? await api.optionLoader.call(src, category.category, category.param)
             : typeof api.optionList === 'function' ? await api.optionList.call(src, category.category, category.param) : api.optionList;
-        const options = category.options && category.options.length ? category.options : (Array.isArray(optionDefinitions) ? optionDefinitions : [])
-            .filter(o => !(o.notShowWhen || []).includes(category.category) && (!(o.showWhen || []).length || o.showWhen.includes(category.category)))
-            .map(o => {const value=o.default ?? o.defaultValue ?? __cialloDiscoverOption((o.options || [])[0]).value;
-                return Array.isArray(value)?JSON.stringify(value):value == null?null:String(value)});
+        const definitions = (Array.isArray(optionDefinitions) ? optionDefinitions : []).filter(o => !(o.notShowWhen || []).includes(category.category) && (!(o.showWhen || []).length || o.showWhen.includes(category.category)));
+        const options = category.options && category.options.length ? category.options.slice() : definitions.map(o => {
+            const value=o.default ?? o.defaultValue ?? __cialloDiscoverOption((o.options || [])[0]).value;
+            return Array.isArray(value)?JSON.stringify(value):value == null?null:String(value);
+        });
+        definitions.forEach((definition,index) => {
+            const choices=(definition.options||[]).map(__cialloDiscoverOption);
+            const statusPattern=q.status === '完结' ? /^(完结|完結|已完结|已完結|completed|finished)$/i : q.status === '连载' ? /^(连载|連載|连载中|連載中|ongoing|publishing)$/i : null;
+            const statusChoice=statusPattern && choices.find(o=>statusPattern.test(o.label));
+            if(statusChoice) options[index]=statusChoice.value;
+            else if (choices.some(o=>/完结|完結|连载|連載|ongoing|completed/i.test(o.label))) {
+                const all=choices.find(o=>/^(全部|All)$/i.test(o.label)); if(all) options[index]=all.value;
+            } else {
+                const kind=String(q.dimension||'').toLowerCase();
+                const window={'日':/日|day/i,'周':/周|週|week/i,'月':/月|month/i,'7d':/7d|周|週|week/i,'30d':/30d|月|month/i,'24h':/24h|日|day/i}[q.range];
+                const criterion=kind==='updates'? /更新|updated/i : kind==='clicks'? /点击|點擊|阅读|閱讀|views|clicks/i : kind==='discussion'? /讨论|討論|评论|評論|comments|discussion/i :
+                    {'热门':/热门|熱門|人氣|人气|关注|關注|收藏|popular|ranking|排行|follow/i,'飙升':/飙升|飆升|trending|rising/i,'新作':/新作|上架|创建|new|created/i,'完结':/完结|完結|completed/i}[q.range];
+                const match=criterion && choices.find(o=>criterion.test(o.label) && (!window || window.test(o.label)));
+                if(match) options[index]=match.value;
+            }
+        });
         if (category.itemType === 'search') {
             paged = typeof api.load === 'function' && !api.__cialloCursorOnly ? true : 'cursor';
             result = paged === 'cursor' ? await api.loadNext.call(src, category.category, options, q.cursor ?? null)
@@ -172,9 +195,9 @@ async function __cialloDiscover(src, q) {
         } else {
             paged = typeof api.load === 'function' ? true : 'cursor';
             result = paged === 'cursor' ? await api.loadNext.call(src, category.category, category.param, options, q.cursor ?? null)
-                : await api.load.call(src, category.category, category.param, options, q.page);
+                : await api.load.call(src, category.category, category.param, options, q.page, q.cursor ?? null);
         }
-        label = category.label; kind = 'native'; categoryTags = [category.label];
+        label = [category.label, ...definitions.map((d,i)=>(d.options||[]).map(__cialloDiscoverOption).find(o=>String(o.value)===String(options[i]))?.label).filter(value=>value && !/^(全部|All)$/i.test(value))].join(' · '); kind = 'native'; categoryTags = [category.label];
     } else {
         let feed = q.feedId && q.feedId !== 'native' ? catalog.feeds.find(f => f.id === q.feedId) : null;
         const desired = String(q.dimension || '').toLowerCase();
@@ -185,7 +208,7 @@ async function __cialloDiscover(src, q) {
         }
         if (!feed && !q.feedId && desired === 'ranking') {
             const rangePattern = { '热门': /热门|熱門|人气|人氣|popular|hot|总|總|all/i, '飙升': /飙升|飆升|rising|trending/i,
-                '新作': /新作|新书|新書|new/i, '完结': /完结|完結|completed/i }[q.range];
+                '新作': /新作|新书|新書|上架|new|recent add/i, '完结': /完结|完結|completed/i }[q.range];
             feed = catalog.feeds.find(f => f.kind === 'ranking' && rangePattern && rangePattern.test(f.label));
             if (!feed && q.range === '热门') feed = catalog.feeds.find(f => f.type === 'ranking');
         }
@@ -219,7 +242,7 @@ async function __cialloDiscover(src, q) {
     if (!native) {
         parts = parts.filter(p => (kind === desired || __cialloDiscoverKind(p.title) === desired));
         if (desired === 'ranking') {
-            const specific = { '飙升': /飙升|飆升|rising|trending/i, '新作': /新作|新书|新書|new/i, '完结': /完结|完結|completed/i }[q.range];
+            const specific = { '飙升': /飙升|飆升|rising|trending/i, '新作': /新作|新书|新書|上架|new|recent add/i, '完结': /完结|完結|completed/i }[q.range];
             if (specific) parts = parts.filter(p => specific.test(p.title || '') || specific.test(label || ''));
         }
         // Native time-window names must match the requested window; counts alone cannot certify it.
@@ -236,7 +259,7 @@ async function __cialloDiscover(src, q) {
         const tags = Array.isArray(c.tags) ? [...c.tags, ...categoryTags]
             : c.tags && typeof c.tags === 'object' ? { ...c.tags, '分类': [...(Array.isArray(c.tags['分类']) ? c.tags['分类'] : []), ...categoryTags] }
             : [...(typeof c.tags === 'string' ? [c.tags] : []), ...categoryTags];
-        return { ...c, tags, nativeOrder: offset, origin: String(part.title || label),
+        return { ...c, tags, status: c.status ?? (/^(完结|完結|completed)$/i.test(categoryTags[0]||'') ? '完结' : /^(连载|連載|ongoing)$/i.test(categoryTags[0]||'') ? '连载' : null), nativeOrder: offset, origin: String(part.title || label),
             rank: (!native && desired === 'ranking') || kind === 'ranking' ? offset : c.rank ?? null,
             subtitle: c.subtitle ?? c.subTitle ?? null };
     }));

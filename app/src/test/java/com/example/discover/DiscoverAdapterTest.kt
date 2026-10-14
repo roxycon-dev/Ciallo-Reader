@@ -19,6 +19,33 @@ class DiscoverAdapterTest {
         assertFalse(DiscoverTaxonomy.isAdult(listOf("百合", "少女")))
     }
     private val now = DiscoverEngine.parseDate("2026-10-13T10:00:00+08:00")!!
+    @Test fun dimensionCardsShowRealCountsAndOrderingOriginWithoutMissingPlaceholders() {
+        val row = DiscoverEntry(SearchBook("1", "s", "作品", ""), clicks = 12000, discussions = 3500,
+            native = true, nativeOrder = 2, origin = "周阅读榜")
+        val work = DiscoverWork("1", listOf(row), 0.0)
+        assertTrue(metric(work, DiscoverDimension.CLICKS).contains("1.2万"))
+        assertTrue(metric(work, DiscoverDimension.DISCUSSION).contains("3500"))
+        assertTrue(metric(work, DiscoverDimension.CLICKS).contains("周阅读榜"))
+        val unknown = DiscoverWork("2", listOf(row.copy(clicks = null, discussions = null)), 0.0)
+        assertTrue(metric(unknown, DiscoverDimension.CLICKS).contains("原站顺序 #2"))
+        assertFalse(metric(unknown, DiscoverDimension.CLICKS).contains("未提供"))
+    }
+    @Test fun sourceStatusesNormalizeWithoutAssigningUnknownWorksAState() {
+        listOf("1", "连载中", "連載", "publishing").forEach { assertEquals("连载", serialLabel(it)) }
+        listOf("2", "完結", "finished", "Complete").forEach { assertEquals("完结", serialLabel(it)) }
+        assertEquals("状态未知", serialLabel(null))
+    }
+    @Test fun actualMetricOrderWinsOverAnUnrelatedSourceListPosition() {
+        val high = DiscoverEntry(SearchBook("high", "s", "高点击", ""), clicks = 200, nativeOrder = 10)
+        val low = DiscoverEntry(SearchBook("low", "s", "低点击", ""), clicks = 100, nativeOrder = 1)
+        assertEquals("high", DiscoverEngine.merge(listOf(low, high), DiscoverDimension.CLICKS).first().book.id)
+    }
+    @Test fun automaticallyMappedCategoriesKeepTheRequestedMetricSort() {
+        val page = JsDiscoverAdapter.page(JSONObject("""{"native":true,"entries":[{"id":"low","title":"低点击","clicks":10,"nativeOrder":1},{"id":"high","title":"高点击","clicks":100,"nativeOrder":2}]}"""), "s",
+            DiscoverQuery(DiscoverDimension.CLICKS, "周", categoryIds = listOf("genre:adventure")))
+        assertFalse(page.entries.first().native)
+        assertEquals("high", DiscoverEngine.merge(page.entries, DiscoverDimension.CLICKS).first().book.id)
+    }
     private fun parse(json: String, range: String = "最新", feed: String? = null) = JsDiscoverAdapter.page(JSONObject(json), "test",
         DiscoverQuery(DiscoverDimension.UPDATES, range, feedId = feed), now)
     @Test fun latestIncludesUndatedWithoutInventingTimestampOrAuthor() {

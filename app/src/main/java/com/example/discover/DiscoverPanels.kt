@@ -63,8 +63,8 @@ internal fun DiscoverCategorySheet(entries: List<DiscoverEntry>, selected: Set<S
     }
     val openTaxonomy = catalogs.isEmpty() || catalogs.any { !it.second.declared }
     fun toggle(id: String) { draft = if (id in draft) draft - id else draft + id }
-    AcrylicBottomOverlay(onDismissRequest = onDismiss) {
-        Column(Modifier.heightIn(max = (LocalConfiguration.current.screenHeightDp * .84f).dp).padding(horizontal = 16.dp)) {
+    AcrylicBottomOverlay(onDismissRequest = onDismiss, dismissOnBackgroundClick = false, fitAvailableHeight = true) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("找你想看的漫画", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 IconButton(onClick = onDismiss) { Icon(Icons.Outlined.Close, "关闭分类窗口") }
@@ -122,7 +122,7 @@ internal fun DiscoverCategorySheet(entries: List<DiscoverEntry>, selected: Set<S
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TextButton(onClick = { draft = emptySet() }) { Text("清除") }
                 AppActionButton(if (draft.isEmpty()) "查看全部" else "应用 ${draft.size} 项", { onApply(draft) },
                     modifier = Modifier.weight(1f), fullWidth = true)

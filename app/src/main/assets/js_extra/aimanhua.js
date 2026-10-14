@@ -6,7 +6,7 @@
 class AiManhua extends ComicSource {
     name = "爱漫画";
     key = "aimanhua";
-    version = "1.0.2";
+    version = "1.0.3";
     minAppVersion = "1.6.0";
     url = "https://www.alipaypay.com";
     baseUrl = "https://www.alipaypay.com";
@@ -35,7 +35,10 @@ class AiManhua extends ComicSource {
     async page(url) {
         if (!url.startsWith(this.baseUrl + "/")) throw new Error("爱漫画请求地址无效");
         const path = url.substring(this.baseUrl.length);
-        const origins = [...new Set([this.readOrigin, "https://mh.iqtao.cn", this.baseUrl])];
+        const allOrigins = [...new Set([this.readOrigin, "https://mh.iqtao.cn", this.baseUrl])];
+        if (!this.failedOrigins) this.failedOrigins = {};
+        const origins = allOrigins.filter(origin => !this.failedOrigins[origin] || Date.now() - this.failedOrigins[origin] > 60000);
+        if (!origins.length) origins.push(this.readOrigin);
         let lastError;
         for (const origin of origins) {
             try {
@@ -47,9 +50,11 @@ class AiManhua extends ComicSource {
                 if (path.startsWith("/index.php/api/")) JSON.parse(body);
                 else if (!/\bMcpath\s*=/.test(body)) throw new Error("爱漫画返回了无效页面");
                 this.readOrigin = origin;
+                delete this.failedOrigins[origin];
                 return body;
             } catch (error) {
                 if (/作品已下架|访问受限/.test(String(error))) throw error;
+                this.failedOrigins[origin] = Date.now();
                 lastError = error;
             }
         }
@@ -89,8 +94,10 @@ class AiManhua extends ComicSource {
     }
 
     // MCCMSWeb's catalogue routes; discover uses the site's real paging links.
-    explore = [{title: "最新上架", type: "multiPageComicList",
-        load: async page => this.browse("/category/order/addtime", page)}];
+    explore = [{title: "最新更新", type: "multiPageComicList",
+        load: async page => this.browse("/category/order/updatetime", page)},
+        {title: "新作上架", type: "multiPageComicList", load: async page => this.browse("/category/order/addtime", page)},
+        {title: "完结榜", type: "multiPageComicList", load: async page => this.browse("/category/finish/2", page)}];
 
     category = {title: "爱漫画分类", parts: [{name: "题材", type: "fixed",
         categories: ["全部", "冒险热血", "武侠格斗", "科幻魔幻", "侦探推理", "耽美爱情", "生活漫画"],
@@ -99,7 +106,7 @@ class AiManhua extends ComicSource {
         categoryParams: ["/category/finish/1", "/category/finish/2"], itemType: "category"}], enableRankingPage: false};
 
     categoryComics = {load: async (category, param, options, page) => {
-        if (!/^\/category\/(?:order\/addtime|tags\/\d+|finish\/[12])$/.test(param || "")) throw new Error("爱漫画分类已变化，请重新选择");
+        if (!/^\/category\/(?:order\/(?:addtime|updatetime)|tags\/\d+|finish\/[12])$/.test(param || "")) throw new Error("爱漫画分类已变化，请重新选择");
         return this.browse(param, page);
     }};
 
@@ -138,6 +145,24 @@ class AiManhua extends ComicSource {
         return url;
     }
 
+    parseMetadata(html, book) {
+        const doc = new HtmlDocument(html);
+        try {
+            const title = doc.querySelector("h1.name_mh"), cover = doc.querySelector("img[title]");
+            if (!title) throw new Error("爱漫画详情页面无效");
+            const spans = doc.querySelectorAll(".info > p > span").map(node => node.text.trim());
+            const field = pattern => { const text = spans.find(value => pattern.test(value)); return text ? text.replace(pattern, "").trim() : null; };
+            const author = field(/^作\s*者\s*[:：]\s*/);
+            const status = field(/^状\s*态\s*[:：]\s*/);
+            const updateTime = field(/^更新时间\s*[:：]\s*/);
+            const tags = doc.querySelectorAll('.info a[href*="/category/tags/"]').map(a => a.text.trim()).filter(Boolean);
+            return {id:book,title:title.text.trim(),cover:cover ? this.imageUrl(cover.attributes.src) : "",author:author || "",status,updateTime,tags};
+        } finally { doc.dispose(); }
+    }
+
+    // One detail HTML request, without loading the chapter API, for progressive metadata.
+    async discoverMetadata(book) { return this.parseMetadata(await this.page(book), book); }
+
     parseImages(html, expected) {
         const doc = new HtmlDocument(html);
         try {
@@ -170,7 +195,8 @@ class AiManhua extends ComicSource {
                 const description = doc.querySelector(".info p.content");
                 const authorEl = doc.querySelector(".info > p > span.l");
                 const author = authorEl ? authorEl.text.replace(/^作\s*者\s*[:：]\s*/, "").trim() : "";
-                return new ComicDetails({title: title.text.trim(), cover: cover ? this.imageUrl(cover.attributes.src) : "", description: description ? description.text.split("\\n")[0].trim() : "", tags: {"作者": author ? [author] : []}, chapters, url: this.baseUrl + "/" + id + ".html"});
+                const metadata = this.parseMetadata(html, book);
+                return new ComicDetails({...metadata, title: title.text.trim(), cover: cover ? this.imageUrl(cover.attributes.src) : "", description: description ? description.text.split("\\n")[0].trim() : "", tags: {"作者": author ? [author] : [], "状态": metadata.status ? [metadata.status] : [], "更新": metadata.updateTime ? [metadata.updateTime] : [], "题材": metadata.tags}, chapters, url: this.baseUrl + "/" + id + ".html"});
             } finally { doc.dispose(); }
         },
         loadEp: async (comicId, epId) => {

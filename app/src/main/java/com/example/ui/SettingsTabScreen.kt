@@ -131,6 +131,8 @@ fun SettingsTabScreen(
     favoritesProtected: Boolean = false,
     onSetFavoritesProtected: (Boolean) -> Unit = {},
 ) {
+    var showDiscoverSettings by remember { mutableStateOf(false) }
+    if (showDiscoverSettings) com.example.discover.DiscoverSettings { showDiscoverSettings = false }
     var showReleaseHistory by remember { mutableStateOf(false) }
     if (showReleaseHistory) com.example.ui.components.ReleaseHistoryDialog { showReleaseHistory = false }
     val context = LocalContext.current
@@ -1286,6 +1288,21 @@ LazyColumn(
                                     onClick={ importBackupLauncher.launch(arrayOf("application/zip","application/octet-stream")) },
                                     variant=AppButtonVariant.Secondary,buttonSize=AppButtonSize.Small)
                             }
+                        }
+                    }
+                }
+
+                item(key = "discover_settings") {
+                    SettingsSectionHeader("书库与发现")
+                    GlassCard(modifier = Modifier.fillMaxWidth().clickableWithFeedback { showDiscoverSettings = true }, shape = RoundedCornerShape(16.dp)) {
+                        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.Explore, null, tint = MintPrimary)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("发现设置", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                                Text("浏览布局、推荐偏好与屏蔽管理", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Icon(Icons.Default.ChevronRight, "打开发现设置")
                         }
                     }
                 }

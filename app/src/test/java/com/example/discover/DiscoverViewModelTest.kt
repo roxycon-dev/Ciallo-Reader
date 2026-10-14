@@ -17,6 +17,85 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class DiscoverViewModelTest {
+    @Test fun mappedGenresNeverBypassADeclaredMissingMetricOrWindow() = runTest(dispatcher) {
+        var calls = 0; val manager = SourceManager()
+        manager.registerSource(object : DiscoverUiTest.FixtureSource("source") {
+            override suspend fun discoverCatalog(resolveDynamic: Boolean) = SourceResult.Success(DiscoverCatalog(declared = true,
+                categories = listOf(DiscoverNativeCategory("genre:adventure", "冒险")), capabilities = mapOf("ranking" to listOf("热门"))))
+            override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> { calls++; return page(id, "book") }
+        })
+        model(manager).configure("source", DiscoverDimension.CLICKS, "周", standardCategories = setOf("adventure"))
+        assertEquals(0, calls)
+    }
+    @Test fun metadataPublishesProgressivelyAndSurvivesAnotherSourceCompleting() = runTest(dispatcher) {
+        val detailReady = CompletableDeferred<Unit>(); val slowReady = CompletableDeferred<Unit>()
+        val manager = SourceManager()
+        manager.registerSource(object : DiscoverUiTest.FixtureSource("metadata") {
+            override val supportsDiscoverMetadata = true
+            override suspend fun discover(query: DiscoverQuery) = page(id, "book")
+            override suspend fun getDiscoverMetadata(bookId: String): SourceResult<SearchBook> {
+                detailReady.await()
+                return SourceResult.Success(SearchBook(bookId, id, "book", "真实作者", comicInfo = ComicInfo(
+                    status = "完结", tags = listOf("爆笑"), updatedAt = "2026-10-14")))
+            }
+        })
+        manager.registerSource(object : DiscoverUiTest.FixtureSource("slow") {
+            override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> { slowReady.await(); return page(id, "other") }
+        })
+        val model = model(manager)
+        model.configure("aggregate", DiscoverDimension.UPDATES, "最新", "native")
+        assertEquals("book", model.state.value.entries.single().book.id)
+        detailReady.complete(Unit)
+        assertEquals("完结", model.state.value.entries.single().book.comicInfo?.status)
+        slowReady.complete(Unit)
+        val enriched = model.state.value.entries.first { it.book.id == "book" }
+        assertEquals("真实作者", enriched.book.author)
+        assertEquals("完结", enriched.book.comicInfo?.status)
+        assertNotNull(enriched.updatedAt)
+    }
+    @Test fun switchingQueryCancelsMetadataWithoutPublishingAnOldBook() = runTest(dispatcher) {
+        val wait = CompletableDeferred<Unit>(); val manager = SourceManager()
+        manager.registerSource(object : DiscoverUiTest.FixtureSource("metadata") {
+            override val supportsDiscoverMetadata = true
+            override suspend fun discover(query: DiscoverQuery) = page(id, query.dimension.name)
+            override suspend fun getDiscoverMetadata(bookId: String): SourceResult<SearchBook> { wait.await(); return SourceResult.Success(SearchBook(bookId, id, bookId, "metadata")) }
+        })
+        val model = model(manager)
+        model.configure("metadata", DiscoverDimension.UPDATES, "最新", "native")
+        model.configure("metadata", DiscoverDimension.RANKING, "热门", "native")
+        wait.complete(Unit)
+        assertEquals("RANKING", model.state.value.entries.single().book.id)
+    }
+    @Test fun slowDirectoriesDoNotPreventTheNextSourcePublishing() = runTest(dispatcher) {
+        val wait = CompletableDeferred<Unit>()
+        val manager = SourceManager()
+        repeat(8) { n -> manager.registerSource(object : DiscoverUiTest.FixtureSource("slow$n") {
+            override suspend fun discoverCatalog(resolveDynamic: Boolean): SourceResult<DiscoverCatalog> { wait.await(); return SourceResult.Success(DiscoverCatalog()) }
+        }) }
+        manager.registerSource(object : DiscoverUiTest.FixtureSource("fast") {
+            override suspend fun discover(query: DiscoverQuery) = page(id, "visible-immediately")
+        })
+        val model = model(manager)
+        model.configure("aggregate", DiscoverDimension.UPDATES, "最新", "native")
+        assertEquals("visible-immediately", model.state.value.entries.single().book.id)
+        wait.complete(Unit)
+    }
+    @Test fun replacingSameSourceInstanceAndRefreshEventsReuseTheSession() = runTest(dispatcher) {
+        val manager = SourceManager(); var calls = 0
+        fun replacement() = object : DiscoverUiTest.FixtureSource("same") {
+            override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> { calls++; return page(id, "book") }
+        }
+        manager.registerSource(replacement())
+        val model = model(manager)
+        model.configure("same", DiscoverDimension.UPDATES, "最新", "native")
+        manager.registerSource(replacement())
+        model.configure("same", DiscoverDimension.UPDATES, "最新", "native")
+        assertEquals(1, calls)
+        assertFalse(model.consumeRefreshRequest(0))
+        assertTrue(model.consumeRefreshRequest(1))
+        assertFalse(model.consumeRefreshRequest(1))
+        assertTrue(model.consumeRefreshRequest(2))
+    }
     private val dispatcher = UnconfinedTestDispatcher()
     private val models = mutableListOf<DiscoverViewModel>()
     @Before fun setup() { Dispatchers.setMain(dispatcher) }

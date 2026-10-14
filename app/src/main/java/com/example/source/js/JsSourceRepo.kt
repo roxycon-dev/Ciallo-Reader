@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 object JsSourceRepo {
 
     /** 本地补丁版本：升级后尝试更新源脚本，失败时仍可使用旧缓存。 */
-    private const val PATCH_VERSION = 44
+    private const val PATCH_VERSION = 45
     // Raw cache format stays stable when compatibility patches change.
     private const val RAW_CACHE_PREFIX = "// EASYREADER_RAW_SOURCE_V28\n"
 
@@ -521,6 +521,99 @@ object JsSourceRepo {
 
     /** Repairs confirmed against live catalogue responses; applied after the existing reader repairs. */
     private fun patchDiscoverSource(key: String, script: String): String = when (key) {
+        "comick" -> {
+            if (script.contains("__cialloComickApiRepair")) script else {
+                var fixed = script.replace("https://comick.art/search?q=", "https://comick.art/api/search?q=")
+                    .replace("\"最近更新\": this.transformBookList(mangaData.most_follow_new['7'])", "\"新作 · 7天关注排行\": this.transformBookList(mangaData.most_follow_new['7'])")
+                    .replace("\"最近上传\":", "\"新作上架\":")
+                    .replace("\"最近热门\":", "\"热门 · 关注排行\":")
+                val start = fixed.indexOf("    search = {")
+                val end = if (start >= 0) fixed.indexOf("    /// single comic related", start) else -1
+                if (end > start) {
+                    var search = fixed.substring(start, end)
+                    search = search.replace(Regex("""let document = new HtmlDocument\(res\.body\);?\s*let jsonData = JSON.parse\(document.getElementById\('sv-data'\).text\);"""), "let jsonData = JSON.parse(res.body);")
+                    fixed = fixed.replaceRange(start, end, search)
+                }
+                fixed = fixed.replace("let mangaList = JSON.parse(res.body).data;", "let jsonData = JSON.parse(res.body); let mangaList = jsonData.data;")
+                    .replace("let maxpage = mangaList.total/mangaList.per_page", "let maxpage = jsonData.next_cursor ? Number(page) + 1 : Number(page)")
+                    .replace("[\"1-连载\", \"2-完结\", \"3-休刊\", \"4-暂停更新\"]", "[\"-全部\", \"1-连载\", \"2-完结\", \"3-休刊\", \"4-暂停更新\"]")
+                    .replace("if (options[2])", "if (options[2] && options[2] !== '-全部')")
+                    .replace("created_at-更新排序", "created_at-新作上架")
+                    .replace("uploaded-创建排序", "uploaded-更新排序")
+                val imageStart = fixed.indexOf("        onImageLoad:")
+                val imageEnd = if (imageStart >= 0) fixed.indexOf("        onClickTag:", imageStart) else -1
+                if (imageEnd > imageStart) fixed = fixed.replaceRange(imageStart, imageEnd,
+                    fixed.substring(imageStart, imageEnd).replace("Comick.getRandomHeaders()", "Comick.getImageHeaders()"))
+                val categoryStart = fixed.indexOf("    categoryComics = {")
+                val categoryEnd = if (categoryStart >= 0) fixed.indexOf("    /// search related", categoryStart) else -1
+                if (categoryEnd > categoryStart) {
+                    var category = fixed.substring(categoryStart, categoryEnd)
+                    category = category.replace("async (category, param, options, page)", "async (category, param, options, page, cursor = null)")
+                    category = category.replace("            url += params.join('&');", """
+            const queryKey = JSON.stringify([param, options]);
+            if (!this.__categoryCursors) this.__categoryCursors = {};
+            if (Number(page) === 1 && !cursor) this.__categoryCursors[queryKey] = {};
+            if (!this.__categoryCursors[queryKey]) this.__categoryCursors[queryKey] = {};
+            const nextToken = cursor || this.__categoryCursors[queryKey]?.[Number(page)];
+            if (nextToken) params.push('cursor=' + encodeURIComponent(nextToken));
+            url += params.join('&');
+                    """.trimIndent())
+                    category = category.replace("maxPage: maxpage", """
+                maxPage: maxpage, next: jsonData.next_cursor || null, __cialloCursorAware: true
+                    """.trimIndent())
+                    category = category.replace("            return {", """
+            if (jsonData.next_cursor) this.__categoryCursors[queryKey][Number(page) + 1] = jsonData.next_cursor;
+            return {
+                    """.trimIndent())
+                    fixed = fixed.replaceRange(categoryStart, categoryEnd, category)
+                }
+                fixed + "\n" + """
+// __cialloComickApiRepair: validated against the site's /api/search and search UI.
+Comick.getRandomHeaders = () => ({"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "Accept":"text/html,application/json;q=0.9", "Referer":"https://comick.art/"});
+Comick.getImageHeaders = () => ({...Comick.getRandomHeaders(),"Accept":"image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8","Sec-Fetch-Dest":"image","Sec-Fetch-Mode":"no-cors","Sec-Fetch-Site":"cross-site"});
+Comick.prototype.transformBookList = function(rows) {
+    return rows.filter(b=>b && b.slug && b.title).map(b=>({
+        ...b,id:b.slug+'//'+b.title,title:b.title,
+        cover:b.default_thumbnail || b.full_image_path || (b.md_covers?.[0]?.b2key ? 'https://cdn1.comicknew.pictures/'+b.slug+'/covers/'+b.md_covers[0].b2key : 'https://comick.art/images/default-thumbnail.webp'),
+        tags:(Array.isArray(b.genres)?b.genres:[]).filter(g=>g && typeof g==='object').map(g=>g.slug||g.name).filter(Boolean),
+        status:b.display_status || Comick.comic_status[String(b.status)] || null,
+        updateTime:b.uploaded_at || b.last_chapter_at || null,
+        latestChapter:b.last_chapter != null ? '第'+b.last_chapter+'话' : null,
+        clicks:b.view_count != null ? Number(b.view_count) : null,
+        followCount:b.user_follow_count ?? b.follow_count ?? null,
+        statistic:b.user_follow_count != null ? '关注 '+b.user_follow_count : b.follow_count != null ? '关注 '+b.follow_count : null,
+        description:b.description || null
+    }));
+};
+Comick.prototype.getFormattedManga = function(manga) { return Comick.prototype.transformBookList([manga])[0]; };
+Comick.prototype.discover = {
+    capabilities:{updates:['最新'],ranking:['热门','飙升','新作','完结']},
+    load:async function(q) {
+        if (q.dimension === 'ranking' && q.range === '飙升') {
+            if(q.page>1) return {entries:[],hasMore:false,supported:true};
+            const r=await Network.get('https://comick.art/home',Comick.getRandomHeaders());
+            if(r.status!==200) throw new Error('Comick 首页请求失败：'+r.status);
+            const doc=new HtmlDocument(r.body);
+            try {
+                const el=doc.getElementById('sv-data'); if(!el) throw new Error('Comick 首页数据结构变化');
+                const data=JSON.parse(el.text).data;
+                return {entries:this.transformBookList(data.trending?.['7'] || []).map((b,i)=>({...b,rank:i+1,nativeOrder:i+1,origin:'原站飙升 · 7天'})),hasMore:false,supported:true};
+            } finally {doc.dispose();}
+        }
+        const sort=q.dimension==='updates'?'uploaded':q.range==='新作'?'created_at':'user_follow_count';
+        const status=q.status==='完结'||q.range==='完结'?'2':q.status==='连载'?'1':null;
+        const url='https://comick.art/api/search?order_by='+sort+(status?'&status='+status:'')+(q.cursor?'&cursor='+encodeURIComponent(q.cursor):'&page='+q.page);
+        const response=await Network.get(url,Comick.getRandomHeaders());
+        if(response.status!==200)throw new Error('Comick 目录请求失败：'+response.status);
+        const result=JSON.parse(response.body);if(!Array.isArray(result.data))throw new Error('Comick 目录数据结构变化');
+        const origin=q.dimension==='updates'?'最新更新':q.range==='新作'?'新作上架':q.range==='完结'?'完结 · 关注排行':'热门 · 关注排行';
+        return {entries:this.transformBookList(result.data).map((b,i)=>({...b,nativeOrder:q.offset+i+1,rank:q.dimension==='ranking'?q.offset+i+1:null,origin})),supported:true,hasMore:!!result.next_cursor,nextCursor:result.next_cursor||null};
+    }
+};
+                """.trimIndent()
+            }
+        }
+
         "jm" -> {
             val start = script.indexOf("    async get(url) {")
             val end = script.indexOf("    async post(url, body) {", start)

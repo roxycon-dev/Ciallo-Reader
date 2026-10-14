@@ -11,6 +11,13 @@ import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPOutputStream
 
 class SourceTransportFormatTest {
+    @Test fun `mixed web accept header must not reject normal HTML directories`() {
+        assertFalse(SourceResponse.expectsJson(mapOf("Accept" to "text/html,application/json;q=0.9,*/*;q=0.8")))
+        assertTrue(SourceResponse.expectsJson(mapOf("accept" to "application/json, text/plain, */*")))
+        val html = "<html><title>爱漫画目录</title></html>"
+        assertNull(SourceResponse.problem(html, SourceResponse.expectsJson(mapOf("Accept" to "text/html,application/json;q=0.9"))))
+        assertNotNull(SourceResponse.problem(html, true))
+    }
     @Test fun `script advertised Brotli and zstd cannot leak compressed bytes into parsers`() {
         ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { server ->
             server.soTimeout = 5_000

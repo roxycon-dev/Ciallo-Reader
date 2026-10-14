@@ -63,7 +63,7 @@ import kotlin.math.abs
 @Composable
 fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favoriteKeys: Set<String>,
     onFollow: (SearchBook, Boolean) -> Unit, onOpen: (SearchBook) -> Unit,
-    onLatest: (SearchBook) -> Unit, onSourceManagement: () -> Unit, readingTitles: Set<String> = emptySet()) {
+    onLatest: (SearchBook) -> Unit, onSourceManagement: () -> Unit, readingTitles: Set<String> = emptySet(), refreshRequest: Int = 0) {
     val (store, revision) = rememberDiscoverStore()
     val model: DiscoverViewModel = viewModel(key = "discover", factory = remember(manager, store) {
         object : ViewModelProvider.Factory {
@@ -81,15 +81,12 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
     val layout = DiscoverLayout.entries.firstOrNull { it.name == store.string("layout", "GRID") } ?: DiscoverLayout.GRID
     val selected = store.selection("categories") - DiscoverTaxonomy.roots.map { it.id }.toSet()
     val blocked = store.selection("blocked")
-    val showAdult = true
     var expanded by rememberSaveable { mutableStateOf(false) }
-    var statusFilter by rememberSaveable { mutableStateOf("全部") }
-    var unreadOnly by rememberSaveable { mutableStateOf(false) }
+    var statusFilter by rememberSaveable(sourceId) { mutableStateOf("全部") }
     var nativeFeed by rememberSaveable(sourceId) { mutableStateOf<String?>(store.string("feed_$sourceId", "native").ifBlank { null }) }
     var nativeCategory by rememberSaveable(sourceId) { mutableStateOf<String?>(store.string("category_$sourceId", "").ifBlank { null }) }
     var noticesExpanded by remember { mutableStateOf(false) }
     var choice by remember { mutableStateOf<DiscoverWork?>(null) }
-    var latestChoice by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showSources by remember { mutableStateOf(false) }
     var menuWork by remember { mutableStateOf<DiscoverWork?>(null) }
@@ -102,49 +99,39 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
     val haptics = LocalHapticFeedback.current
     val hapticsEnabled = LocalHapticsEnabled.current
     fun light() { if (hapticsEnabled) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
-    val scrolling by remember { derivedStateOf { grid.isScrollInProgress } }
-    var movingDown by remember { mutableStateOf(false) }
-    val scrollConnection = remember { object : NestedScrollConnection {
-        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-            if (available.y < -4) movingDown = true
-            if (available.y > 4) movingDown = false
-            return Offset.Zero
-        }
-    } }
-    val today = DiscoverEngine.rangeStart("今日", System.currentTimeMillis()) ?: 0L
-    val updatedFavorites = favorites.filter { it.favorite.latestChapterUpdateAt >= today && it.favorite.latestChapterId != null }
-    val unreadFavorites = updatedFavorites.filter { it.favorite.latestChapterId != it.progress?.lastChapterId || it.progress?.isChapterFinished() != true }
-    val rows = remember(state.entries, sourceId, dimension, selected, blocked, showAdult, statusFilter, unreadOnly, favorites, readingTitles, revision, enabled, sources, nativeFeed, nativeCategory) {
-        val feed = if (unreadOnly) unreadFavorites.filter { (sourceId == "aggregate" || it.favorite.sourceId == sourceId) && enabled[it.favorite.sourceId] != false && sources.any { s -> s.id == it.favorite.sourceId } }.map {
-            val f = it.favorite
-            DiscoverEntry(SearchBook(f.comicId, f.sourceId, f.title, f.author, f.coverUrl, format = "漫画", comicId = f.comicId,
-                comicInfo = ComicInfo(status = f.serialStatus)), updatedAt = f.latestChapterUpdateAt, latestChapter = f.latestChapterTitle)
-        } else state.entries
-        val merged = DiscoverEngine.merge(feed, dimension, sourceId == "aggregate").filter { work ->
+    val rows = remember(state.entries, sourceId, dimension, selected, blocked, statusFilter, favorites, readingTitles, revision, nativeFeed, nativeCategory) {
+        val merged = DiscoverEngine.merge(state.entries, dimension, sourceId == "aggregate").filter { work ->
             work.key !in blocked && work.variants.none { DiscoverEngine.identity(it) in blocked } &&
-                (showAdult || !DiscoverTaxonomy.isAdult(work.tags)) && DiscoverTaxonomy.matches(work.tags, selected) &&
-                (statusFilter == "全部" || work.variants.any { serialLabel(it.book.comicInfo?.status) == statusFilter }) &&
-                (!unreadOnly || work.variants.any { e -> unreadFavorites.any { it.favorite.sourceId == e.book.sourceId && it.favorite.comicId == e.book.id } })
+                DiscoverTaxonomy.matches(work.tags, selected) &&
+                (statusFilter == "全部" || work.variants.any { serialLabel(it.book.comicInfo?.status) == statusFilter })
         }
         val favoriteAuthors = favorites.map { it.favorite.author }.filter { it.isKnownComicAuthor() }.toSet()
-        if (store.flag("personalization") && nativeFeed == null && nativeCategory == null && !unreadOnly)
+        if (store.flag("personalization") && nativeFeed == null && nativeCategory == null)
             DiscoverEngine.personalize(merged, dimension) { w ->
-                val unread = w.variants.any { e -> unreadFavorites.any { it.favorite.sourceId == e.book.sourceId && it.favorite.comicId == e.book.id } }
-                val knownAuthor = w.variants.any { it.book.author in favoriteAuthors }
-                val read = w.variants.any { it.book.title in readingTitles }
-                (if (unread) 3 else 0) + (if (knownAuthor) 1 else 0) - (if (read && !unread) 1 else 0)
+                (if (w.variants.any { it.book.author in favoriteAuthors }) 1 else 0) -
+                    (if (w.variants.any { it.book.title in readingTitles }) 1 else 0)
             } else merged
     }
-    LaunchedEffect(sources, enabled, sourceId, dimension, range, nativeFeed, nativeCategory, selected) {
+    LaunchedEffect(refreshRequest) {
+        if (model.consumeRefreshRequest(refreshRequest)) { grid.scrollToItem(0); model.refresh() }
+    }
+    LaunchedEffect(sources, enabled, sourceId, dimension, range, nativeFeed, nativeCategory, selected, statusFilter) {
         if (sourceId != "aggregate" && sources.none { it.id == sourceId }) { sourceId = "aggregate"; return@LaunchedEffect }
-        model.configure(sourceId, dimension, range, nativeFeed, nativeCategory, selected)
+        model.configure(sourceId, dimension, range, nativeFeed, nativeCategory, selected, status = statusFilter.takeUnless { it == "全部" })
         store.put("last_source", sourceId); store.put("last_dimension", dimension.name)
         store.put("range_${dimension.name}", range)
         store.put("feed_$sourceId", nativeFeed.orEmpty()); store.put("category_$sourceId", nativeCategory.orEmpty())
     }
     val nearEnd by remember { derivedStateOf { grid.firstVisibleItemIndex > 0 && (grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) >= grid.layoutInfo.totalItemsCount - 4 } }
     LaunchedEffect(nearEnd, state.loading, state.more) { if (nearEnd && !state.loading && state.more.isNotEmpty()) model.more() }
-    val viewportKey = "$sourceId:${dimension.name}:$range:$nativeFeed:$nativeCategory:${selected.sorted()}"
+    val viewportKey = "$sourceId:${dimension.name}:$range:$nativeFeed:$nativeCategory:${selected.sorted()}:$statusFilter"
+    var filterScanCount by remember(viewportKey, statusFilter) { mutableIntStateOf(0) }
+    LaunchedEffect(rows.size, state.loading, state.more, viewportKey, statusFilter) {
+        if (!state.loading && rows.size < 4 && state.more.isNotEmpty() && filterScanCount < 3 &&
+            (selected.isNotEmpty() || statusFilter != "全部" || (nativeFeed == null && dimension == DiscoverDimension.UPDATES && range != "最新"))) {
+            filterScanCount++; model.more()
+        }
+    }
     var lastViewportKey by rememberSaveable { mutableStateOf(viewportKey) }
     var restoreViewport by remember { mutableStateOf(false) }
     LaunchedEffect(viewportKey, state.loading) {
@@ -157,11 +144,11 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
             restoreViewport = false
         }
     }
-    fun open(work: DiscoverWork, latest: Boolean = false) {
-        if (work.variants.size > 1) { choice = work; latestChoice = latest }
-        else if (latest) onLatest(work.book) else onOpen(work.book)
+    fun open(work: DiscoverWork) {
+        if (work.variants.size > 1) { choice = work }
+        else onOpen(work.book)
     }
-    fun switch(next: DiscoverDimension) { light(); nativeFeed = null; nativeCategory = null; unreadOnly = false
+    fun switch(next: DiscoverDimension) { light(); nativeFeed = null; nativeCategory = null
         dimension = next; range = store.string("range_${next.name}", next.ranges.first()).takeIf { it in next.ranges } ?: next.ranges.first() }
     fun follow(work: DiscoverWork, next: Boolean) {
         light()
@@ -188,7 +175,7 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
     val headerDistance = with(LocalDensity.current) { 150.dp.toPx() }
     val headerFraction = remember(grid, headerDistance) { { if (grid.firstVisibleItemIndex > 0) 1f else (grid.firstVisibleItemScrollOffset / headerDistance).coerceIn(0f, 1f) } }
     BoxWithConstraints(Modifier.fillMaxSize().testTag("discover_screen").onGloballyPositioned { screenOffset = it.positionInRoot() }) {
-        Column(Modifier.fillMaxSize().nestedScroll(scrollConnection)) {
+        Column(Modifier.fillMaxSize()) {
             CollapsingTabScreenHeader(fractionSource = headerFraction, modifier = Modifier.statusBarsPadding(), title = "发现", subtitle = "DISCOVER",
                 onTitleClick = { scope.launch { if (reduce) grid.scrollToItem(0) else grid.animateScrollToItem(0) } },
                 titleColor = glassTitleColor(), trailing = {
@@ -196,24 +183,15 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
                 })
             LazyRow(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 item { DiscoverChip("推荐", nativeFeed != null || nativeCategory != null, solid = false, onClick = {
-                    light(); nativeFeed = "native"; nativeCategory = null; unreadOnly = false
+                    light(); nativeFeed = "native"; nativeCategory = null
                 }) }
                 items(availableDimensions) { d -> DiscoverChip(d.label, nativeFeed == null && nativeCategory == null && dimension == d,
                     solid = false, onClick = { switch(d) }) }
             }
             PullToRefreshBox(isRefreshing = state.loading && state.entries.isNotEmpty(), onRefresh = { light(); model.refresh() }, modifier = Modifier.weight(1f),
-                indicator = { if (state.loading && state.entries.isNotEmpty()) Row(Modifier.align(Alignment.TopCenter).background(MaterialTheme.colorScheme.surface, CircleShape).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Image(androidx.compose.ui.res.painterResource(MascotSpriteSheet.runDrawable), "刷新指示器", Modifier.size(24.dp))
-                    Text("正在刷新", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
-                } }) {
-                var swipe by remember { mutableFloatStateOf(0f) }
+                ) {
                 LazyVerticalGrid(columns = GridCells.Fixed(if (layout == DiscoverLayout.GRID && (dimension != DiscoverDimension.RANKING || nativeFeed != null || nativeCategory != null || selected.isNotEmpty())) 2 else 1), state = grid,
-                    modifier = Modifier.fillMaxSize().testTag("discover_content").pointerInput(dimension, availableDimensions) {
-                        detectHorizontalDragGestures(onDragStart = { swipe = 0f }, onHorizontalDrag = { _, amount -> swipe += amount }, onDragEnd = {
-                            if (abs(swipe) > 80.dp.toPx()) { val index = (availableDimensions.indexOf(dimension) + if (swipe < 0) 1 else -1).coerceIn(0, (availableDimensions.size - 1).coerceAtLeast(0))
-                                availableDimensions.getOrNull(index)?.let(::switch) }
-                        })
-                    }, contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = LocalAppBottomInset.current + 80.dp),
+                    modifier = Modifier.fillMaxSize().testTag("discover_content"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = LocalAppBottomInset.current + 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Column(Modifier.fillMaxWidth()) {
@@ -228,6 +206,12 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
                         if (nativeFeed == null && nativeCategory == null && availableRanges.size > 1) LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(availableRanges) { r -> DiscoverChip(r, range == r, solid = false, visualHeight = 28, onClick = { light(); range = r }) }
                         }
+                        if (nativeFeed != null && sourceId != "aggregate") LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(currentCatalogs.flatMap { it.feeds }, key = { it.id }) { feed ->
+                                DiscoverChip(feed.label, nativeFeed == feed.id || (nativeFeed == "native" && feed == currentCatalogs.firstOrNull()?.feeds?.firstOrNull()),
+                                    solid = false, visualHeight = 28, onClick = { light(); nativeFeed = feed.id; nativeCategory = null; statusFilter = "全部" })
+                            }
+                        }
                         if (selected.isNotEmpty()) Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(DiscoverTaxonomy.all.filter { it.id in selected }.joinToString(" · ") { it.label }, Modifier.weight(1f),
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -235,19 +219,8 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
                         }
                         }
                     }
-                    if (updatedFavorites.isNotEmpty() || unreadOnly) item(span = { GridItemSpan(maxLineSpan) }) {
-                        DiscoverGlass(Modifier.fillMaxWidth(), padding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
-                            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable { unreadOnly = !unreadOnly; if (unreadOnly) { nativeFeed = null; nativeCategory = null; dimension = DiscoverDimension.UPDATES; range = "今日" }
-                                scope.launch { grid.scrollToItem(0) } }, verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Outlined.AutoAwesome, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                                Spacer(Modifier.width(8.dp))
-                                Text(if (unreadOnly) "正在看未读更新 · 查看全部" else "你追的作品今日更新 ${updatedFavorites.size} 本", Modifier.weight(1f), fontSize = 13.sp, color = discoverInk())
-                                Icon(Icons.Outlined.ChevronRight, "直达未读", Modifier.size(16.dp), tint = discoverInk())
-                            }
-                        }
-                    }
-                    if (dimension == DiscoverDimension.UPDATES && nativeFeed == null && nativeCategory == null) item(span = { GridItemSpan(maxLineSpan) }) {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) { items(listOf("全部", "连载", "完结")) { status ->
+                    if (currentCatalogs.any { c -> c.categories.any { serialLabel(it.label) in setOf("连载", "完结") } } || state.entries.any { e -> activeSources.any { it.id == e.book.sourceId } && serialLabel(e.book.comicInfo?.status) in setOf("连载", "完结") }) item(span = { GridItemSpan(maxLineSpan) }) {
+                        LazyRow(Modifier.testTag("discover_status_filters"), horizontalArrangement = Arrangement.spacedBy(8.dp)) { items(listOf("全部", "连载", "完结")) { status ->
                             DiscoverChip(status, statusFilter == status, solid = false, visualHeight = 28, onClick = { light(); statusFilter = status }) } }
                     }
                     if (state.errors.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
@@ -262,10 +235,10 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
                     }
                     if (rows.isEmpty() && !state.loading) item(span = { GridItemSpan(maxLineSpan) }) {
                         DiscoverGlass(Modifier.fillMaxWidth()) {
-                            DiscoverEmptyState(if (unreadOnly) MascotSpriteSheet.readingDrawable else if (selected.isNotEmpty()) MascotSpriteSheet.sadDrawable else MascotSpriteSheet.idleDrawable,
-                                if (unreadOnly) "暂时没有未读更新" else if (selected.isNotEmpty()) "换个分类，遇见新故事" else "这个书源暂时没有数据",
-                                if (selected.isNotEmpty()) "试试其他分类，或清除筛选继续浏览" else "下拉刷新，或换个书源继续发现", actionLabel = if (selected.isNotEmpty() || unreadOnly) "清除筛选" else "原站推荐",
-                                onActionClick = { if (selected.isNotEmpty() || unreadOnly) { store.put("categories", emptySet()); unreadOnly = false; statusFilter = "全部" }
+                            DiscoverEmptyState(if (selected.isNotEmpty()) MascotSpriteSheet.sadDrawable else MascotSpriteSheet.idleDrawable,
+                                if (state.more.isNotEmpty()) "已加载作品暂无匹配" else if (selected.isNotEmpty() || statusFilter != "全部") "换个分类，遇见新故事" else "这个书源暂时没有数据",
+                                if (state.more.isNotEmpty()) "还有更多原站内容，可以继续查找" else if (selected.isNotEmpty()) "试试其他分类，或清除筛选继续浏览" else "下拉刷新，或换个书源继续发现", actionLabel = if (state.more.isNotEmpty()) "继续查找" else if (selected.isNotEmpty() || statusFilter != "全部") "清除筛选" else "原站推荐",
+                                onActionClick = { if (state.more.isNotEmpty()) model.more() else if (selected.isNotEmpty() || statusFilter != "全部") { store.put("categories", emptySet()); statusFilter = "全部" }
                                     else { nativeFeed = "native"; nativeCategory = null } })
                         }
                     }
@@ -273,7 +246,7 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
                         DiscoverCard(work, dimension, if (dimension == DiscoverDimension.RANKING && nativeFeed == null && nativeCategory == null && selected.isEmpty()) DiscoverLayout.LIST else layout,
                             rank = if (dimension == DiscoverDimension.RANKING && nativeFeed == null && nativeCategory == null && selected.isEmpty()) { if (sourceId == "aggregate") index + 1 else work.variants.first().rank ?: index + 1 } else null,
                             followed = work.variants.any { favoriteKey(it.book.sourceId, it.book.id) in favoriteKeys },
-                            unread = work.variants.any { e -> unreadFavorites.any { it.favorite.sourceId == e.book.sourceId && it.favorite.comicId == e.book.id } },
+                            unread = false,
                             reverseColors = store.flag("green_rise", false), onClick = { open(work) },
                             onFollow = { follow(work, it) }, onBlock = { block(work) },
                             onMenu = { menuWork = work; menuBounds = it }, menuActive = menuWork?.key == work.key,
@@ -289,30 +262,16 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
                 }
             }
         }
-        AnimatedVisibility(!movingDown || !scrolling, Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = LocalAppBottomInset.current + 16.dp),
-            enter = fadeIn(tween(if (reduce) 0 else 120)), exit = fadeOut(tween(if (reduce) 0 else 120))) {
-            val primary = MaterialTheme.colorScheme.primary
-            Surface(onClick = { rows.randomOrNull()?.let { light(); open(it, true) } }, enabled = rows.isNotEmpty(),
-                modifier = Modifier.heightIn(min = 52.dp).widthIn(min = 52.dp)
-                    .shadow(16.dp, CircleShape, ambientColor = primary.copy(alpha = .30f), spotColor = primary.copy(alpha = .30f)),
-                shape = CircleShape, color = if (rows.isEmpty()) primary.copy(alpha = .5f) else primary,
-                contentColor = contrastInk(primary)) {
-            Row(Modifier.heightIn(min = 52.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Casino, "随机来一本", Modifier.size(20.dp), tint = contrastInk(primary))
-                if (!scrolling) { Spacer(Modifier.width(8.dp)); Text("随机来一本", fontSize = 13.sp, color = contrastInk(primary)) }
-            }
-            }
-        }
         choice?.let { work ->
             ModalBottomSheet(onDismissRequest = { choice = null }) {
                 Column(Modifier.padding(16.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(work.book.title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     Text("${work.variants.size} 个源可读 · 选择阅读书源", fontSize = 13.sp)
                     work.variants.forEach { entry ->
-                        DiscoverGlass(Modifier.fillMaxWidth().clickable { choice = null; if (latestChoice) onLatest(entry.book) else onOpen(entry.book) }) {
+                        DiscoverGlass(Modifier.fillMaxWidth().clickable { choice = null; onOpen(entry.book) }) {
                             Text(sources.firstOrNull { it.id == entry.book.sourceId }?.name ?: entry.book.sourceId, fontWeight = FontWeight.SemiBold)
-                            Text("更新 ${dateLabel(entry.updatedAt)} · 讨论 ${DiscoverEngine.compact(entry.discussions)} · 点击 ${DiscoverEngine.compact(entry.clicks)} · 名次 ${entry.rank ?: "未提供"}", fontSize = 12.sp)
-                            Text("${entry.latestChapter ?: "最新话未提供"} · ${serialLabel(entry.book.comicInfo?.status)}", fontSize = 11.sp)
+                            Text(metric(DiscoverWork(work.key, listOf(entry), 0.0), dimension), fontSize = 12.sp)
+                            entry.book.comicInfo?.status?.let { Text(serialLabel(it), fontSize = 11.sp) }
                         }
                     }
                 }
@@ -324,29 +283,28 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
             val density = LocalDensity.current
             val left = with(density) { (menuBounds.left - screenOffset.x).toDp() }
             val top = with(density) { (menuBounds.top - screenOffset.y).toDp() }
-            val menuHeight = 196.dp
+            val menuHeight = 148.dp
             val maxMenuY = (maxHeight - LocalAppBottomInset.current - menuHeight - 16.dp).coerceAtLeast(16.dp)
             val x = left.coerceIn(16.dp, (maxWidth - 216.dp).coerceAtLeast(16.dp))
             val y = (if (top + menuHeight > maxHeight - LocalAppBottomInset.current - 16.dp) top - menuHeight - 8.dp else top + 16.dp).coerceIn(16.dp, maxMenuY)
             DiscoverGlass(Modifier.offset(x = x, y = y).width(200.dp).semantics { paneTitle = "作品快捷菜单" }, RoundedCornerShape(20.dp), PaddingValues(0.dp)) {
                 val followed = work.variants.any { favoriteKey(it.book.sourceId, it.book.id) in favoriteKeys }
-                val actions = listOf(Triple(Icons.Outlined.BookmarkAdd, if (followed) "已追 · 取消追漫" else "加入书架", { follow(work, !followed) }),
-                    Triple(Icons.Outlined.MenuBook, "读最新话", { open(work, true) }), Triple(Icons.Outlined.VisibilityOff, "不感兴趣", { block(work) }),
+                val actions = listOf(Triple(Icons.Outlined.FavoriteBorder, if (followed) "取消喜欢" else "加入我喜欢的", { follow(work, !followed) }), Triple(Icons.Outlined.VisibilityOff, "不感兴趣", { block(work) }),
                     Triple(Icons.Outlined.Share, "分享", { share(work) }))
                 actions.forEachIndexed { index, action ->
                     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable { menuWork = null; action.third() }.padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Icon(action.first, null, Modifier.size(20.dp), tint = if (index == 2) DiscoverRise else discoverInk())
-                        Text(action.second, fontSize = 15.sp, color = if (index == 2) DiscoverRise else discoverInk())
+                        Icon(action.first, null, Modifier.size(20.dp), tint = if (index == 1) DiscoverRise else discoverInk())
+                        Text(action.second, fontSize = 15.sp, color = if (index == 1) DiscoverRise else discoverInk())
                     }
-                    if (index < 3) HorizontalDivider(thickness = .5.dp, color = discoverInk().copy(alpha = .12f))
+                    if (index < actions.lastIndex) HorizontalDivider(thickness = .5.dp, color = discoverInk().copy(alpha = .12f))
                 }
             }
         }
         if (showSettings) DiscoverSettings { showSettings = false }
         if (showSources) DiscoverSourcePicker(sources, enabled, sourceId, { id ->
             sourceId = id; nativeFeed = store.string("feed_$id", "native").ifBlank { null }
-            nativeCategory = store.string("category_$id", "").ifBlank { null }; unreadOnly = false; showSources = false
+            nativeCategory = store.string("category_$id", "").ifBlank { null }; showSources = false
         }, { showSources = false }, { showSources = false; onSourceManagement() })
         if (expanded) DiscoverCategorySheet(state.entries.filter { e -> activeSources.any { it.id == e.book.sourceId } }, selected,
             activeSources.mapNotNull { s -> state.catalogs[s.id]?.let { s to it } },
@@ -362,7 +320,7 @@ internal fun DiscoverChip(label: String, selected: Boolean, onClick: () -> Unit,
     visualHeight: Int = 32, dimmed: Boolean = false, icon: ImageVector? = null, outlined: Boolean = false, modifier: Modifier = Modifier) {
     val primary = MaterialTheme.colorScheme.primary
     Box(modifier.heightIn(min = 48.dp).widthIn(min = 48.dp).alpha(if (dimmed) .5f else 1f)
-        .selectable(selected, role = Role.Checkbox, onClick = onClick), contentAlignment = Alignment.Center) {
+        .selectable(selected, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, role = Role.Checkbox, onClick = onClick), contentAlignment = Alignment.Center) {
         Row(Modifier.heightIn(min = visualHeight.dp).clip(CircleShape)
             .background(if (selected) { if (solid) primary else discoverTint() } else if (solid) MaterialTheme.colorScheme.surface.copy(alpha = .40f) else Color.Transparent)
             .then(if (outlined) Modifier.border(1.dp, if (selected) primary else discoverInk().copy(alpha = .12f), CircleShape) else Modifier)
@@ -376,11 +334,11 @@ internal fun DiscoverChip(label: String, selected: Boolean, onClick: () -> Unit,
     }
 }
 
-internal fun serialLabel(status: String?): String = when (status?.lowercase()) {
-    "ongoing", "连载", "连载中", "連載中" -> "连载"
-    "completed", "finished", "完结", "已完结", "已完結" -> "完结"
-    "hiatus", "cancelled", "停更" -> "停更"
-    else -> "状态未提供"
+internal fun serialLabel(status: String?): String = when (status?.trim()?.lowercase(java.util.Locale.ROOT)) {
+    "ongoing", "publishing", "serial", "连载", "連載", "连载中", "連載中", "1" -> "连载"
+    "completed", "complete", "finished", "ended", "完结", "完結", "已完结", "已完結", "2" -> "完结"
+    "hiatus", "cancelled", "停更", "休刊", "暂停更新", "3", "4" -> "停更"
+    else -> "状态未知"
 }
 internal fun dateLabel(time: Long?): String = time?.let {
     java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.CHINA).format(java.util.Date(it)) } ?: "未提供"

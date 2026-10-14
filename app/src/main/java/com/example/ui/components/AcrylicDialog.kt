@@ -3,6 +3,7 @@ package com.example.ui.components
 import android.app.Activity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -151,6 +153,7 @@ fun AcrylicDialog(
                     modifier = modifier
                         .adaptiveDialogWidth(0.86f)
                         .acrylicPanel(shape = shape)
+                        .pointerInput(Unit) { detectTapGestures(onTap = {}) }
                         .padding(24.dp)
                 ) {
                     title?.invoke()
@@ -184,6 +187,8 @@ fun AcrylicDialog(
 fun AcrylicBottomOverlay(
     onDismissRequest: () -> Unit,
     shape: Shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+    dismissOnBackgroundClick: Boolean = true,
+    fitAvailableHeight: Boolean = false,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
 ) {
     val activity = LocalContext.current as? Activity
@@ -196,7 +201,7 @@ fun AcrylicBottomOverlay(
     ) {
         CompositionLocalProvider(LocalOverlayClose provides close) { DialogLiquidGlass {
             GlassDialogWindowEffect(activity = activity, blurRadiusPx = blurPx)
-            Box(modifier = Modifier.fillMaxSize()) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize().then(if (fitAvailableHeight) Modifier.safeDrawingPadding().imePadding() else Modifier)) {
                 ScrimEntrance(visibility = visibility) {
                     Box(
                         modifier = Modifier
@@ -205,16 +210,19 @@ fun AcrylicBottomOverlay(
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
-                                onClick = { close {} }
+                                onClick = { if (dismissOnBackgroundClick) close {} }
                             )
                     )
                 }
+                val sheetHeight = maxHeight * .9f
                 BottomSheetEntrance(modifier = Modifier.align(Alignment.BottomCenter), visibility = visibility) {
                 Column(
                     modifier = Modifier
                         .adaptiveSheetWidth()
+                        .then(if (fitAvailableHeight) Modifier.heightIn(max = sheetHeight) else Modifier)
+                        .pointerInput(Unit) { detectTapGestures(onTap = {}) }
                         .acrylicPanel(shape = shape, surfaceAlpha = 0.40f)
-                        .navigationBarsPadding()
+                        .then(if (fitAvailableHeight) Modifier else Modifier.navigationBarsPadding())
                 ) {
                     content()
                 }

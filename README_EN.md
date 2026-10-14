@@ -24,19 +24,9 @@ Read local ebooks, novels, and comics in one Android app.
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
 
-**1.3.9 / 220** aligns Discover with the Library header and shared glass components, moves settings into a dedicated window, and fixes tab reloads, caching, category scope and native pagination. It retains the 1.3.8 signing identity for compatible updates. See the [release verification](docs/release-1.3.9-2026-10-14.md).
+**1.3.10 / 221** fixes filter-sheet clipping, unintended dismissal and rectangular tap feedback. Discover uses cover cards and the Library favorite heart, ring pull-to-refresh and bottom-tab double-tap refresh. It repairs ordering provenance, status filters, tab caching, Aiman and Comick search/reading. Same signing identity as 1.3.9. See the [verification record](docs/release-1.3.10-2026-10-14.md).
 
 ## Screenshots
-
-### Discover · Dedicated settings · Categories at 130% font scale
-
-Version 1.3.9 production Compose UI with fixture sources and sample covers; not live catalogue content.
-
-<table><tr>
-<td><img src="./docs/screenshots/shot-discover139-home.png" width="260" alt="Discover home"/></td>
-<td><img src="./docs/screenshots/shot-discover139-settings.png" width="260" alt="Discover settings"/></td>
-<td><img src="./docs/screenshots/shot-discover139-categories.png" width="260" alt="Discover categories"/></td>
-</tr></table>
 
 ### Reading settings and layouts
 
@@ -76,7 +66,7 @@ These 12 earlier screenshots show source management, library search, the bookshe
 Version 1.3.8 adds Discover and restores Aiman and MYCOMIC reading. Its APK retains the 1.3.6 signing identity; the differently signed 1.3.7 requires a data backup before migrating.
 
 - Browse one source or merge sources with separate update, discussion, ranking, and view dimensions. Missing statistics are shown explicitly.
-- Standard categories coexist with native source categories, with saved filters, three layouts, pagination, quick following, and random reading.
+- Standard categories coexist with native source categories, with saved filters, three layouts, pagination, Library favorites, ring pull-to-refresh, and bottom-tab double-tap refresh.
 - Version 1.3.8 repairs discovery feeds, metadata, and pagination, and restores Aiman's public reading path through the HTTPS origin declared by its publisher.
 - MYCOMIC reads public pages with the same in-app WebView engine and session used for site verification. Its real Android verification → catalogue → detail → chapter → reader image decoding chain passed: 30 catalogue entries, 16 chapters, 61 pages, and decoded first/last images. See [validation details](docs/release-1.3.8-2026-10-14.md).
 
@@ -116,7 +106,7 @@ Version 1.3.8 adds Discover and restores Aiman and MYCOMIC reading. Its APK reta
 
 - **Android:** 7.0 (API 24) or newer.
 - **Architecture:** Current release APKs target arm64-v8a, supported by most Android phones and tablets. The release APK does not include an x86_64 emulator build.
-- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.3.9 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.9/Ciallo-Reader-v1.3.9.apk).
+- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.3.10 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.10/Ciallo-Reader-v1.3.10.apk).
 - Open the downloaded APK and follow Android's prompt to allow installation from that source.
 
 ## Get started

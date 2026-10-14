@@ -64,7 +64,8 @@ class DiscoverUiTest {
         override suspend fun getChapters(bookId: String) = SourceResult.Success(emptyList<ComicChapter>())
         override suspend fun getChapterImages(chapterId: String) = SourceResult.Success(emptyList<String>())
     }
-    private fun mount(layout: DiscoverLayout, dark: Boolean = false, fontScale: Float = 1f, dimension: DiscoverDimension = DiscoverDimension.UPDATES): () -> Int {
+    private fun mount(layout: DiscoverLayout, dark: Boolean = false, fontScale: Float = 1f, dimension: DiscoverDimension = DiscoverDimension.UPDATES,
+        scopedStatusFixture: Boolean = false): () -> Int {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val store = DiscoverStore(context)
         store.prefs.edit().clear().putString("layout", layout.name).putString("last_dimension", dimension.name)
@@ -80,7 +81,19 @@ class DiscoverUiTest {
                 coil.request.SuccessResult(android.graphics.drawable.BitmapDrawable(context.resources, bitmap), chain.request, coil.decode.DataSource.DISK)
             })
         }.build())
-        fixtures = listOf(FixtureSource("a"), FixtureSource("b"))
+        fixtures = if (!scopedStatusFixture) listOf(FixtureSource("a"), FixtureSource("b")) else listOf(
+            object : FixtureSource("a") {
+                override suspend fun discoverCatalog(resolveDynamic: Boolean) = SourceResult.Success(DiscoverCatalog(categories = listOf(DiscoverNativeCategory("completed", "完结"))))
+                override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> {
+                    val page = (super.discover(query) as SourceResult.Success<DiscoverPage>).data
+                    return SourceResult.Success(page.copy(entries = page.entries.map { it.copy(book = it.book.copy(comicInfo = it.book.comicInfo?.copy(status = "completed"))) }))
+                }
+            }, object : FixtureSource("b") {
+                override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> {
+                    val page = (super.discover(query) as SourceResult.Success<DiscoverPage>).data
+                    return SourceResult.Success(page.copy(entries = page.entries.map { it.copy(book = it.book.copy(comicInfo = it.book.comicInfo?.copy(status = null))) }))
+                }
+            })
         runBlocking { fixtures.forEach { manager.registerSource(it) } }
         var follows = 0
         compose.setContent {
@@ -111,7 +124,7 @@ class DiscoverUiTest {
     @Test fun gridDeduplicatesAndFollowsWithoutOpening() {
         val follows = mount(DiscoverLayout.GRID)
         compose.onAllNodesWithText("2 个源可读", useUnmergedTree = true).onFirst().assertExists()
-        compose.onAllNodesWithContentDescription("加入书架", useUnmergedTree = true).onFirst().performClick()
+        compose.onAllNodesWithContentDescription("加入我喜欢的", useUnmergedTree = true).onFirst().performClick()
         assertEquals(1, follows())
         capture("discover-grid.png")
     }
@@ -160,9 +173,9 @@ class DiscoverUiTest {
         mount(DiscoverLayout.LIST, dark = true, fontScale = 1.3f)
         DiscoverStore(ApplicationProvider.getApplicationContext<Context>()).put("cache", true)
         compose.onNodeWithContentDescription("发现设置").performClick()
+        compose.onNodeWithText("24小时").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("屏蔽管理").performScrollTo()
         compose.onNodeWithText("屏蔽管理").assertIsDisplayed()
-        compose.onNodeWithText("24小时").assertIsDisplayed()
         compose.onNodeWithText("完成").assertIsDisplayed()
         capture("discover-settings-dark130.png", overlay = true)
     }
@@ -185,15 +198,48 @@ class DiscoverUiTest {
     }
     @Test fun switchingBottomTabsRestoresTheScrolledDiscoverPage() {
         mount(DiscoverLayout.LIST)
+        val calls = fixtures.sumOf { it.discoverCalls }
         compose.onNodeWithTag("discover_content").performScrollToIndex(7)
         compose.waitForIdle()
+        assertEquals("Returning to Discover must reuse results", calls, fixtures.sumOf { it.discoverCalls })
         compose.onNodeWithText("星海冒险 1").assertDoesNotExist()
         compose.onNodeWithText("书架").performClick()
         compose.onNodeWithText("测试书架页面").assertExists()
         compose.onNodeWithText("发现").performClick()
         compose.waitForIdle()
+        assertEquals("Returning to Discover must reuse results", calls, fixtures.sumOf { it.discoverCalls })
         compose.onNodeWithText("星海冒险 1").assertDoesNotExist()
         compose.onNodeWithTag("discover_content").performScrollToIndex(0)
+        compose.onNodeWithText("星海冒险 1").assertExists()
+    }
+    @Test fun categoryInteriorDoesNotDismissAndFooterFitsAt130Percent() {
+        mount(DiscoverLayout.GRID, fontScale = 1.3f)
+        compose.onNodeWithText("分类").performClick()
+        compose.onNodeWithText("找你想看的漫画").performClick()
+        compose.onNodeWithText("查看全部").assertIsDisplayed()
+        compose.onNodeWithText("清除").assertIsDisplayed()
+        val footer = compose.onNodeWithText("查看全部").fetchSemanticsNode().boundsInRoot
+        val window = generateSequence(compose.onNodeWithText("找你想看的漫画").fetchSemanticsNode()) { it.parent }.last().boundsInRoot
+        assertTrue("Footer must remain within the measured dialog window", footer.bottom <= window.bottom)
+        compose.onNodeWithContentDescription("关闭分类窗口").performClick()
+        compose.onNodeWithText("找你想看的漫画").assertDoesNotExist()
+    }
+    @Test fun horizontalSwipeNeverHidesOrFavoritesAWork() {
+        val follows = mount(DiscoverLayout.LIST)
+        compose.onNodeWithText("星海冒险 1").performTouchInput { swipeLeft() }
+        compose.onNodeWithText("星海冒险 1").assertExists()
+        compose.onNodeWithText("星海冒险 1").performTouchInput { swipeRight() }
+        assertEquals(0, follows())
+        listOf("随机来一本", "直达未读", "读最新话", "正在刷新").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
+    }
+    @Test fun aSourcesStatusFilterCannotEmptyAnotherSourcesUnspecifiedStatusBooks() {
+        mount(DiscoverLayout.LIST, scopedStatusFixture = true)
+        compose.onNode(hasText("完结") and hasAnyAncestor(hasTestTag("discover_status_filters"))).performClick()
+        compose.onNodeWithText("星海冒险 1").assertExists()
+        compose.onNodeWithText("聚合书源").performClick()
+        compose.onNodeWithText("示例书源 b").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("discover_status_filters").assertDoesNotExist()
         compose.onNodeWithText("星海冒险 1").assertExists()
     }
     @Test fun layoutPreferenceAndCategoriesSurviveStoreRecreation() {

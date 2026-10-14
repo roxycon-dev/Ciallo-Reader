@@ -2539,10 +2539,11 @@ private fun rememberCoverHeaders(
  * 卡片本身可点（进详情），所以这里只吞掉自己的点击，不参与卡片的手势。
  */
 @Composable
-private fun SearchResultFavoriteButton(
+fun SearchResultFavoriteButton(
     favorite: Boolean,
     onToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    touchSize: Dp = 30.dp,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -2557,7 +2558,7 @@ private fun SearchResultFavoriteButton(
     val tint = if (favorite) MintPrimary else Color.White
     Box(
         modifier = modifier
-            .size(30.dp)
+            .size(touchSize)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale

@@ -17,10 +17,10 @@ enum class DiscoverLayout(val label: String) { LIST("列表"), GRID("双列网�
 data class DiscoverQuery(val dimension: DiscoverDimension, val range: String, val page: Int = 1,
     val cursor: String? = null, val offset: Int = 0, val feedId: String? = null, val categoryId: String? = null,
     val includeAdult: Boolean = true, val standardCategories: Set<String> = emptySet(),
-    val categoryIds: List<String> = emptyList())
+    val categoryIds: List<String> = emptyList(), val status: String? = null)
 data class DiscoverFeed(val id: String, val label: String, val kind: String? = null)
 data class DiscoverNativeCategory(val id: String, val label: String, val group: String = "") {
-    val standardIds: Set<String> get() = DiscoverTaxonomy.classifyNative(label, group)
+    val standardIds: Set<String> by lazy(LazyThreadSafetyMode.PUBLICATION) { DiscoverTaxonomy.classifyNative(label, group) }
 }
 data class DiscoverCatalog(val feeds: List<DiscoverFeed> = emptyList(), val categories: List<DiscoverNativeCategory> = emptyList(),
     val dynamicCategories: Boolean = false, val explicit: Boolean = false,
@@ -55,6 +55,7 @@ data class DiscoverEntry(
     val origin: String? = null,
     val subtitle: String? = null,
     val native: Boolean = false,
+    val statistic: String? = null,
 )
 data class DiscoverPage(val entries: List<DiscoverEntry> = emptyList(), val hasMore: Boolean = false,
     val supported: Boolean = true, val notice: String? = null, val nextCursor: String? = null,
@@ -120,7 +121,7 @@ object DiscoverEngine {
             ordered.forEachIndexed { index, row ->
                 val position = if (row.native) row.nativeOrder ?: index + 1
                     else if (dimension == DiscoverDimension.RANKING && row.rank != null) row.rank
-                    else value(row)?.let { tieRanks.getOrPut(it) { row.nativeOrder ?: index + 1 } }
+                    else value(row)?.let { tieRanks.getOrPut(it) { index + 1 } }
                         ?: row.nativeOrder ?: index + 1
                 // Reciprocal source rank is independent of fetched page length and site traffic.
                 scores[row.book.sourceId to row.book.id] = 1.0 / (1.0 + .08 * (position.coerceAtLeast(1) - 1))

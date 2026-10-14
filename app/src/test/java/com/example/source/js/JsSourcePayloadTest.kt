@@ -12,6 +12,29 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class JsSourcePayloadTest {
+    @Test fun `legacy cached Comick search uses JSON for LF and CRLF scripts`() {
+        val repo = JsSourceRepo
+        val patch = JsSourceRepo::class.java.getDeclaredMethod("patchDiscoverSource", String::class.java, String::class.java).apply { isAccessible = true }
+        val source = """
+            class Comick extends ComicSource {
+                search = {
+                    load: async () => {
+                        let url = 'https://comick.art/search?q=one';
+                        let document = new HtmlDocument(res.body)
+                        let jsonData = JSON.parse(document.getElementById('sv-data').text);
+                    }
+                }
+                /// single comic related
+            }
+        """.trimIndent()
+        for (script in listOf(source, source.replace("\n", "\r\n"))) {
+            val fixed = patch.invoke(repo, "comick", script) as String
+            assertTrue(fixed.contains("https://comick.art/api/search?q=one"))
+            assertTrue(fixed.contains("let jsonData = JSON.parse(res.body);"))
+            assertFalse(fixed.contains("document.getElementById('sv-data').text"))
+            assertEquals(fixed, patch.invoke(repo, "comick", fixed))
+        }
+    }
     @Test fun `HTML verification failures retain actionable network reason`() {
         val raw = "源站返回验证或拦截页面，请在书源管理完成站点验证或稍后重试\nat JSON.parse (source_responses.js:1)"
         assertTrue(jsSourceFailure(raw) is SourceException.NetworkError)

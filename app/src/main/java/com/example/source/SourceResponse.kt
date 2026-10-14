@@ -14,6 +14,11 @@ internal fun Response.readSourceText(maxBytes: Int = 2 * 1024 * 1024, fallback: 
 
 /** Shared by native sources and the JS HTTP bridge. Never include response bodies in errors. */
 internal object SourceResponse {
+    /** Mixed HTML/JSON Accept headers belong to web adapters as well as APIs. */
+    fun expectsJson(headers: Map<String, String>): Boolean {
+        val accept = headers.entries.firstOrNull { it.key.equals("Accept", true) }?.value.orEmpty()
+        return accept.contains("json", true) && !accept.contains("text/html", true) && !accept.contains("application/xhtml", true)
+    }
     fun text(bytes: ByteArray, headers: Map<String, String> = emptyMap(), fallback: String? = null): String {
         val contentType = headers.entries.firstOrNull { it.key.equals("Content-Type", true) }?.value.orEmpty()
         val prefix = String(bytes, 0, minOf(bytes.size, 4096), Charsets.ISO_8859_1)

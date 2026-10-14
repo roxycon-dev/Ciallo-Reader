@@ -70,7 +70,7 @@ class DiscoverStore(context: Context) {
                 rankChange = long("rankChange")?.toInt(), growth = if (row.has("growth")) row.optDouble("growth") else null,
                 newEntry = row.optBoolean("newEntry"), hotComment = row.optString("hotComment").ifBlank { null },
                 canonicalId = row.optString("canonicalId").ifBlank { null }, nativeOrder = long("nativeOrder")?.toInt(),
-                origin = row.optString("origin").ifBlank { null }, subtitle = row.optString("subtitle").ifBlank { null }, native = row.optBoolean("native"))
+                origin = row.optString("origin").ifBlank { null }, subtitle = row.optString("subtitle").ifBlank { null }, native = row.optBoolean("native"), statistic = row.optString("statistic").ifBlank { null })
         }
     }.getOrDefault(emptyList())
     fun writeCache(key: String, entries: List<DiscoverEntry>) {
@@ -82,7 +82,7 @@ class DiscoverStore(context: Context) {
             .put("updatedAt", e.updatedAt).put("latestChapter", e.latestChapter).put("discussions", e.discussions)
             .put("clicks", e.clicks).put("rank", e.rank).put("rankChange", e.rankChange).put("growth", e.growth)
             .put("newEntry", e.newEntry).put("hotComment", e.hotComment).put("canonicalId", e.canonicalId)
-            .put("nativeOrder", e.nativeOrder).put("origin", e.origin).put("subtitle", e.subtitle).put("native", e.native)) }
+            .put("nativeOrder", e.nativeOrder).put("origin", e.origin).put("subtitle", e.subtitle).put("native", e.native).put("statistic", e.statistic)) }
         val editor = cache.edit()
         if (cache.all.size >= 24 && !cache.contains(key)) cache.all.keys.firstOrNull()?.let { editor.remove(it) }
         editor.putString(key, JSONObject().put("savedAt", System.currentTimeMillis()).put("entries", rows).toString()).apply()
