@@ -1082,7 +1082,7 @@ internal fun FilterPreview(page: ComicPageRef?, loader: ComicPageLoader, config:
     val previewKey = "${page.id}|${config.imagePipelineFingerprint()}|$pageRotation|$detail|$retry"
     SegmentRow("对比范围", listOf(0 to "整页", 1 to "原始细节"), if (detail) 1 else 0) { detail = it == 1 }
     val original by key(page.id, geometry, detail, retry) {
-        produceState<PageBitmapState>(PageBitmapState.Loading) {
+        com.example.ui.components.rememberAsyncState<PageBitmapState>(PageBitmapState.Loading) {
             try {
                 val bitmap = loader.loadPreview(page, geometry, ComicImagePipeline.Toning(), detail)
                     ?: throw java.io.IOException("预览解码失败")
@@ -1093,7 +1093,7 @@ internal fun FilterPreview(page: ComicPageRef?, loader: ComicPageLoader, config:
             }
         }
     }
-    val bitmap by key(previewKey) { produceState<PageBitmapState>(PageBitmapState.Loading) {
+    val bitmap by key(previewKey) { com.example.ui.components.rememberAsyncState<PageBitmapState>(PageBitmapState.Loading) {
         kotlinx.coroutines.delay(80)
         try {
                 val result = loader.loadPreview(
@@ -1542,7 +1542,7 @@ private fun PageThumbCell(
     active: Boolean,
     onClick: () -> Unit,
 ) {
-    val bitmap by produceState<Bitmap?>(null, page.id) {
+    val bitmap by com.example.ui.components.rememberAsyncState<Bitmap?>(null, page.id) {
         value = runCatching { loader.loadThumb(page) }.getOrNull()
     }
     Column(
@@ -1858,7 +1858,7 @@ internal fun ComicCropSheet(
     onApply: (Float, Float, Float, Float) -> Unit,
 ) {
     if (page == null) return
-    val bitmap by produceState<Bitmap?>(null, page.id) {
+    val bitmap by com.example.ui.components.rememberAsyncState<Bitmap?>(null, page.id) {
         value = withContext(Dispatchers.Default) {
             // 预览管线加载小图（不把全尺寸原图塞进主缓存）
             runCatching { loader.loadPreview(page, ComicImagePipeline.Geometry(), ComicImagePipeline.Toning()) }

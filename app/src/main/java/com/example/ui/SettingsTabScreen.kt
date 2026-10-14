@@ -327,7 +327,7 @@ fun SettingsTabScreen(
     // ⚠️ 在神回分区之前增删设置项时，同步更新这里的固定计数。
     LaunchedEffect(focusGodSettings) {
         if (!focusGodSettings) return@LaunchedEffect
-        val godIndex = 14 + if (showAdultSourceCard) 1 else 0
+        val godIndex = 1 + 14 + if (showAdultSourceCard) 1 else 0
         settingsListState.animateScrollToItem(godIndex)
     }
     settingsListState.scrollTiltSource()
@@ -369,6 +369,21 @@ LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
 
+
+                item(key = "discover_settings") {
+                    SettingsSectionHeader("书库与发现")
+                    GlassCard(modifier = Modifier.fillMaxWidth().clickableWithFeedback { showDiscoverSettings = true }, shape = RoundedCornerShape(16.dp)) {
+                        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.Explore, null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("发现设置", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                                Text("浏览布局、推荐偏好与屏蔽管理", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Icon(Icons.Default.ChevronRight, "打开发现设置")
+                        }
+                    }
+                }
 
                 // Section 1: Splash Poster
                 item {
@@ -1288,21 +1303,6 @@ LazyColumn(
                                     onClick={ importBackupLauncher.launch(arrayOf("application/zip","application/octet-stream")) },
                                     variant=AppButtonVariant.Secondary,buttonSize=AppButtonSize.Small)
                             }
-                        }
-                    }
-                }
-
-                item(key = "discover_settings") {
-                    SettingsSectionHeader("书库与发现")
-                    GlassCard(modifier = Modifier.fillMaxWidth().clickableWithFeedback { showDiscoverSettings = true }, shape = RoundedCornerShape(16.dp)) {
-                        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.Explore, null, tint = MintPrimary)
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text("发现设置", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                                Text("浏览布局、推荐偏好与屏蔽管理", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Icon(Icons.Default.ChevronRight, "打开发现设置")
                         }
                     }
                 }

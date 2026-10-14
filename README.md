@@ -11,7 +11,7 @@
 
 [🌐 产品主页](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.3.10 更新说明与验证](docs/release-1.3.10-2026-10-14.md) ·
+[1.3.11 更新说明与验证](docs/release-1.3.11-2026-10-14.md) ·
 [查看截图](#界面预览) ·
 [全部功能](#功能亮点) ·
 [提交问题或建议](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -27,7 +27,9 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 **English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
 
-**1.3.10 / 221**：修复分类窗口底部遮挡、误关闭与灰色点击框；发现使用封面卡片和「我喜欢的」爱心，支持圆环下拉刷新与双击底栏回顶刷新。修复排序依据、状态筛选、切栏缓存，恢复爱漫画与 Comick 的搜索及阅读链路。沿用 1.3.9 签名。详见 [验证记录](docs/release-1.3.10-2026-10-14.md)。
+**1.3.11 / 222**：重构发现主题筛选卡和漫画列表，修复分类窗口底部遮挡，统一五页顶栏并恢复英文副标题；修复分类状态联动、榜单缓存续页和 Hitomi 发现入口。分类数字明确为已加载作品数。沿用 1.3.10 签名。详见 [验证记录](docs/release-1.3.11-2026-10-14.md)。
+
+同时修复发布检查发现的旧 Android API 调用、玻璃弹窗清理、EPUB 路径兼容性和 Compose 状态订阅问题。
 
 ## 界面预览
 
@@ -110,7 +112,7 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 - **系统要求：** Android 7.0（API 24）及以上。
 - **当前 Release：** 提供 arm64-v8a APK，适用于大多数 Android 手机和平板；Release 暂不包含 x86_64 模拟器版本。
-- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.3.10](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.10/Ciallo-Reader-v1.3.10.apk)。
+- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.3.11](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.11/Ciallo-Reader-v1.3.11.apk)。
 - 下载后按 Android 提示允许安装该来源的应用，再打开 APK 安装。
 
 ## 快速开始
@@ -150,7 +152,7 @@ Windows 可使用 gradlew.bat :app:assembleDebug。遇到问题或想提出功�
 调试版使用独立包名，可与正式版并存。正式发布必须沿用固定签名密钥，禁止用临时调试签名发布；构建、备份与覆盖升级校验见 [签名说明](docs/app-signing.md)。
 
 - [发布版本与更新记录](CHANGELOG.md)
-- [v1.3.10 更新说明与验证记录](docs/release-1.3.10-2026-10-14.md)
+- [v1.3.11 更新说明与验证记录](docs/release-1.3.11-2026-10-14.md)
 - [v1.3.6 发布说明与验证记录](docs/release-1.3.6-2026-10-12.md)
 - [第三方组件与模型许可说明](docs/vendor-licenses/README.md)
 

@@ -17,6 +17,43 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class DiscoverViewModelTest {
+    @Test fun truncatedDiskEntriesNeverResumePastUncachedBooks() = runBlocking {
+        checkCacheNeedsRestart(truncated = true)
+    }
+    @Test fun aTodayCacheWithPastDatesNeedsRevalidation() = runBlocking {
+        checkCacheNeedsRestart(truncated = false)
+    }
+    private suspend fun checkCacheNeedsRestart(truncated: Boolean) {
+        val store = DiscoverStore(ApplicationProvider.getApplicationContext<Context>())
+        store.prefs.edit().clear().putBoolean("cache", true).apply(); store.cache.edit().clear().apply()
+        val manager = SourceManager()
+        val dimension = if (truncated) DiscoverDimension.RANKING else DiscoverDimension.UPDATES
+        val range = if (truncated) "热门" else "今日"
+        manager.registerSource(object : DiscoverUiTest.FixtureSource("guard") {
+            override suspend fun discover(query: DiscoverQuery) = SourceResult.Success(DiscoverPage(
+                (1..if (truncated) 301 else 1).map { DiscoverEntry(SearchBook("$it", id, "缓存作品 $it", ""), updatedAt = System.currentTimeMillis() - 2 * 86_400_000L) },
+                hasMore = true, nextCursor = "must-not-resume"))
+        })
+        val first = DiscoverViewModel(manager, store).also(models::add)
+        first.configure("guard", dimension, range)
+        first.viewModelScope.coroutineContext[Job]!!.children.toList().joinAll()
+        val requested = CompletableDeferred<DiscoverQuery>(); val ready = CompletableDeferred<Unit>()
+        val restoredManager = SourceManager()
+        restoredManager.registerSource(object : DiscoverUiTest.FixtureSource("guard") {
+            override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> {
+                requested.complete(query); ready.await(); return page(id, "fresh")
+            }
+        })
+        val restored = DiscoverViewModel(restoredManager, store).also(models::add)
+        restored.configure("guard", dimension, range)
+        val query = requested.await()
+        assertEquals(1, query.page); assertNull(query.cursor)
+        if (!truncated) assertTrue(restored.state.value.entries.isEmpty())
+        ready.complete(Unit); restored.viewModelScope.coroutineContext[Job]!!.children.toList().joinAll()
+        val completed = restored.state.first { !it.loading }
+        assertTrue(completed.errors.toString(), completed.errors.isEmpty())
+        assertEquals("fresh", completed.entries.single().book.id)
+    }
     @Test fun mappedGenresNeverBypassADeclaredMissingMetricOrWindow() = runTest(dispatcher) {
         var calls = 0; val manager = SourceManager()
         manager.registerSource(object : DiscoverUiTest.FixtureSource("source") {
@@ -145,10 +182,50 @@ class DiscoverViewModelTest {
         restored.configure("cached", DiscoverDimension.CLICKS, "总")
         val cached = restored.state.first { it.cached }
         assertEquals("persistent-book", cached.entries.single().book.id)
-        assertTrue(cached.loading)
+        assertFalse("A complete unexpired session must not refetch on return", cached.loading)
+        restored.refresh()
         wait.complete(Unit)
         restored.viewModelScope.coroutineContext[Job]!!.children.toList().joinAll()
         assertEquals("fresh-book", restored.state.value.entries.single().book.id)
+    }
+    @Test fun nativeRankingSwitchBackReusesItsLoadedPages() = runTest(dispatcher) {
+        val seen = mutableListOf<String?>(); val manager = SourceManager()
+        manager.registerSource(object : DiscoverUiTest.FixtureSource("ranked") {
+            override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> {
+                seen.add(query.feedId); return page(id, query.feedId.orEmpty())
+            }
+        })
+        val model = model(manager)
+        model.configure("ranked", DiscoverDimension.RANKING, "热门", feedId = "ranking:week")
+        model.configure("ranked", DiscoverDimension.RANKING, "热门", feedId = "ranking:month")
+        model.configure("ranked", DiscoverDimension.RANKING, "热门", feedId = "ranking:week")
+        assertEquals(listOf("ranking:week", "ranking:month"), seen)
+        assertEquals("ranking:week", model.state.value.entries.single().book.id)
+    }
+    @Test fun diskRankingCacheResumesTheSavedCursorWithoutLoadingPageOne() = runTest(dispatcher) {
+        val store = DiscoverStore(ApplicationProvider.getApplicationContext<Context>())
+        store.prefs.edit().clear().putBoolean("cache", true).apply(); store.cache.edit().clear().apply()
+        val firstManager = SourceManager()
+        firstManager.registerSource(object : DiscoverUiTest.FixtureSource("cursor") {
+            override suspend fun discover(query: DiscoverQuery) = SourceResult.Success(DiscoverPage(
+                listOf(DiscoverEntry(SearchBook("one", id, "第一本", ""))), hasMore = true, nextCursor = "saved-cursor"))
+        })
+        val first = DiscoverViewModel(firstManager, store).also(models::add)
+        first.configure("cursor", DiscoverDimension.RANKING, "热门", feedId = "ranking:week")
+        first.viewModelScope.coroutineContext[Job]!!.children.toList().joinAll()
+        val requests = mutableListOf<DiscoverQuery>(); val nextManager = SourceManager()
+        nextManager.registerSource(object : DiscoverUiTest.FixtureSource("cursor") {
+            override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> {
+                requests.add(query); return page(id, "two")
+            }
+        })
+        val restored = DiscoverViewModel(nextManager, store).also(models::add)
+        restored.configure("cursor", DiscoverDimension.RANKING, "热门", feedId = "ranking:week")
+        restored.viewModelScope.coroutineContext[Job]!!.children.toList().joinAll()
+        assertTrue(requests.isEmpty()); assertEquals(setOf("cursor"), restored.state.value.more)
+        restored.more(); restored.viewModelScope.coroutineContext[Job]!!.children.toList().joinAll()
+        assertEquals(2, requests.single().page); assertEquals("saved-cursor", requests.single().cursor)
+        assertEquals(setOf("one", "two"), restored.state.value.entries.map { it.book.id }.toSet())
     }
     @Test fun categoryWindowAndFilteredFeedShareOneDynamicCatalogLoad() = runTest(dispatcher) {
         var dynamicCalls = 0

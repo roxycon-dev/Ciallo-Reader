@@ -27,6 +27,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import coil.compose.AsyncImage
 import com.example.source.SearchBook
+import com.example.source.isKnownComicAuthor
 import com.example.ui.feedback.*
 import kotlinx.coroutines.delay
 
@@ -45,7 +46,8 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
     val alpha by animateFloatAsState(if (entered) 1f else 0f, tween(if (reduce) 0 else 160), label = "discoverEnter")
     val scale by animateFloatAsState(if (menuActive) .97f else 1f, tween(if (reduce) 0 else 120), label = "discoverPress")
     val primary = MaterialTheme.colorScheme.primary
-    val source = if (work.variants.size > 1) "${work.variants.size} 个源可读" else sourceLabel(work.book.sourceId)
+    val sourceCount = work.variants.map { it.book.sourceId }.distinct().size
+    val source = if (sourceCount > 1) "$sourceCount 个源可读" else sourceLabel(work.book.sourceId)
     val medal = rank?.takeIf { it in 1..3 }?.let { DiscoverMedals[it - 1] }
     val shape = RoundedCornerShape(if (layout == DiscoverLayout.LARGE) 24.dp else if (layout == DiscoverLayout.GRID) 16.dp else 20.dp)
     Box(Modifier.fillMaxWidth().alpha(alpha).graphicsLayer { scaleX = scale; scaleY = scale }
@@ -53,29 +55,34 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
         val cardModifier = Modifier.fillMaxWidth()
             .then(if (rank == 1 && medal != null) Modifier.shadow(8.dp, shape, ambientColor = medal.copy(alpha = .16f), spotColor = medal.copy(alpha = .24f)) else Modifier)
             .then(if (medal != null) Modifier.border(if (rank == 1) 1.5.dp else 1.dp, Brush.linearGradient(listOf(medal.copy(alpha = .40f), medal, medal.copy(alpha = .56f))), shape) else Modifier)
-            .clip(shape).background(MaterialTheme.colorScheme.surface.copy(alpha = .72f))
+            .clip(shape).background(MaterialTheme.colorScheme.surface.copy(alpha = .88f))
             .combinedClickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClick = onClick, onLongClick = { onMenu(bounds); haptics.perform(HapticKind.MEDIUM) })
             // Consume a horizontal drag after touch slop so releasing it cannot open a work.
             .pointerInput(Unit) { detectHorizontalDragGestures { change, _ -> change.consume() } }
-        Column(cardModifier.padding(if (layout == DiscoverLayout.LIST) 10.dp else 0.dp)) {
+        Column(cardModifier) {
             when (layout) {
-                DiscoverLayout.LIST -> Row(Modifier.fillMaxWidth().heightIn(min = if (rank == 1) 116.dp else 92.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (rank != null && rank > 3) Text(rank.toString(), Modifier.width(28.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace, color = discoverInk().copy(alpha = .64f))
-                    Cover(work.book, Modifier.size(if (rank == 1) 88.dp else 72.dp, if (rank == 1) 118.dp else 96.dp).clip(RoundedCornerShape(12.dp)),
-                        work.updatedAt, unread, rank, medal, coverSource)
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(work.book.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = discoverInk().copy(alpha = .92f))
-                        if (work.book.author.isNotBlank()) Text(work.book.author, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = discoverInk().copy(alpha = .64f))
-                        Text(metric(work, dimension), fontSize = 12.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace, color = discoverInk(), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        TagRow(work.tags)
-                        if (dimension == DiscoverDimension.DISCUSSION && work.variants.first().hotComment != null)
-                            Text("热评：${work.variants.first().hotComment}", fontSize = 11.sp, color = discoverInk(), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(source, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = discoverInk().copy(alpha = .64f))
-                    }
-                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Trend(work, dimension, reverseColors)
-                        work.book.comicInfo?.status?.let { Text(serialLabel(it), fontSize = 10.sp, color = discoverInk().copy(alpha = .64f)) }
-                        FollowButton(followed, false) { onFollow(!followed); haptics.perform(HapticKind.SUCCESS) }
+                DiscoverLayout.LIST -> {
+                    val largeText = LocalDensity.current.fontScale > 1.15f
+                    val displayRank = rank ?: work.variants.firstNotNullOfOrNull { it.rank?.takeIf { _ -> it.native } }
+                    Row(Modifier.fillMaxWidth().height(160.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(Modifier.width(120.dp).fillMaxHeight()) {
+                            Cover(work.book, Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)), work.updatedAt, false, null, null, coverSource)
+                            if (displayRank != null) SourceBadge("No.$displayRank", Modifier.align(Alignment.BottomCenter).padding(4.dp))
+                        }
+                        Column(Modifier.weight(1f).padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(verticalAlignment = Alignment.Top) {
+                                Text(work.book.title, Modifier.weight(1f), fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold, maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
+                                FollowButton(followed, false) { onFollow(!followed); haptics.perform(HapticKind.SUCCESS) }
+                            }
+                            if (!largeText && work.book.author.isKnownComicAuthor()) Text(work.book.author, fontSize = 12.sp, lineHeight = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            work.variants.firstNotNullOfOrNull { it.latestChapter?.takeIf(String::isNotBlank) }?.let { chapter ->
+                                Text(chapter, fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold, color = discoverAccentText(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            CardDataLine(work, dimension)
+                            TagRow(work.tags, workStatus(work).takeUnless { it == "状态未知" })
+                            if (!largeText) Text(source, fontSize = 11.sp, lineHeight = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .75f))
+                        }
                     }
                 }
                 DiscoverLayout.GRID -> {
@@ -154,21 +161,58 @@ private fun Cover(book: SearchBook, modifier: Modifier, updatedAt: Long?, unread
 @Composable
 private fun SourceBadge(label: String, modifier: Modifier) {
     Text(label, modifier.widthIn(max = 112.dp).background(Color.Black.copy(alpha = .72f), CircleShape).padding(horizontal = 8.dp, vertical = 4.dp),
-        color = Color.White, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        color = Color.White, fontSize = 10.sp, lineHeight = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 @Composable
 private fun FollowButton(followed: Boolean, compact: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Box(modifier.size(48.dp), contentAlignment = Alignment.Center) {
-        com.example.library.SearchResultFavoriteButton(followed, { onClick() }, touchSize = 48.dp)
+    // Foundation expands the small visual icon's touch target without stretching the title row.
+    Box(modifier.size(if (compact) 48.dp else 28.dp).clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick), contentAlignment = Alignment.Center) {
+        Icon(if (followed) Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder,
+            if (followed) "取消喜欢" else "加入我喜欢的", Modifier.size(20.dp),
+            tint = if (followed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 @Composable
-private fun TagRow(tags: List<String>) {
+private fun TagRow(tags: List<String>, status: String? = null) {
+    val labels = (listOfNotNull(status) + DiscoverTaxonomy.labels(tags)).distinct()
+    if (labels.isEmpty()) return
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        DiscoverTaxonomy.labels(tags).take(3).forEach { tag -> Text(tag, Modifier.weight(1f, fill = false).background(discoverTint(), CircleShape).padding(horizontal = 6.dp, vertical = 2.dp),
-            fontSize = 11.sp, color = discoverInk().copy(alpha = .64f), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        (labels.take(3) + if (labels.size > 3) listOf("+${labels.size - 3}") else emptyList()).forEach { tag ->
+            Text(tag, Modifier.weight(1f, fill = false).background(MaterialTheme.colorScheme.onSurface.copy(alpha = .06f), CircleShape).padding(horizontal = 6.dp, vertical = 2.dp),
+                fontSize = 11.sp, lineHeight = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
+internal fun cardCompact(value: Long): String = when {
+    value >= 100_000_000 -> String.format(java.util.Locale.ROOT, "%.1fy", value / 100_000_000.0)
+    value >= 10_000 -> String.format(java.util.Locale.ROOT, "%.1fw", value / 10_000.0)
+    value >= 1_000 -> String.format(java.util.Locale.ROOT, "%.1fk", value / 1_000.0)
+    else -> value.toString()
+}
+@Composable
+private fun CardDataLine(work: DiscoverWork, dimension: DiscoverDimension) {
+    val entries = work.variants
+    val count = when (dimension) {
+        DiscoverDimension.DISCUSSION -> entries.mapNotNull { it.discussions }.takeIf { it.isNotEmpty() }?.sum()
+        DiscoverDimension.CLICKS -> entries.mapNotNull { it.clicks }.takeIf { it.isNotEmpty() }?.sum()
+        DiscoverDimension.RANKING -> entries.mapNotNull { it.clicks }.takeIf { it.isNotEmpty() }?.sum()
+        else -> entries.mapNotNull { it.clicks }.takeIf { it.isNotEmpty() }?.sum()
+    }?.takeIf { it > 0 }
+    val statistic = entries.firstNotNullOfOrNull { it.statistic?.takeIf(String::isNotBlank) }
+    if (work.updatedAt == null && count == null && statistic == null) return
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        work.updatedAt?.let { Text(dateLabel(it).substringBefore(' '), fontSize = 12.sp, lineHeight = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
+        if (count != null || statistic != null) {
+            Icon(when (dimension) { DiscoverDimension.DISCUSSION -> Icons.Outlined.ChatBubbleOutline
+                DiscoverDimension.RANKING -> if (count != null) Icons.Outlined.Visibility else Icons.Outlined.FavoriteBorder
+                else -> Icons.Outlined.Visibility }, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(count?.let(::cardCompact) ?: statistic.orEmpty().substringAfter(' ').replace("万", "w"),
+                Modifier.weight(1f, fill = false), fontSize = 12.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
 internal fun metric(work: DiscoverWork, dimension: DiscoverDimension): String {
     val entries = work.variants
     val actual = when (dimension) {

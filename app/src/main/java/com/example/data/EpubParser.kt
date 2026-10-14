@@ -105,7 +105,7 @@ object EpubParser {
             for (idref in opfData.spineItemRefs) {
                 val href = opfData.manifestItems[idref] ?: continue
                 val xhtmlFile = File(opfDir, decodeUrl(href)).canonicalFile
-                require(xhtmlFile.toPath().startsWith(tempDir.canonicalFile.toPath())) { "EPUB正文路径越界" }
+                require(xhtmlFile.canonicalPath.startsWith(tempDir.canonicalPath.trimEnd(File.separatorChar) + File.separator)) { "EPUB正文路径越界" }
                 if (!xhtmlFile.exists()) {
                     error("EPUB 缺少正文文件：$href")
                 }
@@ -649,7 +649,7 @@ object EpubParser {
                 val title=if(link.tagName()=="navPoint") link.selectFirst("navLabel")?.text() else link.text()
                 if(href.isNullOrBlank() || title.isNullOrBlank()) continue
                 val target=File(toc.parentFile,decodeUrl(href.substringBefore('#'))).canonicalFile
-                if(!target.toPath().startsWith(canonicalRoot.toPath())) continue
+                if(!target.canonicalPath.startsWith(canonicalRoot.canonicalPath.trimEnd(File.separatorChar) + File.separator)) continue
                 val key=target.relativeTo(opf.parentFile!!).invariantSeparatorsPath
                 result.putIfAbsent(key,title.trim())
             }

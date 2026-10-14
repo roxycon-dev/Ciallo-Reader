@@ -24,7 +24,8 @@ data class DiscoverNativeCategory(val id: String, val label: String, val group: 
 }
 data class DiscoverCatalog(val feeds: List<DiscoverFeed> = emptyList(), val categories: List<DiscoverNativeCategory> = emptyList(),
     val dynamicCategories: Boolean = false, val explicit: Boolean = false,
-    val declared: Boolean = false, val capabilities: Map<String, List<String>> = emptyMap(), val dated: Boolean = false) {
+    val declared: Boolean = false, val capabilities: Map<String, List<String>> = emptyMap(), val dated: Boolean = false,
+    val statuses: List<String> = emptyList()) {
     fun ranges(dimension: DiscoverDimension): List<String> {
         if (!declared) return dimension.ranges
         val ranges = capabilities[dimension.name.lowercase()].orEmpty()

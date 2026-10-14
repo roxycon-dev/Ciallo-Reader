@@ -464,11 +464,11 @@ class ZLibrarySource(
                         eapiClient.getBookInfo(key.first, key.second, domain)
                     }
                 }.getOrNull()
-                  if (eapiBook != null) {
-                      return SourceResult.Success(eapiBook.copy(
-                          description = eapiBook.description ?: sourceBook.description,
-                          novelInfo = eapiBook.novelInfo ?: sourceBook.novelInfo))
-                  }
+                if (eapiBook != null) {
+                    return SourceResult.Success(eapiBook.copy(
+                        description = eapiBook.description ?: sourceBook.description,
+                        novelInfo = eapiBook.novelInfo ?: sourceBook.novelInfo))
+                }
             }
             SourceResult.Success(sourceBook)
         } catch (e: SourceException) {

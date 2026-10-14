@@ -16,6 +16,7 @@ internal object JsDiscoverAdapter {
             (0 until categories.length()).mapNotNull { i -> categories.optJSONObject(i)?.let {
                 DiscoverNativeCategory(it.optString("id"), it.optString("label"), it.optString("group")) } },
             data.optBoolean("dynamicCategories"), data.optBoolean("explicit"), declared = true,
+            statuses = data.optJSONArray("statuses")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty(),
             capabilities = data.optJSONObject("capabilities")?.let { obj -> obj.keys().asSequence().associateWith { key ->
                 val values = obj.optJSONArray(key) ?: JSONArray()
                 (0 until values.length()).map { values.getString(it) }
@@ -38,7 +39,10 @@ internal object JsDiscoverAdapter {
                 row.opt(k)?.takeUnless { it == JSONObject.NULL }?.toString()?.takeIf { it.isNotBlank() && it != "null" } }
             fun number(vararg keys: String): Long? = keys.firstNotNullOfOrNull { key ->
                 when (val value = row.opt(key)) {
-                    is Number -> runCatching { value.toString().toBigDecimal().toBigIntegerExact().longValueExact() }.getOrNull()
+                    is Number -> runCatching {
+                        val decimal = value.toString().toBigDecimal().stripTrailingZeros()
+                        decimal.takeIf { it.scale() <= 0 && it >= Long.MIN_VALUE.toBigDecimal() && it <= Long.MAX_VALUE.toBigDecimal() }?.toLong()
+                    }.getOrNull()
                     is String -> value.toLongOrNull()
                     else -> null
                 } }

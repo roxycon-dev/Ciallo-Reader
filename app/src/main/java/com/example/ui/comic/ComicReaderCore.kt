@@ -357,7 +357,8 @@ fun ComicReaderCore(
     }
 
     // 尺寸到达防抖合批（在线逐页到达时避免整布局每页重建）
-    val sizes by loader.sizes.debounce(120).produceState0(emptyMap())
+    val sizeUpdates = remember(loader) { loader.sizes.debounce(120) }
+    val sizes by sizeUpdates.produceState0(emptyMap())
     // 本地页批量预取原始尺寸（宽页拆分判定需要；顺序探测避免抢占 CPU）
     LaunchedEffect(pages) {
         loader.probeSizes(pages.take(600))
@@ -908,7 +909,7 @@ internal fun effectiveSplitPosition(config: ComicReaderConfig, detectedGutterPos
 /** Flow → State 简写（初值即时，后续防抖） */
 @Composable
 private fun <T> kotlinx.coroutines.flow.Flow<T>.produceState0(initial: T): State<T> =
-    produceState(initial, this) {
+    com.example.ui.components.rememberAsyncState(initial, this) {
         this@produceState0.collect { value = it }
     }
 
@@ -963,7 +964,8 @@ fun rememberPageBitmap(
     val rotation = ((config.bookRotation + pageRot) % 360 + 360) % 360
     val cacheKey = "${slot.ref.id}|${slot.half}|${config.imagePipelineFingerprint()}|r$rotation"
     // 第 19 条：拆分位置 = 检测缝位置 + 用户微调（loader.sizes 有探测结论时）
-    val splitPos = effectiveSplitPosition(config, loader.sizes.value[slot.ref.id]?.gutterPos)
+    val pageSizes by loader.sizes.collectAsStateWithLifecycle()
+    val splitPos = effectiveSplitPosition(config, pageSizes[slot.ref.id]?.gutterPos)
     // 第六轮族 A 根治：初值同步读缓存——loader 缓存是页面位图状态的单一数据源，
     // 缓存命中时第一帧即 Ready，不存在"先 Loading 占位、加载完再纠正"的中间态。
     // （磁吸 for+key 窗口平移时 remember 实测全部重建——KeyMoveSemanticsTest——
@@ -1965,9 +1967,10 @@ internal fun SinglePageContent(
         // 保证 hiRes 内容与底层视觉一致。
         var hiRes by remember(slot.ref.id) { mutableStateOf<ImageBitmap?>(null) }
         var hiResRect by remember(slot.ref.id) { mutableStateOf(RectF()) }
+        val regionSizes by loader.sizes.collectAsStateWithLifecycle()
         val geoForRegion = ComicImagePipeline.Geometry(
             half = slot.half,
-            splitPosition = effectiveSplitPosition(config, loader.sizes.value[slot.ref.id]?.gutterPos),
+            splitPosition = effectiveSplitPosition(config, regionSizes[slot.ref.id]?.gutterPos),
             rotationDeg = ((config.bookRotation + (bookState.pageRotations[slot.ref.id] ?: 0)) % 360 + 360) % 360,
             cropMode = config.cropMode,
             manualCrop = config.manualCrop,

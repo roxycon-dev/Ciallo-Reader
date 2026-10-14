@@ -97,8 +97,8 @@ class ZLibraryDns : Dns {
         }
     }
     fun clearCaches() { cache.clear(); failCache.clear(); knownGoodCache.clear() }
-    override fun lookup(hostname: String): List<InetAddress> {
-        if (cache.size + failCache.size > 512 || knownGoodCache.size > 256) clearCaches()
+                override fun lookup(hostname: String): List<InetAddress> {
+                    if (cache.size + failCache.size > 512 || knownGoodCache.size > 256) clearCaches()
                     return when (hostname) {
                         "dns.alidns.com" -> listOf(InetAddress.getByAddress("dns.alidns.com", byteArrayOf(223.toByte(), 5.toByte(), 5.toByte(), 5.toByte())))
                         "doh.pub" -> listOf(InetAddress.getByAddress("doh.pub", byteArrayOf(1.toByte(), 12.toByte(), 12.toByte(), 12.toByte())))

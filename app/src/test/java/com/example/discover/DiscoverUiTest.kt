@@ -15,6 +15,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.Density
@@ -43,6 +44,50 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [35], qualifiers = "zh-rCN-w390dp-h844dp-420dpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class DiscoverUiTest {
+    @Test fun fiveHeadersShareGeometryAndKeepEnglishAt130Percent() {
+        val titles = listOf("书库", "发现", "我的书架", "阅读统计", "设置")
+        val subtitles = listOf("LIBRARY & SEARCH", "DISCOVER", "BOOKSHELF & READING", "STATISTICS & INSIGHTS", "SETTINGS & PREFERENCES")
+        compose.setContent {
+            MyApplicationTheme {
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, 1.3f), LocalRenderQuality provides RenderQuality.MID) {
+                    Column {
+                        titles.forEachIndexed { i, title ->
+                            if (i < 2) com.example.ui.components.CollapsingTabScreenHeader({ 0f }, modifier = Modifier.testTag("header_$i"), title = title, subtitle = subtitles[i], titleColor = MaterialTheme.colorScheme.onSurface,
+                                trailing = { androidx.compose.material3.IconButton(onClick = {}) { androidx.compose.material3.Icon(Icons.Outlined.Tune, null) } })
+                            else com.example.ui.components.TabScreenHeader(modifier = Modifier.testTag("header_$i"), title = title, subtitle = subtitles[i], titleColor = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        val bounds = titles.indices.map { compose.onNodeWithTag("header_$it").fetchSemanticsNode().boundsInRoot }
+        bounds.forEach { assertEquals(bounds[0].width, it.width, 0f); assertEquals(bounds[0].height, it.height, 0f); assertEquals(bounds[0].left, it.left, 0f) }
+        subtitles.forEach { compose.onNodeWithText(it).assertIsDisplayed() }
+    }
+    @Test @Config(qualifiers = "zh-rCN-w360dp-h640dp-420dpi")
+    fun categoryFooterFitsCompactScreensWithLargeText() {
+        mount(DiscoverLayout.GRID, fontScale = 1.3f)
+        compose.onNodeWithText("分类").performClick()
+        compose.onNodeWithText("查看全部").assertIsDisplayed()
+        val footer = compose.onNodeWithText("查看全部").fetchSemanticsNode().boundsInRoot
+        val window = generateSequence(compose.onNodeWithText("找你想看的漫画").fetchSemanticsNode()) { it.parent }.last().boundsInRoot
+        assertTrue(footer.bottom < window.bottom - 12f)
+    }
+    @Test @Config(qualifiers = "zh-rCN-w360dp-h400dp-420dpi")
+    fun categoryFooterStaysVisibleInAKeyboardSizedViewport() {
+        compose.setContent {
+            MyApplicationTheme {
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, 1.3f), LocalReduceMotion provides true, LocalRenderQuality provides RenderQuality.MID) {
+                    Surface(Modifier.fillMaxSize()) { DiscoverCategorySheet(emptyList(), emptySet(), emptyList(), {}, { _, _ -> }, {}) }
+                }
+            }
+        }
+        compose.onNodeWithText("查看全部").assertIsDisplayed()
+        compose.onNodeWithContentDescription("关闭分类窗口").assertIsDisplayed()
+    }
     private var fixtures = emptyList<FixtureSource>()
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     internal open class FixtureSource(override val id: String) : ComicSource {
@@ -131,6 +176,12 @@ class DiscoverUiTest {
     @Test fun rankingHasThreeMedalsAndFitsLargeDarkText() {
         mount(DiscoverLayout.LIST, dark = true, fontScale = 1.3f, dimension = DiscoverDimension.RANKING)
         compose.onNodeWithText("榜单").assertExists()
+        listOf("推荐", "更新", "热议", "榜单", "点击").forEach { label ->
+            val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            compose.onNodeWithText(label).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            assertEquals("$label must stay on one line", 1, layouts.single().lineCount)
+            assertFalse("$label must remain complete", layouts.single().isLineEllipsized(0))
+        }
         val source = compose.onNodeWithText("聚合书源").fetchSemanticsNode().boundsInRoot
         val range = compose.onNodeWithText("热门").fetchSemanticsNode().boundsInRoot
         assertTrue("Range row must stay below the source row", range.top >= source.bottom)
@@ -161,13 +212,19 @@ class DiscoverUiTest {
         compose.onNodeWithText("搜索分类").assertIsDisplayed()
         val before = fixtures.sumOf { it.discoverCalls }
         compose.onNodeWithText("战斗").performClick()
-        compose.onNodeWithText("冒险 12 · 今").performClick()
+        compose.onNodeWithText("冒险 · 12本 · 今").performClick()
         compose.onNodeWithText("应用 2 项").assertIsDisplayed()
         assertEquals("Draft chip changes must not request sources", before, fixtures.sumOf { it.discoverCalls })
         capture("discover-categories130.png", overlay = true)
         compose.onNodeWithText("应用 2 项").performClick()
         compose.waitForIdle()
         assertEquals(setOf("battle", "adventure"), DiscoverStore(ApplicationProvider.getApplicationContext<Context>()).selection("categories"))
+        compose.onNodeWithContentDescription("取消战斗").performClick()
+        compose.waitForIdle()
+        assertEquals(setOf("adventure"), DiscoverStore(ApplicationProvider.getApplicationContext<Context>()).selection("categories"))
+        compose.onNodeWithText("清除").performClick()
+        compose.waitForIdle()
+        assertTrue(DiscoverStore(ApplicationProvider.getApplicationContext<Context>()).selection("categories").isEmpty())
     }
     @Test fun settingsCacheAndBlockManagementAreReachableInDarkLargeText() {
         mount(DiscoverLayout.LIST, dark = true, fontScale = 1.3f)
@@ -221,6 +278,7 @@ class DiscoverUiTest {
         val footer = compose.onNodeWithText("查看全部").fetchSemanticsNode().boundsInRoot
         val window = generateSequence(compose.onNodeWithText("找你想看的漫画").fetchSemanticsNode()) { it.parent }.last().boundsInRoot
         assertTrue("Footer must remain within the measured dialog window", footer.bottom <= window.bottom)
+        assertTrue("Footer needs a bottom gutter on gesture-navigation devices", window.bottom - footer.bottom >= 12f)
         compose.onNodeWithContentDescription("关闭分类窗口").performClick()
         compose.onNodeWithText("找你想看的漫画").assertDoesNotExist()
     }
@@ -231,6 +289,7 @@ class DiscoverUiTest {
         compose.onNodeWithText("星海冒险 1").performTouchInput { swipeRight() }
         assertEquals(0, follows())
         listOf("随机来一本", "直达未读", "读最新话", "正在刷新").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
+        capture("discover-list.png")
     }
     @Test fun aSourcesStatusFilterCannotEmptyAnotherSourcesUnspecifiedStatusBooks() {
         mount(DiscoverLayout.LIST, scopedStatusFixture = true)

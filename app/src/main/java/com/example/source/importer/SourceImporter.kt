@@ -479,7 +479,7 @@ object SourceImporter {
                 val opt = try {
                     JSONObject(candidate)
                 } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
+                    if (e is kotlinx.coroutines.CancellationException) throw e
                     null
                 }
                 if (opt != null) {

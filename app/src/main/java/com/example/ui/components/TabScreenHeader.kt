@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -152,40 +153,9 @@ fun TabScreenHeader(
         derivedStateOf { collapsedSource?.invoke() ?: collapsed }
     }
 
-    val duration = if (LocalRenderQuality.current.minimal) 0 else 220
-    val outerV by animateDpAsState(if (collapsedNow) 6.dp else 10.dp, tween(duration), label = "hdrOuterV")
-    val innerV by animateDpAsState(if (collapsedNow) 7.dp else 12.dp, tween(duration), label = "hdrInnerV")
-    val titleSize by animateFloatAsState(if (collapsedNow) 19f else 24f, tween(duration), label = "hdrTitle")
-
-    GlassCard(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = outerV),
-        shape = RoundedCornerShape(24.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = innerV),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            leading?.invoke(this)
-            if (titleVisible && title != null) {
-                if (leading != null) Spacer(Modifier.width(2.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = title,
-                        fontSize = titleSize.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = titleColor,
-                        fontFamily = AppFonts.Serif
-                    )
-
-                }
-            }
-            trailing?.invoke(this)
-        }
-    }
+    CollapsingTabScreenHeader(fractionSource = { if (collapsedNow) 1f else 0f }, focusDriven = true,
+        modifier = modifier, title = title.orEmpty(), subtitle = subtitle, titleColor = titleColor,
+        titleVisible = titleVisible && title != null, leading = leading, trailing = trailing)
 }
 
 /**
@@ -212,14 +182,16 @@ fun CollapsingTabScreenHeader(
     title: String = "书库",
     subtitle: String? = null,
     titleColor: Color = Color.Unspecified,
+    titleVisible: Boolean = true,
     leading: (@Composable RowScope.() -> Unit)? = null,
     onTitleClick: (() -> Unit)? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null
 ) {
     val target = fractionSource()
+    val reduce = com.example.ui.feedback.LocalReduceMotion.current || LocalRenderQuality.current.minimal
     val fraction by animateFloatAsState(
         targetValue = target,
-        animationSpec = if (focusDriven || target == 1f) tween(260) else tween(120),
+        animationSpec = if (reduce) tween(0) else if (focusDriven || target == 1f) tween(260) else tween(120),
         label = "libHeaderFraction",
     )
     val f0 = fraction.coerceIn(0f, 1f)
@@ -258,11 +230,11 @@ fun CollapsingTabScreenHeader(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = innerV),
+                .padding(horizontal = 20.dp, vertical = innerV).heightIn(min = 52.dp * (1f - compact)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             leading?.invoke(this)
-            Column(Modifier.weight(1f).then(if (onTitleClick != null) Modifier.clickable(onClick = onTitleClick) else Modifier)) {
+            if (titleVisible) Column(Modifier.weight(1f).then(if (onTitleClick != null) Modifier.clickable(onClick = onTitleClick) else Modifier)) {
                 Text(
                     text = title,
                     fontSize = titleSize.sp,

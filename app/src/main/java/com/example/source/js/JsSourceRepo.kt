@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 object JsSourceRepo {
 
     /** 本地补丁版本：升级后尝试更新源脚本，失败时仍可使用旧缓存。 */
-    private const val PATCH_VERSION = 45
+    private const val PATCH_VERSION = 46
     // Raw cache format stays stable when compatibility patches change.
     private const val RAW_CACHE_PREFIX = "// EASYREADER_RAW_SOURCE_V28\n"
 
@@ -1042,6 +1042,22 @@ function __cialloChapterJson(doc, html) {
                 """.trimIndent()
             )
             // hitomi CDN 现在默认给 AVIF（Android 平台解码不稳定），改要 webp
+            if (!patched.contains("Object.entries(resp.headers || {}).find(([key]) => key.toLowerCase() === 'content-range')")) {
+            patched = patched.replace("resp.headers[\"content-range\"]", "Object.entries(resp.headers || {}).find(([key]) => key.toLowerCase() === 'content-range')?.[1]")
+                .replace("let itemCount = 0;", "let itemCount = NaN;")
+                .replace("maxPage: Math.ceil(result.count / 25)", "maxPage: Number.isFinite(result.count) ? Math.ceil(result.count / 25) : null")
+                .replace("title: \"hitomi.la\",", "title: \"最新更新\",")
+                .replace("language: n.language,", "language: n.language, updatedAt: n.posted_time.getTime(),")
+                .replace("...n.series,", "...n.series, n.type, n.language,")
+                .replace("const term = param;", """
+                    const term = param;
+                    const queryKey = JSON.stringify([term, options]);
+                    if (page !== 1 && this.__cialloHitomiCategoryKey !== queryKey) {
+                      await this.categoryComics.load(category, param, options, 1);
+                    }
+                    this.__cialloHitomiCategoryKey = queryKey;
+                """.trimIndent())
+            }
             patched.replace(
                 Regex("""return files\.map\(\(image\) => url_from_url_from_hash\(0, image, "avif"\)\);"""),
                 """return files.map((image) => url_from_url_from_hash(0, image, "webp"));"""

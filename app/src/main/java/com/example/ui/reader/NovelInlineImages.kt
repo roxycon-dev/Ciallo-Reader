@@ -293,7 +293,7 @@ object NovelInlineImages {
 @Composable
 fun NovelInlineImage(path: String, onTap: () -> Unit, enabled: Boolean = true) {
     var decodeDone by remember(path) { mutableStateOf(false) }
-    val bitmap by produceState<android.graphics.Bitmap?>(initialValue = NovelInlineImages.NovelImageCache.get(path), path) {
+    val bitmap by com.example.ui.components.rememberAsyncState<android.graphics.Bitmap?>(initialValue = NovelInlineImages.NovelImageCache.get(path), path) {
         if (value == null) {
             value = withContext(Dispatchers.IO) {
                 runCatching {

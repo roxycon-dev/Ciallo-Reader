@@ -496,7 +496,7 @@ class BookRepository(
                 )
                 Result.success(book.copy(id = bookId, totalChapters = 1))
             } catch (t: Throwable) {
-            if (t is kotlinx.coroutines.CancellationException) throw t
+                if (t is kotlinx.coroutines.CancellationException) throw t
                 android.util.Log.e("BookImport", "[BookRepository] Unsupported format import failed", t)
                 Result.failure(Exception(t.localizedMessage ?: "导入失败"))
             }

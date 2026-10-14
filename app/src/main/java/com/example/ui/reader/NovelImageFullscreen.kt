@@ -78,7 +78,7 @@ fun NovelImageFullscreenViewer(
         if (visibility.isIdle && !visibility.currentState && !visibility.targetState) latestDismiss()
     }
     var loaded by remember(path) { mutableStateOf(false) }
-    val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, path) {
+    val bitmap by com.example.ui.components.rememberAsyncState<android.graphics.Bitmap?>(initialValue = null, path) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 if (path.startsWith("epzip:")) {

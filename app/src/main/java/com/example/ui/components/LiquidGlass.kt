@@ -206,7 +206,7 @@ fun GlassDialogWindowEffect(
             window?.setDimAmount(0.42f)
         }
         onDispose {
-            decorView?.setRenderEffect(null)
+            if (android.os.Build.VERSION.SDK_INT >= 31) decorView?.setRenderEffect(null)
         }
     }
 }

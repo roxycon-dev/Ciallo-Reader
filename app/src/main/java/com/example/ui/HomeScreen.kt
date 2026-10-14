@@ -908,7 +908,6 @@ fun HomeScreen(
                             .fillMaxSize()
                             .statusBarsPadding()
                             .imePadding()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         // 1. TOP BAR GREETINGS & SEARCH
                         val isDark = com.example.ui.theme.LocalAppDarkTheme.current
@@ -1061,6 +1060,7 @@ fun HomeScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxWidth()
+                                    .padding(horizontal = 16.dp)
                                     .onGloballyPositioned { booksGridRoot = it.positionInRoot() },
                                 verticalArrangement = Arrangement.spacedBy(20.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)

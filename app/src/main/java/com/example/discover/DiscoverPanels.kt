@@ -69,30 +69,21 @@ internal fun DiscoverCategorySheet(entries: List<DiscoverEntry>, selected: Set<S
                 Text("找你想看的漫画", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 IconButton(onClick = onDismiss) { Icon(Icons.Outlined.Close, "关闭分类窗口") }
             }
-            OutlinedTextField(search, { search = it }, Modifier.fillMaxWidth(), singleLine = true,
-                placeholder = { Text("搜索分类") }, leadingIcon = { Icon(Icons.Outlined.Search, null) })
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(DiscoverTaxonomy.roots) { root -> DiscoverChip(root.label, facet == root.id, solid = false,
-                    onClick = { facet = root.id; search = "" }) }
-                item { DiscoverChip("书源分类", facet == "native", solid = false, onClick = { facet = "native"; search = "" }) }
-            }
-            Text("组内多选，跨组组合 · 数量与更新来自已加载作品",
-                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 4.dp))
             if (facet == "native") {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(catalogs, key = { it.first.id }) { (source, _) -> DiscoverChip(source.name, nativeSource == source.id,
-                        onClick = { nativeSource = source.id; nativeGroup = "" }) }
-                }
                 val catalog = catalogs.firstOrNull { it.first.id == nativeSource }?.second
                 val groups = catalog?.categories.orEmpty().map { it.group }.filter { it.isNotBlank() }.distinct()
-                if (groups.size > 1) LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item { DiscoverChip("全部", nativeGroup.isBlank(), solid = false, onClick = { nativeGroup = "" }) }
-                    items(groups) { g -> DiscoverChip(g, nativeGroup == g, solid = false, onClick = { nativeGroup = g }) }
-                }
                 val categories = catalog?.categories.orEmpty().filter { (nativeGroup.isBlank() || it.group == nativeGroup) &&
                     (search.isBlank() || it.label.contains(search, true) || it.standardIds.any { id -> DiscoverTaxonomy.all.any { it.id == id && it.label.contains(search) } }) }
                 LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                    item { CategorySearchHeader(search, facet, { search = it }, { facet = it; search = "" }) }
+                    item { LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(catalogs, key = { it.first.id }) { (source, _) -> DiscoverChip(source.name, nativeSource == source.id,
+                            onClick = { nativeSource = source.id; nativeGroup = "" }) }
+                    } }
+                    if (groups.size > 1) item { LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item { DiscoverChip("全部", nativeGroup.isBlank(), solid = false, onClick = { nativeGroup = "" }) }
+                        items(groups) { g -> DiscoverChip(g, nativeGroup == g, solid = false, onClick = { nativeGroup = g }) }
+                    } }
                     items(categories.chunked(3)) { row -> FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         row.forEach { c -> DiscoverChip(c.label, false, solid = false, outlined = true, onClick = { onNative(nativeSource, c.id) }) }
                     } }
@@ -105,13 +96,14 @@ internal fun DiscoverCategorySheet(entries: List<DiscoverEntry>, selected: Set<S
                     (openTaxonomy || b.id in supportedIds || b.children.any { it.id in supportedIds || it.id in draft || it.id in setOf("native_other", "year", "franchise") }) &&
                     (search.isBlank() || b.label.contains(search, true) || b.children.any { c -> c.label.contains(search, true) || c.aliases.any { it.contains(search, true) } }) }
                 LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
+                    item { CategorySearchHeader(search, facet, { search = it }, { facet = it; search = "" }) }
                     items(branches) { branch ->
                         Text(branch.label, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (branch.id in supportedIds) DiscoverChip("全部${branch.label}", branch.id in draft, solid = false, outlined = true, onClick = { toggle(branch.id) })
                             branch.children.filter { c -> (openTaxonomy || c.id in supportedIds || c.id in draft || c.id in setOf("native_other", "year", "franchise")) &&
                                 (search.isBlank() || branch.label.contains(search, true) || c.label.contains(search, true) || c.aliases.any { it.contains(search, true) }) }.forEach { c ->
-                                val count = counts[c.id]?.let { " $it" }.orEmpty()
+                                val count = counts[c.id]?.let { " · ${it}本" }.orEmpty()
                                 DiscoverChip(c.label + count + if (c.id in updated) " · 今" else "", c.id in draft,
                                     solid = false, outlined = true, onClick = {
                                         if (c.id in setOf("native_other", "year", "franchise")) { facet = "native"; search = "" }
@@ -128,5 +120,20 @@ internal fun DiscoverCategorySheet(entries: List<DiscoverEntry>, selected: Set<S
                     modifier = Modifier.weight(1f), fullWidth = true)
             }
         }
+    }
+}
+
+/** Search and facets scroll under the fixed title/footer when the keyboard reduces height. */
+@Composable
+private fun CategorySearchHeader(search: String, facet: String, onSearch: (String) -> Unit, onFacet: (String) -> Unit) {
+    Column {
+        OutlinedTextField(search, onSearch, Modifier.fillMaxWidth(), singleLine = true,
+            placeholder = { Text("搜索分类") }, leadingIcon = { Icon(Icons.Outlined.Search, null) })
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(DiscoverTaxonomy.roots) { root -> DiscoverChip(root.label, facet == root.id, solid = false, onClick = { onFacet(root.id) }) }
+            item { DiscoverChip("书源分类", facet == "native", solid = false, onClick = { onFacet("native") }) }
+        }
+        Text("组内多选，跨组组合 · 本数仅统计已加载作品", style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 4.dp))
     }
 }

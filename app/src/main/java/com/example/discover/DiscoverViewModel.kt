@@ -10,6 +10,8 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.channels.Channel
+import org.json.JSONObject
+import org.json.JSONArray
 
 data class DiscoverState(val entries: List<DiscoverEntry> = emptyList(), val loading: Boolean = false,
     val more: Set<String> = emptySet(), val errors: Map<String, String> = emptyMap(),
@@ -115,7 +117,7 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
         if (cacheKey.isBlank()) return
         sessions[cacheKey] = Session(_state.value.copy(loading = false), pages.toMap(), cursors.toMap(),
             cursorHistory.mapValues { it.value.toSet() }, noProgress.toMap())
-        while (sessions.size > 12 || (sessions.size > 1 && sessions.values.sumOf { it.state.entries.size } > 8000))
+        while (sessions.size > 32 || (sessions.size > 1 && sessions.values.sumOf { it.state.entries.size } > 8000))
             sessions.remove(sessions.keys.first { it != cacheKey })
     }
 
@@ -124,7 +126,8 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
         val nextSources = manager.availableSources.value.filterIsInstance<ComicSource>().filter {
             it.isComicSource && (sourceId == "aggregate" || it.id == sourceId) }
         val signature = nextSources.sortedBy { it.id }.joinToString { "${it.id}@${(it as? com.example.source.js.JsComicSource)?.version.orEmpty()}" }
-        val nextKey = "$sourceId:${dimension.name}:$range:${feedId.orEmpty()}:${categoryId.orEmpty()}:${standardCategories.sorted()}:$signature:$status:v3"
+        val window = if (dimension == DiscoverDimension.UPDATES && feedId == null && categoryId == null) DiscoverEngine.rangeStart(range, System.currentTimeMillis()) ?: 0L else 0L
+        val nextKey = "$sourceId:${dimension.name}:$range:${feedId.orEmpty()}:${categoryId.orEmpty()}:${standardCategories.sorted()}:$signature:$status:$window:v3"
         if (!force && nextKey == cacheKey) { sources = nextSources; return }
         rememberSession()
         job?.cancel()
@@ -134,7 +137,7 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
         query = DiscoverQuery(dimension, range, feedId = feedId, categoryId = categoryId, includeAdult = true,
             standardCategories = standardCategories, status = status)
         cacheKey = nextKey
-        diskCacheKey = "$sourceId:${dimension.name}:$range:${feedId.orEmpty()}:${categoryId.orEmpty()}:${standardCategories.sorted()}:${nextSources.map { it.id }.sorted()}:${com.example.BuildConfig.VERSION_CODE}:$status:v4"
+        diskCacheKey = "$sourceId:${dimension.name}:$range:${feedId.orEmpty()}:${categoryId.orEmpty()}:${standardCategories.sorted()}:$signature:${com.example.BuildConfig.VERSION_CODE}:$status:$window:v5"
         pages.clear(); cursors.clear(); cursorHistory.clear(); noProgress.clear()
         val session = sessions[nextKey]
         if (!force && session != null) {
@@ -154,6 +157,12 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
             val saved = if (store.flag("cache")) withContext(Dispatchers.IO) { store.readCache(key) } else emptyList()
             val cached = previousRows.ifEmpty { saved }.filter { e -> sources.any { it.id == e.book.sourceId } &&
                 (start == null || (e.updatedAt != null && e.updatedAt >= start && e.updatedAt <= now)) }
+            val navigation = if (!force && saved.isNotEmpty()) withContext(Dispatchers.IO) { store.readNavigation(key) } else null
+            if (navigation != null && cached.size == saved.size && navigation.optInt("entryCount", -1) == saved.size && restoreNavigation(navigation)) {
+                _state.value = DiscoverState(entries = cached, cached = true, more = sources.map { it.id }.filter { navigation.optJSONArray("more")?.let { rows -> (0 until rows.length()).any { i -> rows.getString(i) == it } } == true }.toSet(), catalogs = catalogs.toMap())
+                rememberSession()
+                return@launch
+            }
             _state.value = DiscoverState(entries = cached, cached = cached.isNotEmpty(), loading = true, catalogs = catalogs.toMap())
             fetch(sources, append = false)
         }
@@ -251,6 +260,42 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
         _state.update { it.copy(loading = false) }
         rememberSession()
         val persistentKey = diskCacheKey
-        if (rows.isNotEmpty() && store.flag("cache")) withContext(Dispatchers.IO) { store.writeCache(persistentKey, rows) }
+        if (rows.isNotEmpty() && store.flag("cache")) {
+            val navigation = navigationSnapshot()
+            val persistedRows = _state.value.entries
+            withContext(Dispatchers.IO) { store.writeCache(persistentKey, persistedRows, navigation) }
+        }
     }
+
+    private fun navigationSnapshot(): JSONObject = JSONObject().put("entryCount", _state.value.entries.size).put("pages", JSONObject(pages.toMap()))
+        .put("cursors", JSONObject(cursors.filterValues { it != null })).put("more", JSONArray(_state.value.more.toList()))
+        .put("history", JSONObject().apply { cursorHistory.forEach { (id, values) -> put(id, JSONArray(values.toList())) } })
+        .put("progress", JSONObject(noProgress.toMap()))
+        .put("catalogs", JSONObject().apply { catalogs.forEach { (id, catalog) -> put(id, JSONObject()
+            .put("feeds", JSONArray(catalog.feeds.map { JSONObject().put("id", it.id).put("label", it.label).put("kind", it.kind) }))
+            .put("categories", JSONArray(catalog.categories.map { JSONObject().put("id", it.id).put("label", it.label).put("group", it.group) }))
+            .put("capabilities", JSONObject().apply { catalog.capabilities.forEach { (kind, ranges) -> put(kind, JSONArray(ranges)) } })
+            .put("dynamic", catalog.dynamicCategories).put("explicit", catalog.explicit).put("declared", catalog.declared).put("dated", catalog.dated).put("statuses", JSONArray(catalog.statuses))) } })
+
+    /** Only complete pages can be resumed. Old entry-only caches still revalidate. */
+    private fun restoreNavigation(json: JSONObject): Boolean = runCatching {
+        val savedPages = json.getJSONObject("pages")
+        if (sources.any { !savedPages.has(it.id) }) return@runCatching false
+        val savedCatalogs = json.getJSONObject("catalogs")
+        sources.forEach { source ->
+            val c = savedCatalogs.getJSONObject(source.id)
+            val feeds = c.getJSONArray("feeds"); val categories = c.getJSONArray("categories"); val capabilities = c.getJSONObject("capabilities")
+            catalogs[source.id] = DiscoverCatalog(
+                feeds = (0 until feeds.length()).map { i -> feeds.getJSONObject(i).let { DiscoverFeed(it.getString("id"), it.getString("label"), it.optString("kind").takeUnless { kind -> kind.isBlank() || kind == "null" }) } },
+                categories = (0 until categories.length()).map { i -> categories.getJSONObject(i).let { DiscoverNativeCategory(it.getString("id"), it.getString("label"), it.optString("group")) } },
+                dynamicCategories = c.optBoolean("dynamic"), explicit = c.optBoolean("explicit"), declared = c.optBoolean("declared"), dated = c.optBoolean("dated"),
+                statuses = c.optJSONArray("statuses")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty(),
+                capabilities = capabilities.keys().asSequence().associateWith { kind -> capabilities.getJSONArray(kind).let { a -> (0 until a.length()).map { a.getString(it) } } })
+            pages[source.id] = savedPages.getInt(source.id)
+            noProgress[source.id] = json.optJSONObject("progress")?.optInt(source.id) ?: 0
+            json.optJSONObject("history")?.optJSONArray(source.id)?.let { a -> cursorHistory[source.id] = (0 until a.length()).map { a.getString(it) }.toMutableSet() }
+            cursors[source.id] = json.optJSONObject("cursors")?.optString(source.id)?.takeIf { it.isNotBlank() }
+        }
+        true
+    }.getOrDefault(false)
 }

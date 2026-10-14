@@ -23,6 +23,14 @@ const h=host({fileName:'comick.js'});
  for(const [range,key] of [['周','-week'],['月','-month']]){
   const result=await h.run(`__cialloDiscover(fake,{dimension:'clicks',range:${JSON.stringify(range)},status:'完结',categoryId:'category:0:0',page:1})`);
   assert.deepEqual([...(await h.run('actualOptions'))],[key,'completed']);assert(result.entries[0].origin.includes(range+'点击'));
+  assert.equal(result.entries[0].status,'完结','A proven server-side completed filter must survive the local status filter');
  }
- console.log('10 Comick API, metadata, state, restored category cursor, provenance and native week/month option contracts passed (offline).');
+ const catalog=await h.run('__cialloDiscoverCatalog(fake)');assert.deepEqual([...catalog.statuses],['连载','完结']);
+ await h.run(`fake.categoryComics.load=async()=>({comics:[{id:'blank',title:'空状态',status:'  ',clicks:100}],maxPage:1})`);
+ const blank=await h.run(`__cialloDiscover(fake,{dimension:'clicks',range:'周',status:'完结',categoryId:'category:0:0',page:1})`);
+ assert.equal(blank.entries[0].status,'完结','Blank native status must not override a proven filter');
+ await h.run(`fake.categoryComics.optionList=fake.categoryComics.optionList.slice(0,1)`);
+ const unknown=await h.run(`__cialloDiscover(fake,{dimension:'clicks',range:'周',status:'完结',categoryId:'category:0:0',page:1})`);
+ assert.equal(unknown.entries[0].status,null,'Never invent status when the native filter is unavailable');
+ console.log('Comick API, metadata, restored category cursor, provenance, native week/month options and missing/blank/unknown status contracts passed (offline).');
 })().catch(e=>{console.error(e.stack);process.exitCode=1}).finally(()=>{h.close();closeTransport()});

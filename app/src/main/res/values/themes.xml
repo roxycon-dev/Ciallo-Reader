@@ -11,8 +11,7 @@
          重绘（MIUI / HyperOS 尤其激进）。本 App 自己就有 autoNightMode 开关，
          被系统再反一次色 = 两套深色叠加，原生 Toast / 文本选择菜单会糊成鬼画符。
          显式关闭后系统不再插手，明暗完全由 App 自己决定。
-         注：forceDarkAllowed 是 API 29 引入的属性，写在默认 values/ 下时，
-         老系统会直接忽略该条目，既不崩也无副作用。
+         forceDarkAllowed 仅在 values-v29 中设置；旧系统保留公共基础主题。
       2) 状态栏 / 导航栏图标颜色**不**在这里写 windowLightStatusBar ——
          由 MainActivity 依据 App 自己的 autoNightMode 用
          WindowInsetsControllerCompat.isAppearanceLightStatusBars 动态设置。
@@ -20,10 +19,9 @@
       3) statusBarColor / navigationBarColor 保持透明，配合 Activity 的
          enableEdgeToEdge()，由 Compose 侧自己绘制背景。
     -->
-    <style name="Theme.MyApplication" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Theme.MyApplication.Base" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:forceDarkAllowed">false</item>
     </style>
 
     <!--
@@ -37,7 +35,7 @@
     -->
     <color name="splash_background">#FF0F141C</color>
 
-    <style name="Theme.MyApplication.Splash" parent="Theme.SplashScreen">
+    <style name="Theme.MyApplication.SplashBase" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
         <!-- 用户反馈：开屏壁纸前的吉祥物图标卡片不好看，改为透明占位（不可省略，省略会回退启动图标） -->
         <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_transparent</item>
@@ -46,6 +44,7 @@
         <item name="postSplashScreenTheme">@style/Theme.MyApplication</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:forceDarkAllowed">false</item>
     </style>
+    <style name="Theme.MyApplication" parent="Theme.MyApplication.Base" />
+    <style name="Theme.MyApplication.Splash" parent="Theme.MyApplication.SplashBase" />
 </resources>

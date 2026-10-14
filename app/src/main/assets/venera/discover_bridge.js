@@ -83,7 +83,9 @@ function __cialloDiscoverCatalog(src) {
         ['其他','同人志','漫画','画师CG','游戏CG','图集','Cosplay','写真','全年龄','欧美'].forEach((label,index)=>
             categories.push({id:'eh:category:'+index,label,group:'内容形式',category:'',itemType:'search',options:[JSON.stringify([String(index)]),null,null]}));
     }
-    return { feeds, categories, capabilities: { ...__cialloDiscoverCapabilities(feeds), ...(src.discover?.capabilities || {}) }, dynamicCategories: dynamic, hasCategoryLoader: !!(src.categoryComics &&
+    const statusOptions = Array.isArray(src.categoryComics?.optionList) ? src.categoryComics.optionList.flatMap(d => (d.options || []).map(__cialloDiscoverOption)) : [];
+    const statuses = statusOptions.filter(o => /^(连载|連載|连载中|連載中|完结|完結|已完结|已完結|ongoing|publishing|completed|finished)$/i.test(o.label)).map(o => /完结|完結|completed|finished/i.test(o.label) ? '完结' : '连载');
+    return { feeds, categories, statuses: [...new Set(statuses)], capabilities: { ...__cialloDiscoverCapabilities(feeds), ...(src.discover?.capabilities || {}) }, dynamicCategories: dynamic, hasCategoryLoader: !!(src.categoryComics &&
         (typeof src.categoryComics.load === 'function' || typeof src.categoryComics.loadNext === 'function')),
         explicit: !!(src.discover && typeof src.discover.load === 'function') };
 }
@@ -151,7 +153,7 @@ async function __cialloDiscover(src, q) {
         const result = await src.discover.load.call(src, q);
         return { ...result, catalog };
     }
-    let result, label, paged, kind, categoryTags = [];
+    let result, label, paged, kind, appliedStatus = null, categoryTags = [];
     // Request native status routes before filtering; an unknown status is never treated as completed/ongoing.
     if (q.status && !q.categoryId && !(src.discover && !q.feedId)) {
         const pattern = q.status === '完结' ? /^(完结|完結|已完结|已完結|completed|finished)$/i : /^(连载|連載|连载中|連載中|ongoing|publishing)$/i;
@@ -176,7 +178,7 @@ async function __cialloDiscover(src, q) {
             const choices=(definition.options||[]).map(__cialloDiscoverOption);
             const statusPattern=q.status === '完结' ? /^(完结|完結|已完结|已完結|completed|finished)$/i : q.status === '连载' ? /^(连载|連載|连载中|連載中|ongoing|publishing)$/i : null;
             const statusChoice=statusPattern && choices.find(o=>statusPattern.test(o.label));
-            if(statusChoice) options[index]=statusChoice.value;
+            if(statusChoice) { options[index]=statusChoice.value; appliedStatus=q.status; }
             else if (choices.some(o=>/完结|完結|连载|連載|ongoing|completed/i.test(o.label))) {
                 const all=choices.find(o=>/^(全部|All)$/i.test(o.label)); if(all) options[index]=all.value;
             } else {
@@ -259,7 +261,8 @@ async function __cialloDiscover(src, q) {
         const tags = Array.isArray(c.tags) ? [...c.tags, ...categoryTags]
             : c.tags && typeof c.tags === 'object' ? { ...c.tags, '分类': [...(Array.isArray(c.tags['分类']) ? c.tags['分类'] : []), ...categoryTags] }
             : [...(typeof c.tags === 'string' ? [c.tags] : []), ...categoryTags];
-        return { ...c, tags, status: c.status ?? (/^(完结|完結|completed)$/i.test(categoryTags[0]||'') ? '完结' : /^(连载|連載|ongoing)$/i.test(categoryTags[0]||'') ? '连载' : null), nativeOrder: offset, origin: String(part.title || label),
+        const providedStatus = typeof c.status === 'string' && !c.status.trim() ? null : c.status;
+        return { ...c, tags, status: providedStatus ?? appliedStatus ?? (/^(完结|完結|completed)$/i.test(categoryTags[0]||'') ? '完结' : /^(连载|連載|ongoing)$/i.test(categoryTags[0]||'') ? '连载' : null), nativeOrder: offset, origin: String(part.title || label),
             rank: (!native && desired === 'ranking') || kind === 'ranking' ? offset : c.rank ?? null,
             subtitle: c.subtitle ?? c.subTitle ?? null };
     }));

@@ -40,7 +40,7 @@ object DiscoverTaxonomy {
                 leaf("threed", "3D作品", "3D", "3D漫畫", "3d comic"), leaf("cosplay", "写真 / Cosplay", "cosplay", "寫真Cosplay", "写真", "photography"),
                 leaf("animation", "动画", "anime", "动画", "animation"), leaf("long", "长篇", "長篇")),
             branch("edition", "版本信息", leaf("translation", "汉化", "漢化", "嗶咔漢化", "禁漫漢化組", "translated"),
-                leaf("uncensored", "无修正", "無修正", "uncensored"), leaf("language", "语言"), leaf("year", "出版年份"), leaf("franchise", "作品系列"), leaf("native_other", "其他原站分类"))),
+                leaf("uncensored", "无修正", "無修正", "uncensored"), leaf("language", "语言", "汉语", "中文", "英语", "日语", "Chinese", "English", "Japanese"), leaf("year", "出版年份"), leaf("franchise", "作品系列"), leaf("native_other", "其他原站分类"))),
         DiscoverCategory("adult", "成人与偏好", listOf(
             branch("mature", "内容分级", leaf("adultonly", "限制级", "adult", "18+", "hentai", "成人", "pornographic", "19r", "R-18", "R18+", "18禁", "19+"),
                 leaf("explicit", "成人内容", "色情", "erotica", "smut", "情色", "肉欲", "性暴力"), leaf("ecchi", "轻度成人", "ecchi", "性感", "魅惑", "暧昧", "TL")),

@@ -612,7 +612,7 @@ internal fun ComicThumbPreview(
     loader: ComicPageLoader,
     modifier: Modifier = Modifier,
 ) {
-    val bitmap by produceState<Bitmap?>(null, page?.id) {
+    val bitmap by com.example.ui.components.rememberAsyncState<Bitmap?>(null, page?.id) {
         page?.let { value = runCatching { loader.loadThumb(it) }.getOrNull() }
     }
     Column(

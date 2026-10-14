@@ -1698,7 +1698,7 @@ internal fun ComicCurlZoomOverlay(
     dynamicBackground: Color?,
     onDismiss: () -> Unit,
 ) {
-    BoxWithConstraints(
+    Box(
         Modifier
             .fillMaxSize()
     ) {

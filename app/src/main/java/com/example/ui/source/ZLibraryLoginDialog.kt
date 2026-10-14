@@ -69,7 +69,7 @@ fun ZLibraryLoginDialog(
     val activity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
     val blurPx = with(androidx.compose.ui.platform.LocalDensity.current) { 18.dp.toPx() }
     val scope = rememberCoroutineScope()
-    val registrationUrl by produceState<String?>(null, source) {
+    val registrationUrl by com.example.ui.components.rememberAsyncState<String?>(null, source) {
         value = kotlinx.coroutines.withTimeoutOrNull(5_000) { source.getRegistrationUrl() }
     }
     val isJsSource = source.id.startsWith("js_")

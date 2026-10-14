@@ -197,11 +197,11 @@ fun AcrylicBottomOverlay(
     val close = overlayDismiss(visibility, onDismissRequest)
     Dialog(
         onDismissRequest = { close {} },
-        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false, decorFitsSystemWindows = !fitAvailableHeight)
     ) {
         CompositionLocalProvider(LocalOverlayClose provides close) { DialogLiquidGlass {
             GlassDialogWindowEffect(activity = activity, blurRadiusPx = blurPx)
-            BoxWithConstraints(modifier = Modifier.fillMaxSize().then(if (fitAvailableHeight) Modifier.safeDrawingPadding().imePadding() else Modifier)) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize().then(if (fitAvailableHeight) Modifier.safeDrawingPadding().imePadding().padding(bottom = 16.dp) else Modifier)) {
                 ScrimEntrance(visibility = visibility) {
                     Box(
                         modifier = Modifier
@@ -219,7 +219,7 @@ fun AcrylicBottomOverlay(
                 Column(
                     modifier = Modifier
                         .adaptiveSheetWidth()
-                        .then(if (fitAvailableHeight) Modifier.heightIn(max = sheetHeight) else Modifier)
+                        .then(if (fitAvailableHeight) Modifier.height(sheetHeight) else Modifier)
                         .pointerInput(Unit) { detectTapGestures(onTap = {}) }
                         .acrylicPanel(shape = shape, surfaceAlpha = 0.40f)
                         .then(if (fitAvailableHeight) Modifier else Modifier.navigationBarsPadding())

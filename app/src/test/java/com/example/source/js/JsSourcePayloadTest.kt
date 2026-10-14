@@ -12,6 +12,23 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class JsSourcePayloadTest {
+    @Test fun `Hitomi browse repair is idempotent and retains dates and unknown pagination`() {
+        val patch = JsSourceRepo::class.java.getDeclaredMethod("patchScript", String::class.java, String::class.java).apply { isAccessible = true }
+        val source = """
+            title: "hitomi.la",
+            let itemCount = 0;
+            resp.headers["content-range"];
+            maxPage: Math.ceil(result.count / 25),
+            language: n.language,
+            ...n.series,
+        """.trimIndent()
+        val repaired = patch.invoke(JsSourceRepo, "hitomi", source) as String
+        assertTrue(repaired.contains("title: \"最新更新\""))
+        assertTrue(repaired.contains("key.toLowerCase() === 'content-range'"))
+        assertTrue(repaired.contains("updatedAt: n.posted_time.getTime()"))
+        assertTrue(repaired.contains("maxPage: Number.isFinite(result.count)"))
+        assertEquals(repaired, patch.invoke(JsSourceRepo, "hitomi", repaired))
+    }
     @Test fun `legacy cached Comick search uses JSON for LF and CRLF scripts`() {
         val repo = JsSourceRepo
         val patch = JsSourceRepo::class.java.getDeclaredMethod("patchDiscoverSource", String::class.java, String::class.java).apply { isAccessible = true }

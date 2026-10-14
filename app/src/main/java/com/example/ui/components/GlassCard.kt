@@ -190,6 +190,7 @@ private const val DENT_LIGHT_AGLS = """
  * 把更新完 uniform 的着色器包装为图层 RenderEffect。
  * 调用点位于 shader 非空分支内（shader 仅在 API 33+ 构造成功时非空）。
  */
+@androidx.annotation.RequiresApi(33)
 private fun dentRenderEffect(shader: RuntimeShader): androidx.compose.ui.graphics.RenderEffect =
     android.graphics.RenderEffect.createRuntimeShaderEffect(shader, "inputShader")
         .asComposeRenderEffect()
@@ -441,7 +442,7 @@ fun GlassCard(
                     val indentVal = pressAnim.value.coerceIn(0f, 1f)
                     val strengthMult = tweaks.pressStrength.coerceIn(0f, 2f)
                     val shader = indentShader
-                    if (shader != null && strengthMult > 0f && indentVal > 0.004f) {
+                    if (Build.VERSION.SDK_INT >= 33 && shader != null && strengthMult > 0f && indentVal > 0.004f) {
                         val cx = if (pressPos == Offset.Zero) size.width / 2f
                                  else pressPos.x.coerceIn(0f, size.width)
                         val cy = if (pressPos == Offset.Zero) size.height / 2f

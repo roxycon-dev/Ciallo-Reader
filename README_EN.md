@@ -24,7 +24,9 @@ Read local ebooks, novels, and comics in one Android app.
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
 
-**1.3.10 / 221** fixes filter-sheet clipping, unintended dismissal and rectangular tap feedback. Discover uses cover cards and the Library favorite heart, ring pull-to-refresh and bottom-tab double-tap refresh. It repairs ordering provenance, status filters, tab caching, Aiman and Comick search/reading. Same signing identity as 1.3.9. See the [verification record](docs/release-1.3.10-2026-10-14.md).
+**1.3.11 / 222** redesigns the theme-aware Discover filters and fixed-slot comic rows, fixes the category sheet footer, and unifies all five headers with English subtitles. It repairs native status filtering, resumable ranking caches and Hitomi discovery. Category counts refer to loaded works. Same signing identity as 1.3.10. See the [verification record](docs/release-1.3.11-2026-10-14.md).
+
+Also repairs legacy Android API compatibility, glass effect cleanup, EPUB path handling and Compose state subscriptions found during release checks.
 
 ## Screenshots
 
@@ -106,7 +108,7 @@ Version 1.3.8 adds Discover and restores Aiman and MYCOMIC reading. Its APK reta
 
 - **Android:** 7.0 (API 24) or newer.
 - **Architecture:** Current release APKs target arm64-v8a, supported by most Android phones and tablets. The release APK does not include an x86_64 emulator build.
-- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.3.10 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.10/Ciallo-Reader-v1.3.10.apk).
+- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.3.11 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.11/Ciallo-Reader-v1.3.11.apk).
 - Open the downloaded APK and follow Android's prompt to allow installation from that source.
 
 ## Get started

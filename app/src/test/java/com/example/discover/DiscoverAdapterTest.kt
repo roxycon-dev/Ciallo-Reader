@@ -12,6 +12,16 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class DiscoverAdapterTest {
+    @Test fun mappedLanguageAndWorkStatusStayConsistentAcrossSources() {
+        assertTrue(DiscoverTaxonomy.matches(listOf("汉语"), setOf("language")))
+        assertFalse(DiscoverTaxonomy.matches(listOf("artist:Chinese"), setOf("language")))
+        val unknown = DiscoverEntry(SearchBook("1", "a", "作品", "", comicInfo = com.example.source.ComicInfo(status = null)))
+        val completed = unknown.copy(book = unknown.book.copy(sourceId = "b", comicInfo = com.example.source.ComicInfo(status = "completed")))
+        val ongoing = unknown.copy(book = unknown.book.copy(sourceId = "c", comicInfo = com.example.source.ComicInfo(status = "ongoing")))
+        assertEquals("完结", workStatus(DiscoverWork("one", listOf(unknown, completed, ongoing), 0.0)))
+        assertEquals("状态未知", workStatus(DiscoverWork("one", listOf(unknown), 0.0)))
+        assertEquals("128.6w", cardCompact(1_286_000))
+    }
     @Test fun nativeRestrictedLabelsRespectMetadataNamespaces() {
         assertTrue(DiscoverTaxonomy.isAdult(listOf("19r")))
         assertTrue(DiscoverTaxonomy.isAdult(listOf("R-18")))
@@ -110,6 +120,12 @@ class DiscoverAdapterTest {
     @Test fun fractionalAndOverflowStatisticsRemainUnknown() {
         val row = parse("""{"entries":[{"id":"1","title":"漫画","clicks":1.5,"discussions":1e30,"rank":9223372036854775807}]}""").entries.single()
         assertNull(row.clicks); assertNull(row.discussions); assertNull(row.rank)
+    }
+    @Test fun exactMetricConversionAcceptsLongBoundsWithoutNewPlatformApis() {
+        val rows = parse("""{"entries":[{"id":"max","title":"最大值","clicks":9223372036854775807},{"id":"overflow","title":"溢出","clicks":9223372036854775808},{"id":"integer","title":"整数","clicks":1000.0}]}""").entries
+        assertEquals(Long.MAX_VALUE, rows[0].clicks)
+        assertNull(rows[1].clicks)
+        assertEquals(1000L, rows[2].clicks)
     }
     @Test fun invalidDateSuffixesNeverQualifyForTodayAndIsoPrecisionIsRetained() {
         assertNull(DiscoverEngine.parseDate("2026-10-13 invalid"))

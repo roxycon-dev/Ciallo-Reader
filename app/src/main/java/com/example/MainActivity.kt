@@ -109,17 +109,18 @@ class MainActivity : ComponentActivity() {
      * 其余场景（其它页面 / 来电 / 开关关闭）返回 false，音量键走系统原生
      * 音量调节，行为完全一致。消费后不弹系统音量条。
      */
-    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
-        if (event.keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP ||
-            event.keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN
-        ) {
-            val isDownAction = event.action == android.view.KeyEvent.ACTION_DOWN
-            if (com.example.ui.comic.ComicVolumeKeyBridge.dispatch(event.keyCode, isDownAction)) {
-                return true
-            }
-        }
-        return super.dispatchKeyEvent(event)
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if (isReaderVolumeKey(keyCode) && com.example.ui.comic.ComicVolumeKeyBridge.dispatch(keyCode, true)) return true
+        return super.onKeyDown(keyCode, event)
     }
+
+    override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if (isReaderVolumeKey(keyCode) && com.example.ui.comic.ComicVolumeKeyBridge.dispatch(keyCode, false)) return true
+        return super.onKeyUp(keyCode, event)
+    }
+
+    private fun isReaderVolumeKey(keyCode: Int) = keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP ||
+        keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // P2-1：安装系统启动窗口 —— 必须在 super.onCreate **之前**调用（官方要求：
@@ -303,7 +304,7 @@ class MainActivity : ComponentActivity() {
                         // 页面有效背景平均亮度（已含遮罩）：标题文字据此实时取对比色
                         val bgTone: Float = if (bgActive) {
                             val appContext = LocalContext.current.applicationContext
-                            val loaded by produceState(0.5f, bgConfig.uri, bgConfig.dim) {
+                            val loaded by com.example.ui.components.rememberAsyncState(0.5f, bgConfig.uri, bgConfig.dim) {
                                 value = loadBackgroundAvgLuminance(
                                     appContext,
                                     bgConfig.uri.orEmpty(),
@@ -1396,9 +1397,9 @@ class MainActivity : ComponentActivity() {
                             // 神回话会先渲染成普通章节行（滑动书签手势活着），一滑就写库+弹
                             // 提示，随后金卡顶替行——看起来"卡片没反应但弹了书签提示"。
                             // 所以随 map 一起跟踪"已加载"，加载前不武装书签手势、写入回调也拦。
-                            val godMomentsState by produceState(
+                            val godMomentsState by com.example.ui.components.rememberAsyncState(
                                 initialValue = emptyMap<String, com.example.god.GodMomentEntity>() to false,
-                                key1 = comicSourceId, key2 = comicId,
+                                comicSourceId, comicId,
                             ) {
                                 if (comicSourceId.isBlank() || comicId.isBlank()) {
                                     value = emptyMap<String, com.example.god.GodMomentEntity>() to true

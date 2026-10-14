@@ -73,7 +73,12 @@ class DiscoverStore(context: Context) {
                 origin = row.optString("origin").ifBlank { null }, subtitle = row.optString("subtitle").ifBlank { null }, native = row.optBoolean("native"), statistic = row.optString("statistic").ifBlank { null })
         }
     }.getOrDefault(emptyList())
-    fun writeCache(key: String, entries: List<DiscoverEntry>) {
+    fun readNavigation(key: String): JSONObject? = runCatching {
+        val json = JSONObject(cache.getString(key, "{}") ?: "{}")
+        if (System.currentTimeMillis() - json.optLong("savedAt") > string("cache_hours", "24").toLong() * 3_600_000) null
+        else json.optJSONObject("navigation")
+    }.getOrNull()
+    fun writeCache(key: String, entries: List<DiscoverEntry>, navigation: JSONObject? = null) {
         if (!flag("cache")) return
         val rows = JSONArray()
         entries.take(300).forEach { e -> rows.put(JSONObject().put("id", e.book.id).put("source", e.book.sourceId)
@@ -85,7 +90,8 @@ class DiscoverStore(context: Context) {
             .put("nativeOrder", e.nativeOrder).put("origin", e.origin).put("subtitle", e.subtitle).put("native", e.native).put("statistic", e.statistic)) }
         val editor = cache.edit()
         if (cache.all.size >= 24 && !cache.contains(key)) cache.all.keys.firstOrNull()?.let { editor.remove(it) }
-        editor.putString(key, JSONObject().put("savedAt", System.currentTimeMillis()).put("entries", rows).toString()).apply()
+        editor.putString(key, JSONObject().put("savedAt", System.currentTimeMillis()).put("entries", rows)
+            .put("navigation", navigation ?: readNavigation(key)).toString()).apply()
     }
 }
 

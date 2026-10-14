@@ -103,7 +103,7 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
         val merged = DiscoverEngine.merge(state.entries, dimension, sourceId == "aggregate").filter { work ->
             work.key !in blocked && work.variants.none { DiscoverEngine.identity(it) in blocked } &&
                 DiscoverTaxonomy.matches(work.tags, selected) &&
-                (statusFilter == "全部" || work.variants.any { serialLabel(it.book.comicInfo?.status) == statusFilter })
+                (statusFilter == "全部" || workStatus(work) == statusFilter)
         }
         val favoriteAuthors = favorites.map { it.favorite.author }.filter { it.isKnownComicAuthor() }.toSet()
         if (store.flag("personalization") && nativeFeed == null && nativeCategory == null)
@@ -117,10 +117,11 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
     }
     LaunchedEffect(sources, enabled, sourceId, dimension, range, nativeFeed, nativeCategory, selected, statusFilter) {
         if (sourceId != "aggregate" && sources.none { it.id == sourceId }) { sourceId = "aggregate"; return@LaunchedEffect }
-        model.configure(sourceId, dimension, range, nativeFeed, nativeCategory, selected, status = statusFilter.takeUnless { it == "全部" })
+        model.configure(sourceId, dimension, range, nativeFeed, nativeCategory, selected, status = statusFilter.takeIf { it in setOf("连载", "完结") })
         store.put("last_source", sourceId); store.put("last_dimension", dimension.name)
         store.put("range_${dimension.name}", range)
         store.put("feed_$sourceId", nativeFeed.orEmpty()); store.put("category_$sourceId", nativeCategory.orEmpty())
+        if (nativeFeed != null) store.put("native_feed_$sourceId", nativeFeed!!)
     }
     val nearEnd by remember { derivedStateOf { grid.firstVisibleItemIndex > 0 && (grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) >= grid.layoutInfo.totalItemsCount - 4 } }
     LaunchedEffect(nearEnd, state.loading, state.more) { if (nearEnd && !state.loading && state.more.isNotEmpty()) model.more() }
@@ -181,47 +182,29 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
                 titleColor = glassTitleColor(), trailing = {
                     IconButton(onClick = { showSettings = true }) { Icon(Icons.Outlined.Tune, "发现设置") }
                 })
-            LazyRow(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { DiscoverChip("推荐", nativeFeed != null || nativeCategory != null, solid = false, onClick = {
-                    light(); nativeFeed = "native"; nativeCategory = null
-                }) }
-                items(availableDimensions) { d -> DiscoverChip(d.label, nativeFeed == null && nativeCategory == null && dimension == d,
-                    solid = false, onClick = { switch(d) }) }
-            }
             PullToRefreshBox(isRefreshing = state.loading && state.entries.isNotEmpty(), onRefresh = { light(); model.refresh() }, modifier = Modifier.weight(1f),
                 ) {
                 LazyVerticalGrid(columns = GridCells.Fixed(if (layout == DiscoverLayout.GRID && (dimension != DiscoverDimension.RANKING || nativeFeed != null || nativeCategory != null || selected.isNotEmpty())) 2 else 1), state = grid,
                     modifier = Modifier.fillMaxSize().testTag("discover_content"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = LocalAppBottomInset.current + 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        Column(Modifier.fillMaxWidth()) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            DiscoverChip(if (sourceId == "aggregate") "聚合书源" else sources.firstOrNull { it.id == sourceId }?.name ?: "选择书源",
-                                false, solid = false, icon = Icons.Outlined.ExpandMore, modifier = Modifier.widthIn(max = 180.dp), onClick = { showSources = true })
-                            Spacer(Modifier.weight(1f))
-                            DiscoverChip("分类${if (selected.isNotEmpty()) " ${selected.size}" else ""}", selected.isNotEmpty(), solid = false,
-                                icon = Icons.Outlined.FilterList, onClick = { expanded = true })
-                            IconButton(onClick = { light(); model.refresh() }, enabled = !state.loading) { Icon(Icons.Outlined.Refresh, "刷新发现", Modifier.size(20.dp)) }
-                        }
-                        if (nativeFeed == null && nativeCategory == null && availableRanges.size > 1) LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(availableRanges) { r -> DiscoverChip(r, range == r, solid = false, visualHeight = 28, onClick = { light(); range = r }) }
-                        }
-                        if (nativeFeed != null && sourceId != "aggregate") LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(currentCatalogs.flatMap { it.feeds }, key = { it.id }) { feed ->
-                                DiscoverChip(feed.label, nativeFeed == feed.id || (nativeFeed == "native" && feed == currentCatalogs.firstOrNull()?.feeds?.firstOrNull()),
-                                    solid = false, visualHeight = 28, onClick = { light(); nativeFeed = feed.id; nativeCategory = null; statusFilter = "全部" })
-                            }
-                        }
-                        if (selected.isNotEmpty()) Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(DiscoverTaxonomy.all.filter { it.id in selected }.joinToString(" · ") { it.label }, Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            TextButton(onClick = { store.put("categories", emptySet()) }) { Text("清除") }
-                        }
-                        }
-                    }
-                    if (currentCatalogs.any { c -> c.categories.any { serialLabel(it.label) in setOf("连载", "完结") } } || state.entries.any { e -> activeSources.any { it.id == e.book.sourceId } && serialLabel(e.book.comicInfo?.status) in setOf("连载", "完结") }) item(span = { GridItemSpan(maxLineSpan) }) {
-                        LazyRow(Modifier.testTag("discover_status_filters"), horizontalArrangement = Arrangement.spacedBy(8.dp)) { items(listOf("全部", "连载", "完结")) { status ->
-                            DiscoverChip(status, statusFilter == status, solid = false, visualHeight = 28, onClick = { light(); statusFilter = status }) } }
+                        val native = nativeFeed != null || nativeCategory != null
+                        val feeds = if (nativeFeed != null && sourceId != "aggregate") currentCatalogs.flatMap { it.feeds }.distinctBy { it.id } else emptyList()
+                        val ranges = if (!native && availableRanges.size > 1) availableRanges else emptyList()
+                        val statusKnown = currentCatalogs.any { c -> c.statuses.isNotEmpty() || c.categories.any { serialLabel(it.label) in setOf("连载", "完结") } } ||
+                            state.entries.any { e -> activeSources.any { it.id == e.book.sourceId } && serialLabel(e.book.comicInfo?.status) in setOf("连载", "完结") }
+                        val unknownStatus = state.entries.any { serialLabel(it.book.comicInfo?.status) == "状态未知" }
+                        DiscoverFilters(
+                            tabs = listOf("推荐" to native) + availableDimensions.map { it.label to (!native && dimension == it) },
+                            onTab = { index -> if (index == 0) { light(); nativeFeed = store.string("native_feed_$sourceId", "native"); nativeCategory = null } else switch(availableDimensions[index - 1]) },
+                            source = if (sourceId == "aggregate") "聚合书源" else sources.firstOrNull { it.id == sourceId }?.name ?: "选择书源",
+                            onSource = { showSources = true }, selected = selected, onCategory = { expanded = true },
+                            onRemove = { store.put("categories", selected - it) }, onClear = { store.put("categories", emptySet()) },
+                            refreshing = state.loading, onRefresh = { light(); model.refresh() },
+                            sorts = if (feeds.isNotEmpty()) feeds.map { it.label to (nativeFeed == it.id || (nativeFeed == "native" && it == feeds.first())) } else ranges.map { it to (range == it) },
+                            onSort = { index -> light(); if (feeds.isNotEmpty()) { nativeFeed = feeds[index].id; nativeCategory = null; statusFilter = "全部" } else range = ranges[index] },
+                            statuses = if (statusKnown) listOf("全部", "连载", "完结") + (if (state.entries.any { serialLabel(it.book.comicInfo?.status) == "停更" }) listOf("停更") else emptyList()) + (if (unknownStatus) listOf("状态未知") else emptyList()) else emptyList(),
+                            status = statusFilter, onStatus = { light(); statusFilter = it })
                     }
                     if (state.errors.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
                         GlassCard(contentPadding = PaddingValues(12.dp)) {
@@ -340,5 +323,7 @@ internal fun serialLabel(status: String?): String = when (status?.trim()?.lowerc
     "hiatus", "cancelled", "停更", "休刊", "暂停更新", "3", "4" -> "停更"
     else -> "状态未知"
 }
+internal fun workStatus(work: DiscoverWork): String = work.variants.map { serialLabel(it.book.comicInfo?.status) }
+    .firstOrNull { it != "状态未知" } ?: "状态未知"
 internal fun dateLabel(time: Long?): String = time?.let {
     java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.CHINA).format(java.util.Date(it)) } ?: "未提供"

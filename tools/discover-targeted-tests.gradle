@@ -1,0 +1,18 @@
+// Compile the exact related test sources; keep the Android/resource setup unchanged.
+gradle.projectsEvaluated {
+    def app = rootProject.project(':app')
+    def selected = ['com/example/discover/DiscoverUiTest.kt', 'com/example/discover/DiscoverViewModelTest.kt',
+                    'com/example/discover/DiscoverAdapterTest.kt', 'com/example/source/js/JsSourcePayloadTest.kt',
+                    'com/example/data/EpubCompatibilityTest.kt', 'com/example/ui/components/ReleaseCompatibilityTest.kt']
+    app.tasks.named('compileDebugUnitTestKotlin').configure {
+        setSource(selected.collect { new File(app.projectDir, 'src/test/java/' + it) })
+    }
+    // These tests use the production Room database, not test-only KSP/Java generated sources.
+    app.tasks.matching { it.name in ['kspDebugUnitTestKotlin', 'compileDebugUnitTestJavaWithJavac'] }.configureEach {
+        enabled = false
+    }
+    app.tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+        forkEvery = 1
+        maxParallelForks = 1
+    }
+}

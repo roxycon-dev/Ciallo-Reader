@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.MyApplication" parent="Theme.MyApplication.Base">
+        <item name="android:forceDarkAllowed">false</item>
+    </style>
+    <style name="Theme.MyApplication.Splash" parent="Theme.MyApplication.SplashBase">
+        <item name="android:forceDarkAllowed">false</item>
+    </style>
+</resources>
