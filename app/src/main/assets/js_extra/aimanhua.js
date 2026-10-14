@@ -6,7 +6,7 @@
 class AiManhua extends ComicSource {
     name = "爱漫画";
     key = "aimanhua";
-    version = "1.0.3";
+    version = "1.0.4";
     minAppVersion = "1.6.0";
     url = "https://www.alipaypay.com";
     baseUrl = "https://www.alipaypay.com";

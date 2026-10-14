@@ -252,6 +252,9 @@ class JsMessageHandler(
                 throw java.io.IOException("不安全 TLS 书源不能发送登录凭据，请启用证书验证")
             chain.proceed(request)
         }
+        if (sourceKey == "aimanhua" && !insecure) {
+            context.assets.open("certificates/isrg-root-x2.pem").use { AimanhuaTls.configure(builder, it) }
+        }
         if (insecure) {
             val sslContext = SSLContext.getInstance("TLS")
             sslContext.init(null, trustAll, SecureRandom())
@@ -463,7 +466,7 @@ class JsMessageHandler(
             }
 
             val proxied = useProxyRoute(url)
-            if (!insecureTls && !proxied) {
+            if (!insecureTls && !proxied && !AimanhuaTls.route(sourceKey, url)) {
                 // 走 Cronet（Chromium 网络栈）：浏览器级 TLS 指纹，绕过按 Java 客户端封禁的站点
                 var res = cronetRequest(httpMethod, url, effectiveHeaders, bodyBytes,
                     timeoutMs = if (sourceKey == "jm") 10_000 else if (httpMethod == "GET" && !bytes) 20_000 else 60_000)

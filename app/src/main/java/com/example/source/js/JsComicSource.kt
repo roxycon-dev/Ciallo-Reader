@@ -73,10 +73,10 @@ class JsComicSource(
 ) : ComicSource {
 
     override val id: String get() = "js_$sourceKey"
-    override val supportsDiscoverMetadata: Boolean get() = sourceKey == "aimanhua"
+    override val supportsDiscoverMetadata: Boolean get() = sourceKey != "hitomi"
     override suspend fun getDiscoverMetadata(bookId: String): SourceResult<SearchBook> = withContext(Dispatchers.IO) {
         try {
-            val result = callJsWithRetry("src.discoverMetadata(${q(bookId)})")
+            val result = callJsWithRetry("typeof src.discoverMetadata === 'function' ? src.discoverMetadata(${q(bookId)}) : src.comic?.loadInfo(${q(bookId)})")
             if (result?.optBoolean("ok") != true) SourceResult.Error(SourceException.ParseError("轻量元数据暂时不可用"))
             else SourceResult.Success(JsComicMetadata.book(result.optJSONObject("data") ?: JSONObject(), id, bookId))
         } catch (e: CancellationException) { throw e }

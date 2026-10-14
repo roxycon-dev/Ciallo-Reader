@@ -12,6 +12,21 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class DiscoverAdapterTest {
+    @Test fun coarseDatesDoNotLetOneSourceFillTheAggregateTopPage() {
+        val sameDate = (1..30).map { DiscoverEntry(SearchBook("$it", "a", "A $it", ""), updatedAt = 123L) }
+        val other = (1..8).map { DiscoverEntry(SearchBook("$it", "b", "B $it", ""), updatedAt = 456L - it) }
+        assertTrue(DiscoverEngine.merge(sameDate + other, DiscoverDimension.UPDATES).take(8).count { it.book.sourceId == "b" } >= 3)
+    }
+    @Test fun statusChoicesAreSubsetsAndKeepOnlyMatchingReadableVariants() {
+        val entries = listOf("ongoing", "completed", null).mapIndexed { i, state ->
+            DiscoverEntry(SearchBook("id", "$i", "同一作品", "作者", comicInfo = com.example.source.ComicInfo(status = state))) }
+        val all = DiscoverEngine.merge(entries, DiscoverDimension.RANKING)
+        for (status in listOf("连载", "完结", "状态未知")) {
+            val filtered = filterWorkStatus(all, status)
+            assertEquals(all.single().key, filtered.single().key)
+            assertTrue(filtered.single().variants.all { serialLabel(it.book.comicInfo?.status) == status })
+        }
+    }
     @Test fun mappedLanguageAndWorkStatusStayConsistentAcrossSources() {
         assertTrue(DiscoverTaxonomy.matches(listOf("汉语"), setOf("language")))
         assertFalse(DiscoverTaxonomy.matches(listOf("artist:Chinese"), setOf("language")))

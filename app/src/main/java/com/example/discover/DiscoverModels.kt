@@ -122,7 +122,7 @@ object DiscoverEngine {
             ordered.forEachIndexed { index, row ->
                 val position = if (row.native) row.nativeOrder ?: index + 1
                     else if (dimension == DiscoverDimension.RANKING && row.rank != null) row.rank
-                    else value(row)?.let { tieRanks.getOrPut(it) { index + 1 } }
+                    else value(row)?.let { if (aggregate && dimension == DiscoverDimension.UPDATES) index + 1 else tieRanks.getOrPut(it) { index + 1 } }
                         ?: row.nativeOrder ?: index + 1
                 // Reciprocal source rank is independent of fetched page length and site traffic.
                 scores[row.book.sourceId to row.book.id] = 1.0 / (1.0 + .08 * (position.coerceAtLeast(1) - 1))

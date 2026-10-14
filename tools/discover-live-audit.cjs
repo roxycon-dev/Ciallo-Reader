@@ -61,7 +61,7 @@ function host(meta,sourceOverride) {
    return iconv.decode(data,declared&&iconv.encodingExists(declared)?declared:'utf8').replace(/^\uFEFF/,'');
   }
   if(m.type==='utf8'||m.type==='gbk')return m.isEncode ? arrayBuffer(iconv.encode(String(m.value),m.type)) : iconv.decode(data,m.type);
-  if(m.type==='base64')return m.isEncode ? data.toString('base64') : arrayBuffer(Buffer.from(String(m.value),'base64'));
+  if(m.type==='base64')return m.isEncode ? data.toString('base64') : [...Buffer.from(String(m.value),'base64')];
   if(m.type==='hex')return data.toString('hex');
   if(['md5','sha1','sha256','sha512'].includes(m.type))return arrayBuffer(crypto.createHash(m.type).update(data).digest());
   if(m.type==='hmac'){const value=crypto.createHmac(m.hash,buffer(m.key)).update(data).digest();return m.isString?value.toString('hex'):arrayBuffer(value);}

@@ -9,7 +9,7 @@ function __cialloDiscoverOption(raw) {
 }
 function __cialloDiscoverKind(label) {
     const text = String(label || '');
-    if (/更新|latest updates|recent updates/i.test(text)) return 'updates';
+    if (/更新|latest|recent updates|recently updated/i.test(text)) return 'updates';
     if (/热议|熱議|讨论|討論|discussion|comments/i.test(text)) return 'discussion';
     if (/点击|點擊|阅读量|閱讀量|views|clicks/i.test(text)) return 'clicks';
     if (/榜|排行|热门|熱門|人气|人氣|飙升|飆升|完结|完結|新作|新书|新書|上架|popular|ranking|trending|hot|completed|new releases|recently added/i.test(text)) return 'ranking';
@@ -56,7 +56,7 @@ function __cialloDiscoverCatalog(src) {
         (options.length ? options : ['-原站排行']).forEach(raw => {
             const o = __cialloDiscoverOption(raw);
             feeds.push({ id: 'ranking:' + o.value, label: o.label,
-                kind: __cialloDiscoverKind(o.label) === 'clicks' || /^-?(views|clicks|reads)$/i.test(o.value) ? 'clicks' : 'ranking', type: 'ranking', value: o.value });
+                kind: 'ranking', type: 'ranking', value: o.value });
         });
     }
     const categories = [];
@@ -219,6 +219,7 @@ async function __cialloDiscover(src, q) {
             catalog.feeds.find(f => /multiPart|singlePageWithMultiPart|mixed/i.test(f.type));
         if (!feed) return { supported: false, entries: [], catalog };
         label = feed.label; kind = feed.kind;
+        if (/完结|完結|completed|finished/i.test(label)) appliedStatus = '完结';
         if (feed.type === 'ranking') {
             const api = src.categoryComics.ranking;
             paged = typeof api.load === 'function' ? true : 'cursor';
@@ -237,6 +238,7 @@ async function __cialloDiscover(src, q) {
         }
     }
     let parts = __cialloDiscoverParts(result, label);
+    parts = parts.map(p => ({...p, title: p.title || label}));
     const observed = __cialloDiscoverCapabilities(parts.map(p=>({label:p.title,kind:__cialloDiscoverKind(p.title)})));
     for(const [key,ranges] of Object.entries(observed)) catalog.capabilities[key]=Array.from(new Set([...(catalog.capabilities[key]||[]),...ranges]));
     const native = !!q.feedId || !!q.categoryId;

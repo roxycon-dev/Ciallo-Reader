@@ -50,14 +50,19 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
     private val catalogLocks = mutableMapOf<String, Mutex>()
     private val viewports = mutableMapOf<String, Pair<Int, Int>>()
     private val metadataJobs = mutableMapOf<String, Job>()
+    private val metadataAttempts = LinkedHashMap<Pair<String, String>, Long>()
     private fun enrich(source: ComicSource, entries: List<DiscoverEntry>, key: String) {
         if (!source.supportsDiscoverMetadata) return
         val previous = metadataJobs[source.id]
         metadataJobs[source.id] = viewModelScope.launch {
             previous?.join()
-            for (entry in entries) {
+            for (entry in entries.filter { serialLabel(it.book.comicInfo?.status) == "状态未知" || it.book.comicInfo?.tags.isNullOrEmpty() }.take(8)) {
                 ensureActive()
                 if (key != cacheKey) return@launch
+                val bookKey = source.id to entry.book.id
+                if (System.currentTimeMillis() - (metadataAttempts[bookKey] ?: 0L) < 300_000) continue
+                metadataAttempts[bookKey] = System.currentTimeMillis()
+                if (metadataAttempts.size > 500) metadataAttempts.remove(metadataAttempts.keys.first())
                 val result = try { withTimeout(15_000) { source.getDiscoverMetadata(entry.book.id) } }
                     catch (e: TimeoutCancellationException) { continue }
                     catch (e: CancellationException) { throw e }
@@ -66,7 +71,9 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
                     _state.update { state -> state.copy(entries = state.entries.map { row ->
                         if (row.book.sourceId == source.id && row.book.id == entry.book.id) row.copy(
                             book = row.book.copy(author = detail.author.ifBlank { row.book.author },
-                                comicInfo = detail.comicInfo?.copy(tags = (row.book.comicInfo?.tags.orEmpty() + detail.comicInfo.tags).distinct())),
+                                comicInfo = detail.comicInfo?.copy(
+                                    status = detail.comicInfo.status?.takeIf { serialLabel(it) in setOf("连载", "完结", "停更") } ?: row.book.comicInfo?.status,
+                                    tags = (row.book.comicInfo?.tags.orEmpty() + detail.comicInfo.tags).distinct()) ?: row.book.comicInfo),
                             updatedAt = DiscoverEngine.parseDate(detail.comicInfo?.updatedAt) ?: row.updatedAt)
                         else row
                     }) }
@@ -200,8 +207,8 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
                 }
                 val catalog = catalogs[source.id]
                 val routes = if (requested.categoryId == null) catalog?.routes(requested.standardCategories).orEmpty() else emptyList()
-                if (requested.feedId == null && requested.categoryId == null &&
-                    catalog?.supports(requested.dimension, requested.range) == false)
+                if (requested.feedId == null && requested.categoryId == null && catalog?.supports(requested.dimension, requested.range) == false &&
+                    (catalog.explicit || (catalog.feeds.isEmpty() && catalog.categories.isEmpty() && catalog.capabilities.isNotEmpty())))
                     SourceResult.Success(DiscoverPage(supported = false, catalog = catalog))
                 else slots.withPermit { withTimeout(50_000) { source.discover(requested.copy(page = page, cursor = cursors[source.id], categoryIds = routes,
                     offset = if (append) _state.value.entries.count { it.book.sourceId == source.id } else 0)) } }
@@ -229,7 +236,7 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
                     val fresh = data.entries.any { it.book.id !in oldIds }
                     noProgress[id] = if (fresh || !append) 0 else (noProgress[id] ?: 0) + 1
                     if (!append) rows = rows.filterNot { it.book.sourceId == id }
-                    rows = (data.entries + rows).distinctBy { it.book.sourceId to it.book.id }
+                    rows = ((if (data.supported) data.entries else emptyList()) + rows).distinctBy { it.book.sourceId to it.book.id }
                         .sortedWith(compareBy<DiscoverEntry> { it.book.sourceId }.thenBy { it.nativeOrder ?: Int.MAX_VALUE })
                     data.catalog?.let { next ->
                         val previous = catalogs[id]
@@ -239,7 +246,9 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
                                 (previous?.capabilities?.get(kind).orEmpty() + next.capabilities[kind].orEmpty()).distinct() })
                     }
                     errors.remove(id)
-                    notices.remove(id)
+                    if (!data.supported) notices[id] = data.notice ?: "该站未提供当前榜单或时间范围"
+                    else if (data.entries.isEmpty() && !data.hasMore) notices[id] = "该站当前条件没有作品"
+                    else notices.remove(id)
                     val repeatedCursor = data.nextCursor?.let { !cursorHistory.getOrPut(id) { mutableSetOf() }.add(it) } == true
                     cursors[id] = data.nextCursor
                     val stalled = (noProgress[id] ?: 0) >= 2 || repeatedCursor
@@ -254,7 +263,7 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
             val enriched = _state.value.entries.associateBy { it.book.sourceId to it.book.id }
             rows = rows.map { row -> enriched[row.book.sourceId to row.book.id]?.takeIf { row.book.sourceId != id && it.updatedAt != null } ?: row }
             _state.value = DiscoverState(rows, true, more.toSet(), errors.toMap(), notices.toMap(), errors.isNotEmpty(), catalogs.toMap())
-            if (result is SourceResult.Success) sources.firstOrNull { it.id == id }?.let { enrich(it, result.data.entries, key) }
+            if (result is SourceResult.Success && result.data.supported) sources.firstOrNull { it.id == id }?.let { enrich(it, result.data.entries, key) }
         }
         completed.close()
         _state.update { it.copy(loading = false) }

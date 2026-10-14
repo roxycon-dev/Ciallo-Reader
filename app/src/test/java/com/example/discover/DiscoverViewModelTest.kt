@@ -54,15 +54,15 @@ class DiscoverViewModelTest {
         assertTrue(completed.errors.toString(), completed.errors.isEmpty())
         assertEquals("fresh", completed.entries.single().book.id)
     }
-    @Test fun mappedGenresNeverBypassADeclaredMissingMetricOrWindow() = runTest(dispatcher) {
+    @Test fun declaredCatalogCannotVetoAProbeButUnsupportedResultsRemainEmpty() = runTest(dispatcher) {
         var calls = 0; val manager = SourceManager()
         manager.registerSource(object : DiscoverUiTest.FixtureSource("source") {
             override suspend fun discoverCatalog(resolveDynamic: Boolean) = SourceResult.Success(DiscoverCatalog(declared = true,
                 categories = listOf(DiscoverNativeCategory("genre:adventure", "冒险")), capabilities = mapOf("ranking" to listOf("热门"))))
-            override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> { calls++; return page(id, "book") }
+            override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> { calls++; return SourceResult.Success(DiscoverPage(supported = false)) }
         })
         model(manager).configure("source", DiscoverDimension.CLICKS, "周", standardCategories = setOf("adventure"))
-        assertEquals(0, calls)
+        assertEquals(1, calls)
     }
     @Test fun metadataPublishesProgressivelyAndSurvivesAnotherSourceCompleting() = runTest(dispatcher) {
         val detailReady = CompletableDeferred<Unit>(); val slowReady = CompletableDeferred<Unit>()
@@ -383,7 +383,7 @@ class DiscoverViewModelTest {
         })
         val model = model(manager)
         model.configure("source", DiscoverDimension.UPDATES, "今日")
-        assertEquals(0, calls); assertTrue(model.state.value.errors.isEmpty()); assertTrue(model.state.value.notices.isEmpty())
+        assertEquals(0, calls); assertTrue(model.state.value.errors.isEmpty()); assertTrue(model.state.value.notices.isNotEmpty())
         model.configure("source", DiscoverDimension.UPDATES, "最新")
         assertEquals(1, calls)
     }

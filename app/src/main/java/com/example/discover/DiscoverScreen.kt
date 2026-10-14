@@ -76,7 +76,7 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
     val sources = all.filter { it.isComicSource }
     var sourceId by rememberSaveable { mutableStateOf(store.string("last_source", "aggregate")) }
     var dimension by rememberSaveable { mutableStateOf(DiscoverDimension.entries.firstOrNull {
-        it.name == store.string("last_dimension", "UPDATES") } ?: DiscoverDimension.UPDATES) }
+        it != DiscoverDimension.CLICKS && it.name == store.string("last_dimension", "UPDATES") } ?: DiscoverDimension.UPDATES) }
     var range by rememberSaveable { mutableStateOf(store.string("range_${dimension.name}", dimension.ranges.first()).takeIf { it in dimension.ranges } ?: dimension.ranges.first()) }
     val layout = DiscoverLayout.entries.firstOrNull { it.name == store.string("layout", "GRID") } ?: DiscoverLayout.GRID
     val selected = store.selection("categories") - DiscoverTaxonomy.roots.map { it.id }.toSet()
@@ -99,11 +99,15 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
     val haptics = LocalHapticFeedback.current
     val hapticsEnabled = LocalHapticsEnabled.current
     fun light() { if (hapticsEnabled) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
-    val rows = remember(state.entries, sourceId, dimension, selected, blocked, statusFilter, favorites, readingTitles, revision, nativeFeed, nativeCategory) {
-        val merged = DiscoverEngine.merge(state.entries, dimension, sourceId == "aggregate").filter { work ->
-            work.key !in blocked && work.variants.none { DiscoverEngine.identity(it) in blocked } &&
-                DiscoverTaxonomy.matches(work.tags, selected) &&
-                (statusFilter == "全部" || workStatus(work) == statusFilter)
+    val rows = remember(state.entries, sourceId, dimension, range, state.catalogs, selected, blocked, statusFilter, favorites, readingTitles, revision, nativeFeed, nativeCategory) {
+        val completedFeed = sourceId != "aggregate" && nativeFeed != null && state.catalogs[sourceId]?.feeds?.let { feeds ->
+            (if (nativeFeed == "native") feeds.firstOrNull() else feeds.firstOrNull { it.id == nativeFeed })?.label?.contains(Regex("完结|完結|completed|finished", RegexOption.IGNORE_CASE))
+        } == true
+        val completedOnly = completedFeed || (nativeFeed == null && nativeCategory == null && dimension == DiscoverDimension.RANKING && range == "完结")
+        val completed = filterWorkStatus(DiscoverEngine.merge(state.entries, dimension, sourceId == "aggregate"),
+            if (completedOnly) "完结" else "全部")
+        val merged = filterWorkStatus(completed, statusFilter).filter { work ->
+            work.key !in blocked && work.variants.none { DiscoverEngine.identity(it) in blocked } && DiscoverTaxonomy.matches(work.tags, selected)
         }
         val favoriteAuthors = favorites.map { it.favorite.author }.filter { it.isKnownComicAuthor() }.toSet()
         if (store.flag("personalization") && nativeFeed == null && nativeCategory == null)
@@ -117,7 +121,7 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
     }
     LaunchedEffect(sources, enabled, sourceId, dimension, range, nativeFeed, nativeCategory, selected, statusFilter) {
         if (sourceId != "aggregate" && sources.none { it.id == sourceId }) { sourceId = "aggregate"; return@LaunchedEffect }
-        model.configure(sourceId, dimension, range, nativeFeed, nativeCategory, selected, status = statusFilter.takeIf { it in setOf("连载", "完结") })
+        model.configure(sourceId, dimension, range, nativeFeed, nativeCategory, selected)
         store.put("last_source", sourceId); store.put("last_dimension", dimension.name)
         store.put("range_${dimension.name}", range)
         store.put("feed_$sourceId", nativeFeed.orEmpty()); store.put("category_$sourceId", nativeCategory.orEmpty())
@@ -150,7 +154,7 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
         else onOpen(work.book)
     }
     fun switch(next: DiscoverDimension) { light(); nativeFeed = null; nativeCategory = null
-        dimension = next; range = store.string("range_${next.name}", next.ranges.first()).takeIf { it in next.ranges } ?: next.ranges.first() }
+        dimension = next; statusFilter = "全部"; range = store.string("range_${next.name}", next.ranges.first()).takeIf { it in next.ranges } ?: next.ranges.first() }
     fun follow(work: DiscoverWork, next: Boolean) {
         light()
         val followed = work.variants.filter { favoriteKey(it.book.sourceId, it.book.id) in favoriteKeys }
@@ -166,10 +170,10 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
 
     val activeSources = sources.filter { enabled[it.id] != false && (sourceId == "aggregate" || it.id == sourceId) }
     val currentCatalogs = activeSources.mapNotNull { state.catalogs[it.id] }
-    val availableDimensions = DiscoverDimension.entries.filter { d -> currentCatalogs.isEmpty() || currentCatalogs.any { it.ranges(d).isNotEmpty() } }
-    val availableRanges = dimension.ranges.filter { r -> currentCatalogs.isEmpty() || currentCatalogs.any { r in it.ranges(dimension) } }
-    LaunchedEffect(sourceId, availableDimensions, availableRanges, nativeFeed, nativeCategory) {
-        if (nativeFeed == null && nativeCategory == null && (dimension !in availableDimensions || range !in availableRanges)) {
+    val availableDimensions = DiscoverDimension.entries.filter { d -> d != DiscoverDimension.CLICKS && (sourceId == "aggregate" || currentCatalogs.isEmpty() || currentCatalogs.any { it.ranges(d).isNotEmpty() || it.feeds.any { f -> f.kind == null } }) }
+    val availableRanges = dimension.ranges.filter { r -> sourceId == "aggregate" || currentCatalogs.isEmpty() || currentCatalogs.any { r in it.ranges(dimension) || it.feeds.any { f -> f.kind == null } } }
+    LaunchedEffect(sourceId, state.loading, availableDimensions, availableRanges, nativeFeed, nativeCategory) {
+        if (sourceId != "aggregate" && !state.loading && nativeFeed == null && nativeCategory == null && (dimension !in availableDimensions || range !in availableRanges)) {
             if (availableRanges.isNotEmpty()) range = availableRanges.first() else nativeFeed = "native"
         }
     }
@@ -202,9 +206,22 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
                             onRemove = { store.put("categories", selected - it) }, onClear = { store.put("categories", emptySet()) },
                             refreshing = state.loading, onRefresh = { light(); model.refresh() },
                             sorts = if (feeds.isNotEmpty()) feeds.map { it.label to (nativeFeed == it.id || (nativeFeed == "native" && it == feeds.first())) } else ranges.map { it to (range == it) },
-                            onSort = { index -> light(); if (feeds.isNotEmpty()) { nativeFeed = feeds[index].id; nativeCategory = null; statusFilter = "全部" } else range = ranges[index] },
+                            onSort = { index -> light(); if (feeds.isNotEmpty()) { nativeFeed = feeds[index].id; nativeCategory = null; statusFilter = "全部" } else { range = ranges[index]; statusFilter = "全部" } },
                             statuses = if (statusKnown) listOf("全部", "连载", "完结") + (if (state.entries.any { serialLabel(it.book.comicInfo?.status) == "停更" }) listOf("停更") else emptyList()) + (if (unknownStatus) listOf("状态未知") else emptyList()) else emptyList(),
                             status = statusFilter, onStatus = { light(); statusFilter = it })
+                    }
+                    if (sourceId == "aggregate") item(span = { GridItemSpan(maxLineSpan) }) {
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                            val participants = rows.flatMap { it.variants }.map { it.book.sourceId }.distinct()
+                            TextButton(onClick = { noticesExpanded = !noticesExpanded }) {
+                                Text("当前结果 ${participants.size} 个源 · 已请求 ${activeSources.size} 个源" + if (state.loading) " · 加载中" else " · 查看来源", style = MaterialTheme.typography.labelMedium)
+                            }
+                            if (noticesExpanded) activeSources.forEach { source ->
+                                val count = rows.count { w -> w.variants.any { it.book.sourceId == source.id } }
+                                Text(source.name + " · " + if (count > 0) "${count} 本" else state.errors[source.id] ?: state.notices[source.id] ?: if (state.loading) "加载中" else if (statusFilter != "全部" && state.entries.any { it.book.sourceId == source.id && serialLabel(it.book.comicInfo?.status) == "状态未知" }) "作品状态尚未提供或待补全" else "当前筛选无结果",
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
                     }
                     if (state.errors.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
                         GlassCard(contentPadding = PaddingValues(12.dp)) {
@@ -323,7 +340,13 @@ internal fun serialLabel(status: String?): String = when (status?.trim()?.lowerc
     "hiatus", "cancelled", "停更", "休刊", "暂停更新", "3", "4" -> "停更"
     else -> "状态未知"
 }
-internal fun workStatus(work: DiscoverWork): String = work.variants.map { serialLabel(it.book.comicInfo?.status) }
-    .firstOrNull { it != "状态未知" } ?: "状态未知"
+internal fun filterWorkStatus(works: List<DiscoverWork>, status: String): List<DiscoverWork> =
+    if (status == "全部") works else works.mapNotNull { work ->
+        work.variants.filter { serialLabel(it.book.comicInfo?.status) == status }.takeIf { it.isNotEmpty() }?.let { work.copy(variants = it) }
+    }
+internal fun workStatus(work: DiscoverWork): String {
+    val statuses = work.variants.map { serialLabel(it.book.comicInfo?.status) }.toSet()
+    return listOf("完结", "连载", "停更").firstOrNull { it in statuses } ?: "状态未知"
+}
 internal fun dateLabel(time: Long?): String = time?.let {
     java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.CHINA).format(java.util.Date(it)) } ?: "未提供"

@@ -44,6 +44,17 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [35], qualifiers = "zh-rCN-w390dp-h844dp-420dpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class DiscoverUiTest {
+    private val pendingCatalog = kotlinx.coroutines.CompletableDeferred<Unit>()
+    private var pendingQuery: DiscoverQuery? = null
+    @Test fun aggregateDoesNotCancelPendingSourcesWhenTheFirstCatalogHasNoRankings() {
+        mount(DiscoverLayout.LIST, dimension = DiscoverDimension.RANKING, partialCatalogFixture = true)
+        compose.onNodeWithText("榜单").assertExists()
+        compose.runOnIdle { pendingCatalog.complete(Unit) }
+        compose.waitForIdle()
+        assertEquals(DiscoverDimension.RANKING, pendingQuery?.dimension)
+        assertNull(pendingQuery?.feedId)
+        assertTrue(fixtures.last().discoverCalls > 0)
+    }
     @Test fun fiveHeadersShareGeometryAndKeepEnglishAt130Percent() {
         val titles = listOf("书库", "发现", "我的书架", "阅读统计", "设置")
         val subtitles = listOf("LIBRARY & SEARCH", "DISCOVER", "BOOKSHELF & READING", "STATISTICS & INSIGHTS", "SETTINGS & PREFERENCES")
@@ -110,7 +121,7 @@ class DiscoverUiTest {
         override suspend fun getChapterImages(chapterId: String) = SourceResult.Success(emptyList<String>())
     }
     private fun mount(layout: DiscoverLayout, dark: Boolean = false, fontScale: Float = 1f, dimension: DiscoverDimension = DiscoverDimension.UPDATES,
-        scopedStatusFixture: Boolean = false): () -> Int {
+        scopedStatusFixture: Boolean = false, partialCatalogFixture: Boolean = false): () -> Int {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val store = DiscoverStore(context)
         store.prefs.edit().clear().putString("layout", layout.name).putString("last_dimension", dimension.name)
@@ -126,7 +137,14 @@ class DiscoverUiTest {
                 coil.request.SuccessResult(android.graphics.drawable.BitmapDrawable(context.resources, bitmap), chain.request, coil.decode.DataSource.DISK)
             })
         }.build())
-        fixtures = if (!scopedStatusFixture) listOf(FixtureSource("a"), FixtureSource("b")) else listOf(
+        fixtures = if (partialCatalogFixture) listOf(object : FixtureSource("a") {
+            override suspend fun discoverCatalog(resolveDynamic: Boolean) = SourceResult.Success(DiscoverCatalog(declared = true, capabilities = mapOf("updates" to listOf("最新"))))
+        }, object : FixtureSource("b") {
+            override suspend fun discoverCatalog(resolveDynamic: Boolean): SourceResult<DiscoverCatalog> {
+                pendingCatalog.await(); return SourceResult.Success(DiscoverCatalog(declared = true, capabilities = mapOf("ranking" to listOf("热门"))))
+            }
+            override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> { pendingQuery = query; return super.discover(query) }
+        }) else if (!scopedStatusFixture) listOf(FixtureSource("a"), FixtureSource("b")) else listOf(
             object : FixtureSource("a") {
                 override suspend fun discoverCatalog(resolveDynamic: Boolean) = SourceResult.Success(DiscoverCatalog(categories = listOf(DiscoverNativeCategory("completed", "完结"))))
                 override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> {
@@ -162,7 +180,7 @@ class DiscoverUiTest {
                 }
             }
         }
-        compose.waitUntil(15_000) { compose.onAllNodesWithText("星海冒险 1", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        if (!partialCatalogFixture) compose.waitUntil(15_000) { compose.onAllNodesWithText("星海冒险 1", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         compose.waitForIdle()
         return { follows }
     }
@@ -176,7 +194,8 @@ class DiscoverUiTest {
     @Test fun rankingHasThreeMedalsAndFitsLargeDarkText() {
         mount(DiscoverLayout.LIST, dark = true, fontScale = 1.3f, dimension = DiscoverDimension.RANKING)
         compose.onNodeWithText("榜单").assertExists()
-        listOf("推荐", "更新", "热议", "榜单", "点击").forEach { label ->
+        compose.onNodeWithText("点击").assertDoesNotExist()
+        listOf("推荐", "更新", "热议", "榜单").forEach { label ->
             val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
             compose.onNodeWithText(label).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
             assertEquals("$label must stay on one line", 1, layouts.single().lineCount)
@@ -299,6 +318,16 @@ class DiscoverUiTest {
         compose.onNodeWithText("示例书源 b").performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("discover_status_filters").assertDoesNotExist()
+        compose.onNodeWithText("星海冒险 1").assertExists()
+    }
+    @Test fun completedRankingCannotShowBooksUnderTheOngoingStatus() {
+        mount(DiscoverLayout.LIST, dimension = DiscoverDimension.RANKING, scopedStatusFixture = true)
+        compose.onAllNodes(hasText("完结") and !hasAnyAncestor(hasTestTag("discover_status_filters"))).onFirst().performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("星海冒险 1").assertExists()
+        compose.onNode(hasText("连载") and hasAnyAncestor(hasTestTag("discover_status_filters"))).performClick()
+        compose.onNodeWithText("星海冒险 1").assertDoesNotExist()
+        compose.onNode(hasText("全部") and hasAnyAncestor(hasTestTag("discover_status_filters"))).performClick()
         compose.onNodeWithText("星海冒险 1").assertExists()
     }
     @Test fun layoutPreferenceAndCategoriesSurviveStoreRecreation() {

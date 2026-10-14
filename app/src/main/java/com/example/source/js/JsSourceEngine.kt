@@ -415,7 +415,10 @@ class JsSourceEngine(
                 if (typeof result === 'string') { result = JSON.parse(result); }
                 if (result.error) { throw result.error; }
                 if (typeof result.body === 'string') {
-                    result.body = Convert.decodeBase64(result.body);
+                    const decoded = Convert.decodeBase64(result.body);
+                    result.body = decoded instanceof ArrayBuffer ? decoded :
+                        ArrayBuffer.isView(decoded) ? decoded.buffer.slice(decoded.byteOffset, decoded.byteOffset + decoded.byteLength) :
+                        Uint8Array.from(decoded || []).buffer;
                 }
                 return result;
             };

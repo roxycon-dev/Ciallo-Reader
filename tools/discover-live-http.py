@@ -10,6 +10,9 @@ import threading
 import time
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from pathlib import Path
 
 backend = os.environ.get('DISCOVER_LIVE_HTTP_BACKEND', 'requests')
 if backend in ('curl', 'auto'):
@@ -61,7 +64,20 @@ def perform(message):
             options = {'impersonate': 'firefox144'} if actual_backend == 'curl' and any('Firefox/144' in v for k, v in headers.items() if k.lower() == 'user-agent') else {}
             if actual_backend == 'curl' and key.replace('.js', '') not in ('mycomic', 'nhentai', 'pufei', 'bilimanga', 'goda', 'comick'):
                 options['http_version'] = CurlHttpVersion.V1_1
-            r = session.request(method, url, headers=headers, data=data, timeout=(10, 18), stream=True, **options)
+            pinned = key == 'aimanhua.js' and urlsplit(url).hostname == 'mh.iqtao.cn'
+            r = session.request(method, url, headers=headers, data=data, timeout=(10, 18), stream=True, **({'verify':False} if pinned else {}), **options)
+            if pinned:
+                from cryptography import x509
+                from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+                import datetime
+                cert = x509.load_der_x509_certificate(r.raw.connection.sock.getpeercert(binary_form=True))
+                digest = hashlib.sha256(cert.public_key().public_bytes(Encoding.DER,PublicFormat.SubjectPublicKeyInfo)).hexdigest()
+                if digest != '84f816f39fb638fe06c65f5489ef9be3ed93ab195a56ff1ba014dfe000869729' or datetime.datetime.now(datetime.timezone.utc) > cert.not_valid_after_utc + datetime.timedelta(days=14):
+                    raise ValueError('Publisher TLS key/grace verification failed')
+                names=cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value.get_values_for_type(x509.DNSName)
+                if not ('mh.iqtao.cn' in names or '*.iqtao.cn' in names): raise ValueError('Publisher hostname mismatch')
+                (Path(__file__).resolve().parents[1]/'artifacts/discover-live/aimanhua-publisher.pem').write_bytes(cert.public_bytes(Encoding.PEM))
+
             payload = bytearray()
             for chunk in r.iter_content(65536):
                 payload.extend(chunk)
