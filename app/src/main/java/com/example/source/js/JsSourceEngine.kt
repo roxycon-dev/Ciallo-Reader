@@ -80,24 +80,6 @@ class JsSourceEngine(
         ensureReadyLocked()
         val code = """
             await (async () => {
-                const __flattenChapters = (value) => {
-                    const entries = value instanceof Map ? Array.from(value.entries()) : Object.entries(value);
-                    const out = [];
-                    for (const [k, v] of entries) {
-                        if (v instanceof Map) {
-                            for (const [k2, v2] of v.entries()) {
-                                out.push({ id: String(k2), title: String(v2), group: String(k) });
-                            }
-                        } else if (v && typeof v === 'object' && !Array.isArray(v)) {
-                            for (const [k2, v2] of Object.entries(v)) {
-                                out.push({ id: String(k2), title: String(v2), group: String(k) });
-                            }
-                        } else {
-                            out.push({ id: String(k), title: String(v) });
-                        }
-                    }
-                    return out;
-                };
                 const __normalize = (value) => {
                     if (value instanceof Map) {
                         const out = {};
@@ -111,7 +93,7 @@ class JsSourceEngine(
                             const v = value[key];
                             if (key === 'chapters' && v &&
                                 (v instanceof Map || (typeof v === 'object' && !Array.isArray(v)))) {
-                                out[key] = __flattenChapters(v);
+                                out[key] = CialloSourceResponse.chapters(v).map(__normalize);
                             } else {
                                 out[key] = __normalize(v);
                             }
@@ -263,6 +245,7 @@ class JsSourceEngine(
         // Venera App 注入的全局变量（appVersion 等）
         quickJs.evaluate<Any?>("globalThis.appVersion = '1.7.0';", filename = "globals.js")
         quickJs.evaluate<Any?>(runtimeJs, filename = "venera_runtime.js")
+        quickJs.evaluate<Any?>(app.assets.open("venera/source_responses.js").bufferedReader().use { it.readText() }, filename = "source_responses.js")
         // Venera 的 sendMessage 混合同步/异步语义；这里用同步桥覆盖同步消费方
         quickJs.evaluate<Any?>(SYNC_OVERRIDE, filename = "sync_override.js")
         quickJs.evaluate<Any?>(app.assets.open("venera/comic_metadata.js").bufferedReader().use { it.readText() }, filename = "comic_metadata.js")
@@ -294,11 +277,16 @@ class JsSourceEngine(
             throw SourceException.ParseError("JS 书源未找到 ComicSource 类")
         }
         // 与 Venera 一致：源实例只创建一次、init() 一次，后续调用全部复用同一实例
+        if (sourceKey in setOf("wnacg", "jm")) {
+            val adapter = if (sourceKey == "wnacg") "wnacg_info.js" else "jm_response.js"
+            quickJs.evaluate<Any?>(instrument(app.assets.open("venera/$adapter").bufferedReader().use { it.readText() }), filename = adapter)
+        }
         // 先创建实例并抓取 settings 默认值，但暂不执行 init()，
         // 保证 init() 期间 loadSetting 也能拿到默认值（如 jm/ehentai 的域名）。
         quickJs.evaluate<Any?>(
             """
             globalThis.__veneraSrc = new $className();
+            CialloSourceResponse.install(globalThis.__veneraSrc, ${JSONObject.quote(sourceKey)});
             // 与 Venera 一致：部分源只实现 search.loadNext（首页传 null），补一个 load 适配
             (() => {
                 const s = globalThis.__veneraSrc.search || {};
@@ -397,6 +385,7 @@ class JsSourceEngine(
             // ---- Convert（同步） ----
             Convert.encodeUtf8 = (str) => sendMessageSync({ method: 'convert', type: 'utf8', value: str, isEncode: true });
             Convert.decodeUtf8 = (value) => sendMessageSync({ method: 'convert', type: 'utf8', value: value, isEncode: false });
+            Convert.decodeResponseText = (value, headers) => sendMessageSync({ method: 'convert', type: 'response_text', value: value, headers: headers });
             Convert.encodeGbk = (str) => sendMessageSync({ method: 'convert', type: 'gbk', value: str, isEncode: true });
             Convert.decodeGbk = (value) => sendMessageSync({ method: 'convert', type: 'gbk', value: value, isEncode: false });
             Convert.encodeBase64 = (value) => sendMessageSync({ method: 'convert', type: 'base64', value: value, isEncode: true });

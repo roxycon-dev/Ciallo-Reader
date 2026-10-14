@@ -557,8 +557,8 @@ async function fetch(url, options) {
         statusText: '',
         headers: result.headers,
         arrayBuffer: async () => result.body,
-        text: async () => Convert.decodeUtf8(result.body),
-        json: async () => JSON.parse(Convert.decodeUtf8(result.body)),
+        text: async () => Convert.decodeResponseText ? Convert.decodeResponseText(result.body, result.headers) : Convert.decodeUtf8(result.body),
+        json: async () => JSON.parse(Convert.decodeResponseText ? Convert.decodeResponseText(result.body, result.headers) : Convert.decodeUtf8(result.body)),
     }
 }
 

@@ -13,6 +13,8 @@ import com.example.source.SearchBook
 import com.example.source.SourceCapabilities
 import com.example.source.SourceException
 import com.example.source.SourceResult
+import com.example.source.SourceResponse
+import com.example.source.readSourceText
 import com.example.source.js.JsSourceProxy
 import com.example.discover.*
 import kotlinx.coroutines.CancellationException
@@ -270,8 +272,7 @@ class MangaDexSource(
                 Log.i(TAG, "official api search HTTP ${response.code}")
                 return emptyList()
             }
-            val body = response.body?.string() ?: return emptyList()
-            val root = JSONObject(body)
+            val root = SourceResponse.jsonObject(response.readSourceText())
             val data = root.optJSONArray("data") ?: return emptyList()
             val out = ArrayList<SearchBook>(data.length())
             for (i in 0 until data.length()) {
@@ -432,7 +433,7 @@ class MangaDexSource(
             .build()
         http.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return@use null
-            response.body?.string()?.let { JSONObject(it) }
+            SourceResponse.jsonObject(response.readSourceText())
         }
     }.getOrNull()
 
@@ -922,7 +923,9 @@ class MangaDexSource(
                 Log.e(TAG, "HTTP ${response.code} for ${url.take(140)}")
                 throw SourceException.NetworkError("MangaDex HTTP ${response.code} @ ${url.take(160)}")
             }
-            return response.body?.string() ?: ""
+            val html = response.readSourceText()
+            SourceResponse.problem(html)?.let { throw SourceException.ParseError(it) }
+            return html
         }
     }
 }

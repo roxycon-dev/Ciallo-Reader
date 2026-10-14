@@ -3,6 +3,8 @@ package com.example.source.zlibrary
 import android.util.Log
 import com.example.source.BookFormat
 import com.example.source.SearchBook
+import com.example.source.SourceResponse
+import com.example.source.readSourceText
 import com.example.source.zlibrary.network.ZLibraryHttpClient
 import okhttp3.FormBody
 import org.json.JSONArray
@@ -31,14 +33,10 @@ class ZLibraryEapiClient(
         referer: String? = null
     ): JSONObject? = withContext(Dispatchers.IO) {
         try {
-            val response = httpClient.get(url, referer = referer)
-            val body = response.body?.string() ?: return@withContext null
-            response.close()
-            if (!response.isSuccessful) {
-                Log.w(TAG, "eapi GET ${response.code} $url")
-                return@withContext null
+            httpClient.get(url, referer = referer).use { response ->
+                if (!response.isSuccessful) return@use null
+                SourceResponse.jsonObject(response.readSourceText())
             }
-            JSONObject(body)
         } catch (e: Exception) {
             Log.w(TAG, "eapi GET failed: $url ${e.message}")
             null
@@ -54,14 +52,10 @@ class ZLibraryEapiClient(
             val formBody = FormBody.Builder().apply {
                 fields.forEach { (k, v) -> add(k, v) }
             }.build()
-            val response = httpClient.postForm(url, formBody, referer = referer)
-            val body = response.body?.string() ?: return@withContext null
-            response.close()
-            if (!response.isSuccessful) {
-                Log.w(TAG, "eapi POST ${response.code} $url")
-                return@withContext null
+            httpClient.postForm(url, formBody, referer = referer).use { response ->
+                if (!response.isSuccessful) return@use null
+                SourceResponse.jsonObject(response.readSourceText())
             }
-            JSONObject(body)
         } catch (e: Exception) {
             Log.w(TAG, "eapi POST failed: $url ${e.message}")
             null

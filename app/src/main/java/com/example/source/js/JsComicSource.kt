@@ -26,6 +26,13 @@ internal fun friendlyJsSourceError(raw: String): String {
     val text = raw.trim()
     return when {
         text.isEmpty() -> "JS 执行失败"
+        text.startsWith("源站返回") || text.startsWith("接口数据") || text.startsWith("源站接口") ->
+            text.lineSequence().first().take(160)
+        text.contains("cannot read", true) || text.contains("Cannot read properties", true) ->
+            "源站页面缺少必要内容，页面可能已变更或作品已下架，请更新书源后重试"
+        text.contains("unexpected token", true) || text.contains("JSON.parse", true) ->
+            "源站返回的接口内容异常，请稍后重试或切换该源线路"
+        text.contains("Login expired", true) -> "登录已过期：请在书源管理中重新登录"
         text.contains("Not logged in", ignoreCase = true) ||
             text.contains("请先登录") -> "该源需要登录：请在书源管理中登录"
         text.contains("Invalid status code: 401") -> "登录已过期：请在书源管理中重新登录"
@@ -44,6 +51,15 @@ internal fun friendlyJsSourceError(raw: String): String {
             "网络连接失败：请检查该源站点、系统代理或 VPN 后重试"
         else -> text.take(120)
     }
+}
+
+internal fun jsSourceFailure(raw: String): SourceException {
+    val message = friendlyJsSourceError(raw)
+    if (raw.contains("Not logged in", true) || raw.contains("Login expired", true) || raw.contains("请先登录") ||
+        raw.contains("该源需要登录") || raw.contains("Invalid status code: 401", true)) return SourceException.LoginRequired
+    return if (message.startsWith("源站返回网页") || message.startsWith("源站返回验证") || message.startsWith("源站返回空响应") ||
+        message.startsWith("网络连接失败") || message.contains("HTTP 403") || raw.contains("Cloudflare", true))
+        SourceException.NetworkError(message) else SourceException.ParseError(message)
 }
 
 class JsComicSource(
@@ -274,13 +290,13 @@ class JsComicSource(
                     numericIdFallback(keyword)?.let {
                         return@withContext SourceResult.Success(listOf(it))
                     }
-                    return@withContext SourceResult.Error(SourceException.ParseError(friendlyJsSourceError(err)))
+                    return@withContext SourceResult.Error(jsSourceFailure(err))
                 }
-                val comics = obj.optJSONObject("data")?.optJSONArray("comics") ?: JSONArray()
+                val comics = JsSourcePayload.requiredArray(obj.optJSONObject("data"), "comics")
                 val books = (0 until comics.length()).mapNotNull { i ->
                     val c = comics.optJSONObject(i) ?: return@mapNotNull null
-                    val id = c.optString("id")
-                    val title = c.optString("title")
+                    val id = JsSourcePayload.string(c, "id")
+                    val title = JsSourcePayload.string(c, "title")
                     if (id.isBlank() || title.isBlank()) return@mapNotNull null
                     val metadata = JsComicMetadata.book(c, this@JsComicSource.id, id)
                     SearchBook(
@@ -297,6 +313,7 @@ class JsComicSource(
                     )
                 }
                 // 号码牌直达：搜索结果为空且关键词是纯数字号牌时，按 ID 直接加载详情
+                if (comics.length() > 0 && books.isEmpty()) throw SourceException.ParseError("源站搜索条目缺少作品编号或标题，请更新书源后重试")
                 if (books.isEmpty()) {
                     numericIdFallback(keyword)?.let {
                         return@withContext SourceResult.Success(listOf(it))
@@ -305,6 +322,8 @@ class JsComicSource(
                 SourceResult.Success(books)
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: SourceException) {
+                SourceResult.Error(e)
             } catch (e: Exception) {
                 Log.e("JsComic[$sourceKey]", "search failed", e)
                 SourceResult.Error(SourceException.Unknown("JS 搜索失败: ${e.message}", e))
@@ -380,27 +399,19 @@ class JsComicSource(
                     val err = obj.optString("error", "JS 执行失败")
                     Log.w("JsComic[$sourceKey]", "call error: $err")
                     return@withContext SourceResult.Error(
-                        if (err.contains("请先登录") || err.contains("Not logged in", ignoreCase = true) ||
-                            err.contains("Invalid status code: 401")) SourceException.LoginRequired
-                        else SourceException.ParseError(friendlyJsSourceError(err))
+                        jsSourceFailure(err)
                     )
                 }
                 val data = obj.optJSONObject("data") ?: return@withContext SourceResult.Error(
                     SourceException.ParseError("JS 源无数据")
                 )
-                rememberShareUrl(bookId, data)
-                synchronized(chapterCacheMonitor) {
-                    if (detailEpoch == chapterCacheEpoch) {
-                        detailCache[bookId] = android.os.SystemClock.elapsedRealtime() to JsComicMetadata.book(data, id, bookId)
-                        while (detailCache.size > 8) detailCache.remove(detailCache.keys.first())
-                    }
-                }
-                val chapters = data.optJSONArray("chapters") ?: JSONArray()
+                if (JsSourcePayload.string(data, "title").isBlank()) throw SourceException.ParseError("源站未返回有效作品详情，请更新书源或稍后重试")
+                val chapters = JsSourcePayload.chapters(data)
                 var hasExplicitOrder = true
                 val list = (0 until chapters.length()).mapNotNull { i ->
                     val c = chapters.optJSONObject(i) ?: return@mapNotNull null
-                    val epId = c.optString("id")
-                    val title = c.optString("title")
+                    val epId = JsSourcePayload.string(c, "id")
+                    val title = JsSourcePayload.string(c, "title")
                     if (epId.isBlank() || title.isBlank()) return@mapNotNull null
                     hasExplicitOrder = hasExplicitOrder && c.has("order") && !c.isNull("order") &&
                         c.optDouble("order", Double.NaN).toFloat().isFinite()
@@ -413,6 +424,14 @@ class JsComicSource(
                 }
                 // 与 Venera 一致：单图集/画廊类源（nhentai/hitomi/ehentai 等）
                 // loadInfo 不返回 chapters，App 会合成一个“整本阅读”章节
+                if (chapters.length() != list.size) throw SourceException.ParseError("源站目录包含缺失或异常的章节，请更新书源或稍后重试")
+                rememberShareUrl(bookId, data)
+                synchronized(chapterCacheMonitor) {
+                    if (detailEpoch == chapterCacheEpoch) {
+                        detailCache[bookId] = android.os.SystemClock.elapsedRealtime() to JsComicMetadata.book(data, id, bookId)
+                        while (detailCache.size > 8) detailCache.remove(detailCache.keys.first())
+                    }
+                }
                 if (list.isEmpty() && sourceKey in setOf("manhuaren", "goda", "comick", "bilimanga", "vomic")) {
                     SourceResult.Error(SourceException.ParseError("源站当前未提供这部作品的在线章节"))
                 } else if (list.isEmpty()) {
@@ -432,7 +451,7 @@ class JsComicSource(
                 throw e
             } catch (e: Exception) {
                 Log.e("JsComic[$sourceKey]", "chapters failed", e)
-                SourceResult.Error(SourceException.Unknown("JS 章节加载失败: ${e.message}", e))
+                SourceResult.Error(if (e is SourceException) e else SourceException.Unknown("JS 章节加载失败: ${e.message}", e))
             }
         }
 
@@ -447,15 +466,10 @@ class JsComicSource(
                     val err = obj.optString("error", "JS 执行失败")
                     Log.w("JsComic[$sourceKey]", "call error: $err")
                     return@withContext SourceResult.Error(
-                        if (err.contains("请先登录") || err.contains("Not logged in", ignoreCase = true) ||
-                            err.contains("Invalid status code: 401")) SourceException.LoginRequired
-                        else SourceException.ParseError(friendlyJsSourceError(err))
+                        jsSourceFailure(err)
                     )
                 }
-                val images = obj.optJSONObject("data")?.optJSONArray("images") ?: JSONArray()
-                val rawUrls = (0 until images.length()).mapNotNull { i ->
-                    images.optString(i).ifBlank { null }
-                }
+                val rawUrls = JsSourcePayload.images(obj.optJSONObject("data"))
                 if (rawUrls.isEmpty()) {
                     SourceResult.Error(SourceException.ParseError("该章节没有可读取的图片"))
                 } else if (sourceKey == "ehentai") {
@@ -494,7 +508,7 @@ class JsComicSource(
                 throw e
             } catch (e: Exception) {
                 Log.e("JsComic[$sourceKey]", "images failed", e)
-                SourceResult.Error(SourceException.Unknown("JS 图片加载失败: ${e.message}", e))
+                SourceResult.Error(if (e is SourceException) e else SourceException.Unknown("JS 图片加载失败: ${e.message}", e))
             }
         }
 

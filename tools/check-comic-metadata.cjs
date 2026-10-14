@@ -15,7 +15,8 @@ for (const name of ['Comic', 'ComicDetails']) {
     vm.runInContext(runtime.slice(start, end), context);
 }
 vm.runInContext(read('app/src/main/assets/venera/comic_metadata.js'), context);
-const start = engine.indexOf('const __flattenChapters =');
+vm.runInContext(read('app/src/main/assets/venera/source_responses.js'), context);
+const start = engine.indexOf('const __normalize =');
 const end = engine.indexOf('                try {', start);
 assert(start >= 0 && end > start, 'Missing bridge normalizer');
 vm.runInContext(engine.slice(start, end) + '\nglobalThis.normalize = __normalize;', context);

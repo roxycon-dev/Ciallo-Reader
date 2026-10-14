@@ -1,5 +1,9 @@
 // Gradle build config
 
+import java.util.Properties
+import java.security.KeyStore
+import java.security.MessageDigest
+
 plugins {
   id("com.android.application")
   id("org.jetbrains.kotlin.android")
@@ -8,7 +12,7 @@ plugins {
   alias(libs.plugins.roborazzi)
 }
 
-// 本地调试密钥库：不在仓库提交，首次构建自动生成（保证 clone 后可直接编译）
+// 调试密钥仅用于独立的 .debug 应用；正式发布绝不回退到它。
 val debugKeystoreFile = file("${rootDir}/debug.keystore")
 if (!debugKeystoreFile.exists()) {
   val javaHome = System.getProperty("java.home")
@@ -24,7 +28,46 @@ if (!debugKeystoreFile.exists()) {
     "-dname", "CN=Android Debug,O=Android,C=US"
   )
   pb.redirectErrorStream(true)
-  pb.start().waitFor()
+  check(pb.start().waitFor() == 0) { "无法生成调试签名密钥" }
+}
+
+// 本地配置不入库；CI 使用同一份密钥及环境变量。证书指纹入库，阻止意外换签名。
+val releaseSigningProperties = Properties().apply {
+  val config = rootProject.file("release-signing.properties")
+  if (config.exists()) config.inputStream().use { load(it) }
+}
+fun signingValue(environment: String, property: String): String? =
+  System.getenv(environment)?.takeIf { it.isNotBlank() }
+    ?: releaseSigningProperties.getProperty(property)?.takeIf { it.isNotBlank() }
+val releaseKeystore = signingValue("KEYSTORE_PATH", "storeFile")?.let { rootProject.file(it) }
+val releaseStorePassword = signingValue("STORE_PASSWORD", "storePassword")
+val releaseKeyAlias = signingValue("KEY_ALIAS", "keyAlias")
+val releaseKeyPassword = signingValue("KEY_PASSWORD", "keyPassword")
+
+val verifyReleaseSigning = tasks.register("verifyReleaseSigning") {
+  group = "verification"
+  description = "校验正式发布密钥与固定证书指纹，禁止临时签名"
+  doLast {
+    val keyFile = releaseKeystore
+    check(keyFile != null && keyFile.isFile && releaseStorePassword != null &&
+      releaseKeyAlias != null && releaseKeyPassword != null) {
+      "RELEASE_SIGNING_MISSING: 正式版缺少固定签名配置。请配置 release-signing.properties 或 KEYSTORE_PATH / STORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD；不会使用调试签名。"
+    }
+    val store = KeyStore.getInstance(requireNotNull(keyFile), requireNotNull(releaseStorePassword).toCharArray())
+    check(store.isKeyEntry(releaseKeyAlias) && store.getKey(releaseKeyAlias, requireNotNull(releaseKeyPassword).toCharArray()) != null) {
+      "正式发布密钥别名或密码无效"
+    }
+    val certificate = store.getCertificate(releaseKeyAlias)
+    val actual = MessageDigest.getInstance("SHA-256").digest(certificate.encoded)
+      .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    val expected = rootProject.file("signing/release-cert.sha256").readText().trim().lowercase()
+    check(expected.matches(Regex("[0-9a-f]{64}")) && actual == expected) {
+      "RELEASE_SIGNING_CERT_MISMATCH: 正式发布证书与 signing/release-cert.sha256 不一致，已阻止生成无法覆盖安装的版本。"
+    }
+  }
+}
+tasks.configureEach {
+  if (name == "preReleaseBuild" || name == "validateSigningRelease") dependsOn(verifyReleaseSigning)
 }
 
 android {
@@ -44,8 +87,8 @@ android {
     applicationId = "com.aistudio.novelreader.kxmpzq"
     minSdk = 24
     targetSdk = 35
-    versionCode = 218
-    versionName = "1.3.7"
+    versionCode = 219
+    versionName = "1.3.8"
     externalNativeBuild {
       cmake { arguments += "-DANDROID_STL=c++_static" }
     }
@@ -73,11 +116,10 @@ android {
 
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+      storeFile = releaseKeystore
+      storePassword = releaseStorePassword
+      keyAlias = releaseKeyAlias
+      keyPassword = releaseKeyPassword
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
@@ -93,14 +135,11 @@ android {
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      val keystoreFile = file("${rootDir}/my-upload-key.jks")
-      signingConfig = if (keystoreFile.exists() && System.getenv("STORE_PASSWORD") != null) {
-        signingConfigs.getByName("release")
-      } else {
-        signingConfigs.getByName("debugConfig")
-      }
+      signingConfig = signingConfigs.getByName("release")
     }
     debug {
+      applicationIdSuffix = ".debug"
+      resValue("string", "app_name", "Ciallo Reader · 调试版")
       signingConfig = signingConfigs.getByName("debugConfig")
       // 2026-09-21：debug 体积的主要来源已通过统一 arm64 解决（62MB → 41.8MB）。
       // 剩余与 release 的差距全部来自「不做混淆 / 资源精简」。

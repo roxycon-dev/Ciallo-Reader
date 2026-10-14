@@ -321,6 +321,11 @@ class JsMessageHandler(
         val isString = msg["isString"] == true
         return try {
             when (type) {
+                "response_text" -> {
+                    val headers = (msg["headers"] as? Map<*, *>)?.entries
+                        ?.associate { it.key.toString() to it.value.toString() }.orEmpty()
+                    com.example.source.SourceResponse.text(bytesOf(value) ?: ByteArray(0), headers)
+                }
                 "utf8", "gbk" -> {
                     val charset = if (type == "gbk") Charset.forName("GBK") else Charsets.UTF_8
                     if (isEncode) (value as? String)?.toByteArray(charset)
@@ -406,6 +411,7 @@ class JsMessageHandler(
                     if (k.toString().equals("User-Agent", ignoreCase = true)) hasUa = true
                 }
             }
+            effectiveHeaders.keys.removeAll { it.equals("Accept-Encoding", true) && !effectiveHeaders[it].equals("identity", true) }
             if (!hasUa) {
                 effectiveHeaders["User-Agent"] =
                     "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.5359.128 Mobile Safari/537.36"
@@ -459,7 +465,7 @@ class JsMessageHandler(
             val proxied = useProxyRoute(url)
             if (!insecureTls && !proxied) {
                 // 走 Cronet（Chromium 网络栈）：浏览器级 TLS 指纹，绕过按 Java 客户端封禁的站点
-                var res = cronetRequest(httpMethod, url, effectiveHeaders, bodyBytes)
+                var res = cronetRequest(httpMethod, url, effectiveHeaders, bodyBytes, timeoutMs = if (sourceKey == "jm") 10_000 else 60_000)
                 // Cloudflare 挑战：用无头 WebView 自动过盾一次（cf_clearance 会同步进共享
                 // Cookie 存储），刷新请求头里的 Cookie 后重试原请求
                 if (res.error == null && CfWebViewSolver.isChallengeResponse(res.status, res.headers)) {
@@ -488,9 +494,14 @@ class JsMessageHandler(
                 val systemProxy = com.example.source.zlibrary.network.SystemProxyResolver.resolve(context)
                 val retryViaProxy = systemProxy != null &&
                     (res.error != null || res.status == 403 || res.status == 429 || res.status >= 500)
-                val retryViaHttp = httpMethod == "GET" &&
+                val responseProblem = if (!bytes && httpMethod == "GET" && res.status == 200)
+                    com.example.source.SourceResponse.problem(com.example.source.SourceResponse.text(res.body ?: ByteArray(0), res.headers),
+                        sourceKey == "jm" || effectiveHeaders.any { it.key.equals("Accept", true) && it.value.contains("json", true) } ||
+                            res.headers.any { it.key.equals("Content-Type", true) && it.value.contains("json", true) })
+                    else null
+                val retryViaHttp = httpMethod == "GET" && (responseProblem != null ||
                     ((sourceKey in setOf("pufei", "bilimanga") && res.error != null) ||
-                        (sourceKey == "bilimanga" && res.status == 403))
+                        (sourceKey == "bilimanga" && res.status == 403)))
                 if (res.error != null || retryViaProxy || retryViaHttp) {
                     if (!retryViaProxy && !retryViaHttp) {
                         return JSONObject().put("error", res.error).toString()
@@ -514,7 +525,7 @@ class JsMessageHandler(
                                 ?: JSONObject.NULL
                         )
                     } else {
-                        val text = res.body?.let { String(it, Charsets.UTF_8) } ?: ""
+                        val text = res.body?.let { com.example.source.SourceResponse.text(it, respHeaders) } ?: ""
                         obj.put("body", text.ifEmpty { JSONObject.NULL })
                     }
                     return obj.toString()
@@ -525,7 +536,9 @@ class JsMessageHandler(
             val builder = Request.Builder().url(url)
             effectiveHeaders.forEach { (k, v) -> builder.header(k, v) }
             val request = builder.method(httpMethod, body).build()
-            val result = client.newCall(request).executeWithCancellation(requestJob).use {
+            val transport = if (sourceKey == "jm") client.newBuilder().connectTimeout(8, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS).callTimeout(12, TimeUnit.SECONDS).build() else client
+            val result = transport.newCall(request).executeWithCancellation(requestJob).use {
                 if (httpMethod == "GET") {
                     if (it.isSuccessful) JsSourceProxy.rememberProxySuccess(context, url)
                     else if (it.code == 403 || it.code == 429 || it.code >= 500) JsSourceProxy.forgetRoute(url)
@@ -546,7 +559,11 @@ class JsMessageHandler(
                             ?: JSONObject.NULL
                     )
                 } else {
-                    val text = decoded?.toString(Charsets.UTF_8) ?: ""
+                    val text = decoded?.let { com.example.source.SourceResponse.text(it, respHeaders) } ?: ""
+                    val expectJson = sourceKey == "jm" || effectiveHeaders.any { header -> header.key.equals("Accept", true) && header.value.contains("json", true) } ||
+                        it.header("Content-Type").orEmpty().contains("json", true)
+                    if (it.code == 200 && httpMethod != "HEAD" && (text.isNotBlank() || expectJson)) com.example.source.SourceResponse.problem(text, expectJson)
+                        ?.let { reason -> throw com.example.source.SourceException.ParseError(reason) }
                     obj.put("body", text.ifEmpty { JSONObject.NULL })
                 }
                 obj.toString()
@@ -626,11 +643,14 @@ class JsMessageHandler(
                 CronetResult(-1, emptyMap(), null, e.message ?: e.javaClass.simpleName)
             }
             val empty = response.status in 200..299 && response.body?.isNotEmpty() != true && !allowEmpty
-            val retryable = response.error != null || empty || response.status == 403 ||
+            val pageProblem = if (!bytes && response.status in 200..299 && response.body != null && !allowEmpty)
+                com.example.source.SourceResponse.problem(decodeComicText(response.body, response.headers)) else null
+            val retryable = response.error != null || empty || pageProblem != null || response.status == 403 ||
                 response.status == 429 || response.status >= 500
             if (retryable) {
                 if (directMirror) publicDirectRoutes.remove(host)
                 lastError = when {
+                    pageProblem != null -> pageProblem
                     empty -> "源站返回空响应，重新连接后仍未收到页面"
                     response.error != null -> "网络连接失败：${response.error}"
                     else -> "源站返回 HTTP ${response.status}"
@@ -657,12 +677,7 @@ class JsMessageHandler(
     }
 
     private fun decodeComicText(bytes: ByteArray, headers: Map<String, String>): String {
-        val contentType = headers.entries.firstOrNull { it.key.equals("Content-Type", true) }?.value.orEmpty()
-        val prefix = String(bytes, 0, minOf(bytes.size, 4096), Charsets.ISO_8859_1)
-        val declaredGbk = Regex("charset\\s*=\\s*[\"']?\\s*(gbk|gb2312|gb18030)", RegexOption.IGNORE_CASE)
-            .containsMatchIn(contentType + "\n" + prefix)
-        val utf8 = bytes.toString(Charsets.UTF_8)
-        return if (declaredGbk || utf8.contains('\uFFFD')) bytes.toString(Charset.forName("GB18030")) else utf8
+        return com.example.source.SourceResponse.text(bytes, headers)
     }
 
     private data class CronetResult(
@@ -774,7 +789,7 @@ class JsMessageHandler(
         val builder = cronetEngine.newUrlRequestBuilder(url, callback, cronetExecutor)
             .setHttpMethod(method)
             .setPriority(UrlRequest.Builder.REQUEST_PRIORITY_MEDIUM)
-        headers.forEach { (k, v) -> builder.addHeader(k, v) }
+        headers.forEach { (k, v) -> if (!k.equals("Accept-Encoding", true) || v.equals("identity", true)) builder.addHeader(k, v) }
         if (body != null) {
             if (headers.keys.none { it.equals("Content-Type", ignoreCase = true) }) {
                 builder.addHeader("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")

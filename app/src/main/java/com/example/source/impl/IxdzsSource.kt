@@ -44,9 +44,9 @@ class IxdzsSource(
             .header("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/139.0.0.0 Mobile Safari/537.36").build()
         return http.newCall(request).executeCancellable().use { response ->
             if (!response.isSuccessful) throw SourceException.NetworkError("爱下电子书返回 HTTP ${response.code}")
-            val bytes = response.body?.byteStream()?.use { it.readImportBytes(2 * 1024 * 1024) }
-                ?: throw SourceException.ParseError("网文源返回空页面")
-            Jsoup.parse(bytes.toString(Charsets.UTF_8), url.toString())
+            val html = response.readSourceText()
+            SourceResponse.problem(html)?.let { throw SourceException.ParseError(it) }
+            Jsoup.parse(html, url.toString())
         }
     }
     private suspend fun detail(bookId: String, fresh: Boolean = false): Detail = mutex.withLock {

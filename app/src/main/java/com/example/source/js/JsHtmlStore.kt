@@ -29,6 +29,7 @@ class JsHtmlStore {
      * 不能与元素 id 共用自增计数器，否则后续文档全部错位。
      */
     fun parse(jsKey: Int, html: String): Int {
+        com.example.source.SourceResponse.problem(html)?.let { throw com.example.source.SourceException.ParseError(it) }
         require(html.length <= 2 * 1024 * 1024) { "书源 HTML 超过 2Mi 字符" }
         dispose(jsKey)
         val doc = Jsoup.parse(html)

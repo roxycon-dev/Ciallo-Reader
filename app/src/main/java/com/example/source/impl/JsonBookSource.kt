@@ -150,8 +150,9 @@ class JsonBookSource(
                     )
                 }
 
-                val bodyStr = response.body?.byteStream()?.use { it.readImportBytes(2*1024*1024).toString(Charsets.UTF_8) } ?: ""
-                val jsonItems = JsonPathResolver.resolveArray(bodyStr, config.search.listPath)
+                val bodyStr = response.use { it.readSourceText() }
+                SourceResponse.jsonRoot(bodyStr)
+                val jsonItems = JsonPathResolver.resolveArray(bodyStr, config.search.listPath, required = true)
 
                 jsonItems.forEach { jsonObj ->
                     parseSearchBook(jsonObj, config.search.fields)?.let { book ->
@@ -163,8 +164,11 @@ class JsonBookSource(
                 val books = jsonItems.mapNotNull { jsonObj ->
                     parseSearchBook(jsonObj, config.search.fields)
                 }
+                if (jsonItems.isNotEmpty() && books.isEmpty()) throw SourceException.ParseError("源站条目无法匹配书名或编号，请检查书源字段规则")
 
                 SourceResult.Success(books)
+            } catch (e: SourceException) {
+                SourceResult.Error(e)
             } catch (e: IOException) {
                 SourceResult.Error(SourceException.NetworkError("网络连接错误: ${e.message}", e))
             } catch (e: JSONException) {
@@ -217,6 +221,8 @@ class JsonBookSource(
                     }
                 }
                 SourceResult.Success(chapters)
+            } catch (e: SourceException) {
+                SourceResult.Error(e)
             } catch (e: IOException) {
                 SourceLog.log(name, "目录失败 ← $bookId: ${e.message}")
                 SourceResult.Error(SourceException.NetworkError("网络连接错误: ${e.message}", e))
@@ -256,6 +262,8 @@ class JsonBookSource(
                     SourceLog.log(name, "正文图片 ${images.size} 张 ← $chapterId")
                     SourceResult.Success(images)
                 }
+            } catch (e: SourceException) {
+                SourceResult.Error(e)
             } catch (e: IOException) {
                 SourceLog.log(name, "正文失败 ← $chapterId: ${e.message}")
                 SourceResult.Error(SourceException.NetworkError("网络连接错误: ${e.message}", e))
@@ -291,6 +299,8 @@ class JsonBookSource(
                     SourceLog.log(name, "正文 ${text.length} 字 ← $chapterId")
                     SourceResult.Success(text)
                 }
+            } catch (e: SourceException) {
+                SourceResult.Error(e)
             } catch (e: IOException) {
                 SourceLog.log(name, "正文失败 ← $chapterId: ${e.message}")
                 SourceResult.Error(SourceException.NetworkError("网络连接错误: ${e.message}"))
@@ -445,16 +455,9 @@ class JsonBookSource(
         }
         SourceLog.log(name, "HTTP ${response.code} OK ← $method ${url.take(120)}")
         val charset = config.htmlSearch?.charset?.ifBlank { null }
-        if (charset != null) {
-            val bytes = response.body?.byteStream()?.use { it.readImportBytes(2*1024*1024) } ?: return ""
-            try {
-                String(bytes, Charset.forName(charset))
-            } catch (e: Exception) {
-                String(bytes, Charsets.UTF_8)
-            }
-        } else {
-            response.body?.byteStream()?.use { it.readImportBytes(2*1024*1024).toString(Charsets.UTF_8) } ?: ""
-        }
+        val text = response.readSourceText(fallback = charset)
+        SourceResponse.problem(text)?.let { throw SourceException.ParseError(it) }
+        text
         }
     }
 
@@ -514,12 +517,8 @@ class JsonBookSource(
                     )
                 }
 
-                val bodyStr = response.body?.byteStream()?.use { it.readImportBytes(2*1024*1024).toString(Charsets.UTF_8) } ?: ""
-                val jsonObj = try {
-                    JSONObject(bodyStr)
-                } catch (e: Exception) {
-                    return@withContext SourceResult.Error(SourceException.ParseError("无效的详情 JSON"))
-                }
+                val bodyStr = response.use { it.readSourceText() }
+                val jsonObj = SourceResponse.jsonObject(bodyStr)
 
                 val book = parseSearchBook(jsonObj, detailRule.fields, defaultId = bookId)
                 if (book != null) {
@@ -527,6 +526,8 @@ class JsonBookSource(
                 } else {
                     SourceResult.Error(SourceException.BookNotFound)
                 }
+            } catch (e: SourceException) {
+                SourceResult.Error(e)
             } catch (e: IOException) {
                 SourceResult.Error(SourceException.NetworkError("网络连接错误: ${e.message}", e))
             } catch (e: JSONException) {
