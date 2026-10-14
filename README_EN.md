@@ -61,7 +61,7 @@ These 12 earlier screenshots show source management, library search, the bookshe
 
 ### Discover comics
 
-Version 1.3.8 is pending release. The changes below are in source and validated; publishing the APK requires the existing fixed signing key. The current published version remains 1.3.7.
+Version 1.3.8 adds Discover and restores Aiman and MYCOMIC reading. Its APK retains the 1.3.6 signing identity; the differently signed 1.3.7 requires a data backup before migrating.
 
 - Browse one source or merge sources with separate update, discussion, ranking, and view dimensions. Missing statistics are shown explicitly.
 - Standard categories coexist with native source categories, with saved filters, three layouts, pagination, quick following, and random reading.
@@ -104,7 +104,7 @@ Version 1.3.8 is pending release. The changes below are in source and validated;
 
 - **Android:** 7.0 (API 24) or newer.
 - **Architecture:** Current release APKs target arm64-v8a, supported by most Android phones and tablets. The release APK does not include an x86_64 emulator build.
-- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.3.7 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.7/Ciallo-Reader-v1.3.7.apk).
+- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.3.8 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.8/Ciallo-Reader-v1.3.8.apk).
 - Open the downloaded APK and follow Android's prompt to allow installation from that source.
 
 ## Get started

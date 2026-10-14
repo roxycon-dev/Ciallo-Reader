@@ -1,6 +1,6 @@
-# Ciallo Reader 1.3.8 · 发现与书源修复（待正式签名发布）
+# Ciallo Reader 1.3.8 · 发现与书源修复
 
-版本 1.3.8 / 219，Android 7.0+、arm64。新增发现入口，并集中修复书库现有源的发现、分类及元数据。MYCOMIC 实际 Android 链路已通过。发布前发现远端已发布 1.3.7，因此合并其响应解析修复和固定发布签名，递增为 1.3.8 / 219。合并后 109 项回归和 MYCOMIC 专项链路均通过；当前缺少远端固定证书对应的私有密钥，正式 APK / Release 尚未发布，不使用另一证书替代。
+版本 1.3.8 / 219，Android 7.0+、arm64。新增发现入口，并集中修复书库现有源的发现、分类及元数据。MYCOMIC 实际 Android 链路已通过。发布前发现远端已发布 1.3.7，因此合并其响应解析修复和固定发布签名，递增为 1.3.8 / 219。合并后 109 项回归和 MYCOMIC 专项链路均通过。用户最终要求找不到 1.3.7 密钥就按原方式构建，本版沿用已有 1.3.6 密钥。
 
 发现支持聚合/单源、四独立维度、标准三级分类与原站分类、三布局、无限分页、快捷追漫、随机阅读和设置。没有原始讨论/点击/时间信息的源明确标为缺失，不将普通推荐包装成统计。跨源合并使用可信身份去重和稳定源内排序；分类保留未知原站标签，作者/角色命名空间不误归题材，成人分类默认隐藏。
 
@@ -16,12 +16,16 @@ MYCOMIC 的桌面直接/系统代理 HTTP 请求均被 Cloudflare 拦截。本�
 
 合并前选定 96 项回归全部通过，无失败、错误或跳过；本地候选 Release/R8 与 MYCOMIC 专项 Android 测试编译成功。该历史候选签名与 1.3.6 相同、ZIP CRC、ZIP/原生库 16 KiB 对齐、35 个资产逐字节核对、912 项构建输入稳定性通过；不代表符合远端现有 1.3.7 的固定签名。MYCOMIC 专项设备测试实际运行通过（1 项）。首次设备运行仅因测试夹具路径不存在失败，尚未发起站点请求；修正后重编测试包并运行成功。初轮 85 项中 81 通过，4 项导航测试受不同 Robolectric TLS provider 跨类缓存影响；Release Kotlin 默认 daemon 堆不足也曾失败。使用既有逐类隔离测试设置和进程内 3 GiB 堆后通过，初轮失败日志保留。
 
-合并后的 1.3.8 增加响应解码和载荷校验回归，共 109 项 JVM/Robolectric 选定测试全部通过。生产响应适配器的 17 项离线检查、漫画元数据检查、发现及 MYCOMIC 离线契约通过；合并后的 MYCOMIC Android 专项链路再次实际通过（63.889 秒），新独立调试包 1.3.8 / 219 编译成功，921 项生产/测试输入稳定；回执含版本、包名与源脚本哈希。正式 Release 仍受缺少固定密钥阻塞，没有将旧签名候选上传。
+合并后的 1.3.8 增加响应解码和载荷校验回归，共 109 项 JVM/Robolectric 选定测试全部通过。生产响应适配器的 17 项离线检查、漫画元数据检查、发现及 MYCOMIC 离线契约通过；合并后的 MYCOMIC Android 专项链路再次实际通过（63.889 秒），新独立调试包 1.3.8 / 219 编译成功，921 项生产/测试输入稳定；回执含版本、包名与源脚本哈希。正式 Release/R8 构建成功，38 个打包资产逐字节核对、921 项输入稳定、ZIP CRC 与 ZIP/原生库 16 KiB 对齐通过。正式包签名与已发布 1.3.6 相同，包名不变，versionCode 从 217 增至 219；升级检查通过，不代表手机数据保留实测。
 
 遵照用户最终授权，仅为 MYCOMIC 启动现有 Android 模拟器并完成链路检查，没有重复测试其他健康源。未宣称玻璃视觉真机验收或业界排名。已有 1.3.6 / 1.3.7 稳定 Release 未改；完整 MangaJaNai 权重仍从已有不可变 1.3.6 模型附件下载，没有重打或替换模型包。
 
 参考：[原站声明线路与作品详情](https://mh.iqtao.cn/69008588.html)、[Venera 官方源配置](https://github.com/venera-app/venera-configs)、[Keiyoushi MCCMS 实现](https://github.com/keiyoushi/extensions-source/blob/main/lib-multisrc/mccms/src/eu/kanade/tachiyomi/multisrc/mccms/MCCMSWeb.kt)。
 
-合并前本地候选包为 1.3.7 / 218，28,939,839 B，SHA256 `0b55d08d916f80e5342ecb451ba6375e8f12bd8ec69c9a0ceba41a201acc9c74`；该包不是 GitHub 现有 1.3.7，签名也不同，已停止将其作为发布包。1.3.8 正式版必须沿用 `signing/release-cert.sha256` 固定证书，并在拿到私有密钥后重新构建、验签和核对升级。
+## 安装与签名
 
-正式构建实际停止于 `:app:verifyReleaseSigning`，`RELEASE_SIGNING_MISSING`。本机未找到原私有密钥，GitHub Actions 也无签名 Secrets；已请求用户恢复原文件，不生成替代证书，不覆盖现有 Release。源码推送不等于正式包发布或任务全部完成。
+按用户最终授权，本版沿用 1.3.6 的现有密钥，没有生成新密钥。1.3.6 可覆盖升级；现有 1.3.7 使用另一证书，不能直接覆盖，需先备份数据再迁移安装。旧 Release、标签和附件保持不变。[签名说明](app-signing.md)。
+
+APK：`Ciallo-Reader-v1.3.8.apk`，28,946,709 B；SHA256 `e3e16473285d6393c4372f7f6f6cdb247e4120165d03070a5dc33dc8a46ab7d6`。证书 SHA256 `d2115e3cc5880b210a120558aaab03eb30ee5de2952a80f3376dda7e45501146`。下载见 [1.3.8 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.3.8)。本地构建及上传回执在 `artifacts/release-1.3.8/`；`python tools/verify-discover-candidate.py` 仅核验，不推送或发布。
+
+历史签名阻塞：第一次正式构建因缺少 1.3.7 私钥在 `verifyReleaseSigning` 停止；用户选择 1.3.6、又改回 1.3.7 时取消了中间构建，直到最终授权原方式后才用现有 1.3.6 密钥完成构建。未把中间候选冒充已发布包。
