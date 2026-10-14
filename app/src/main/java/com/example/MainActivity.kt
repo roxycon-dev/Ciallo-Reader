@@ -28,6 +28,9 @@ import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.filled.Explore
+import kotlinx.coroutines.flow.first
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -454,7 +457,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    var selectedTab by rememberSaveable { mutableIntStateOf(1) }
+                    var selectedTab by rememberSaveable { mutableIntStateOf(2) }
                     val favoriteAddRequest by viewModel.favoriteAddRequest.collectAsStateWithLifecycle()
                     val favoriteActionMessage by viewModel.favoriteActionMessage.collectAsStateWithLifecycle()
                     val favoriteSourceNames by libraryViewModel.availableSources.collectAsStateWithLifecycle()
@@ -541,6 +544,7 @@ class MainActivity : ComponentActivity() {
                             val tabItems = remember {
                                 listOf(
                                     AppTabItem("书库", Icons.Outlined.Search, Icons.Filled.Search),
+                                    AppTabItem("发现", Icons.Outlined.Explore, Icons.Filled.Explore),
                                     AppTabItem("书架", Icons.Outlined.BookmarkBorder, Icons.Filled.Bookmark),
                                     AppTabItem("统计", Icons.Outlined.BarChart, Icons.Filled.BarChart),
                                     AppTabItem("设置", Icons.Outlined.Settings, Icons.Filled.Settings)
@@ -570,6 +574,7 @@ class MainActivity : ComponentActivity() {
                                 favoriteCategoryEntities.map { it.name }
                             }
                             val homeScope = rememberCoroutineScope()
+                            var discoverReadJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
                             /**
                              * 删除下载的"撤销窗口"：先软删除（立刻从界面移除，DB 与文件都还在），
@@ -699,7 +704,7 @@ class MainActivity : ComponentActivity() {
                                                 0 -> com.example.library.LibraryScreen(
                                                     viewModel = libraryViewModel,
                                                     onBookImported = { 
-                                                        selectedTab = 1 
+                                                        selectedTab = 2
                                                     },
                                                     onOpenSourceManagement = {
                                                         navController.navigate("source_management")
@@ -720,7 +725,34 @@ class MainActivity : ComponentActivity() {
                                                     onOpenLocalNovel = { book -> viewModel.selectBook(book); navController.navigate("reader") },
                                                     extraBottomPadding = LocalAppBottomInset.current
                                                 )
-                                            1 -> HomeScreen(
+                                            1 -> com.example.discover.DiscoverScreen(
+                                                readingTitles = readingRecords.map { it.bookTitle }.toSet(),
+                                                manager = libraryViewModel.sourceManager,
+                                                favorites = if (viewModel.favoritesProtected.collectAsStateWithLifecycle().value) emptyList() else favoriteItems,
+                                                favoriteKeys = favoriteKeys,
+                                                onFollow = { book, next -> viewModel.toggleFavorite(book, next) },
+                                                onOpen = { book -> discoverReadJob?.cancel(); libraryViewModel.openComic(book); navController.navigate("comic_chapters") },
+                                                onLatest = { book ->
+                                                    discoverReadJob?.cancel()
+                                                    libraryViewModel.openComic(book)
+                                                    discoverReadJob = homeScope.launch {
+                                                        val result = kotlinx.coroutines.withTimeoutOrNull(30_000) {
+                                                            kotlinx.coroutines.flow.combine(libraryViewModel.comicChaptersLoading, libraryViewModel.comicChapters,
+                                                                libraryViewModel.comicChaptersError) { loading, chapters, error -> Triple(loading, chapters, error) }
+                                                                .first { !it.first && (it.second.isNotEmpty() || it.third != null) }
+                                                        }
+                                                        if (libraryViewModel.comicBook.value?.id != book.id || libraryViewModel.comicBook.value?.sourceId != book.sourceId) return@launch
+                                                        val latest = result?.second?.let { com.example.data.favorite.ComicReadingLogic.ordered(it).lastOrNull()?.chapter }
+                                                        if (latest != null) {
+                                                            ComicJumpState.startPage = 0
+                                                            libraryViewModel.loadChapterImages(latest)
+                                                            navController.navigate("comic_reader_online")
+                                                        } else navController.navigate("comic_chapters")
+                                                    }
+                                                },
+                                                onSourceManagement = { navController.navigate("source_management") },
+                                            )
+                                            2 -> HomeScreen(
                                                 books = visibleBooks,
                                                 categories = categories,
                                                 shelfCategory = shelfCategory,
@@ -741,16 +773,13 @@ class MainActivity : ComponentActivity() {
                                                     viewModel.addCategory(name)
                                                 },
                                                 onSettingsClick = {
-                                                    // 第十一轮第 2 条修复：设置页是
-                                                    // Tab 3（2=统计）——旧值跳错页，长按分类
-                                                    // 的"需先开启隐私模式"引导落不到设置页
-                                                    selectedTab = 3
+                                                    selectedTab = 4
                                                 },
                                                 onNavigateToShelf = {
                                                     selectedTab = 0
                                                 },
                                                 onNavigateToStats = {
-                                                    selectedTab = 2
+                                                    selectedTab = 3
                                                 },
                                                 todayReadSecondsFlow = viewModel.todayReadSeconds,
                                                 streakDaysFlow = viewModel.streakDays,
@@ -867,7 +896,7 @@ class MainActivity : ComponentActivity() {
                                                 },
                                                 onDeleteFavoriteCategory = { viewModel.deleteFavoriteCategory(it) },
                                             )
-                                            2 -> {
+                                            3 -> {
                                                 var dailyGoalState by remember { mutableIntStateOf(viewModel.prefs.dailyGoalMinutes) }
                                                 /* 神回订阅只在这一 Tab 内：切到统计页才读 DataStore / 查库 */
                                                 val godMoments by viewModel.godMoments.collectAsStateWithLifecycle()
@@ -885,7 +914,7 @@ class MainActivity : ComponentActivity() {
                                                         viewModel.prefs.dailyGoalMinutes = it
                                                         dailyGoalState = it  // 触发重组刷新目标环
                                                     },
-                                                onGoToShelf = { selectedTab = 1 },
+                                                onGoToShelf = { selectedTab = 2 },
                                                 onDeleteRecord = { viewModel.deleteReadingRecord(it.id) },
                                                 recordCovers = libraryViewModel.recordCovers.collectAsStateWithLifecycle().value,
                                                 recordBooks = libraryViewModel.recordBooks.collectAsStateWithLifecycle().value,
@@ -952,7 +981,8 @@ class MainActivity : ComponentActivity() {
                                                 }
                                                 )
                                             }
-                                            3 -> SettingsTabScreen(
+                                            4 -> SettingsTabScreen(
+                                                discoverSources = libraryViewModel.sourceManager.allSources.value.filter { it.capabilities.supportComic }.map { it.id to it.name },
                                                     prefs = viewModel.prefs,
                                                     backupManager = viewModel.backupManager,
                                                     categories = categories,
@@ -1036,6 +1066,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             SettingsTabScreen(
+                                discoverSources = libraryViewModel.sourceManager.allSources.value.filter { it.capabilities.supportComic }.map { it.id to it.name },
                                 focusGodSettings = focusGodSettings,
                                 onOpenSourceManager = {
                                     navController.navigate("source_management")
@@ -1283,7 +1314,7 @@ class MainActivity : ComponentActivity() {
                             val favoriteKeys by viewModel.favoriteKeys.collectAsStateWithLifecycle()
                             com.example.library.LibraryScreen(
                                 viewModel = searchViewModel,
-                                onBookImported = { selectedTab = 1 },
+                                onBookImported = { selectedTab = 2 },
                                 onOpenSourceManagement = { navController.navigate("source_management") },
                                 onImportLocalBook = {
                                     selectedCategoryForImport = "全部"

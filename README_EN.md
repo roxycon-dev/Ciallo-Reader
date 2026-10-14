@@ -59,6 +59,13 @@ These 12 earlier screenshots show source management, library search, the bookshe
 
 ## Features
 
+### Discover comics
+
+- Browse one source or merge sources with separate update, discussion, ranking, and view dimensions. Missing statistics are shown explicitly.
+- Standard categories coexist with native source categories, with saved filters, three layouts, pagination, quick following, and random reading.
+- Version 1.3.7 repairs discovery feeds, metadata, and pagination, and restores Aiman's public reading path through the HTTPS origin declared by its publisher.
+- MYCOMIC reads public pages with the same in-app WebView engine and session used for site verification. Its real Android verification → catalogue → detail → chapter → reader image decoding chain passed: 30 catalogue entries, 16 chapters, 61 pages, and decoded first/last images. See [validation details](docs/release-1.3.7-2026-10-14.md).
+
 ### One library for novels, ebooks, and comics
 
 - Import and read TXT, EPUB, MOBI, AZW, AZW3, PRC, DOCX, FB2, CBZ, ZIP, and PDF files.
@@ -95,7 +102,7 @@ These 12 earlier screenshots show source management, library search, the bookshe
 
 - **Android:** 7.0 (API 24) or newer.
 - **Architecture:** Current release APKs target arm64-v8a, supported by most Android phones and tablets. The release APK does not include an x86_64 emulator build.
-- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.3.6 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.6/Ciallo-Reader-v1.3.6.apk).
+- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.3.7 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.7/Ciallo-Reader-v1.3.7.apk).
 - Open the downloaded APK and follow Android's prompt to allow installation from that source.
 
 ## Get started

@@ -199,7 +199,7 @@ class JsMessageHandler(
     private val cronetEngine: CronetEngine by lazy {
         CronetEngine.Builder(context)
             // 部分站点（拷贝漫画/漫画柜）对 HTTP/2 直接断连，强制 HTTP/1.1 与 Venera 一致
-            .enableHttp2(sourceKey in setOf("mycomic", "nhentai", "pufei", "bilimanga"))
+            .enableHttp2(sourceKey in setOf("mycomic", "nhentai", "pufei", "bilimanga", "goda"))
             .enableBrotli(true)
             .enableQuic(false)
             .setUserAgent(
@@ -391,6 +391,12 @@ class JsMessageHandler(
         val httpMethod = (msg["http_method"] as? String ?: "GET").uppercase()
         val bytes = msg["bytes"] == true
         return try {
+            if (!insecureTls && MyComicBrowserReader.accepts(sourceKey, httpMethod, url, bytes)) {
+                val userAgent = context.getSharedPreferences("js_source_website_verification", Context.MODE_PRIVATE)
+                    .getString("mycomic_user_agent", null)
+                    ?: android.webkit.WebSettings.getDefaultUserAgent(context)
+                return MyComicBrowserReader.read(context, url, userAgent, requestJob)
+            }
             val effectiveHeaders = LinkedHashMap<String, String>()
             val sourceHeaders = msg["headers"] as? Map<*, *>
             var hasUa = false

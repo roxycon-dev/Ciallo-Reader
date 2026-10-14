@@ -4,6 +4,10 @@ package com.example.source
  * A book source that can browse online comics chapter by chapter.
  */
 interface ComicSource : BookSource {
+    suspend fun discoverCatalog(resolveDynamic: Boolean = false): SourceResult<com.example.discover.DiscoverCatalog> =
+        SourceResult.Success(com.example.discover.DiscoverCatalog())
+    suspend fun discover(query: com.example.discover.DiscoverQuery): SourceResult<com.example.discover.DiscoverPage> =
+        SourceResult.Success(com.example.discover.DiscoverPage(supported = false, notice = "该书源未提供此维度数据"))
     suspend fun getChapters(bookId: String): SourceResult<List<ComicChapter>>
     suspend fun getChapterImages(chapterId: String): SourceResult<List<String>>
 

@@ -52,7 +52,7 @@ import com.example.ui.components.AppIconButton
 import com.example.ui.components.DialogLiquidGlass
 import com.example.ui.components.AppIconButton
 import kotlinx.coroutines.launch
-import com.example.ui.adaptive.AdaptiveSpec
+import com.example.ui.adaptive.AdaptiveSpec
 import com.example.ui.components.AppToast
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -168,7 +168,7 @@ fun ZLibraryLoginDialog(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = if (isJsSource) "登录 ${source.name}" else "登录 Z-Library",
+                            text = if (source.id == "js_mycomic") "验证 ${source.name}" else if (isJsSource) "登录 ${source.name}" else "登录 Z-Library",
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp,
                             color = MaterialTheme.colorScheme.onSurface
@@ -182,22 +182,12 @@ fun ZLibraryLoginDialog(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     if (supportsCookieLogin && source.id != "js_mycomic") {
-                        TabRow(
-                            selectedTabIndex = loginModeTab,
-                            containerColor = Color.Transparent,
-                            divider = {}
-                        ) {
-                            Tab(
-                                selected = loginModeTab == 0,
-                                onClick = { loginModeTab = 0 },
-                                text = { Text("账号密码", fontSize = 14.sp, fontWeight = if (loginModeTab == 0) FontWeight.Bold else FontWeight.Normal) }
-                            )
-                            Tab(
-                                selected = loginModeTab == 1,
-                                onClick = { loginModeTab = 1 },
-                                text = { Text(if (source.id == "js_mycomic") "cf_clearance" else "粘贴 Cookie", fontSize = 14.sp, fontWeight = if (loginModeTab == 1) FontWeight.Bold else FontWeight.Normal) }
-                            )
-                        }
+                        com.example.ui.components.SegmentedPillSelector(
+                            options = listOf(0 to "账号密码", 1 to if (source.id == "js_mycomic") "cf_clearance" else "粘贴 Cookie"),
+                            selected = loginModeTab,
+                            onSelect = { loginModeTab = it },
+                            fontSp = 14f,
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(20.dp))
@@ -210,7 +200,10 @@ fun ZLibraryLoginDialog(
                         focusedLeadingIconColor = MaterialTheme.colorScheme.secondary
                     )
 
-                    if (loginModeTab == 0) {
+                    if (source.id == "js_mycomic") {
+                        Text("点击下方按钮，在应用内完成站点验证。验证成功后会自动返回，浏览凭据由应用保存。",
+                            fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else if (loginModeTab == 0) {
                         OutlinedTextField(
                             value = username,
                             onValueChange = { username = it },
@@ -259,7 +252,7 @@ fun ZLibraryLoginDialog(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     AppLiquidButton(
-                        text = if (isLoading) "登录中" else "确认登录",
+                        text = if (source.id == "js_mycomic") { if (isLoading) "等待站点验证" else "打开站点验证" } else if (isLoading) "登录中" else "确认登录",
                         enabled = !isLoading,
                         onClick = {
                             scope.launch {
@@ -276,7 +269,7 @@ fun ZLibraryLoginDialog(
                                 }
                                 when (val result = source.login(credential)) {
                                     is SourceResult.Success -> {
-                                        AppToast.makeText(context, "登录成功", Toast.LENGTH_SHORT).show()
+                                        AppToast.makeText(context, if (source.id == "js_mycomic") "验证成功" else "登录成功", Toast.LENGTH_SHORT).show()
                                         onSuccess()
                                         onDismiss()
                                     }

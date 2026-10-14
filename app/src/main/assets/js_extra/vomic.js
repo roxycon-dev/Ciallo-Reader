@@ -7,7 +7,7 @@ class VomicSource extends ComicSource {
 
     key = "vomic"
 
-    version = "1.0.0"
+    version = "1.0.1"
 
     minAppVersion = "1.6.0"
 
@@ -110,6 +110,8 @@ class VomicSource extends ComicSource {
     }
 
     parseCards(text) {
+        const structured = this.structuredCards(text);
+        if (structured.length) return structured;
         const out = [];
         const seen = {};
         const re = /\{"id":(\d{2,7}),"name":"([^"]{1,80})","cover":"([^"]{1,200})","intro":"([^"]{0,400})"/g;
@@ -128,6 +130,10 @@ class VomicSource extends ComicSource {
     }
 
     parseHomeCards(text) {
+        const structured = this.structuredCards(text);
+        if (structured.length) return structured.sort((a, b) => (b.subtitle || "").localeCompare(a.subtitle || ""));
+        // The HTML embeds escaped Flight payloads; RSC returns those records directly.
+        text = this.unesc(text);
         const out = [];
         const seen = {};
         const re = /\{"id":(\d{2,7}),"name":"([^"]{1,80})","cover":"([^"]{1,200})","intro":"([^"]{0,400})","updated_at":"([^"]{1,25})"/g;
@@ -144,6 +150,41 @@ class VomicSource extends ComicSource {
             });
         }
         return out.sort(function (a, b) { return (b.subtitle || "").localeCompare(a.subtitle || ""); });
+    }
+
+    structuredCards(text) {
+        // Parse Flight records as JSON, including the escaped records in server HTML.
+        // This preserves quoted titles, long signed cover URLs and source metadata.
+        const records = [], cards = [], seen = new Set();
+        const flights = /self\.__next_f\.push\((\[1,"(?:\\.|[^"\\])*"\])\)/g;
+        let match;
+        while ((match = flights.exec(text)) !== null) {
+            try { records.push(JSON.parse(match[1])[1]); } catch (_) {}
+        }
+        if (!records.length) records.push(text);
+        function visit(value, depth) {
+            if (!value || typeof value !== "object" || depth > 32) return;
+            if (value.id != null && /^\d+$/.test(String(value.id)) && typeof value.name === "string" &&
+                typeof value.cover === "string" && value.cover && !seen.has(String(value.id))) {
+                seen.add(String(value.id));
+                cards.push({id: String(value.id), name: value.name, cover: value.cover, intro: value.intro || "",
+                    subtitle: value.updated_at || "", author: typeof value.author === "string" ? value.author : "",
+                    status: value.process || null, tags: typeof value.tags === "string" ? value.tags.split(/[,，]/).filter(Boolean) : [],
+                    clicks: Number.isSafeInteger(value.view_num) && value.view_num >= 0 ? value.view_num : null,
+                    discussions: Number.isSafeInteger(value.comment_num) && value.comment_num >= 0 ? value.comment_num : null});
+            }
+            for (const child of Object.values(value)) visit(child, depth + 1);
+        }
+        for (const record of records) {
+            for (const line of record.split(/\r?\n/)) {
+                const colon = line.indexOf(":");
+                if (colon < 0) continue;
+                const json = line.slice(colon + 1);
+                if (json[0] !== "[" && json[0] !== "{") continue;
+                try { visit(JSON.parse(json), 0); } catch (_) {}
+            }
+        }
+        return cards;
     }
 
     categories = [
@@ -178,16 +219,15 @@ class VomicSource extends ComicSource {
             title: "vomic 最新更新",
             type: "singlePageWithMultiPart",
             load: async () => {
-                const res = await Network.get(this.site("/"), this.headers);
+                const res = await Network.get(this.site("/"), this.rscHeaders(await this.token()));
                 if (res.status !== 200) throw "加载失败";
                 const cards = this.parseHomeCards(res.body);
                 const comics = cards.map(function (c) {
-                    return new Comic({
-                        id: c.id, title: c.name, cover: c.cover,
-                        subtitle: (c.subtitle || "").slice(0, 16), tags: []
-                    });
+                    return { id: c.id, title: c.name, cover: c.cover,
+                        subtitle: c.subtitle || "", author: c.author || "", updatedAt: c.subtitle || null,
+                        clicks: c.clicks, discussions: c.discussions, status: c.status, tags: c.tags || [] };
                 });
-                return { "今日更新": comics };
+                return { "最新更新": comics };
             }
         }
     ]
@@ -211,10 +251,10 @@ class VomicSource extends ComicSource {
             if (res.status !== 200) throw "加载失败";
             const cards = this.parseCards(res.body);
             const comics = cards.map(function (c) {
-                return new Comic({
+                return {
                     id: c.id, title: c.name, cover: c.cover,
-                    description: c.intro, tags: []
-                });
+                    description: c.intro, author: c.author || "", status: c.status, tags: c.tags || []
+                };
             });
             return { comics: comics, maxPage: comics.length >= 12 ? page + 1 : page };
         }
@@ -228,10 +268,10 @@ class VomicSource extends ComicSource {
             if (res.status !== 200) throw "搜索失败";
             const cards = this.parseCards(res.body);
             const comics = cards.map(function (c) {
-                return new Comic({
+                return {
                     id: c.id, title: c.name, cover: c.cover,
-                    description: c.intro, tags: []
-                });
+                    description: c.intro, author: c.author || "", status: c.status, tags: c.tags || []
+                };
             });
             // 空结果安静返回：App 的 healthCheck 会把搜索抛错的源自动停用
             return { comics: comics, maxPage: cards.length >= 12 ? page + 1 : page };

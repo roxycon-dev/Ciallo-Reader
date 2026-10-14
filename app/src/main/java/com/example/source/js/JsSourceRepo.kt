@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 object JsSourceRepo {
 
     /** 本地补丁版本：升级后尝试更新源脚本，失败时仍可使用旧缓存。 */
-    private const val PATCH_VERSION = 40
+    private const val PATCH_VERSION = 42
     // Raw cache format stays stable when compatibility patches change.
     private const val RAW_CACHE_PREFIX = "// EASYREADER_RAW_SOURCE_V28\n"
 
@@ -58,7 +58,7 @@ object JsSourceRepo {
 
     /**
      * 本地内置源：不在远端仓库索引里，随 App 资产分发（assets/js_extra/）。
-     * 嗶哩/vomic 参考 Keiyoushi；扑飞按本站公开目录及阅读器数据格式适配。
+     * 嗶哩/vomic/爱漫画参考 Keiyoushi；扑飞按本站公开目录及阅读器数据格式适配。
      * （tencent/kuaikan 已按用户要求下架：官方平台付费墙锁内容，归档于
      *   %LOCALAPPDATA%/Temp/mp/archive_sources/，可随时恢复）
      */
@@ -66,6 +66,7 @@ object JsSourceRepo {
         Triple("bilimanga", "嗶哩漫畫", "bilimanga.js"),
         Triple("vomic", "vomic漫画", "vomic.js"),
         Triple("pufei", "扑飞漫画", "pufei.js"),
+        Triple("aimanhua", "爱漫画", "aimanhua.js"),
     )
 
     /** 从 assets 读取本地内置源并包装成 JsComicSource（不受远端仓库可用性影响）。 */
@@ -142,10 +143,10 @@ object JsSourceRepo {
                         // 旧版缓存已存放补丁后的脚本；新版有标记，才在内存里补丁。
                         script = if (body.startsWith(RAW_CACHE_PREFIX)) {
                             patchScript(meta.key, body.removePrefix(RAW_CACHE_PREFIX))
-                        } else if (meta.key in setOf("wnacg", "mxs")) {
+                        } else if (meta.key in setOf("wnacg", "mxs", "jm")) {
                             // These repairs are idempotent and also migrate pre-raw-cache scripts.
                             patchScript(meta.key, body)
-                        } else body,
+                        } else patchDiscoverSource(meta.key, body),
                         insecureTls = meta.insecure,
                         loginRequired = meta.key in LOGIN_KEYS
                     )
@@ -421,7 +422,7 @@ object JsSourceRepo {
             "this.convertData(await res.text(), domainSecret)",
             "this.convertData((await res.text()).replace(/^\\uFEFF/, ''), domainSecret)"
         )
-        patched = patched.replace(
+        if (!patched.contains("static apiDomains =")) patched = patched.replace(
             "    static imageUrl = \"https://cdn-msp.jmapinodeudzn.net\"",
             """
     static apiDomains = [
@@ -466,7 +467,171 @@ object JsSourceRepo {
         return patched
     }
 
-    private fun patchScript(key: String, script: String): String = when (key) {
+    private fun patchWnacgDiscovery(script: String): String {
+        var patched = script.replace("Network.get(this.baseUrl, {})", "Network.get(this.baseUrl, this.__cialloBrowseHeaders)")
+            .replace("Network.get(url, {})", "Network.get(url, this.__cialloBrowseHeaders)")
+            .replace("let pages = Number(pagesLink[pagesLink.length - 1].text)", "let pages = pagesLink.length ? Number(pagesLink[pagesLink.length - 1].text) : page; if (!Number.isFinite(pages)) pages = page;")
+            .replace("div.info > div.title > a, a.ImgA span", "div.info > div.title > a, a.txtA, a.ImgA span")
+        if (patched.contains("async __cialloList(path, page)")) return patched
+        val start = patched.indexOf("    parseComic(c) {")
+        val end = patched.indexOf("    // categories", start)
+        if (start < 0 || end < start) return patched
+        val browse = """
+    __cialloBrowseHeaders = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
+    };
+    parseComic(c) {
+        const link = c.querySelector('a[href*="photos-index-aid-"]');
+        const id = (link && link.attributes.href || '').match(/photos-index-aid-(\d+)/);
+        const titleEl = c.querySelector('div.info > div.title > a, a.txtA, a.ImgA span');
+        const image = link && link.querySelector('img');
+        const title = (titleEl && titleEl.text || link && link.attributes.title || '').trim();
+        if (!id || !title) return null;
+        let cover = image && (image.attributes['data-original'] || image.attributes['data-src'] || image.attributes.src) || '';
+        if (cover.startsWith('//')) cover = 'https://' + cover.replace(/^\/+/, '');
+        else if (cover.startsWith('/')) cover = this.baseUrl + cover;
+        const info = c.querySelector('div.info_col, span.info');
+        const description = info ? info.text.trim() : '';
+        const date = description.match(/\d{4}-\d{2}-\d{2}/);
+        return {id: id[1], title, cover, description, updatedAt: date ? date[0] : null};
+    }
+    async __cialloList(path, page) {
+        const response = await Network.get(this.baseUrl + path, this.__cialloBrowseHeaders);
+        if (response.status !== 200) throw new Error('目录加载失败：' + response.status);
+        const doc = new HtmlDocument(response.body);
+        try {
+            const comics = doc.querySelectorAll('.gallary_wrap > ul.cc > li, #classify_container > li, ul.imgBox > li')
+                .map(c => this.parseComic(c)).filter(Boolean);
+            if (!comics.length) throw new Error('目录结构已变化，请刷新书源');
+            let maxPage = page;
+            for (const a of doc.querySelectorAll('a[href*="-page-"]')) {
+                const match = (a.attributes.href || '').match(/-page-(\d+)/);
+                if (match) maxPage = Math.max(maxPage, Number(match[1]));
+            }
+            return {comics, maxPage};
+        } finally { doc.dispose(); }
+    }
+    explore = [{ title: '最新发布', type: 'multiPageComicList',
+        load: async page => this.__cialloList('/albums-index-page-' + page + '.html', page) }];
+
+""".trimIndent() + "\n\n"
+        patched = patched.substring(0, start) + browse + patched.substring(end)
+        return patched
+    }
+
+    /** Repairs confirmed against live catalogue responses; applied after the existing reader repairs. */
+    private fun patchDiscoverSource(key: String, script: String): String = when (key) {
+        "jm" -> {
+            val start = script.indexOf("    async get(url) {")
+            val end = script.indexOf("    async post(url, body) {", start)
+            if (start < 0 || end < start || script.contains("__cialloApiFailover")) script else {
+                val get = """
+    async get(url) {
+        // Retry read-only API calls across the publisher's known routes, including
+        // TLS failures and 200 proxy error text. Validate decoded JSON before learning a route.
+        const __cialloApiFailover = true;
+        const current = this.baseUrl;
+        const path = url.startsWith(current + '/') ? url.substring(current.length) : null;
+        const domains = [...new Set([current, ...(JM.apiDomains || []).map(d => 'https://' + d),
+            ...(JM.fallbackServers || []).map(d => 'https://' + d)])].slice(0, 5);
+        const candidates = path ? domains.map(d => d + path) : [url];
+        let lastError;
+        const started = Date.now();
+        for (const candidate of candidates) {
+            if (lastError && Date.now() - started > 18000) break;
+            try {
+                const time = Math.floor(Date.now() / 1000);
+                const response = await Network.get(candidate, this.getApiHeaders(time));
+                if (response.status === 401) throw new Error('Login expired');
+                if (response.status !== 200) throw new Error('API HTTP ' + response.status);
+                const data = JSON.parse(response.body);
+                if (data.code === 401) throw new Error('Login expired');
+                if (typeof data.data !== 'string' || !data.data) throw new Error('API returned no encrypted data');
+                const decoded = this.convertData(data.data, String(time) + '185Hcomic3PAPP7R');
+                JSON.parse(decoded);
+                if (path && candidate !== url && String(this.loadSetting('apiDomain') || '1') === '1') {
+                    const winner = candidate.substring(8).split('/')[0];
+                    JM.apiDomains = [winner, ...(JM.apiDomains || []).filter(d => d !== winner)];
+                }
+                return decoded;
+            } catch (error) {
+                if (/login expired/i.test(String(error))) throw error;
+                lastError = error;
+            }
+        }
+        throw lastError || new Error('禁漫 API 暂时不可用，请稍后重试');
+    }
+
+""".trimIndent() + "\n\n"
+                script.substring(0, start) + get + script.substring(end)
+            }
+        }
+        "manwaba" -> script.replace(
+            "let url = this.api + pathMap[param] || \"/cate\";",
+            "let url = this.api + (pathMap[param] || \"/cate\");"
+        ).replace(
+            "let res = await Network.sendRequest(method, url, headers, payload);",
+            "let requestHeaders = Object.assign({}, headers || {}, method === 'POST' ? {'Content-Type':'application/json; charset=utf-8'} : {});\n      let res = await Network.sendRequest(method, url, requestHeaders, payload);"
+        ).let { patched -> if (patched.contains("author: comic.author,")) patched else
+            patched.replace("subTitle: comic.author,", "subTitle: comic.author, author: comic.author,") }
+        "picacg" -> if (script.contains("author: comic.author,")) script else
+            script.replace("subTitle: comic.author,", "subTitle: comic.author, author: comic.author,")
+        "wnacg" -> patchWnacgDiscovery(script)
+        "hcomic" -> if (script.contains("return { comics: [], maxPage: 0 };")) {
+            val patched = script.replace("Chrome/120.0.0.0", "Chrome/131.0.0.0")
+                .replace("enableRankingPage: true", "enableRankingPage: false")
+            if (patched.contains("__cialloUnavailable: true")) patched
+            else patched.replace("ranking: {", "ranking: { __cialloUnavailable: true,")
+        } else script
+        "mycomic" -> script.replace(
+            "Cloudflare 验证拦截：请在漫画源设置中点击「登录」，通过内置浏览器完成一次 Cloudflare 验证后即可正常使用。",
+            "原站需要浏览器验证，请在书源管理中点击 MYCOMIC 的「验证」，完成后重试。"
+        ).let { patched ->
+            // Keep the declaration's UA initializer intact; image hooks inside the class
+            // must use the same mutable headers as the verified browser session.
+            val start = patched.indexOf("class MyComic")
+            val withAgent = if (start < 0) patched else patched.substring(0, start) + patched.substring(start)
+                .replace("\"User-Agent\": UA,", "\"User-Agent\": headers['User-Agent'],")
+            val withChapters = withAgent.replace(
+                "const chapterMatch = /chapters:\\s*(\\[[\\s\\S]*?\\])/.exec(html);",
+                "const chapterMatch = __cialloChapterJson(doc, html);"
+            )
+            if (withChapters.contains("function __cialloChapterJson(")) withChapters else """
+function __cialloChapterJson(doc, html) {
+    // DOM attributes decode &quot; after WebView serializes outerHTML. Balanced JSON
+    // also preserves ']' and escaped quotes inside chapter titles without evaluating code.
+    const texts = doc.querySelectorAll('[x-data]').map(e => String(e.attributes['x-data'] || ''));
+    texts.push(html);
+    for (const text of texts) {
+        const marker = /chapters\s*:\s*\[/.exec(text);
+        if (!marker) continue;
+        const start = text.indexOf('[', marker.index);
+        let depth = 0, quoted = false, escaped = false;
+        for (let i = start; i < text.length; i++) {
+            const c = text[i];
+            if (quoted) {
+                if (escaped) escaped = false;
+                else if (c === '\\') escaped = true;
+                else if (c === '"') quoted = false;
+            } else if (c === '"') quoted = true;
+            else if (c === '[') depth++;
+            else if (c === ']' && --depth === 0) {
+                const json = text.substring(start, i + 1);
+                try { if (Array.isArray(JSON.parse(json))) return [null, json]; } catch (e) {}
+                break;
+            }
+        }
+    }
+    // Trigger the existing real chapter-link fallback when Alpine data is absent.
+    return [null, 'invalid chapter JSON'];
+}
+
+""".trimIndent() + "\n" + withChapters
+        }
+        else -> script
+    }
+
+    private fun patchScript(key: String, script: String): String = patchDiscoverSource(key, when (key) {
         // 漫蛙吧 API 域名迁移（mwuu.cc 301 → manwaxu.cc），2026-09-26 实测
         "manwaba" -> script.replace("https://mwuu.cc", "https://manwaxu.cc")
         "ehentai" -> {
@@ -1145,7 +1310,7 @@ object JsSourceRepo {
             patched
         }
         else -> script
-    }
+    })
 
     private fun fetch(context: Context, url: String): String? {
         return try {

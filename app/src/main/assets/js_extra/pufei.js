@@ -76,6 +76,14 @@ class Pufei extends ComicSource {
             "&type%5Border%5D=hits" + (mark ? "&type%5Bmark%5D=" + encodeURIComponent(mark) : "");
     }
 
+    explore = [{ title: "热门目录", type: "multiPageComicList", load: async page => {
+        const raw = await this.json(this.catalogueUrl("", page).replace("size=300", "size=40"));
+        const items = this.compact(raw);
+        this.rememberSearchLinks(items);
+        const comics = items.filter(b => b[0] && b[1]).map(b => ({ id: this.abs(b[1]), title: b[0], cover: b[2], author: b[3], tags: [] }));
+        return { comics, maxPage: raw.length === 40 ? null : page };
+    } }]
+
     compact(items) {
         return items.filter(b => b.chapter_nums === undefined || Number(b.chapter_nums) > 0).map(b => [this.titleText(b.name), b.url,
             b.pic_local ? this.abs(b.pic_local) : this.abs(b.pic || ""), b.author || "", b.chapter_url || "",

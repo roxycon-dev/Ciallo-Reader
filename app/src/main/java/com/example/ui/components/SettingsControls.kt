@@ -48,7 +48,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -58,16 +57,13 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.pageturn.PageTurnType
@@ -79,149 +75,17 @@ import kotlin.math.roundToInt
  * JunoSlider 护眼强度滑块（展开交互 + 内外阴影 + 主题色渐变 + 拖动气泡）。
  */
 
-/** 胶囊分段选择器：选中指示器弹簧滑动、半透明玻璃质感（文字始终在指示器上方）。 */
+/** 通用水滴分段选择器；调用方的布局、选项 id 与回调保持不变。 */
 @Composable
 fun SegmentedPillSelector(
     options: List<Pair<Int, String>>,
     selected: Int,
     onSelect: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    fontSp: Float = 12f,
 ) {
-    val primary = MaterialTheme.colorScheme.primary
-    val secondary = MaterialTheme.colorScheme.secondary
-    val quality = LocalRenderQuality.current
-    if (quality.minimal) {
-        Row(modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            options.forEach { (id, label) ->
-                Text(label, color = if (id == selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.clip(RoundedCornerShape(10.dp))
-                        .background(if (id == selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-                        .clickable { onSelect(id) }.padding(horizontal = 12.dp, vertical = 14.dp))
-            }
-        }
-        return
-    }
-    val positions = remember { mutableStateMapOf<Int, Rect>() }
-    val textWidths = remember { mutableStateMapOf<Int, Float>() }
-    var trackWidth by remember { mutableStateOf(0) }
-    val density = LocalDensity.current
-    val shape = RoundedCornerShape(percent = 50)
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            // 可访问性：触控目标提升至 Material 指南的 48dp
-            .height(48.dp)
-            .onSizeChanged { trackWidth = it.width }
-            .clip(shape)
-            .background(
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.55f)
-            )
-            .border(1.dp, primary.copy(alpha = 0.30f), shape)
-    ) {
-        val target = positions[selected]
-        if (target != null && trackWidth > 0 && (textWidths[selected] ?: 0f) > 0f) {
-            // 指示器宽度 = 文字宽度 + 少量内边距，和字一样长，居中在文字上
-            val indicatorWidth = textWidths[selected]!! + with(density) { 16.dp.toPx() }
-            val centerX = target.left + target.width / 2f
-            val targetX = centerX - indicatorWidth / 2f
-            val animatedX by animateFloatAsState(
-                targetValue = targetX,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                ),
-                label = "pillX"
-            )
-            val animatedW by animateFloatAsState(
-                targetValue = indicatorWidth,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                ),
-                label = "pillW"
-            )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .offset { IntOffset(animatedX.roundToInt(), 0) }
-                    .width(with(density) { animatedW.toDp() })
-                    .height(42.dp)
-                    // 极致档：选中指示器带主题色光晕（HWUI 投影，单节点开销）
-                    .then(
-                        if (quality == RenderQuality.MAX) {
-                            Modifier.shadow(
-                                elevation = 10.dp,
-                                shape = shape,
-                                ambientColor = primary.copy(alpha = 0.55f),
-                                spotColor = primary.copy(alpha = 0.55f)
-                            )
-                        } else {
-                            Modifier
-                        }
-                    )
-                    .clip(shape)
-                    // 半透明玻璃质感：能看到底下的文字，不遮内容
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                primary.copy(alpha = 0.22f),
-                                secondary.copy(alpha = 0.16f)
-                            )
-                        )
-                    )
-                    .border(1.5.dp, primary.copy(alpha = 0.45f), shape)
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            options.forEach { (mode, label) ->
-                val interaction = remember { MutableInteractionSource() }
-                val pressed by interaction.collectIsPressedAsState()
-                val scale by animateFloatAsState(
-                    targetValue = if (pressed) 0.92f else 1f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMedium
-                    ),
-                    label = "pillPress"
-                )
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .onGloballyPositioned { coords ->
-                            positions[mode] = Rect(
-                                offset = coords.positionInParent(),
-                                size = Size(coords.size.width.toFloat(), coords.size.height.toFloat())
-                            )
-                        }
-                        .graphicsLayer { scaleX = scale; scaleY = scale }
-                        .clickable(interactionSource = interaction, indication = null) { onSelect(mode) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        fontSize = 12.sp,
-                        fontWeight = if (selected == mode) FontWeight.Bold else FontWeight.Medium,
-                        color = if (selected == mode) {
-                            primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.onGloballyPositioned { coords ->
-                            textWidths[mode] = coords.size.width.toFloat()
-                        }
-                    )
-                }
-            }
-        }
-
-    }
+    val items = remember(options) { options.map { (id, label) -> LiquidSegmentOption(id, label) } }
+    LiquidSegmentedSelector(items, selected, onSelect, modifier, fontSp = fontSp)
 }
 
 /** 翻页动画选择行：选中态渐变胶囊 + 弹簧勾选反馈。 */

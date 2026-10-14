@@ -303,6 +303,7 @@ class JsSourceEngine(
             (() => {
                 const s = globalThis.__veneraSrc.search || {};
                 if (typeof s.load !== 'function' && typeof s.loadNext === 'function') {
+                    s.__cialloCursorOnly = true;
                     s.load = (keyword, options, page) => {
                         const list = s.optionList || [];
                         const opts = list.map((item, i) => {
@@ -379,6 +380,19 @@ class JsSourceEngine(
             Object.defineProperty(ComicSource.prototype, 'isLogged', {
                 get() { return sendMessageSync({ method: 'isLogged', key: this.key }); }
             });
+
+            // Keep explicit discovery metadata that the original Venera Comic constructor drops.
+            // Only declared fields are copied; no dates, authors or statistics are inferred.
+            const __cialloBaseComic = Comic;
+            Comic = function(data) {
+                __cialloBaseComic.call(this, data);
+                for (const key of ['author','authors','artist','artists','status','updatedAt','updateTime',
+                    'latestChapter','lastChapter','clicks','viewCount','readCount','discussions','commentCount',
+                    'growth','rank','rankChange','newEntry','hotComment','canonicalId','contentRating']) {
+                    if (Object.prototype.hasOwnProperty.call(data, key)) this[key] = data[key];
+                }
+            };
+            Comic.prototype = __cialloBaseComic.prototype;
 
             // ---- Convert（同步） ----
             Convert.encodeUtf8 = (str) => sendMessageSync({ method: 'convert', type: 'utf8', value: str, isEncode: true });

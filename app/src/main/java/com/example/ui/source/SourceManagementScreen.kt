@@ -1199,7 +1199,7 @@ private fun SourceGroupCard(
                         isCustom = group.kind == SourceGroupKind.CUSTOM,
                         onToggleEnable = { onToggleEnable(source, it) },
                         onOpenLogin = if (
-                            source.capabilities.requiresLogin && source.id != "zlibrary"
+                            (source.capabilities.requiresLogin || source.id == "js_mycomic") && source.id != "zlibrary"
                         ) {
                             { onOpenLogin(source) }
                         } else null,
@@ -1436,7 +1436,7 @@ private fun SourceRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             if (onOpenLogin != null) {
-                SourceMiniActionChip(text = "登录", onClick = onOpenLogin)
+                SourceMiniActionChip(text = if (source.id == "js_mycomic") "验证" else "登录", onClick = onOpenLogin)
             }
             if (onOpenNodeManager != null) {
                 SourceMiniActionChip(text = "节点", onClick = onOpenNodeManager)

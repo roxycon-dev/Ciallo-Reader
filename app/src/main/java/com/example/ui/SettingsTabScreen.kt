@@ -130,6 +130,7 @@ fun SettingsTabScreen(
     /* ── 「我喜欢的」密码保护（与受保护分类同一套 PIN） ── */
     favoritesProtected: Boolean = false,
     onSetFavoritesProtected: (Boolean) -> Unit = {},
+    discoverSources: List<Pair<String, String>> = emptyList(),
 ) {
     var showReleaseHistory by remember { mutableStateOf(false) }
     if (showReleaseHistory) com.example.ui.components.ReleaseHistoryDialog { showReleaseHistory = false }
@@ -1404,6 +1405,7 @@ LazyColumn(
                         }
                     }
                 }
+                item { com.example.discover.DiscoverSettings(discoverSources) }
             }
             }
         }

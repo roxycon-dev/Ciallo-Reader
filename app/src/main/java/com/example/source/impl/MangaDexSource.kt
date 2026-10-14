@@ -14,6 +14,8 @@ import com.example.source.SourceCapabilities
 import com.example.source.SourceException
 import com.example.source.SourceResult
 import com.example.source.js.JsSourceProxy
+import com.example.discover.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
@@ -47,6 +49,88 @@ class MangaDexSource(
 
     override val id: String = "mangadex"
     override val name: String = "MangaDex 漫画"
+    override suspend fun discoverCatalog(resolveDynamic: Boolean): SourceResult<DiscoverCatalog> = SourceResult.Success(
+        DiscoverCatalog(feeds = listOf(DiscoverFeed("md:latest", "最新更新", "updates"), DiscoverFeed("md:popular", "热门排行", "ranking"),
+            DiscoverFeed("md:new", "新作排行", "ranking"), DiscoverFeed("md:completed", "完结排行", "ranking"))))
+    override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> = withContext(Dispatchers.IO) {
+        if (query.feedId != null) {
+            val nativeQuery = when (query.feedId) {
+                "md:popular" -> query.copy(dimension = DiscoverDimension.RANKING, range = "热门", feedId = null)
+                "md:new" -> query.copy(dimension = DiscoverDimension.RANKING, range = "新作", feedId = null)
+                "md:completed" -> query.copy(dimension = DiscoverDimension.RANKING, range = "完结", feedId = null)
+                else -> query.copy(dimension = DiscoverDimension.UPDATES, range = "最新", feedId = null)
+            }
+            return@withContext when (val response = discover(nativeQuery)) {
+                is SourceResult.Error -> response
+                is SourceResult.Success -> SourceResult.Success(response.data.copy(native = true,
+                    entries = response.data.entries.map { it.copy(native = true, origin = "MangaDex ${nativeQuery.range}") }))
+            }
+        }
+        if (query.dimension !in setOf(DiscoverDimension.UPDATES, DiscoverDimension.RANKING) ||
+            (query.dimension == DiscoverDimension.RANKING && query.range == "飙升"))
+            return@withContext SourceResult.Success(DiscoverPage(supported = false, notice = "MangaDex 未提供此维度数据"))
+        try {
+            val limit = 30
+            val offset = (query.page - 1) * limit
+            val includes = "&includes%5B%5D=cover_art&includes%5B%5D=author&includes%5B%5D=artist"
+            val ratings = "&contentRating%5B%5D=safe&contentRating%5B%5D=suggestive" +
+                if (query.includeAdult) "&contentRating%5B%5D=erotica&contentRating%5B%5D=pornographic" else ""
+            val updates = linkedMapOf<String, Pair<Long?, String>>()
+            val response: JSONObject
+            val collection: org.json.JSONArray
+            if (query.dimension == DiscoverDimension.UPDATES) {
+                val start = DiscoverEngine.rangeStart(query.range, System.currentTimeMillis()) ?: 0L
+                val since = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.ROOT).apply {
+                    timeZone = java.util.TimeZone.getTimeZone("UTC") }.format(java.util.Date(start))
+                response = apiGet("$OFFICIAL_API/chapter?limit=$limit&offset=$offset&order%5BpublishAt%5D=desc" +
+                    "&translatedLanguage%5B%5D=zh&translatedLanguage%5B%5D=zh-hk&translatedLanguage%5B%5D=en" +
+                    "&publishAtSince=${URLEncoder.encode(since, "UTF-8")}$ratings")
+                    ?: return@withContext SourceResult.Error(SourceException.NetworkError("MangaDex 更新接口不可达"))
+                val chapters = response.optJSONArray("data") ?: org.json.JSONArray()
+                for (i in 0 until chapters.length()) {
+                    val chapter = chapters.optJSONObject(i) ?: continue
+                    val attrs = chapter.optJSONObject("attributes") ?: continue
+                    val rels = chapter.optJSONArray("relationships") ?: continue
+                    val uuid = (0 until rels.length()).firstNotNullOfOrNull { n -> rels.optJSONObject(n)
+                        ?.takeIf { it.optString("type") == "manga" }?.optString("id") } ?: continue
+                    val time = DiscoverEngine.parseDate(attrs.optString("publishAt"))
+                    if (time == null || time < start || time > System.currentTimeMillis()) continue
+                    if (uuid !in updates) updates[uuid] = time to attrs.optString("title").ifBlank { "第${attrs.optString("chapter", "?")}话" }
+                }
+                collection = if (updates.isEmpty()) org.json.JSONArray() else apiGet("$OFFICIAL_API/manga?limit=$limit$includes$ratings&" +
+                    updates.keys.joinToString("&") { "ids%5B%5D=$it" })?.optJSONArray("data")
+                    ?: return@withContext SourceResult.Error(SourceException.NetworkError("MangaDex 作品信息加载失败"))
+            } else {
+                val order = if (query.range == "新作") "createdAt" else "followedCount"
+                val status = if (query.range == "完结") "&status%5B%5D=completed" else ""
+                response = apiGet("$OFFICIAL_API/manga?limit=$limit&offset=$offset&order%5B$order%5D=desc$includes$ratings$status")
+                    ?: return@withContext SourceResult.Error(SourceException.NetworkError("MangaDex 榜单接口不可达"))
+                collection = response.optJSONArray("data") ?: org.json.JSONArray()
+            }
+            val entries = (0 until collection.length()).mapNotNull { i ->
+                val item = collection.optJSONObject(i) ?: return@mapNotNull null
+                val uuid = item.optString("id").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val attrs = item.optJSONObject("attributes") ?: return@mapNotNull null
+                val info = officialInfo(attrs).copy(artists = officialCreators(item, "artist"))
+                val rels = item.optJSONArray("relationships") ?: org.json.JSONArray()
+                val fileName = (0 until rels.length()).firstNotNullOfOrNull { n -> rels.optJSONObject(n)
+                    ?.takeIf { it.optString("type") == "cover_art" }?.optJSONObject("attributes")?.optString("fileName") }
+                val mainTitle = officialText(attrs.optJSONObject("title")) ?: return@mapNotNull null
+                synchronized(officialTitleCache) { officialTitleCache[uuid] = mainTitle
+                    if (officialTitleCache.size > 64) officialTitleCache.remove(officialTitleCache.keys.first()) }
+                val tags = info.tags + listOfNotNull(attrs.optString("publicationDemographic").ifBlank { null },
+                    attrs.optString("contentRating").takeIf { it in setOf("erotica", "pornographic") })
+                DiscoverEntry(SearchBook("mdapi:$uuid", id, mainTitle, officialCreators(item, "author").joinToString("、"),
+                    fileName?.let { "https://uploads.mangadex.org/covers/$uuid/$it.512.jpg" }, format = "漫画", comicId = "mdapi:$uuid",
+                    comicInfo = info.copy(tags = tags)), updatedAt = updates[uuid]?.first, latestChapter = updates[uuid]?.second,
+                    rank = if (query.dimension == DiscoverDimension.RANKING) offset + i + 1 else null,
+                    nativeOrder = if (query.dimension == DiscoverDimension.UPDATES) updates.keys.indexOf(uuid) + offset + 1 else offset + i + 1)
+            }
+            SourceResult.Success(DiscoverPage(entries, offset + response.optInt("limit", limit) < response.optInt("total"),
+                notice = if (query.dimension == DiscoverDimension.RANKING) "MangaDex 原生${query.range}排行" else null))
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { SourceResult.Error(SourceException.Unknown("MangaDex 发现加载失败：${e.message}", e)) }
+    }
     override suspend fun getShareUrl(bookId: String): String = officialUuid(bookId)?.let {
         "https://mangadex.org/title/${Uri.encode(it)}"
     } ?: "$BASE/manga/${Uri.encode(bookId)}"

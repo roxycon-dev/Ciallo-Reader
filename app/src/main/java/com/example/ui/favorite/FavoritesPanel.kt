@@ -474,102 +474,15 @@ fun ShelfSegmentedTabs(
     favoritesCount: Int,
     modifier: Modifier = Modifier,
 ) {
-    val reduceMotion = LocalReduceMotion.current
-    val density = LocalDensity.current
-    val padPx = with(density) { 4.dp.toPx() }
-    var rowWidthPx by remember { mutableStateOf(0f) }
-    val itemWidthPx = ((rowWidthPx - padPx * 2) / 2f).coerceAtLeast(0f)
-
-    // 指示器是"滑过去"的，不是"闪现"的：弹簧带轻微过冲，刚好能被眼睛捕捉到
-    val fraction by animateFloatAsState(
-        targetValue = selectedIndex.toFloat(),
-        animationSpec = if (reduceMotion) {
-            tween(0)
-        } else {
-            spring(dampingRatio = 0.72f, stiffness = 420f, visibilityThreshold = 0.001f)
-        },
-        label = "segment_slide",
-    )
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.35f))
-            .border(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f), RoundedCornerShape(20.dp))
-            .onSizeChanged { rowWidthPx = it.width.toFloat() }
-            .padding(4.dp),
-    ) {
-        if (itemWidthPx > 0f) {
-            Box(
-                modifier = Modifier
-                    .offset { IntOffset((fraction * itemWidthPx).toInt(), 0) }
-                    .fillMaxHeight()
-                    .width(with(density) { itemWidthPx.toDp() })
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MintPrimary.copy(alpha = 0.18f)),
-            )
-        }
-        Row(modifier = Modifier.fillMaxWidth()) {
-            SegmentedItem(
-                text = "我的书架",
-                selected = selectedIndex == 0,
-                modifier = Modifier.weight(1f),
-                onClick = { onSelected(0) },
-            )
-            SegmentedItem(
-                text = "我喜欢的",
-                selected = selectedIndex == 1,
-                badge = favoritesCount,
-                modifier = Modifier.weight(1f),
-                onClick = { onSelected(1) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun SegmentedItem(
-    text: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    badge: Int = -1,
-) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            // 底色由外层滑动指示器提供，这里只管内容与点击（点按时轻微下沉）
-            .pressScale { onClick() }
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (text == "我喜欢的") {
-            Icon(
-                Icons.Filled.Favorite,
-                contentDescription = null,
-                tint = if (selected) MintPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
-                modifier = Modifier.size(14.dp),
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-        }
-        Text(
-            text = text,
-            fontSize = 13.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = if (selected) MintPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+    val options = remember(favoritesCount) {
+        listOf(
+            com.example.ui.components.LiquidSegmentOption(0, "我的书架"),
+            com.example.ui.components.LiquidSegmentOption(1, "我喜欢的", favoritesCount, favorite = true),
         )
-        if (badge > 0) {
-            Spacer(modifier = Modifier.width(5.dp))
-            Text(
-                text = badge.toString(),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (selected) MintPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.40f),
-            )
-        }
     }
+    com.example.ui.components.LiquidSegmentedSelector(
+        options, selectedIndex, onSelected, modifier, height = 36.dp, fontSp = 13f,
+    )
 }
 
 /** 空状态：友好插画 + 引导（设计稿 §2.5）。 */

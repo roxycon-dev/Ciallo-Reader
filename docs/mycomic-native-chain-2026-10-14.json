@@ -1,0 +1,32 @@
+{
+  "source": "mycomic",
+  "complete": true,
+  "scriptSha256": "369c18cd76633fe475285888595f1ff4631be4f86eea38842fe5a59a5daeaf87",
+  "stage": "passed",
+  "verificationPassed": true,
+  "catalogueCount": 30,
+  "bookId": "1",
+  "title": "A PRESTO破碎的记忆",
+  "chapters": 16,
+  "pages": 61,
+  "decodedImages": [
+    {
+      "width": 780,
+      "height": 1157
+    },
+    {
+      "width": 780,
+      "height": 1157
+    }
+  ],
+  "date": "2026-10-14",
+  "androidApi": 35,
+  "webView": "124.0.6367.219",
+  "test": "MyComicVerificationDeviceTest.verificationCatalogueDetailsChapterAndDecodedImages",
+  "instrumentationResult": "OK (1 test)",
+  "seconds": 62.675,
+  "imageDecoder": "production ComicPageLoader / Coil",
+  "scope": "One real catalogue/detail/chapter chain; first and last images decoded",
+  "credentialsInjected": false,
+  "automatedCaptchaClicks": false
+}

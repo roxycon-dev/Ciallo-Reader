@@ -346,6 +346,6 @@ class LiveComicSourcesAuditTest {
         record(JSONObject().put("summary", true).put("remoteExpected", expected.size)
             .put("installedJs", installed.size).put("attempted", sources.size))
         // Completion of the audit is separate from availability of the individual websites.
-        assertEquals(expected.size + 3, byKey.size + expected.count { it.key !in byKey })
+        assertEquals(expected.size + 4, byKey.size + expected.count { it.key !in byKey })
     }
 }

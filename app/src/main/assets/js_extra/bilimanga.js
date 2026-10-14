@@ -10,7 +10,7 @@ class BiliManga extends ComicSource {
 
     key = "bilimanga"
 
-    version = "1.1.2"
+    version = "1.1.3"
 
     minAppVersion = "1.6.0"
 
@@ -98,6 +98,32 @@ class BiliManga extends ComicSource {
             if (typeof res.body !== "string" || !res.body.length) throw "搜索响应为空，请稍后重试";
             return this.parseSearch(res, page);
         }
+    }
+
+    // Public catalogue routes and pagination follow Keiyoushi BiliManga.kt.
+    explore = [
+        { title: "最新更新", type: "multiPageComicList", load: async page => this.discoverList("lastupdate", page) },
+        { title: "点击周榜", type: "multiPageComicList", load: async page => this.discoverList("weekvisit", page) }
+    ]
+
+    async discoverList(order, page) {
+        // The public catalogue has a desktop DOM; keep its browser identity consistent.
+        const response = await this.page(`${this.baseUrl}/top/${order}/${page}.html`, Object.assign({}, this.headers, {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        }));
+        const doc = new HtmlDocument(response.body);
+        try {
+            const comics = [];
+            for (const card of doc.querySelectorAll("a.book-layout[href*='/detail/']")) {
+                const image = card.querySelector("img");
+                const href = card.attributes.href || "";
+                const title = image && image.attributes.alt;
+                if (!title || !href) continue;
+                comics.push({ id: this.absUrl(href), title, cover: this.absUrl(image.attributes["data-src"] || image.attributes.src || ""), tags: [] });
+            }
+            if (!comics.length && doc.querySelector(".aui-ver-form")) throw new Error("原站需要验证，请在书源管理中打开网站");
+            return { comics, maxPage: comics.length === 50 ? null : page };
+        } finally { doc.dispose(); }
     }
 
     parseSearch(res, page) {

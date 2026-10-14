@@ -58,6 +58,34 @@ class JsComicSource(
 
     override val id: String get() = "js_$sourceKey"
 
+    private val discoverBridge by lazy { context.assets.open("venera/discover_bridge.js").bufferedReader().use { it.readText() } }
+    private suspend fun discoverCall(request: JSONObject): JSONObject? = callJsWithRetry(
+        "(() => { $discoverBridge; return __cialloDiscover(src, $request); })()")
+
+    override suspend fun discoverCatalog(resolveDynamic: Boolean): SourceResult<com.example.discover.DiscoverCatalog> =
+        withContext(Dispatchers.IO) {
+            try {
+                val result = discoverCall(JSONObject().put("catalogOnly", true).put("resolveDynamic", resolveDynamic))
+                    ?: return@withContext SourceResult.Error(SourceException.ParseError("书源目录无响应"))
+                if (!result.optBoolean("ok")) return@withContext SourceResult.Error(SourceException.ParseError(friendlyJsSourceError(result.optString("error"))))
+                SourceResult.Success(JsDiscoverAdapter.catalog(result.optJSONObject("data") ?: JSONObject()))
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { SourceResult.Error(SourceException.Unknown("书源目录加载失败：${e.message}", e)) }
+        }
+
+    override suspend fun discover(query: com.example.discover.DiscoverQuery): SourceResult<com.example.discover.DiscoverPage> =
+        withContext(Dispatchers.IO) {
+            try {
+                val request = JSONObject().put("dimension", query.dimension.name.lowercase()).put("range", query.range)
+                    .put("page", query.page).put("cursor", query.cursor).put("offset", query.offset)
+                    .put("feedId", query.feedId).put("categoryId", query.categoryId).put("includeAdult", query.includeAdult)
+                val result = discoverCall(request) ?: return@withContext SourceResult.Error(SourceException.ParseError("书源无响应"))
+                if (!result.optBoolean("ok")) return@withContext SourceResult.Error(SourceException.ParseError(friendlyJsSourceError(result.optString("error"))))
+                SourceResult.Success(JsDiscoverAdapter.page(result.optJSONObject("data") ?: JSONObject(), id, query))
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { SourceResult.Error(SourceException.Unknown("发现加载失败：${e.message}", e)) }
+        }
+
     private val shareLinks by lazy {
         context.getSharedPreferences("work_detail_share_links", Context.MODE_PRIVATE)
     }
@@ -174,9 +202,13 @@ class JsComicSource(
             ).also { engine = it }
             if (!engineInitialized) {
                 runtime.call("null")
-                // Preserve the source's original headers for ordinary reading.
-                // Only a completed WebView verification establishes a new UA-bound session.
-                verificationPrefs.getString("${sourceKey}_user_agent", null)?.let { userAgent ->
+                // MYCOMIC HTML and image hooks share the actual browser identity.
+                // Persist it only after verification; an unverified UA is not a login flag.
+                val browserAgent = if (sourceKey == "mycomic") {
+                    verificationPrefs.getString("${sourceKey}_user_agent", null)
+                        ?: android.webkit.WebSettings.getDefaultUserAgent(context)
+                } else null
+                browserAgent?.let { userAgent ->
                     applyVerifiedUserAgent(runtime, userAgent)
                 }
                 engineInitialized = true
@@ -630,23 +662,14 @@ class JsComicSource(
                 if (sourceKey == "mycomic") {
                     var supplied = credential.cookie.orEmpty().trim()
                     if (supplied.isBlank()) {
-                        // 未粘贴 Cookie 时自动过盾：无头 WebView 加载 mycomic.com 让
-                        // Cloudflare JS 挑战自行执行，cf_clearance 同步进共享 Cookie 存储
-                        val solved = runCatching {
-                            CfWebViewSolver.solveAndSync(
-                                context,
-                                "https://mycomic.com/",
-                                "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.5359.128 Mobile Safari/537.36"
-                            )
-                        }.getOrDefault(false)
-                        if (solved) {
-                            supplied = JsCookieJar.cookieHeader(context, "https://mycomic.com/")
-                                .split(';')
-                                .map { it.trim() }
-                                .firstOrNull { it.startsWith("cf_clearance=") }
-                                .orEmpty()
-                                .removePrefix("cf_clearance=")
+                        // Interactive challenges need the real, visible browser. Its cookies and
+                        // UA stay together; a headless session under a different UA is not reusable.
+                        val verification = verifyWebsite()
+                        if (verification is SourceResult.Success && verification.data) {
+                            getEngine().setLoggedIn(true)
+                            return@withContext SourceResult.Success(true)
                         }
+                        return@withContext verification
                     }
                     val clearance = supplied
                         .ifBlank { credential.cookie.orEmpty() }
@@ -704,7 +727,7 @@ class JsComicSource(
 
     suspend fun verifyWebsite(): SourceResult<Boolean> {
         val url = when (sourceKey) {
-            "mycomic" -> "https://mycomic.com/cn"
+            "mycomic" -> "https://mycomic.com/cn/comics?sort=-id"
             "nhentai" -> "https://nhentai.net/"
             else -> return SourceResult.Error(SourceException.Unknown("该源不支持此验证入口"))
         }

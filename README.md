@@ -11,6 +11,7 @@
 
 [🌐 产品主页](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
+[1.3.7 发布说明与验证](docs/release-1.3.7-2026-10-14.md) ·
 [查看截图](#界面预览) ·
 [全部功能](#功能亮点) ·
 [提交问题或建议](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -61,6 +62,16 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 ## 功能亮点
 
+### 发现漫画与统一分类
+
+- 底栏「发现」支持聚合与单源浏览，更新、热议、榜单、点击独立排序；缺失的统计明确提示，不用普通推荐伪造数据。
+- 标准三级分类与原站分类并存，多选、记忆、清除；提供列表、双列网格、大图、快捷追漫与随机阅读。
+- 聚合跨源去重、展示可读书源，按源内名次公平排序；成人分类默认隐藏，作者与角色标签不误当题材。
+- 爱漫画使用原站声明的 HTTPS 阅读线路，保留既有书架 ID 和进度。1.3.7 已验证目录分页、284 条章节目录、完整章节图片地址及首尾图片解码。
+- MYCOMIC 使用与站点验证一致的内置浏览器和会话读取。遇到验证提示，请到「书源管理 → MYCOMIC → 验证」完成原站验证后重试；1.3.7 已通过实际 Android 验证 → 目录 → 详情 → 章节 → 阅读器图片解码链路（30 本目录、16 章、61 页，首尾图片实际解码）。
+
+验证范围和剩余限制见 [1.3.7 发布说明](docs/release-1.3.7-2026-10-14.md)。
+
 ### 小说、漫画和电子书，一个书架管理
 
 - 导入并阅读 **TXT、EPUB、MOBI、AZW、AZW3、PRC、DOCX、FB2、CBZ、ZIP、PDF** 等文件。
@@ -95,7 +106,7 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 - **系统要求：** Android 7.0（API 24）及以上。
 - **当前 Release：** 提供 arm64-v8a APK，适用于大多数 Android 手机和平板；Release 暂不包含 x86_64 模拟器版本。
-- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.3.6](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.6/Ciallo-Reader-v1.3.6.apk)。
+- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.3.7](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.7/Ciallo-Reader-v1.3.7.apk)。
 - 下载后按 Android 提示允许安装该来源的应用，再打开 APK 安装。
 
 ## 快速开始
