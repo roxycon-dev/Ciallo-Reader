@@ -10,7 +10,7 @@ class BiliManga extends ComicSource {
 
     key = "bilimanga"
 
-    version = "1.1.3"
+    version = "1.1.5"
 
     minAppVersion = "1.6.0"
 
@@ -106,9 +106,16 @@ class BiliManga extends ComicSource {
         { title: "点击周榜", type: "multiPageComicList", load: async page => this.discoverList("weekvisit", page) }
     ]
 
+    category = {title:"嗶哩分類",parts:[{name:"題材",itemType:"category",
+        categories:["奇幻冒險","戰鬥熱血","懸疑驚悚","校園青春","愛情浪漫","職場都市","歷史文化","科幻未來","奇異幻想","治癒溫馨","末日生存","其他分類"],
+        categoryParams:["FantasyAdventure","Action","SuspenseHorror","SchoolLife","Romance","Workplace","Historical","Sci-Fi","Supernatural","Healing","Survival","Other"]}]};
+    categoryComics = {load:async(category,param,options,page)=>this.browsePath(`/filter/${encodeURIComponent(param)}/${page}.html`,page,[category])};
     async discoverList(order, page) {
+        return this.browsePath(`/top/${order}/${page}.html`,page,[]);
+    }
+    async browsePath(path, page, categoryTags) {
         // The public catalogue has a desktop DOM; keep its browser identity consistent.
-        const response = await this.page(`${this.baseUrl}/top/${order}/${page}.html`, Object.assign({}, this.headers, {
+        const response = await this.page(this.baseUrl + path, Object.assign({}, this.headers, {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
         }));
         const doc = new HtmlDocument(response.body);
@@ -119,10 +126,20 @@ class BiliManga extends ComicSource {
                 const href = card.attributes.href || "";
                 const title = image && image.attributes.alt;
                 if (!title || !href) continue;
-                comics.push({ id: this.absUrl(href), title, cover: this.absUrl(image.attributes["data-src"] || image.attributes.src || ""), tags: [] });
+                const tags = card.querySelectorAll('.tag-small.yellow').flatMap(tag => tag.text.trim().split(/[\s,，/、]+/)).filter(Boolean);
+                const status = card.querySelector('.tag-small.red');
+                const author = card.querySelector('.book-author');
+                const count = card.querySelector('.tag-small.blue')?.text.trim().match(/^([\d.]+)(萬|万|億|亿)?$/);
+                const clicks = count ? Number(count[1]) * (count[2] === '萬' || count[2] === '万' ? 10000 : count[2] ? 100000000 : 1) : null;
+                comics.push({ id: this.absUrl(href), title, cover: this.absUrl(image.attributes["data-src"] || image.attributes.src || ""),
+                    author: author?.text.replace(/^作者\s*/, '').trim() || '', status: status?.text.trim() || null,
+                    clicks, tags: [...new Set([...tags,...categoryTags])] });
             }
             if (!comics.length && doc.querySelector(".aui-ver-form")) throw new Error("原站需要验证，请在书源管理中打开网站");
-            return { comics, maxPage: comics.length === 50 ? null : page };
+            const prefix = path.slice(0, path.lastIndexOf('/') + 1);
+            const pages = doc.querySelectorAll('a[href]').map(a => a.attributes.href || '')
+                .filter(href => href.startsWith(prefix)).map(href => Number(href.slice(prefix.length).match(/^(\d+)\.html/)?.[1] || 0));
+            return { comics, maxPage: Math.max(page, ...pages) };
         } finally { doc.dispose(); }
     }
 

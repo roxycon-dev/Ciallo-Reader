@@ -26,9 +26,9 @@ class DiscoverAdapterTest {
         assertNull(row.updatedAt); assertNull(row.clicks); assertNull(row.discussions)
         assertFalse(row.book.author == "昨天更新 · 12万阅读")
     }
-    @Test fun datedWindowExplainsMissingDatesAndKeepsCursor() {
+    @Test fun datedWindowKeepsPrecisionAndCursorWithoutAnUnsupportedBanner() {
         val page = parse("""{"entries":[{"id":"1","title":"漫画"}],"hasMore":true,"nextCursor":"next"}""", "今日")
-        assertTrue(page.entries.isEmpty()); assertTrue(page.notice!!.contains("缺少更新时间")); assertEquals("next", page.nextCursor)
+        assertTrue(page.entries.isEmpty()); assertNull(page.notice); assertEquals("next", page.nextCursor)
     }
     @Test fun nativeBrowseDoesNotApplyUnrelatedDimensionWindow() {
         val row = parse("""{"entries":[{"id":"1","title":"漫画","updatedAt":"2020-01-01","origin":"原站精选"}]}""", "今日", "native").entries.single()

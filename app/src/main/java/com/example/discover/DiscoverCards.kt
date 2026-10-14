@@ -30,53 +30,6 @@ import com.example.source.SearchBook
 import com.example.ui.feedback.*
 import kotlinx.coroutines.delay
 
-@Composable
-internal fun DiscoverCategories(entries: List<DiscoverEntry>, selected: Set<String>, adult: Boolean,
-    rootId: String, branchId: String, onRoot: (String) -> Unit, onBranch: (String) -> Unit, onSelection: (Set<String>) -> Unit) {
-    val works = remember(entries) { DiscoverEngine.merge(entries, DiscoverDimension.UPDATES) }
-    val roots = DiscoverTaxonomy.roots.filter { adult || !it.adult }
-    val root = roots.firstOrNull { it.id == rootId } ?: roots.first()
-    val branch = root.children.firstOrNull { it.id == branchId }
-    val today = DiscoverEngine.rangeStart("今日", System.currentTimeMillis()) ?: 0L
-    val classified = remember(works, adult) { works.filter { adult || !DiscoverTaxonomy.isAdult(it.tags) }
-        .map { it to DiscoverTaxonomy.classify(it.tags) } }
-    val counts = remember(classified) { classified.flatMap { it.second }.groupingBy { it }.eachCount() }
-    val updates = remember(classified, today) { classified.filter { (it.first.updatedAt ?: 0) >= today }.flatMap { it.second }.toSet() }
-    fun count(c: DiscoverCategory) = counts[c.id] ?: 0
-    fun updated(c: DiscoverCategory) = c.id in updates
-    fun toggle(c: DiscoverCategory) = onSelection(if (c.id in selected) selected - c.id else selected + c.id)
-    DiscoverGlass(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp), PaddingValues(8.dp)) {
-        Text("选你喜欢的故事", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = discoverInk())
-        Text("数量为已加载作品 · ${classified.count { it.second.isEmpty() }} 本标签未映射；0 不代表书源不支持", fontSize = 11.sp, color = discoverInk().copy(alpha = .64f))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { DiscoverChip("全部", selected.isEmpty(), onClick = { onSelection(emptySet()) }) }
-            items(roots) { c -> DiscoverChip("${c.label} ${count(c)}${if (updated(c)) " · 今" else ""}", c.id in selected,
-                onClick = { onRoot(c.id); toggle(c) }) }
-        }
-        HorizontalDivider(color = discoverInk().copy(alpha = .12f))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { DiscoverChip("全部${root.label}", root.id in selected, solid = false, visualHeight = 28,
-                onClick = { onSelection(selected - root.leaves + root.id) }) }
-            items(root.children) { c -> DiscoverChip("${c.label} ${count(c)}${if (updated(c)) " · 今" else ""}", c.id in selected,
-                solid = false, visualHeight = 28, outlined = c.id in selected, onClick = { onBranch(c.id); toggleSelection(selected - root.id, c.id, onSelection) }) }
-        }
-        branch?.let { b ->
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { DiscoverChip("全部${b.label}", b.id in selected, solid = false, visualHeight = 24,
-                    onClick = { onSelection(selected - b.leaves - root.id + b.id) }) }
-                items(b.children) { c ->
-                        DiscoverChip("${c.label} ${count(c)}${if (updated(c)) " · 今" else ""}", c.id in selected, solid = false, visualHeight = 24,
-                            outlined = true, onClick = { toggleSelection(selected - root.id - b.id, c.id, onSelection) })
-                }
-            }
-        }
-        if (selected.isNotEmpty()) TextButton(onClick = { onSelection(emptySet()) }, Modifier.heightIn(min = 48.dp)) {
-            Text("已选 ${selected.size} 项 · 清除", fontSize = 12.sp)
-        }
-    }
-}
-private fun toggleSelection(selected: Set<String>, id: String, change: (Set<String>) -> Unit) = change(if (id in selected) selected - id else selected + id)
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layout: DiscoverLayout, rank: Int?,
@@ -118,7 +71,7 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
                         work.updatedAt, unread, rank, medal, coverSource)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(work.book.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = discoverInk().copy(alpha = .92f))
-                        Text(work.book.author.ifBlank { "作者未提供" }, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = discoverInk().copy(alpha = .64f))
+                        if (work.book.author.isNotBlank()) Text(work.book.author, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = discoverInk().copy(alpha = .64f))
                         Text(metric(work, dimension), fontSize = 12.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace, color = discoverInk(), maxLines = 2, overflow = TextOverflow.Ellipsis)
                         TagRow(work.tags)
                         if (dimension == DiscoverDimension.DISCUSSION && work.variants.first().hotComment != null)
@@ -127,7 +80,7 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
                     }
                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Trend(work, dimension, reverseColors)
-                        Text(serialLabel(work.book.comicInfo?.status), fontSize = 10.sp, color = discoverInk().copy(alpha = .64f))
+                        work.book.comicInfo?.status?.let { Text(serialLabel(it), fontSize = 10.sp, color = discoverInk().copy(alpha = .64f)) }
                         FollowButton(followed, false) { onFollow(!followed); haptics.perform(HapticKind.SUCCESS) }
                     }
                 }
@@ -136,11 +89,11 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
                         Cover(work.book, Modifier.fillMaxSize(), work.updatedAt, unread, null, null, coverSource)
                         SourceBadge(source, Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = if ((work.updatedAt ?: 0) >= (DiscoverEngine.rangeStart("今日", System.currentTimeMillis()) ?: Long.MAX_VALUE)) 32.dp else 8.dp))
                         FollowButton(followed, true, Modifier.align(Alignment.TopEnd)) { onFollow(!followed); haptics.perform(HapticKind.SUCCESS) }
-                        SourceBadge(serialLabel(work.book.comicInfo?.status), Modifier.align(Alignment.BottomStart).padding(8.dp))
+                        work.book.comicInfo?.status?.let { SourceBadge(serialLabel(it), Modifier.align(Alignment.BottomStart).padding(8.dp)) }
                     }
                     Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(work.book.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis, color = discoverInk())
-                        Text(work.book.author.ifBlank { "作者未提供" }, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = discoverInk().copy(alpha = .64f))
+                        Text(work.book.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis, color = discoverInk())
+                        if (work.book.author.isNotBlank()) Text(work.book.author, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = discoverInk().copy(alpha = .64f))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(metric(work, dimension), Modifier.weight(1f), fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium, color = discoverInk(), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             if (dimension != DiscoverDimension.UPDATES) Trend(work, dimension, reverseColors)
@@ -164,7 +117,7 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
                     Column(Modifier.padding(10.dp)) {
                         TagRow(work.tags)
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text("${work.book.author.ifBlank { "作者未提供" }} · ${serialLabel(work.book.comicInfo?.status)}", Modifier.weight(1f), fontSize = 13.sp, color = discoverInk())
+                            Text(listOfNotNull(work.book.author.takeIf { it.isNotBlank() }, work.book.comicInfo?.status?.let(::serialLabel)).joinToString(" · "), Modifier.weight(1f), fontSize = 13.sp, color = discoverInk())
                             FollowButton(followed, false) { onFollow(!followed); haptics.perform(HapticKind.SUCCESS) }
                         }
                     }
@@ -222,14 +175,21 @@ private fun FollowButton(followed: Boolean, compact: Boolean, modifier: Modifier
 @Composable
 private fun TagRow(tags: List<String>) {
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        tags.filter(DiscoverTaxonomy::isStoryTag).take(3).forEach { tag -> Text(tag.substringAfter('：').substringAfter(':'), Modifier.weight(1f, fill = false).background(discoverTint(), CircleShape).padding(horizontal = 6.dp, vertical = 2.dp),
+        DiscoverTaxonomy.labels(tags).take(3).forEach { tag -> Text(tag, Modifier.weight(1f, fill = false).background(discoverTint(), CircleShape).padding(horizontal = 6.dp, vertical = 2.dp),
             fontSize = 11.sp, color = discoverInk().copy(alpha = .64f), maxLines = 1, overflow = TextOverflow.Ellipsis) }
     }
 }
-internal fun metric(work: DiscoverWork, dimension: DiscoverDimension): String = if (work.variants.first().native)
-    listOfNotNull(work.variants.first().origin, work.variants.first().subtitle).joinToString(" · ").ifBlank { "原站推荐" }
+internal fun metric(work: DiscoverWork, dimension: DiscoverDimension): String = if (work.variants.first().native) {
+    val entry = work.variants.maxByOrNull { it.updatedAt ?: 0 }!!
+    val latest = listOfNotNull(entry.latestChapter, entry.updatedAt?.let(::dateLabel)).joinToString(" · ")
+    latest.ifBlank {
+        val clicks = work.variants.mapNotNull { it.clicks }.takeIf { it.isNotEmpty() }?.sum()
+        if (clicks != null) "阅读 ${DiscoverEngine.compact(clicks)}"
+        else listOfNotNull(entry.origin, entry.subtitle).joinToString(" · ").ifBlank { "原站推荐" }
+    }
+}
 else when (dimension) {
-    DiscoverDimension.UPDATES -> work.variants.maxByOrNull { it.updatedAt ?: 0 }?.let { "${it.latestChapter ?: "最新话未提供"} · ${dateLabel(it.updatedAt)}" } ?: "更新未提供"
+    DiscoverDimension.UPDATES -> work.variants.maxByOrNull { it.updatedAt ?: 0 }?.let { listOfNotNull(it.latestChapter, it.updatedAt?.let(::dateLabel)).joinToString(" · ").ifBlank { it.origin ?: "最新收录" } } ?: "最新收录"
     DiscoverDimension.DISCUSSION -> "讨论 ${DiscoverEngine.compact(work.variants.mapNotNull { it.discussions }.takeIf { it.isNotEmpty() }?.sum())}"
     DiscoverDimension.CLICKS -> "点击 ${DiscoverEngine.compact(work.variants.mapNotNull { it.clicks }.takeIf { it.isNotEmpty() }?.sum())}"
     DiscoverDimension.RANKING -> "源内 #${work.variants.mapNotNull { it.rank }.minOrNull() ?: "—"}"
@@ -238,6 +198,7 @@ else when (dimension) {
 private fun Trend(work: DiscoverWork, dimension: DiscoverDimension, reverse: Boolean, idleColor: Color? = null) {
     val entry = work.variants.first()
     val value = if (dimension == DiscoverDimension.RANKING) entry.rankChange?.toDouble() else entry.growth
+    if (value == null && !entry.newEntry) return
     val label = when { entry.newEntry && dimension == DiscoverDimension.RANKING -> "NEW"
         value == null || value == 0.0 -> "—"
         dimension == DiscoverDimension.RANKING -> "${if (value > 0) "↑" else "↓"}${kotlin.math.abs(value).toInt()}"

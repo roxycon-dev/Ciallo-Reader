@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.example.source.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
+import kotlinx.coroutines.flow.first
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
@@ -43,6 +44,53 @@ class DiscoverViewModelTest {
         wait.complete(Unit)
         assertFalse(model.state.value.loading)
         assertEquals(2, model.state.value.entries.size)
+    }
+    @Test fun diskCacheSurvivesNewSourceInstancesAndViewModels() = runTest(dispatcher) {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val store = DiscoverStore(context)
+        store.prefs.edit().clear().putBoolean("cache", true).apply()
+        store.cache.edit().clear().apply()
+        val manager1 = SourceManager()
+        manager1.registerSource(object : DiscoverUiTest.FixtureSource("cached") {
+            override suspend fun discover(query: DiscoverQuery) = page(id, "persistent-book")
+        })
+        val first = DiscoverViewModel(manager1, store).also(models::add)
+        first.configure("cached", DiscoverDimension.CLICKS, "总")
+        first.viewModelScope.coroutineContext[Job]!!.children.toList().joinAll()
+        val wait = CompletableDeferred<Unit>()
+        val manager2 = SourceManager()
+        manager2.registerSource(object : DiscoverUiTest.FixtureSource("cached") {
+            override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> { wait.await(); return page(id, "fresh-book") }
+        })
+        val restored = DiscoverViewModel(manager2, DiscoverStore(context)).also(models::add)
+        restored.configure("cached", DiscoverDimension.CLICKS, "总")
+        val cached = restored.state.first { it.cached }
+        assertEquals("persistent-book", cached.entries.single().book.id)
+        assertTrue(cached.loading)
+        wait.complete(Unit)
+        restored.viewModelScope.coroutineContext[Job]!!.children.toList().joinAll()
+        assertEquals("fresh-book", restored.state.value.entries.single().book.id)
+    }
+    @Test fun categoryWindowAndFilteredFeedShareOneDynamicCatalogLoad() = runTest(dispatcher) {
+        var dynamicCalls = 0
+        val ready = CompletableDeferred<Unit>()
+        val manager = SourceManager()
+        manager.registerSource(object : DiscoverUiTest.FixtureSource("dynamic") {
+            override suspend fun discoverCatalog(resolveDynamic: Boolean): SourceResult<DiscoverCatalog> {
+                if (resolveDynamic) { dynamicCalls++; ready.await() }
+                return SourceResult.Success(DiscoverCatalog(dynamicCategories = true,
+                    categories = if (resolveDynamic) listOf(DiscoverNativeCategory("dynamic:stable", "冒险")) else emptyList()))
+            }
+        })
+        val model = model(manager)
+        model.configure("dynamic", DiscoverDimension.UPDATES, "最新", feedId = "native")
+        model.loadCategories("dynamic"); model.loadCategories("dynamic")
+        model.configure("dynamic", DiscoverDimension.UPDATES, "最新", standardCategories = setOf("adventure"))
+        assertEquals(1, dynamicCalls)
+        ready.complete(Unit)
+        assertEquals(1, dynamicCalls)
+        assertFalse(model.state.value.loading)
+        assertEquals("dynamic:stable", model.state.value.catalogs.getValue("dynamic").categories.single().id)
     }
     @Test fun switchingDimensionCancelsObsoleteResults() = runTest(dispatcher) {
         val wait = CompletableDeferred<Unit>()
@@ -88,14 +136,14 @@ class DiscoverViewModelTest {
         model.configure("aggregate", DiscoverDimension.CLICKS, "总")
         assertTrue(model.state.value.entries.all { it.book.sourceId == "a" })
     }
-    @Test fun adultSourceWithMissingTagsIsHiddenByDefault() = runTest(dispatcher) {
+    @Test fun allEnabledComicSourcesParticipateWithoutASecondAdultGate() = runTest(dispatcher) {
         val manager = SourceManager()
         manager.registerSource(DiscoverUiTest.FixtureSource("a"))
         manager.registerSource(DiscoverUiTest.FixtureSource("js_jm"))
         val model = model(manager)
         model.configure("aggregate", DiscoverDimension.CLICKS, "总")
         assertTrue(model.state.value.entries.isNotEmpty())
-        assertTrue(model.state.value.entries.all { it.book.sourceId == "a" })
+        assertEquals(setOf("a", "js_jm"), model.state.value.entries.map { it.book.sourceId }.toSet())
     }
     @Test fun refreshFailureKeepsVisibleRowsEvenWhenDiskCacheIsOff() = runTest(dispatcher) {
         var fail = false
@@ -120,7 +168,7 @@ class DiscoverViewModelTest {
         model.configure("source", DiscoverDimension.CLICKS, "总")
         repeat(6) { model.more() }
         assertEquals(3, calls); assertTrue(model.state.value.more.isEmpty())
-        assertTrue(model.state.value.notices.values.single().contains("重复页"))
+        assertTrue(model.state.value.notices.isEmpty())
     }
     @Test fun cursorAndNativeSelectionSurviveRetryAndRefresh() = runTest(dispatcher) {
         val queries = mutableListOf<DiscoverQuery>()
@@ -139,5 +187,59 @@ class DiscoverViewModelTest {
         model.more(); fail = false; model.retry()
         assertEquals("cursor1", queries[1].cursor); assertEquals(queries[1], queries[2])
         model.refresh(); assertEquals("native", queries.last().feedId); assertNull(queries.last().cursor)
+    }
+    @Test fun switchingBackReusesRowsAndResumesTheNextPage() = runTest(dispatcher) {
+        val calls = mutableListOf<Pair<DiscoverDimension, Int>>()
+        val manager = SourceManager()
+        manager.registerSource(object : DiscoverUiTest.FixtureSource("source") {
+            override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> {
+                calls += query.dimension to query.page
+                return page(id, "${query.dimension}-${query.page}", true)
+            }
+        })
+        val model = model(manager)
+        model.configure("source", DiscoverDimension.CLICKS, "总"); model.more()
+        model.configure("source", DiscoverDimension.RANKING, "热门")
+        model.configure("source", DiscoverDimension.CLICKS, "总")
+        assertEquals(3, calls.size)
+        assertEquals(2, model.state.value.entries.size)
+        model.more(); assertEquals(DiscoverDimension.CLICKS to 3, calls.last())
+    }
+    @Test fun recompositionAndRepeatedRefreshDoNotCancelAnActiveLoad() = runTest(dispatcher) {
+        val wait = CompletableDeferred<Unit>(); var calls = 0
+        val manager = SourceManager()
+        manager.registerSource(object : DiscoverUiTest.FixtureSource("source") {
+            override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> { calls++; wait.await(); return page(id, "book") }
+        })
+        val model = model(manager)
+        model.configure("source", DiscoverDimension.UPDATES, "最新")
+        repeat(5) { model.configure("source", DiscoverDimension.UPDATES, "最新"); model.refresh() }
+        assertEquals(1, calls); wait.complete(Unit)
+        assertEquals("book", model.state.value.entries.single().book.id)
+    }
+    @Test fun anUnsupportedWindowNeverSendsAContentRequest() = runTest(dispatcher) {
+        var calls = 0
+        val manager = SourceManager()
+        manager.registerSource(object : DiscoverUiTest.FixtureSource("source") {
+            override suspend fun discoverCatalog(resolveDynamic: Boolean) = SourceResult.Success(DiscoverCatalog(declared = true,
+                capabilities = mapOf("updates" to listOf("最新"))))
+            override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> { calls++; return page(id, "book") }
+        })
+        val model = model(manager)
+        model.configure("source", DiscoverDimension.UPDATES, "今日")
+        assertEquals(0, calls); assertTrue(model.state.value.errors.isEmpty()); assertTrue(model.state.value.notices.isEmpty())
+        model.configure("source", DiscoverDimension.UPDATES, "最新")
+        assertEquals(1, calls)
+    }
+    @Test fun standardCategoriesResolveToNativeSourceRoutes() = runTest(dispatcher) {
+        var seen: DiscoverQuery? = null
+        val manager = SourceManager()
+        manager.registerSource(object : DiscoverUiTest.FixtureSource("source") {
+            override suspend fun discoverCatalog(resolveDynamic: Boolean) = SourceResult.Success(DiscoverCatalog(
+                categories = listOf(DiscoverNativeCategory("genre:42", "冒險", "题材"))))
+            override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> { seen = query; return page(id, "book") }
+        })
+        model(manager).configure("source", DiscoverDimension.UPDATES, "最新", "native", standardCategories = setOf("adventure"))
+        assertEquals(listOf("genre:42"), seen?.categoryIds)
     }
 }

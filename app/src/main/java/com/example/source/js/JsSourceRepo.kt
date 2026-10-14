@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 object JsSourceRepo {
 
     /** 本地补丁版本：升级后尝试更新源脚本，失败时仍可使用旧缓存。 */
-    private const val PATCH_VERSION = 43
+    private const val PATCH_VERSION = 44
     // Raw cache format stays stable when compatibility patches change.
     private const val RAW_CACHE_PREFIX = "// EASYREADER_RAW_SOURCE_V28\n"
 

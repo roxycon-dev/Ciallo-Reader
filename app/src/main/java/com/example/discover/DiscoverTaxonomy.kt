@@ -35,11 +35,39 @@ object DiscoverTaxonomy {
             branch("format", "阅读形式", leaf("webtoon", "条漫", "webtoon", "长条"), leaf("page", "页漫"), leaf("color", "全彩", "full color", "彩色", "官方上色", "粉丝上色"), leaf("short", "短篇", "one shot", "单篇"), leaf("anthology", "合集", "anthology", "选集"), leaf("doujin", "同人", "doujinshi", "同人志"), leaf("adaptation", "改编", "adaptation", "light novel adaptation"), leaf("fourpanel", "四格", "4-koma"), leaf("magazine", "杂志", "雜誌"), leaf("lightnovel", "轻小说相关", "轻小说", "輕小說", "light novel"), leaf("webcomic", "网络连载", "webcomic", "网络漫画")),
             branch("region", "地区风格", leaf("japan", "日漫", "日本", "manga", "japanese"), leaf("china", "国漫", "内地", "大陆", "manhua"), leaf("korea", "韩漫", "韩国", "manhwa"), leaf("hktw", "港台", "港台漫画"), leaf("western", "欧美", "western")),
             branch("taste", "阅读偏好", leaf("cute", "萌系"), leaf("otaku", "宅系", "宅男", "宅向"), leaf("award", "获奖", "award winning"))),
-        DiscoverCategory("adult", "成人向", listOf(branch("mature", "成人内容", leaf("adultonly", "限制级", "adult", "18+", "hentai", "成人", "pornographic", "19r", "R-18", "R18+", "18禁", "19+"), leaf("explicit", "露骨内容", "色情", "erotica", "smut", "情色", "肉欲", "性暴力"))), adult = true)
+        branch("publication", "形式与来源",
+            branch("media", "内容形式", leaf("artbook", "画集 / CG", "CG", "CG畫集", "CG雜圖", "画师CG", "游戏CG", "图集", "artbook", "artist cg", "game cg"),
+                leaf("threed", "3D作品", "3D", "3D漫畫", "3d comic"), leaf("cosplay", "写真 / Cosplay", "cosplay", "寫真Cosplay", "写真", "photography"),
+                leaf("animation", "动画", "anime", "动画", "animation"), leaf("long", "长篇", "長篇")),
+            branch("edition", "版本信息", leaf("translation", "汉化", "漢化", "嗶咔漢化", "禁漫漢化組", "translated"),
+                leaf("uncensored", "无修正", "無修正", "uncensored"), leaf("language", "语言"), leaf("year", "出版年份"), leaf("franchise", "作品系列"), leaf("native_other", "其他原站分类"))),
+        DiscoverCategory("adult", "成人与偏好", listOf(
+            branch("mature", "内容分级", leaf("adultonly", "限制级", "adult", "18+", "hentai", "成人", "pornographic", "19r", "R-18", "R18+", "18禁", "19+"),
+                leaf("explicit", "成人内容", "色情", "erotica", "smut", "情色", "肉欲", "性暴力"), leaf("ecchi", "轻度成人", "ecchi", "性感", "魅惑", "暧昧", "TL")),
+            branch("preferences", "原站偏好", leaf("uniform", "制服装扮", "制服", "女學生", "女学生", "女大生", "女教師", "护士", "女僕", "maid", "milf", "巫女", "眼鏡控", "眼镜", "女仆", "泳裝", "泳装", "新婚", "人妻", "御姐", "大姐姐", "空姐", "上班族"),
+                leaf("relationship", "成人关系", "NTR", "寝取", "偷情", "继母", "亂倫", "乱伦", "年上", "年下", "母系", "母子", "姐系", "巨乳", "貧乳", "贫乳", "长腿", "美腿", "多人", "巨根", "乳交", "全裸", "汗", "眼鏡", "皮裤", "兽娘", "精灵", "萝莉", "蘿莉", "正太", "loli", "shota", "胸毛", "中出"),
+                leaf("play", "特殊偏好", "SM", "BDSM", "束缚", "束縛", "女性支配", "男性支配", "黑絲", "白襪", "黑丝", "白袜", "足交", "腳交", "口交", "颜射", "肛交", "触手", "觸手", "自卫", "自慰", "獵奇", "猎奇", "ryona", "獣姦", "兽奸", "野外露出", "露出", "催眠", "调教", "調教", "痴汉", "痴漢", "重口", "重口地帶", "血腥暴力", "人外", "妖精", "肉感", "骚", "騷", "耻辱", "羞耻", "淫语", "淫亂"))), adult = true)
     )
     val all: List<DiscoverCategory> by lazy { roots.flatMap { listOf(it) + it.children.flatMap { b -> listOf(b) + b.children } } }
     private fun tagKey(value: String) = DiscoverEngine.normalize(value.map(com.example.source.anilist.CjkFoldMap::fold).joinToString(""))
-    private val aliasIndex by lazy { all.flatMap { c -> c.aliases.map { tagKey(it) to c.id } }.groupBy({ it.first }, { it.second }) }
+    private val extraAliases = listOf(
+        "action" to listOf("热血", "冒险热血", "冒險熱血", "武侠格斗"), "fantasy" to listOf("科幻魔幻", "魔幻", "魔法少女"),
+        "detective" to listOf("侦探推理", "偵探推理"), "love" to listOf("耽美爱情", "耽美愛情", "同志 BL", "浪漫"),
+        "daily" to listOf("生活漫画", "生活漫畫"), "shonen" to listOf("少男"), "josei" to listOf("淑女", "女士", "女青年"),
+        "scifi" to listOf("科学", "科學"), "war" to listOf("战斗", "戰爭", "戰爭史詩"), "hktw" to listOf("台湾", "港台漫画", "台灣", "港漫"),
+        "western" to listOf("美漫", "欧美", "欧漫"), "short" to listOf("雜誌短篇", "單行本"), "harem" to listOf("逆后宫"),
+        "travel" to listOf("时间旅行"), "cute" to listOf("萌系", "萌"), "game" to listOf("电子游戏", "傳統遊戲", "传统游戏"),
+        "historical" to listOf("宗教", "历史文化"), "suspense" to listOf("黑暗", "悬疑惊悚", "悬疑灵异", "推理悬疑"), "gender" to listOf("性转变", "性别变"),
+        "adventure" to listOf("奇幻冒险", "动作冒险", "奇幻冒險"), "fantasy" to listOf("奇幻冒险", "奇幻冒險", "奇异幻想", "西幻"),
+        "battle" to listOf("战斗热血", "战斗 怪物"), "school" to listOf("校园青春"), "love" to listOf("爱情浪漫", "浪漫爱情", "情感", "同志 BL", "耽美爱情"),
+        "career" to listOf("职场都市"), "modern" to listOf("职场都市"), "scifi" to listOf("科幻未来", "科学"),
+        "healing" to listOf("治愈温馨"), "survival" to listOf("末日生存"), "martial" to listOf("武侠仙侠"),
+        "palace" to listOf("古代宫廷", "欧式宫廷", "后宫·宮廷", "宅斗", "宫廷"), "japan" to listOf("日本漫画"),
+        "china" to listOf("国产漫画", "中国"), "korea" to listOf("韩国漫画", "韩国", "咚漫"), "western" to listOf("欧美漫画", "美漫", "欧漫"),
+        "music" to listOf("偶像", "歌舞"), "inspiring" to listOf("正能量"), "seinen" to listOf("成人向"),
+        "femalelead" to listOf("女性视角", "女性視角"), "supernatural" to listOf("奇异幻想", "奇異幻想"))
+        .groupBy({ it.first }, { it.second }).mapValues { it.value.flatten() }
+    private val aliasIndex by lazy { all.flatMap { c -> (c.aliases + extraAliases[c.id].orEmpty()).map { tagKey(it) to c.id } }.groupBy({ it.first }, { it.second }) }
     private val ancestors by lazy { all.associate { c -> c.id to all.filter { c.id in it.leaves }.map { it.id }.toSet() } }
     private val metadataNamespaces = setOf("author", "authors", "artist", "artists", "group", "groups", "character", "characters", "parody",
         "作者", "作家", "画师", "画家", "绘师", "繪師", "藝術家", "艺术家", "角色", "社团", "社團", "language", "语言", "語言")
@@ -49,7 +77,10 @@ object DiscoverTaxonomy {
         val matched = tags.flatMap { raw ->
             if (!isStoryTag(raw)) emptyList()
             else raw.substringAfter('：').substringAfter(':').split(Regex("[,，/、;；|]"))
-                .flatMap { aliasIndex[tagKey(it)].orEmpty() }
+                .flatMap { tag ->
+                    val tokens = if (tag.any { it.code in 0x3400..0x9fff }) listOf(tag) + tag.split(Regex("\\s+")) else listOf(tag)
+                    tokens.flatMap { aliasIndex[tagKey(it)].orEmpty() }
+                }
         }.toSet()
         return matched.flatMap { ancestors[it].orEmpty() }.toSet()
     }
@@ -60,4 +91,21 @@ object DiscoverTaxonomy {
             picks.isEmpty() || picks.any(classified::contains) }
     }
     fun isAdult(tags: List<String>) = classify(tags).any { it in roots.last().leaves }
+    /** Every native route stays reachable, including IP, language, year and site-specific tags. */
+    fun classifyNative(label: String, group: String): Set<String> {
+        val direct = classify(listOf(label))
+        if (direct.isNotEmpty()) return direct
+        val id = when {
+            group.contains("语言") || group.equals("Language", true) || label in setOf("Chinese", "English", "Japanese", "汉语", "英语", "日语", "英語 ENG") -> "language"
+            group.contains("年份") || label.matches(Regex("\\d{4}|\\d{2}年代|\\d{2}後")) -> "year"
+            group.contains("角色") || group.contains("作品系列") || label.matches(Regex("(?i).*fate.*|.*東方.*|.*东方.*|.*原神.*|.*Love ?Live.*|.*SAO.*|.*碧藍.*")) -> "franchise"
+            else -> "native_other"
+        }
+        return ancestors[id].orEmpty()
+    }
+    fun labels(tags: List<String>): List<String> {
+        val ids = classify(tags)
+        return all.filter { it.id in ids && it !in roots && (it.children.isEmpty() || it.children.none { child -> child.id in ids }) }.map { it.label }
+            .ifEmpty { tags.filter(::isStoryTag).map { it.substringAfter('：').substringAfter(':') } }.distinct()
+    }
 }

@@ -51,11 +51,28 @@ class MangaDexSource(
 
     override val id: String = "mangadex"
     override val name: String = "MangaDex 漫画"
-    override suspend fun discoverCatalog(resolveDynamic: Boolean): SourceResult<DiscoverCatalog> = SourceResult.Success(
-        DiscoverCatalog(feeds = listOf(DiscoverFeed("md:latest", "最新更新", "updates"), DiscoverFeed("md:popular", "热门排行", "ranking"),
-            DiscoverFeed("md:new", "新作排行", "ranking"), DiscoverFeed("md:completed", "完结排行", "ranking"))))
+    private var discoverTags: List<DiscoverNativeCategory>? = null
+    override suspend fun discoverCatalog(resolveDynamic: Boolean): SourceResult<DiscoverCatalog> = withContext(Dispatchers.IO) {
+        if (discoverTags == null) {
+            val data = try { apiGet("$OFFICIAL_API/manga/tag")?.optJSONArray("data") }
+                catch (e: CancellationException) { throw e }
+                catch (_: Exception) { null }
+            if (data != null) discoverTags = (0 until data.length()).mapNotNull { i -> data.optJSONObject(i)?.let { tag ->
+                val attributes = tag.optJSONObject("attributes") ?: return@let null
+                val label = officialText(attributes.optJSONObject("name")) ?: return@let null
+                DiscoverNativeCategory("md:tag:${tag.optString("id")}", label, attributes.optString("group"))
+            } }
+        }
+        SourceResult.Success(DiscoverCatalog(feeds = listOf(DiscoverFeed("md:latest", "最新更新", "updates"), DiscoverFeed("md:popular", "热门排行", "ranking"),
+            DiscoverFeed("md:new", "新作排行", "ranking"), DiscoverFeed("md:completed", "完结排行", "ranking")),
+            categories = discoverTags.orEmpty(), dynamicCategories = discoverTags == null, declared = true, dated = true,
+            capabilities = mapOf("updates" to DiscoverDimension.UPDATES.ranges, "ranking" to listOf("热门", "新作", "完结"))))
+    }
     override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> = withContext(Dispatchers.IO) {
-        if (query.feedId != null) {
+        val tagIds = (query.categoryIds + listOfNotNull(query.categoryId)).filter { it.startsWith("md:tag:") }
+            .map { it.removePrefix("md:tag:") }.filter { it.matches(Regex("[a-f0-9-]{36}")) }.distinct()
+        val tagBrowse = tagIds.isNotEmpty()
+        if (query.feedId != null && !tagBrowse) {
             val nativeQuery = when (query.feedId) {
                 "md:popular" -> query.copy(dimension = DiscoverDimension.RANKING, range = "热门", feedId = null)
                 "md:new" -> query.copy(dimension = DiscoverDimension.RANKING, range = "新作", feedId = null)
@@ -68,8 +85,8 @@ class MangaDexSource(
                     entries = response.data.entries.map { it.copy(native = true, origin = "MangaDex ${nativeQuery.range}") }))
             }
         }
-        if (query.dimension !in setOf(DiscoverDimension.UPDATES, DiscoverDimension.RANKING) ||
-            (query.dimension == DiscoverDimension.RANKING && query.range == "飙升"))
+        if (!tagBrowse && (query.dimension !in setOf(DiscoverDimension.UPDATES, DiscoverDimension.RANKING) ||
+            (query.dimension == DiscoverDimension.RANKING && query.range == "飙升")))
             return@withContext SourceResult.Success(DiscoverPage(supported = false, notice = "MangaDex 未提供此维度数据"))
         try {
             val limit = 30
@@ -80,7 +97,7 @@ class MangaDexSource(
             val updates = linkedMapOf<String, Pair<Long?, String>>()
             val response: JSONObject
             val collection: org.json.JSONArray
-            if (query.dimension == DiscoverDimension.UPDATES) {
+            if (query.dimension == DiscoverDimension.UPDATES && !tagBrowse) {
                 val start = DiscoverEngine.rangeStart(query.range, System.currentTimeMillis()) ?: 0L
                 val since = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.ROOT).apply {
                     timeZone = java.util.TimeZone.getTimeZone("UTC") }.format(java.util.Date(start))
@@ -105,7 +122,8 @@ class MangaDexSource(
             } else {
                 val order = if (query.range == "新作") "createdAt" else "followedCount"
                 val status = if (query.range == "完结") "&status%5B%5D=completed" else ""
-                response = apiGet("$OFFICIAL_API/manga?limit=$limit&offset=$offset&order%5B$order%5D=desc$includes$ratings$status")
+                val tagsFilter = if (tagBrowse) "&includedTagsMode=OR" + tagIds.joinToString("") { "&includedTags%5B%5D=$it" } else ""
+                response = apiGet("$OFFICIAL_API/manga?limit=$limit&offset=$offset&order%5B$order%5D=desc$includes$ratings$status$tagsFilter")
                     ?: return@withContext SourceResult.Error(SourceException.NetworkError("MangaDex 榜单接口不可达"))
                 collection = response.optJSONArray("data") ?: org.json.JSONArray()
             }
@@ -125,10 +143,11 @@ class MangaDexSource(
                 DiscoverEntry(SearchBook("mdapi:$uuid", id, mainTitle, officialCreators(item, "author").joinToString("、"),
                     fileName?.let { "https://uploads.mangadex.org/covers/$uuid/$it.512.jpg" }, format = "漫画", comicId = "mdapi:$uuid",
                     comicInfo = info.copy(tags = tags)), updatedAt = updates[uuid]?.first, latestChapter = updates[uuid]?.second,
-                    rank = if (query.dimension == DiscoverDimension.RANKING) offset + i + 1 else null,
-                    nativeOrder = if (query.dimension == DiscoverDimension.UPDATES) updates.keys.indexOf(uuid) + offset + 1 else offset + i + 1)
+                    rank = if (!tagBrowse && query.dimension == DiscoverDimension.RANKING) offset + i + 1 else null,
+                    native = tagBrowse, origin = if (tagBrowse) "分类推荐" else null,
+                    nativeOrder = if (query.dimension == DiscoverDimension.UPDATES && !tagBrowse) updates.keys.indexOf(uuid) + offset + 1 else offset + i + 1)
             }
-            SourceResult.Success(DiscoverPage(entries, offset + response.optInt("limit", limit) < response.optInt("total"),
+            SourceResult.Success(DiscoverPage(entries, offset + response.optInt("limit", limit) < response.optInt("total"), native = tagBrowse,
                 notice = if (query.dimension == DiscoverDimension.RANKING) "MangaDex 原生${query.range}排行" else null))
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { SourceResult.Error(SourceException.Unknown("MangaDex 发现加载失败：${e.message}", e)) }

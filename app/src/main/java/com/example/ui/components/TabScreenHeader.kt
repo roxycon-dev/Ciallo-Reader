@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -26,6 +27,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.layout
+import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
@@ -177,6 +181,109 @@ fun TabScreenHeader(
                         fontFamily = AppFonts.Serif
                     )
 
+                }
+            }
+            trailing?.invoke(this)
+        }
+    }
+}
+
+/**
+ * 书库渐进折叠头部（强化版收缩）——区别于四 Tab 共享的 [TabScreenHeader] 布尔两态：
+ * [fraction] 由滚动偏移连续驱动（0=完全展开，1=完全收起零占位），
+ * 三段式映射（区间重叠交叉淡化）保证全程连续无跳变：
+ * - 0→0.5：内容紧凑化（副标题双通道淡出、标题 24→19sp、内外 padding 收紧）
+ * - 0.4→0.8：整卡淡出（先于压高完成，压高裁切时内容已不可见，杜绝"半截字"伪影）
+ * - 0.6→1：整卡高度按比例归零（自绘 layout 压缩高度，真正释放布局空间）
+ * 滚动中每帧只重排一个 layout 节点，无监听器开销；回顶按同一路径反向恢复。
+ */
+@Composable
+fun CollapsingTabScreenHeader(
+    /**
+     * 折叠目标值的**来源**（不在页面体里求值）。
+     *
+     * 传 lambda 而不是 Float：滚动位置、聚焦状态这些 State 的读取发生在
+     * **本组件内部**，于是它们的每一帧变化只让头部重组，不会重组整个 LibraryScreen。
+     */
+    fractionSource: () -> Float,
+    /** 目标来自搜索聚焦（状态跳变）：用 260ms 补间，否则用 120ms（滚动驱动）。 */
+    focusDriven: Boolean = false,
+    modifier: Modifier = Modifier,
+    title: String = "书库",
+    subtitle: String? = null,
+    titleColor: Color = Color.Unspecified,
+    leading: (@Composable RowScope.() -> Unit)? = null,
+    onTitleClick: (() -> Unit)? = null,
+    trailing: (@Composable RowScope.() -> Unit)? = null
+) {
+    val target = fractionSource()
+    val fraction by animateFloatAsState(
+        targetValue = target,
+        animationSpec = if (focusDriven || target == 1f) tween(260) else tween(120),
+        label = "libHeaderFraction",
+    )
+    val f0 = fraction.coerceIn(0f, 1f)
+    // 三段式：0→0.5 内容紧凑化；0.4→0.8 整卡淡出；0.6→1 压高归零——
+    // 淡出先于压高完成，避免压高裁切把标题/图标拦腰截断的"半截字"伪影
+    val compact = (f0 / 0.5f).coerceIn(0f, 1f)
+    val fade = ((f0 - 0.4f) / 0.4f).coerceIn(0f, 1f)
+    val collapse = ((f0 - 0.6f) / 0.4f).coerceIn(0f, 1f)
+    val titleSize = 24f - 5f * compact
+    val subAlpha = (1f - f0 / 0.3f).coerceIn(0f, 1f)
+    // 副标题槽位 20dp：12sp 字体自然行高约 17.6~19sp，17dp 会把英文降部
+    // （"LIBRARY & SEARCH" 的 Y / & 下缘）裁掉 —— 厂商字体 descent 越大裁得越狠。
+    // 槽位放大后配合 clipToBounds 只在折叠收起时裁切。
+    val subH = with(LocalDensity.current) { 12.sp.toDp() * 1.65f }.coerceAtLeast(20.dp) * subAlpha
+    val outerV = (10 * (1f - collapse) * (1f - collapse)).dp
+    val innerV = (12 - 8 * compact).dp
+
+    GlassCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = outerV)
+            // 高度按 (1-collapse) 等比压缩 + 淡出（淡出已完成，裁切不可见）：
+            // 完全收起后高度 0、padding 0，真正零垂直占用。
+            // placement 必须真正 place placeable——空 placement 块会让整卡不参与绘制
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val h = (placeable.height * (1f - collapse)).roundToInt()
+                layout(constraints.maxWidth, h) {
+                    placeable.placeRelative(0, 0)
+                }
+            }
+            .alpha(1f - fade)
+            .clipToBounds(),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = innerV),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            leading?.invoke(this)
+            Column(Modifier.weight(1f).then(if (onTitleClick != null) Modifier.clickable(onClick = onTitleClick) else Modifier)) {
+                Text(
+                    text = title,
+                    fontSize = titleSize.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = titleColor,
+                    fontFamily = AppFonts.Serif,
+                    maxLines = 1
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = titleColor.copy(alpha = 0.75f),
+                        letterSpacing = 1.5.sp,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .height(subH)
+                            .alpha(subAlpha)
+                            .clipToBounds()
+                    )
                 }
             }
             trailing?.invoke(this)

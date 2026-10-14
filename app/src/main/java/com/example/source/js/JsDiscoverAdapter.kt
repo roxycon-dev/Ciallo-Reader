@@ -15,13 +15,17 @@ internal object JsDiscoverAdapter {
                 DiscoverFeed(it.optString("id"), it.optString("label"), it.optString("kind").takeUnless { v -> v.isBlank() || v == "null" }) } },
             (0 until categories.length()).mapNotNull { i -> categories.optJSONObject(i)?.let {
                 DiscoverNativeCategory(it.optString("id"), it.optString("label"), it.optString("group")) } },
-            data.optBoolean("dynamicCategories"), data.optBoolean("explicit"))
+            data.optBoolean("dynamicCategories"), data.optBoolean("explicit"), declared = true,
+            capabilities = data.optJSONObject("capabilities")?.let { obj -> obj.keys().asSequence().associateWith { key ->
+                val values = obj.optJSONArray(key) ?: JSONArray()
+                (0 until values.length()).map { values.getString(it) }
+            } }.orEmpty())
     }
     fun page(data: JSONObject, sourceId: String, query: DiscoverQuery, now: Long = System.currentTimeMillis()): DiscoverPage {
         val rows = data.optJSONArray("entries") ?: data.optJSONArray("comics") ?: JSONArray()
         val native = data.optBoolean("native") || query.feedId != null || query.categoryId != null
         val start = if (!native && query.dimension == DiscoverDimension.UPDATES) DiscoverEngine.rangeStart(query.range, now) else null
-        var undated = 0
+        var dated = false
         val entries = (0 until rows.length()).mapNotNull { index ->
             val row = rows.optJSONObject(index) ?: return@mapNotNull null
             val raw = row.optJSONObject("book") ?: row
@@ -39,8 +43,9 @@ internal object JsDiscoverAdapter {
                 } }
             val updated = number("updatedAt", "updateTime")?.takeIf { it > 0 }?.let { if (it < 10_000_000_000L) it * 1000 else it }
                 ?: DiscoverEngine.parseDate(text("updatedAt", "updateTime") ?: metadata.comicInfo?.updatedAt)
+            if (updated != null) dated = true
             if (!native && query.dimension == DiscoverDimension.UPDATES && start != null &&
-                (updated == null || updated < start || updated > now)) { if (updated == null) undated++; return@mapNotNull null }
+                (updated == null || updated < start || updated > now)) return@mapNotNull null
             val tags = metadata.comicInfo?.tags.orEmpty() + listOfNotNull(text("contentRating").takeIf { it in setOf("erotica", "pornographic") })
             DiscoverEntry(
                 book = metadata.copy(title = title, comicId = id, comicInfo = metadata.comicInfo?.copy(tags = tags.distinct())),
@@ -55,9 +60,8 @@ internal object JsDiscoverAdapter {
                 origin = text("origin") ?: data.optString("origin").takeIf { it.isNotBlank() }, subtitle = text("subtitle", "subTitle"), native = native)
         }
         val notice = data.optString("notice").takeUnless { it.isBlank() || it == "null" }
-            ?: if (undated > 0) "$undated 本缺少更新时间，可在「最新」或原站推荐中浏览" else null
         return DiscoverPage(entries.distinctBy { it.book.id }, data.optBoolean("hasMore"), data.optBoolean("supported", true), notice,
             data.optString("nextCursor").takeUnless { it.isBlank() || it == "null" },
-            data.optJSONObject("catalog")?.let(::catalog), native)
+            data.optJSONObject("catalog")?.let { catalog(it).copy(dated = dated) }, native)
     }
 }

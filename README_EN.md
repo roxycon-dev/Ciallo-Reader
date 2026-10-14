@@ -24,7 +24,19 @@ Read local ebooks, novels, and comics in one Android app.
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
 
+**1.3.9 / 220** aligns Discover with the Library header and shared glass components, moves settings into a dedicated window, and fixes tab reloads, caching, category scope and native pagination. It retains the 1.3.8 signing identity for compatible updates. See the [release verification](docs/release-1.3.9-2026-10-14.md).
+
 ## Screenshots
+
+### Discover · Dedicated settings · Categories at 130% font scale
+
+Version 1.3.9 production Compose UI with fixture sources and sample covers; not live catalogue content.
+
+<table><tr>
+<td><img src="./docs/screenshots/shot-discover139-home.png" width="260" alt="Discover home"/></td>
+<td><img src="./docs/screenshots/shot-discover139-settings.png" width="260" alt="Discover settings"/></td>
+<td><img src="./docs/screenshots/shot-discover139-categories.png" width="260" alt="Discover categories"/></td>
+</tr></table>
 
 ### Reading settings and layouts
 
@@ -104,7 +116,7 @@ Version 1.3.8 adds Discover and restores Aiman and MYCOMIC reading. Its APK reta
 
 - **Android:** 7.0 (API 24) or newer.
 - **Architecture:** Current release APKs target arm64-v8a, supported by most Android phones and tablets. The release APK does not include an x86_64 emulator build.
-- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.3.8 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.8/Ciallo-Reader-v1.3.8.apk).
+- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.3.9 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.3.9/Ciallo-Reader-v1.3.9.apk).
 - Open the downloaded APK and follow Android's prompt to allow installation from that source.
 
 ## Get started

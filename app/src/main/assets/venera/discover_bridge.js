@@ -3,7 +3,8 @@
 function __cialloDiscoverOption(raw) {
     if (raw && typeof raw === 'object') return { value: String(raw.value ?? raw.key ?? ''), label: String(raw.label ?? raw.text ?? raw.value ?? '') };
     const text = String(raw ?? '');
-    const dash = text.indexOf('-');
+    // MYCOMIC sort keys are negative ("-week-週排行"); keep the leading sign.
+    const dash = /^-[a-z_0-9]+-/i.test(text) ? text.indexOf('-', 1) : text.indexOf('-');
     return { value: dash < 0 ? text : text.slice(0, dash), label: dash < 0 ? text : text.slice(dash + 1) };
 }
 function __cialloDiscoverKind(label) {
@@ -13,6 +14,34 @@ function __cialloDiscoverKind(label) {
     if (/点击|點擊|阅读量|閱讀量|views|clicks/i.test(text)) return 'clicks';
     if (/榜|排行|热门|熱門|人气|人氣|飙升|飆升|popular|ranking|trending|hot/i.test(text)) return 'ranking';
     return null;
+}
+function __cialloCategoryKey(part, target) {
+    const a=target.attributes||{};
+    const text=JSON.stringify([target.page,a.param??null,a.category??a.keyword??'',a.options??[]]);
+    let hash=2166136261;
+    for(let n=0;n<text.length;n++)hash=Math.imul(hash^text.charCodeAt(n),16777619);
+    return 'dynamic:'+part+':'+(hash>>>0).toString(16);
+}
+function __cialloDiscoverCapabilities(feeds) {
+    const result = {};
+    const add = (kind, range) => { if (kind && range) (result[kind] ||= []).includes(range) || result[kind].push(range); };
+    for (const f of feeds) {
+        const text = String(f.label || '');
+        if (f.kind === 'updates') add('updates', '最新');
+        if (f.kind === 'ranking') {
+            add('ranking', '热门');
+            if (/飙升|飆升|rising|trending/i.test(text)) add('ranking', '飙升');
+            if (/新作|新书|新書|new/i.test(text)) add('ranking', '新作');
+            if (/完结|完結|completed/i.test(text)) add('ranking', '完结');
+        }
+        if (['discussion', 'clicks'].includes(f.kind)) {
+            for (const [range, pattern] of Object.entries(f.kind === 'discussion' ?
+                {'24h':/24h|24小时|24小時|日|day/i,'7d':/7d|7天|周|週|week/i,'30d':/30d|30天|月|month/i} :
+                {'日':/日|day/i,'周':/周|週|week/i,'月':/月|month/i,'总':/总|總|历史|歷史|all|views/i}))
+                if (pattern.test(text)) add(f.kind, range);
+        }
+    }
+    return result;
 }
 function __cialloDiscoverCatalog(src) {
     const feeds = [];
@@ -26,7 +55,8 @@ function __cialloDiscoverCatalog(src) {
         const options = Array.isArray(ranking.options) ? ranking.options : Object.entries(ranking.options || {}).map(([value, label]) => ({ value, label }));
         (options.length ? options : ['-原站排行']).forEach(raw => {
             const o = __cialloDiscoverOption(raw);
-            feeds.push({ id: 'ranking:' + o.value, label: o.label, kind: 'ranking', type: 'ranking', value: o.value });
+            feeds.push({ id: 'ranking:' + o.value, label: o.label,
+                kind: __cialloDiscoverKind(o.label) === 'clicks' || /^-?(views|clicks|reads)$/i.test(o.value) ? 'clicks' : 'ranking', type: 'ranking', value: o.value });
         });
     }
     const categories = [];
@@ -48,11 +78,21 @@ function __cialloDiscoverCatalog(src) {
         });
     });
     const dynamic = parts.some(part => part.type === 'dynamic' && typeof part.loader === 'function');
-    return { feeds, categories, dynamicCategories: dynamic, hasCategoryLoader: !!(src.categoryComics &&
+    // EH exposes these native categories through search option 0 rather than category.parts.
+    if (src.key === 'ehentai' && !categories.length && src.search?.loadNext) {
+        ['其他','同人志','漫画','画师CG','游戏CG','图集','Cosplay','写真','全年龄','欧美'].forEach((label,index)=>
+            categories.push({id:'eh:category:'+index,label,group:'内容形式',category:'',itemType:'search',options:[JSON.stringify([String(index)]),null,null]}));
+    }
+    return { feeds, categories, capabilities: __cialloDiscoverCapabilities(feeds), dynamicCategories: dynamic, hasCategoryLoader: !!(src.categoryComics &&
         (typeof src.categoryComics.load === 'function' || typeof src.categoryComics.loadNext === 'function')),
         explicit: !!(src.discover && typeof src.discover.load === 'function') };
 }
 async function __cialloDiscoverDynamicCategories(src, catalog) {
+    const cached = src.__cialloDynamicCategories;
+    if (cached && Date.now() - cached.time < 300000 && cached.logged === !!src.isLogged) {
+        catalog.categories.push(...cached.rows.filter(c => !catalog.categories.some(old => old.id === c.id)));
+        return catalog;
+    }
     const parts = src.category && src.category.parts || [];
     for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
@@ -63,11 +103,12 @@ async function __cialloDiscoverDynamicCategories(src, catalog) {
             const target = item && item.target;
             if (!target || !['category', 'search'].includes(target.page)) return;
             const a = target.attributes || {};
-            catalog.categories.push({ id: 'dynamic:' + i + ':' + n, label: String(item.label || a.category || a.keyword || ''),
+            catalog.categories.push({ id: __cialloCategoryKey(i,target), legacyId:'dynamic:'+i+':'+n, label: String(item.label || a.category || a.keyword || ''),
                 group: String(part.name || ''), category: String(a.category || a.keyword || item.label || ''), param: a.param ?? null,
                 itemType: target.page, dynamic: true, options: a.options || [] });
         });
     }
+    src.__cialloDynamicCategories = {time:Date.now(),logged:!!src.isLogged,rows:catalog.categories.filter(c=>c.dynamic)};
     return catalog;
 }
 function __cialloDiscoverParts(value, fallback) {
@@ -90,6 +131,20 @@ function __cialloDiscoverPagination(value, q, paged) {
     return { nextCursor: null, hasMore: populated && (max == null || Number(max) > q.page) };
 }
 async function __cialloDiscover(src, q) {
+    if (Array.isArray(q.categoryIds) && q.categoryIds.length > 1) {
+        const saved = q.cursor ? JSON.parse(q.cursor) : {};
+        const next = {}, entries = []; let catalog;
+        for (const id of q.categoryIds) {
+            if (q.page > 1 && saved[id] === false) { next[id] = false; continue; }
+            const part = await __cialloDiscover(src,{...q,feedId:null,categoryIds:[],categoryId:id,
+                cursor:saved[id] ?? null,offset:Number(q.offset||0)+entries.length});
+            entries.push(...part.entries); catalog=part.catalog;
+            next[id] = part.hasMore ? part.nextCursor ?? null : false;
+        }
+        return {entries:Array.from(new Map(entries.map(e=>[String(e.id),e])).values()),catalog,
+            supported:true,native:true,hasMore:Object.values(next).some(v=>v!==false),nextCursor:JSON.stringify(next)};
+    }
+    if (q.categoryIds && q.categoryIds.length === 1) q = {...q,feedId:null,categoryId:q.categoryIds[0]};
     const catalog = __cialloDiscoverCatalog(src);
     if (q.catalogOnly) return q.resolveDynamic ? await __cialloDiscoverDynamicCategories(src, catalog) : catalog;
     if (src.discover && typeof src.discover.load === 'function' && !q.feedId && !q.categoryId) {
@@ -99,7 +154,7 @@ async function __cialloDiscover(src, q) {
     let result, label, paged, kind, categoryTags = [];
     if (q.categoryId) {
         if (String(q.categoryId).startsWith('dynamic:')) await __cialloDiscoverDynamicCategories(src, catalog);
-        const category = catalog.categories.find(c => c.id === q.categoryId);
+        const category = catalog.categories.find(c => c.id === q.categoryId || c.legacyId === q.categoryId);
         if (!category) return { supported: false, entries: [], catalog, notice: '书源分类已变化，请重新选择' };
         const api = category.itemType === 'search' ? src.search : src.categoryComics;
         if (!api || (typeof api.load !== 'function' && typeof api.loadNext !== 'function'))
@@ -108,7 +163,8 @@ async function __cialloDiscover(src, q) {
             : typeof api.optionList === 'function' ? await api.optionList.call(src, category.category, category.param) : api.optionList;
         const options = category.options && category.options.length ? category.options : (Array.isArray(optionDefinitions) ? optionDefinitions : [])
             .filter(o => !(o.notShowWhen || []).includes(category.category) && (!(o.showWhen || []).length || o.showWhen.includes(category.category)))
-            .map(o => String(o.default ?? o.defaultValue ?? __cialloDiscoverOption((o.options || [])[0]).value));
+            .map(o => {const value=o.default ?? o.defaultValue ?? __cialloDiscoverOption((o.options || [])[0]).value;
+                return Array.isArray(value)?JSON.stringify(value):value == null?null:String(value)});
         if (category.itemType === 'search') {
             paged = typeof api.load === 'function' && !api.__cialloCursorOnly ? true : 'cursor';
             result = paged === 'cursor' ? await api.loadNext.call(src, category.category, options, q.cursor ?? null)
@@ -133,9 +189,10 @@ async function __cialloDiscover(src, q) {
             feed = catalog.feeds.find(f => f.kind === 'ranking' && rangePattern && rangePattern.test(f.label));
             if (!feed && q.range === '热门') feed = catalog.feeds.find(f => f.type === 'ranking');
         }
-        if (!feed && !q.feedId) feed = catalog.feeds.find(f => f.kind === desired) ||
+        if (!feed && !q.feedId) feed = catalog.feeds.find(f => f.kind === desired &&
+            (desired !== 'clicks' || q.range === '总' || ({'日':/日|day/i,'周':/周|週|week/i,'月':/月|month/i}[q.range]?.test(f.label)))) ||
             catalog.feeds.find(f => /multiPart|singlePageWithMultiPart|mixed/i.test(f.type));
-        if (!feed) return { supported: false, entries: [], catalog, notice: '原站未提供此维度，可查看原站推荐或分类目录' };
+        if (!feed) return { supported: false, entries: [], catalog };
         label = feed.label; kind = feed.kind;
         if (feed.type === 'ranking') {
             const api = src.categoryComics.ranking;
@@ -155,6 +212,8 @@ async function __cialloDiscover(src, q) {
         }
     }
     let parts = __cialloDiscoverParts(result, label);
+    const observed = __cialloDiscoverCapabilities(parts.map(p=>({label:p.title,kind:__cialloDiscoverKind(p.title)})));
+    for(const [key,ranges] of Object.entries(observed)) catalog.capabilities[key]=Array.from(new Set([...(catalog.capabilities[key]||[]),...ranges]));
     const native = !!q.feedId || !!q.categoryId;
     const desired = String(q.dimension || '').toLowerCase();
     if (!native) {
@@ -182,5 +241,5 @@ async function __cialloDiscover(src, q) {
             subtitle: c.subtitle ?? c.subTitle ?? null };
     }));
     return { entries, catalog, ...page, supported: native || parts.length > 0, native,
-        origin: label, notice: !native && !parts.length ? '原站没有匹配的维度或时间范围，可查看原站推荐' : null };
+        origin: label };
 }

@@ -43,29 +43,17 @@ fun themeText(primary: Color, background: Color, minimum: Float = 4.5f): Color {
 }
 
 @Composable
-fun discoverInk(): Color = if (MaterialTheme.colorScheme.surface.luminance() < .5f) Color.White else Color.Black
+fun discoverInk(): Color = MaterialTheme.colorScheme.onSurface
 @Composable
-fun discoverTint(): Color = MaterialTheme.colorScheme.primary.copy(alpha = if (discoverInk() == Color.White) .22f else .14f)
+fun discoverTint(): Color = MaterialTheme.colorScheme.primary.copy(alpha = if (MaterialTheme.colorScheme.surface.luminance() < .5f) .22f else .14f)
 @Composable
 fun discoverAccentText(): Color = themeText(MaterialTheme.colorScheme.primary,
-    discoverTint().compositeOver(if (discoverInk() == Color.White) Color.Black else Color.White), 5.2f)
+    discoverTint().compositeOver(MaterialTheme.colorScheme.surface), 5.2f)
 
 @Composable
-fun DiscoverGlass(modifier: Modifier = Modifier, shape: Shape = RoundedCornerShape(20.dp),
+fun DiscoverGlass(modifier: Modifier = Modifier, shape: Shape? = null,
     padding: PaddingValues = PaddingValues(10.dp), content: @Composable ColumnScope.() -> Unit) {
-    val dark = discoverInk() == Color.White
-    val base = if (dark) Color.Black else Color.White
-    val tone = LocalBackgroundTone.current.coerceIn(0f, 1f)
-    val background = Color(tone, tone, tone).compositeOver(Color.Black)
-    var opacity = if (dark) .48f else .62f
-    while (opacity < .88f && contrast(discoverInk().copy(alpha = .64f).compositeOver(base.copy(alpha = opacity).compositeOver(background)),
-            base.copy(alpha = opacity).compositeOver(background)) < 4.5f) opacity += .02f
-    val backdrop = LocalGlassBackdrop.current
-    val glass = if (backdrop != null && LocalRenderQuality.current.realtimeGlass)
-        Modifier.liquidGlass(backdrop, shape, base.copy(alpha = opacity.coerceAtMost(.88f)), blurRadius = 24.dp)
-        else Modifier.background(base.copy(alpha = opacity.coerceAtMost(.88f)), shape)
-    Column(modifier.clip(shape).then(glass).border(1.dp, Color.White.copy(alpha = if (dark) .12f else .40f), shape)
-        .padding(padding), content = content)
+    GlassCard(modifier = modifier, shape = shape, contentPadding = padding, content = content)
 }
 
 @Composable

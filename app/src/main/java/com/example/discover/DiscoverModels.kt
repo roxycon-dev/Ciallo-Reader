@@ -16,13 +16,28 @@ enum class DiscoverDimension(val label: String, val ranges: List<String>) {
 enum class DiscoverLayout(val label: String) { LIST("列表"), GRID("双列网格"), LARGE("大图") }
 data class DiscoverQuery(val dimension: DiscoverDimension, val range: String, val page: Int = 1,
     val cursor: String? = null, val offset: Int = 0, val feedId: String? = null, val categoryId: String? = null,
-    val includeAdult: Boolean = false)
+    val includeAdult: Boolean = true, val standardCategories: Set<String> = emptySet(),
+    val categoryIds: List<String> = emptyList())
 data class DiscoverFeed(val id: String, val label: String, val kind: String? = null)
 data class DiscoverNativeCategory(val id: String, val label: String, val group: String = "") {
-    val standardIds: Set<String> get() = DiscoverTaxonomy.classify(listOf(label))
+    val standardIds: Set<String> get() = DiscoverTaxonomy.classifyNative(label, group)
 }
 data class DiscoverCatalog(val feeds: List<DiscoverFeed> = emptyList(), val categories: List<DiscoverNativeCategory> = emptyList(),
-    val dynamicCategories: Boolean = false, val explicit: Boolean = false)
+    val dynamicCategories: Boolean = false, val explicit: Boolean = false,
+    val declared: Boolean = false, val capabilities: Map<String, List<String>> = emptyMap(), val dated: Boolean = false) {
+    fun ranges(dimension: DiscoverDimension): List<String> {
+        if (!declared) return dimension.ranges
+        val ranges = capabilities[dimension.name.lowercase()].orEmpty()
+        return if (dimension == DiscoverDimension.UPDATES && dated && ranges.isNotEmpty()) dimension.ranges else ranges
+    }
+    fun supports(dimension: DiscoverDimension, range: String) = !declared || range in ranges(dimension)
+    /** Query the most selective mapped facet; other facets are applied to its results. */
+    fun routes(selected: Set<String>): List<String> = DiscoverTaxonomy.roots.mapNotNull { root ->
+        val picks = selected.intersect(root.leaves)
+        categories.filter { c -> picks.any { it in c.standardIds } && c.label !in setOf("全部", "All") }
+            .map { it.id }.distinct().takeIf { picks.isNotEmpty() && it.isNotEmpty() }
+    }.minByOrNull { it.size }.orEmpty()
+}
 /** Null means the source did not supply the value, never a fabricated zero. */
 data class DiscoverEntry(
     val book: SearchBook,

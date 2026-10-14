@@ -684,6 +684,7 @@ class MainActivity : ComponentActivity() {
                                         .padding(top = innerPadding.calculateTopPadding())
                                         .nestedScroll(tabBarCollapseState.connection())
                                 ) {
+                                    val tabSaveableState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
                                     AnimatedContent(
                                         targetState = selectedTab,
                                         transitionSpec = {
@@ -700,6 +701,7 @@ class MainActivity : ComponentActivity() {
                                         },
                                         label = "TabSwitch"
                                     ) { tab ->
+                                        tabSaveableState.SaveableStateProvider(tab) {
                                         when (tab) {
                                                 0 -> com.example.library.LibraryScreen(
                                                     viewModel = libraryViewModel,
@@ -982,7 +984,6 @@ class MainActivity : ComponentActivity() {
                                                 )
                                             }
                                             4 -> SettingsTabScreen(
-                                                discoverSources = libraryViewModel.sourceManager.allSources.value.filter { it.capabilities.supportComic }.map { it.id to it.name },
                                                     prefs = viewModel.prefs,
                                                     backupManager = viewModel.backupManager,
                                                     categories = categories,
@@ -1032,6 +1033,7 @@ class MainActivity : ComponentActivity() {
                                                 onOpenGodRanking = { navController.navigate("god_ranking") },
                                             )
                                         }
+                                        }
                                     }
                                 }
                             }
@@ -1066,7 +1068,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             SettingsTabScreen(
-                                discoverSources = libraryViewModel.sourceManager.allSources.value.filter { it.capabilities.supportComic }.map { it.id to it.name },
                                 focusGodSettings = focusGodSettings,
                                 onOpenSourceManager = {
                                     navController.navigate("source_management")

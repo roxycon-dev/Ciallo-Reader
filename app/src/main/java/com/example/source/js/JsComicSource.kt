@@ -95,6 +95,7 @@ class JsComicSource(
                 val request = JSONObject().put("dimension", query.dimension.name.lowercase()).put("range", query.range)
                     .put("page", query.page).put("cursor", query.cursor).put("offset", query.offset)
                     .put("feedId", query.feedId).put("categoryId", query.categoryId).put("includeAdult", query.includeAdult)
+                    .put("categoryIds", org.json.JSONArray(query.categoryIds))
                 val result = discoverCall(request) ?: return@withContext SourceResult.Error(SourceException.ParseError("书源无响应"))
                 if (!result.optBoolean("ok")) return@withContext SourceResult.Error(SourceException.ParseError(friendlyJsSourceError(result.optString("error"))))
                 SourceResult.Success(JsDiscoverAdapter.page(result.optJSONObject("data") ?: JSONObject(), id, query))

@@ -18,6 +18,40 @@ class DiscoverStore(context: Context) {
     fun put(key: String, value: String) { prefs.edit().putString(key, value).apply() }
     fun put(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply() }
     fun put(key: String, value: Set<String>) { prefs.edit().putStringSet(key, value).apply() }
+    fun block(work: DiscoverWork) {
+        val identities = setOf(work.key) + work.variants.map { DiscoverEngine.identity(it) }
+        val groups = runCatching { JSONObject(string("blocked_groups", "{}")) }.getOrDefault(JSONObject())
+        groups.put(work.key, JSONArray(identities.toList()))
+        val labels = runCatching { JSONObject(string("blocked_labels", "{}")) }.getOrDefault(JSONObject())
+        labels.put(work.key, work.book.title)
+        prefs.edit().putStringSet("blocked", selection("blocked") + identities)
+            .putString("blocked_groups", groups.toString()).putString("blocked_labels", labels.toString()).apply()
+    }
+    fun unblock(key: String) {
+        val groups = runCatching { JSONObject(string("blocked_groups", "{}")) }.getOrDefault(JSONObject())
+        val aliases = groups.optJSONArray(key)
+        val removed = setOf(key) + (0 until (aliases?.length() ?: 0)).map { aliases!!.getString(it) }
+        groups.remove(key)
+        val labels = runCatching { JSONObject(string("blocked_labels", "{}")) }.getOrDefault(JSONObject())
+        labels.remove(key)
+        val retained = (groups.keys().asSequence().toList()).flatMap { group ->
+            val list = groups.optJSONArray(group) ?: JSONArray()
+            (0 until list.length()).map { list.getString(it) }
+        }.toSet()
+        prefs.edit().putStringSet("blocked", (selection("blocked") - removed) + retained)
+            .putString("blocked_groups", groups.toString()).putString("blocked_labels", labels.toString()).apply()
+    }
+    fun blockedWorks(): List<Pair<String, String>> {
+        val labels = runCatching { JSONObject(string("blocked_labels", "{}")) }.getOrDefault(JSONObject())
+        val groups = runCatching { JSONObject(string("blocked_groups", "{}")) }.getOrDefault(JSONObject())
+        val grouped = groups.keys().asSequence().toList().flatMap { key ->
+            val aliases = groups.optJSONArray(key) ?: JSONArray()
+            (0 until aliases.length()).map { aliases.getString(it) }
+        }.toSet()
+        return labels.keys().asSequence().map { it to labels.getString(it) }.toList() +
+            (selection("blocked") - grouped).map { it to it.removePrefix("title:").substringBefore('|') }
+    }
+    fun clearBlocked() { prefs.edit().remove("blocked").remove("blocked_groups").remove("blocked_labels").apply() }
     fun readCache(key: String): List<DiscoverEntry> = runCatching {
         val json = JSONObject(cache.getString(key, "{}") ?: "{}")
         if (System.currentTimeMillis() - json.optLong("savedAt") > string("cache_hours", "24").toLong() * 3_600_000) return@runCatching emptyList()

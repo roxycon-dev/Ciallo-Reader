@@ -465,7 +465,8 @@ class JsMessageHandler(
             val proxied = useProxyRoute(url)
             if (!insecureTls && !proxied) {
                 // 走 Cronet（Chromium 网络栈）：浏览器级 TLS 指纹，绕过按 Java 客户端封禁的站点
-                var res = cronetRequest(httpMethod, url, effectiveHeaders, bodyBytes, timeoutMs = if (sourceKey == "jm") 10_000 else 60_000)
+                var res = cronetRequest(httpMethod, url, effectiveHeaders, bodyBytes,
+                    timeoutMs = if (sourceKey == "jm") 10_000 else if (httpMethod == "GET" && !bytes) 20_000 else 60_000)
                 // Cloudflare 挑战：用无头 WebView 自动过盾一次（cf_clearance 会同步进共享
                 // Cookie 存储），刷新请求头里的 Cookie 后重试原请求
                 if (res.error == null && CfWebViewSolver.isChallengeResponse(res.status, res.headers)) {
@@ -500,7 +501,7 @@ class JsMessageHandler(
                             res.headers.any { it.key.equals("Content-Type", true) && it.value.contains("json", true) })
                     else null
                 val retryViaHttp = httpMethod == "GET" && (responseProblem != null ||
-                    ((sourceKey in setOf("pufei", "bilimanga") && res.error != null) ||
+                    ((url.startsWith("https://") && !bytes && requestJob?.isActive != false && res.error != null) ||
                         (sourceKey == "bilimanga" && res.status == 403)))
                 if (res.error != null || retryViaProxy || retryViaHttp) {
                     if (!retryViaProxy && !retryViaHttp) {
@@ -536,8 +537,8 @@ class JsMessageHandler(
             val builder = Request.Builder().url(url)
             effectiveHeaders.forEach { (k, v) -> builder.header(k, v) }
             val request = builder.method(httpMethod, body).build()
-            val transport = if (sourceKey == "jm") client.newBuilder().connectTimeout(8, TimeUnit.SECONDS)
-                .readTimeout(10, TimeUnit.SECONDS).callTimeout(12, TimeUnit.SECONDS).build() else client
+            val transport = if (sourceKey == "jm" || (httpMethod == "GET" && !bytes)) client.newBuilder().connectTimeout(8, TimeUnit.SECONDS)
+                .readTimeout(12, TimeUnit.SECONDS).callTimeout(if (sourceKey == "jm") 12 else 18, TimeUnit.SECONDS).build() else client
             val result = transport.newCall(request).executeWithCancellation(requestJob).use {
                 if (httpMethod == "GET") {
                     if (it.isSuccessful) JsSourceProxy.rememberProxySuccess(context, url)
