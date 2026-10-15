@@ -44,6 +44,29 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [35], qualifiers = "zh-rCN-w390dp-h844dp-420dpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class DiscoverUiTest {
+    @Test fun historyIncludesCurrentReleaseAndMissingDiscoverReleases() {
+        val versions = com.example.ui.components.releaseHistory.map { it.version }
+        assertEquals(com.example.BuildConfig.VERSION_NAME, versions.first())
+        assertTrue(versions.containsAll(listOf("1.4.1", "1.4.0", "1.3.11", "1.3.10", "1.3.9", "1.3.8", "1.3.7")))
+        assertEquals(versions.size, versions.toSet().size)
+        var shown by mutableStateOf(true)
+        compose.setContent {
+            MyApplicationTheme {
+                CompositionLocalProvider(LocalReduceMotion provides true, LocalRenderQuality provides RenderQuality.MID) {
+                    if (shown) com.example.ui.components.ReleaseHistoryDialog { shown = false }
+                }
+            }
+        }
+        compose.onNodeWithText(com.example.BuildConfig.VERSION_NAME).assertIsDisplayed()
+        compose.onNodeWithText("关闭").performClick()
+        compose.onNodeWithText("更新目录").assertDoesNotExist()
+    }
+    @Test fun savedDiscussionSelectionMigratesToUpdates() {
+        mount(DiscoverLayout.LIST, dimension = DiscoverDimension.DISCUSSION)
+        compose.onNodeWithText("热议").assertDoesNotExist()
+        compose.onNodeWithText("更新").assertExists()
+        assertEquals("UPDATES", DiscoverStore(ApplicationProvider.getApplicationContext<Context>()).string("last_dimension", ""))
+    }
     private val pendingCatalog = kotlinx.coroutines.CompletableDeferred<Unit>()
     private var pendingQuery: DiscoverQuery? = null
     @Test fun aggregateDoesNotCancelPendingSourcesWhenTheFirstCatalogHasNoRankings() {
@@ -195,7 +218,8 @@ class DiscoverUiTest {
         mount(DiscoverLayout.LIST, dark = true, fontScale = 1.3f, dimension = DiscoverDimension.RANKING)
         compose.onNodeWithText("榜单").assertExists()
         compose.onNodeWithText("点击").assertDoesNotExist()
-        listOf("推荐", "更新", "热议", "榜单").forEach { label ->
+        compose.onNodeWithText("热议").assertDoesNotExist()
+        listOf("推荐", "更新", "榜单").forEach { label ->
             val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
             compose.onNodeWithText(label).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
             assertEquals("$label must stay on one line", 1, layouts.single().lineCount)

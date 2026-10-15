@@ -20,6 +20,13 @@ import androidx.compose.ui.unit.dp
 
 internal data class ReleaseSummary(val version: String, val date: String, val summary: String)
 internal val releaseHistory = listOf(
+    ReleaseSummary("1.4.1", "10-15", "禁漫连接与线路恢复 · 移除热议 · 更新目录补齐"),
+    ReleaseSummary("1.4.0", "10-15", "发现聚合与状态筛选 · Hitomi 与爱漫画修复"),
+    ReleaseSummary("1.3.11", "10-15", "发现筛选与列表重构 · 分类窗口 · 栏目缓存"),
+    ReleaseSummary("1.3.10", "10-14", "发现收藏与刷新 · 原站排序 · 元数据补全"),
+    ReleaseSummary("1.3.9", "10-14", "发现设置与分类 · 共用顶栏 · 渐进加载"),
+    ReleaseSummary("1.3.8", "10-14", "发现板块 · 爱漫画与 MYCOMIC 阅读链路"),
+    ReleaseSummary("1.3.7", "10-13", "发布签名 · 书源响应与线路容错"),
     ReleaseSummary("1.3.6", "10-12", "完整增强 · GPU 加速"),
     ReleaseSummary("1.3.5", "10-12", "极速增强 · 后续预生成"),
     ReleaseSummary("1.3.4", "10-12", "漫画增强提速"),

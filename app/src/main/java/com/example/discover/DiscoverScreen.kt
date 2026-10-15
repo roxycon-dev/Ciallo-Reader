@@ -76,7 +76,10 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
     val sources = all.filter { it.isComicSource }
     var sourceId by rememberSaveable { mutableStateOf(store.string("last_source", "aggregate")) }
     var dimension by rememberSaveable { mutableStateOf(DiscoverDimension.entries.firstOrNull {
-        it != DiscoverDimension.CLICKS && it.name == store.string("last_dimension", "UPDATES") } ?: DiscoverDimension.UPDATES) }
+        it in listOf(DiscoverDimension.UPDATES, DiscoverDimension.RANKING) && it.name == store.string("last_dimension", "UPDATES") } ?: DiscoverDimension.UPDATES) }
+    LaunchedEffect(dimension) {
+        if (dimension !in listOf(DiscoverDimension.UPDATES, DiscoverDimension.RANKING)) dimension = DiscoverDimension.UPDATES
+    }
     var range by rememberSaveable { mutableStateOf(store.string("range_${dimension.name}", dimension.ranges.first()).takeIf { it in dimension.ranges } ?: dimension.ranges.first()) }
     val layout = DiscoverLayout.entries.firstOrNull { it.name == store.string("layout", "GRID") } ?: DiscoverLayout.GRID
     val selected = store.selection("categories") - DiscoverTaxonomy.roots.map { it.id }.toSet()
@@ -170,7 +173,7 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
 
     val activeSources = sources.filter { enabled[it.id] != false && (sourceId == "aggregate" || it.id == sourceId) }
     val currentCatalogs = activeSources.mapNotNull { state.catalogs[it.id] }
-    val availableDimensions = DiscoverDimension.entries.filter { d -> d != DiscoverDimension.CLICKS && (sourceId == "aggregate" || currentCatalogs.isEmpty() || currentCatalogs.any { it.ranges(d).isNotEmpty() || it.feeds.any { f -> f.kind == null } }) }
+    val availableDimensions = listOf(DiscoverDimension.UPDATES, DiscoverDimension.RANKING).filter { d -> sourceId == "aggregate" || currentCatalogs.isEmpty() || currentCatalogs.any { it.ranges(d).isNotEmpty() || it.feeds.any { f -> f.kind == null } } }
     val availableRanges = dimension.ranges.filter { r -> sourceId == "aggregate" || currentCatalogs.isEmpty() || currentCatalogs.any { r in it.ranges(dimension) || it.feeds.any { f -> f.kind == null } } }
     LaunchedEffect(sourceId, state.loading, availableDimensions, availableRanges, nativeFeed, nativeCategory) {
         if (sourceId != "aggregate" && !state.loading && nativeFeed == null && nativeCategory == null && (dimension !in availableDimensions || range !in availableRanges)) {

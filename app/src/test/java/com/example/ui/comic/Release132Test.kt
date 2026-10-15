@@ -218,7 +218,7 @@ class Release132Test {
             }
         } }
         compose.onNodeWithText("更新目录").assertExists()
-        compose.onNodeWithText("1.3.2").assertExists()
+        compose.onNodeWithText(com.example.BuildConfig.VERSION_NAME).assertExists()
         compose.onNodeWithTag("release-history").captureRoboImage(File("../artifacts/release-1.3.2/history132.png").absolutePath)
         compose.onNodeWithText("关闭").performClick()
         compose.waitForIdle()
@@ -237,7 +237,7 @@ class Release132Test {
         compose.onNodeWithText("检查更新").assertIsDisplayed()
         compose.onNodeWithTag("software-info").captureRoboImage(File("../artifacts/release-1.3.2/about132.png").absolutePath)
         compose.onNodeWithText("更新目录").performClick()
-        compose.onNodeWithText("1.3.2").assertIsDisplayed()
+        compose.onNodeWithText(com.example.BuildConfig.VERSION_NAME).assertIsDisplayed()
     }
 
     @Test fun minimalNovelTurnsWithoutComposingNeighborsAndMenuBlocksTurns() {

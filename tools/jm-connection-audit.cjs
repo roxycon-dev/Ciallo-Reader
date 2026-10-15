@@ -1,0 +1,23 @@
+const assert=require('node:assert/strict');const {host,closeTransport}=require('./discover-live-audit.cjs');
+const h=host({fileName:'jm.js'});
+const runScript=code=>h.run('(async()=>{'+code+'})()');
+(async()=>{
+ await h.run(`globalThis.manualChoice='2';const originalSettings=src.loadSetting.bind(src);src.loadSetting=k=>k==='apiDomain'?manualChoice:originalSettings(k);src.getApiHeaders=()=>({});src.convertData=s=>s;JM.apiDomains=['first.invalid','second.invalid','third.invalid','fourth.invalid','fifth.invalid','sixth.invalid'];JM.fallbackServers=[];globalThis.calls=[];Network.get=async url=>{calls.push(url);if(calls.length===1)throw Error('connection closed');if(calls.length===2)return {status:200,body:'upstream proxy error'};return {status:200,body:JSON.stringify({data:'{"ok":true}'})};};`);
+ assert.equal(JSON.parse(await h.run(`src.get(src.baseUrl+'/categories?page=2')`)).ok,true);
+ assert.equal(await h.run('calls.length'),3);
+ assert.equal(await h.run('JSON.parse(src.loadData("jm_read_route")).domain'),'third.invalid');
+ await runScript(`calls=[];Network.get=async url=>{calls.push(url);return {status:200,body:JSON.stringify({data:'{"ok":true}'})};};await src.get(src.baseUrl+'/categories?page=2');`);
+ assert.equal(await h.run('calls.length'),1);assert((await h.run('calls[0]')).startsWith('https://third.invalid/'));
+ await runScript(`globalThis.restarted=new JM();restarted.loadSetting=src.loadSetting;restarted.getApiHeaders=src.getApiHeaders;restarted.convertData=src.convertData;CialloSourceResponse.install(restarted,'jm');calls=[];await restarted.get(restarted.baseUrl+'/categories?page=2');`);
+ assert.equal(await h.run('calls.length'),1);assert((await h.run('calls[0]')).startsWith('https://third.invalid/'));
+ await runScript(`manualChoice='1';calls=[];await src.get(src.baseUrl+'/categories?page=2');`);assert((await h.run('calls[0]')).startsWith('https://first.invalid/'));
+ await h.run(`calls=[];Network.get=async url=>{calls.push(url);return {status:401};};`);
+ await assert.rejects(h.run(`src.get(src.baseUrl+'/categories')`),e=>e.noRetry===true);assert.equal(await h.run('calls.length'),1);
+ await h.run(`calls=[];Network.get=async url=>{calls.push(url);throw Error('connection closed');};`);
+ await assert.rejects(h.run(`src.get('https://unrelated.invalid/book')`));assert.equal(await h.run('calls.length'),1);
+ await runScript(`src.deleteData('jm_read_route');const originalNow=Date.now;globalThis.now=0;Date.now=()=>now;calls=[];Network.get=async url=>{calls.push(url);now+=7000;throw Error('connection closed');};try{await src.get(src.baseUrl+'/categories')}catch(_){}finally{Date.now=originalNow;}`);
+ assert.equal(await h.run('calls.length'),3);
+ await runScript(`src.overwriteApiDomains(['saved.good']);src.refreshApiDomains=async()=>{throw Error('connection closed')};src.refreshImgUrl=async()=>{throw Error('connection closed')};JM.apiDomains=['lost.invalid'];await src.init();`);
+ assert.equal(await h.run('JM.apiDomains[0]'),'saved.good');assert.equal(h.evidence.length,0);
+ console.log('JM closed-connection failover, decoded JSON checks, learned routes with manual selection, auth/foreign isolation, retry budget and cached startup passed (offline).');
+})().catch(e=>{console.error(String(e.stack||e));process.exitCode=1}).finally(()=>{h.close();closeTransport()});

@@ -5,12 +5,15 @@ const path = require('node:path');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
-const {parseHTML} = require(process.env.CIALLO_DOM_MODULE || path.join(root, '.tools/dom/node_modules/linkedom'));
+const parseHTML = (...args) => require(process.env.CIALLO_DOM_MODULE || path.join(root, '.tools/dom/node_modules/linkedom')).parseHTML(...args);
 const acorn = require(path.join(root, 'app/src/main/assets/js_safety/acorn.js'));
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const assets = 'app/src/main/assets/venera/';
 let passed = 0;
-async function check(name, run) { await run(); passed++; console.log('PASS ' + name); }
+async function check(name, run) {
+  if (process.env.CIALLO_RESPONSE_FILTER && !name.startsWith(process.env.CIALLO_RESPONSE_FILTER)) return;
+  await run(); passed++; console.log('PASS ' + name);
+}
 function context(extra = {}) {
   const state = {opened: 0, disposed: 0};
   class HtmlDocument {

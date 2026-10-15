@@ -12,6 +12,29 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class JsSourcePayloadTest {
+    @Test fun `JM upgrades old patched caches without depending on method indentation`() {
+        val patch = JsSourceRepo::class.java.getDeclaredMethod("patchScript", String::class.java, String::class.java).apply { isAccessible = true }
+        val source = """
+            class JM extends ComicSource {
+                static fallbackServers = ["dead.invalid"];
+                static apiDomains = ["dead.invalid"];
+            async get(url) {
+                const __cialloApiFailover = true;
+                throw new Error('connection closed');
+            }
+                async post(url, body) { return 'unchanged'; }
+            }
+        """.trimIndent()
+        for (input in listOf(source, source.replace("\n", "\r\n"))) {
+            val repaired = patch.invoke(JsSourceRepo, "jm", input) as String
+            assertTrue(repaired.contains("__cialloApiFailoverV2"))
+            assertTrue(repaired.contains("jm_read_route"))
+            assertTrue(repaired.contains("www.cdnhjk.net"))
+            assertFalse(repaired.contains("dead.invalid"))
+            assertTrue(repaired.contains("async post(url, body) { return 'unchanged'; }"))
+            assertEquals(repaired, patch.invoke(JsSourceRepo, "jm", repaired))
+        }
+    }
     @Test fun `Hitomi browse repair is idempotent and retains dates and unknown pagination`() {
         val patch = JsSourceRepo::class.java.getDeclaredMethod("patchScript", String::class.java, String::class.java).apply { isAccessible = true }
         val source = """

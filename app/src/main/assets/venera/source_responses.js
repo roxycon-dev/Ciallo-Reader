@@ -61,6 +61,13 @@
             if (sourceKey === 'wnacg' && src.comic) src.comic.loadInfo = id => cialloWnacgInfo.call(src, id);
             if (sourceKey !== 'jm' || typeof src.get !== 'function' || typeof src.convertData !== 'function') return;
             src.get = url => cialloJmGet.call(src, url);
+            try {
+                const saved = JSON.parse(typeof src.loadData === 'function' ? src.loadData('jm_read_route') || 'null' : 'null');
+                if (saved && typeof saved.domain === 'string' && /^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(saved.domain)) {
+                    src.__cialloApiOrigin = 'https://' + saved.domain;
+                    src.__cialloApiSelection = saved.selection;
+                }
+            } catch (_) {}
             const type = Object.getPrototypeOf(src).constructor;
             Object.defineProperty(src, 'baseUrl', {get() {
                 const setting = String(src.loadSetting('apiDomain'));

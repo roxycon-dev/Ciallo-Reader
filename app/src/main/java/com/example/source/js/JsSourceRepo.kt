@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 object JsSourceRepo {
 
     /** 本地补丁版本：升级后尝试更新源脚本，失败时仍可使用旧缓存。 */
-    private const val PATCH_VERSION = 47
+    private const val PATCH_VERSION = 48
     // Raw cache format stays stable when compatibility patches change.
     private const val RAW_CACHE_PREFIX = "// EASYREADER_RAW_SOURCE_V28\n"
 
@@ -418,19 +418,36 @@ object JsSourceRepo {
      * 防止未初始化设置生成 https://undefined，并在 API 返回 404 时自动换线。
      */
     private fun patchJm(script: String): String {
-        var patched = script.replace(
+        var patched = script.replace("\r\n", "\n").replace(
             "this.convertData(await res.text(), domainSecret)",
             "this.convertData((await res.text()).replace(/^\\uFEFF/, ''), domainSecret)"
         )
+        // Publisher's encrypted route directory, verified 2026-10-15. Preserve live
+        // refresh and retain its last successful result when the directory is down.
+        patched = patched.replace(Regex("static\\s+(fallbackServers|apiDomains)\\s*=\\s*\\[[^]]*]")) { match ->
+            "static ${match.groupValues[1]} = [\"www.cdnhjk.net\",\"www.cdngwc.cc\",\"www.cdngwc.net\",\"www.cdngwc.club\"]"
+        }
+        patched = patched.replace("""    async init() {
+        if (this.loadSetting('refreshDomainsOnStart')) await this.refreshApiDomains(false)
+        this.refreshImgUrl(false)
+    }""", """    async init() {
+        try {
+            const saved = JSON.parse(this.loadData('jm_api_routes') || '[]');
+            if (Array.isArray(saved)) this.overwriteApiDomains(saved);
+        } catch (_) {}
+        try { if (this.loadSetting('refreshDomainsOnStart')) await this.refreshApiDomains(false); } catch (_) {}
+        this.refreshImgUrl(false).catch(() => {});
+    }""")
+        patched = patched.replace("""    overwriteApiDomains(domains) {
+        if (domains.length != 0) JM.apiDomains = domains
+    }""", """    overwriteApiDomains(domains) {
+        const valid = Array.isArray(domains) ? domains.filter(d => typeof d === 'string' && /^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(d)).slice(0, 8) : [];
+        if (valid.length) { JM.apiDomains = valid; this.saveData('jm_api_routes', JSON.stringify(valid)); }
+    }""")
         if (!patched.contains("static apiDomains =")) patched = patched.replace(
             "    static imageUrl = \"https://cdn-msp.jmapinodeudzn.net\"",
             """
-    static apiDomains = [
-        "www.cdntwice.org",
-        "www.cdnsha.org",
-        "www.cdnaspa.cc",
-        "www.cdnntr.cc",
-    ]
+    static apiDomains = ["www.cdnhjk.net","www.cdngwc.cc","www.cdngwc.net","www.cdngwc.club"]
 
     static imageUrl = "https://cdn-msp.jmapinodeudzn.net"
             """.trimIndent()
@@ -464,7 +481,7 @@ object JsSourceRepo {
         }
         if(res.status !== 200) {"""
         )
-        return patched
+        return patched.replace("servers = JM.fallbackServers", "servers = JM.apiDomains?.length ? JM.apiDomains : JM.fallbackServers")
     }
 
     private fun patchWnacgDiscovery(script: String): String {
@@ -615,17 +632,22 @@ Comick.prototype.discover = {
         }
 
         "jm" -> {
-            val start = script.indexOf("    async get(url) {")
+            val start = Regex("(?m)^[ \\t]*async get\\(url\\)\\s*\\{").find(script)?.range?.first ?: -1
             val end = script.indexOf("    async post(url, body) {", start)
-            if (start < 0 || end < start || script.contains("__cialloApiFailover")) script else {
+            if (start < 0 || end < start || script.contains("__cialloApiFailoverV2")) script else {
                 val get = """
     async get(url) {
         // Retry read-only API calls across the publisher's known routes, including
         // TLS failures and 200 proxy error text. Validate decoded JSON before learning a route.
-        const __cialloApiFailover = true;
+        const __cialloApiFailoverV2 = true;
         const current = this.baseUrl;
         const path = url.startsWith(current + '/') ? url.substring(current.length) : null;
-        const domains = [...new Set([current, ...(JM.apiDomains || []).map(d => 'https://' + d),
+        const selection = String(this.loadSetting('apiDomain') || '1');
+        let learned = null;
+        try { const saved = JSON.parse(this.loadData('jm_read_route') || 'null');
+            if (saved && saved.selection === selection && /^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(saved.domain)) learned = 'https://' + saved.domain;
+        } catch (_) {}
+        const domains = [...new Set([...(learned ? [learned] : []), current, ...(JM.apiDomains || []).map(d => 'https://' + d),
             ...(JM.fallbackServers || []).map(d => 'https://' + d)])].slice(0, 5);
         const candidates = path ? domains.map(d => d + path) : [url];
         let lastError;
@@ -642,9 +664,9 @@ Comick.prototype.discover = {
                 if (typeof data.data !== 'string' || !data.data) throw new Error('API returned no encrypted data');
                 const decoded = this.convertData(data.data, String(time) + '185Hcomic3PAPP7R');
                 JSON.parse(decoded);
-                if (path && candidate !== url && String(this.loadSetting('apiDomain') || '1') === '1') {
+                if (path) {
                     const winner = candidate.substring(8).split('/')[0];
-                    JM.apiDomains = [winner, ...(JM.apiDomains || []).filter(d => d !== winner)];
+                    this.saveData('jm_read_route', JSON.stringify({domain:winner, selection}));
                 }
                 return decoded;
             } catch (error) {

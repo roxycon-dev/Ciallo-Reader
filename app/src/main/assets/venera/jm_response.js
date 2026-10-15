@@ -51,6 +51,9 @@ async function cialloJmGet(url) {
             if (local) {
                 this.__cialloApiOrigin = route;
                 this.__cialloApiSelection = String(this.loadSetting('apiDomain'));
+                if (typeof this.saveData === 'function') this.saveData('jm_read_route', JSON.stringify({
+                    domain: route.slice(8), selection: this.__cialloApiSelection
+                }));
             }
             return endpoint === '/album' ? JSON.stringify(parsed) : decoded;
         } catch (error) {

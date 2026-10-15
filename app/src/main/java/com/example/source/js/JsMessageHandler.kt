@@ -466,7 +466,7 @@ class JsMessageHandler(
             }
 
             val proxied = useProxyRoute(url)
-            if (!insecureTls && !proxied && !AimanhuaTls.route(sourceKey, url)) {
+            if (!insecureTls && !proxied && !AimanhuaTls.route(sourceKey, url) && !(sourceKey == "jm" && httpMethod == "GET")) {
                 // 走 Cronet（Chromium 网络栈）：浏览器级 TLS 指纹，绕过按 Java 客户端封禁的站点
                 var res = cronetRequest(httpMethod, url, effectiveHeaders, bodyBytes,
                     timeoutMs = if (sourceKey == "jm") 10_000 else if (httpMethod == "GET" && !bytes) 20_000 else 60_000)
@@ -540,7 +540,9 @@ class JsMessageHandler(
             val builder = Request.Builder().url(url)
             effectiveHeaders.forEach { (k, v) -> builder.header(k, v) }
             val request = builder.method(httpMethod, body).build()
-            val transport = if (sourceKey == "jm" || (httpMethod == "GET" && !bytes)) client.newBuilder().connectTimeout(8, TimeUnit.SECONDS)
+            val transport = if (sourceKey == "jm" && httpMethod == "GET" && !bytes) client.newBuilder()
+                .connectTimeout(4, TimeUnit.SECONDS).readTimeout(6, TimeUnit.SECONDS).callTimeout(6, TimeUnit.SECONDS).build()
+                else if (sourceKey == "jm" || (httpMethod == "GET" && !bytes)) client.newBuilder().connectTimeout(8, TimeUnit.SECONDS)
                 .readTimeout(12, TimeUnit.SECONDS).callTimeout(if (sourceKey == "jm") 12 else 18, TimeUnit.SECONDS).build() else client
             val result = transport.newCall(request).executeWithCancellation(requestJob).use {
                 if (httpMethod == "GET") {
