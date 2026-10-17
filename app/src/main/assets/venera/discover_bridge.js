@@ -7,6 +7,14 @@ function __cialloDiscoverOption(raw) {
     const dash = /^-[a-z_0-9]+-/i.test(text) ? text.indexOf('-', 1) : text.indexOf('-');
     return { value: dash < 0 ? text : text.slice(0, dash), label: dash < 0 ? text : text.slice(dash + 1) };
 }
+function __cialloDiscoverNegativeCompletionLabel(label) {
+    return /未完[结結]|未[结結]束|不完[结結]|未完成|not\s+(?:yet\s+)?(?:completed|finished)|uncompleted|incomplete|unfinished|ongoing|连载|連載/i.test(String(label || ''));
+}
+function __cialloDiscoverCompletedLabel(label) {
+    const text = String(label || '');
+    return !__cialloDiscoverNegativeCompletionLabel(text) &&
+        /完[结結]|已完成|\b(completed|finished|ended)\b/i.test(text);
+}
 function __cialloDiscoverKind(label) {
     const text = String(label || '');
     if (/更新|latest|recent updates|recently updated/i.test(text)) return 'updates';
@@ -32,7 +40,7 @@ function __cialloDiscoverCapabilities(feeds) {
             if (/热门|熱門|人气|人氣|popular|hot|总|總|all/i.test(text) || !/飙升|飆升|rising|trending|新作|新书|新書|上架|new|完结|完結|completed/i.test(text)) add('ranking', '热门');
             if (/飙升|飆升|rising|trending/i.test(text)) add('ranking', '飙升');
             if (/新作|新书|新書|上架|new|recent add/i.test(text)) add('ranking', '新作');
-            if (/完结|完結|completed/i.test(text)) add('ranking', '完结');
+            if (__cialloDiscoverCompletedLabel(text)) add('ranking', '完结');
         }
         if (['discussion', 'clicks'].includes(f.kind)) {
             for (const [range, pattern] of Object.entries(f.kind === 'discussion' ?
@@ -211,7 +219,8 @@ async function __cialloDiscover(src, q) {
         if (!feed && !q.feedId && desired === 'ranking') {
             const rangePattern = { '热门': /热门|熱門|人气|人氣|popular|hot|总|總|all/i, '飙升': /飙升|飆升|rising|trending/i,
                 '新作': /新作|新书|新書|上架|new|recent add/i, '完结': /完结|完結|completed/i }[q.range];
-            feed = catalog.feeds.find(f => f.kind === 'ranking' && rangePattern && rangePattern.test(f.label));
+            feed = catalog.feeds.find(f => f.kind === 'ranking' && rangePattern && rangePattern.test(f.label) &&
+                (q.range !== '完结' || __cialloDiscoverCompletedLabel(f.label)));
             if (!feed && q.range === '热门') feed = catalog.feeds.find(f => f.type === 'ranking');
         }
         if (!feed && !q.feedId) feed = catalog.feeds.find(f => f.kind === desired &&
@@ -219,7 +228,7 @@ async function __cialloDiscover(src, q) {
             catalog.feeds.find(f => /multiPart|singlePageWithMultiPart|mixed/i.test(f.type));
         if (!feed) return { supported: false, entries: [], catalog };
         label = feed.label; kind = feed.kind;
-        if (/完结|完結|completed|finished/i.test(label)) appliedStatus = '完结';
+        if (__cialloDiscoverCompletedLabel(label)) appliedStatus = '完结';
         if (feed.type === 'ranking') {
             const api = src.categoryComics.ranking;
             paged = typeof api.load === 'function' ? true : 'cursor';
@@ -247,7 +256,9 @@ async function __cialloDiscover(src, q) {
         parts = parts.filter(p => (kind === desired || __cialloDiscoverKind(p.title) === desired));
         if (desired === 'ranking') {
             const specific = { '飙升': /飙升|飆升|rising|trending/i, '新作': /新作|新书|新書|上架|new|recent add/i, '完结': /完结|完結|completed/i }[q.range];
-            if (specific) parts = parts.filter(p => specific.test(p.title || '') || specific.test(label || ''));
+            if (specific) parts = parts.filter(p => (specific.test(p.title || '') || specific.test(label || '')) &&
+                (q.range !== '完结' || (!__cialloDiscoverNegativeCompletionLabel(p.title) &&
+                    (__cialloDiscoverCompletedLabel(p.title) || __cialloDiscoverCompletedLabel(label)))));
         }
         // Native time-window names must match the requested window; counts alone cannot certify it.
         if (desired === 'discussion' || (desired === 'clicks' && q.range !== '总')) {

@@ -98,6 +98,8 @@ class DiscoverUiTest {
         compose.waitForIdle()
         val bounds = titles.indices.map { compose.onNodeWithTag("header_$it").fetchSemanticsNode().boundsInRoot }
         bounds.forEach { assertEquals(bounds[0].width, it.width, 0f); assertEquals(bounds[0].height, it.height, 0f); assertEquals(bounds[0].left, it.left, 0f) }
+        val density = ApplicationProvider.getApplicationContext<Context>().resources.displayMetrics.density
+        assertTrue("Expanded header must stay compact at 130% text", bounds[0].height <= 96f * density)
         subtitles.forEach { compose.onNodeWithText(it).assertIsDisplayed() }
     }
     @Test @Config(qualifiers = "zh-rCN-w360dp-h640dp-420dpi")
@@ -126,6 +128,7 @@ class DiscoverUiTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     internal open class FixtureSource(override val id: String) : ComicSource {
         var discoverCalls = 0
+        var lastQuery: DiscoverQuery? = null
         override val name = "示例书源 $id"
         override val capabilities = SourceCapabilities(supportComic = true)
         override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> = SourceResult.Success(DiscoverPage((1..12).map { n ->
@@ -133,7 +136,7 @@ class DiscoverUiTest {
             DiscoverEntry(SearchBook("$n", id, "星海冒险 $n", "星川工作室", cover = cover, comicInfo = ComicInfo(tags = listOf("冒险", "奇幻"), status = "ongoing")),
                 updatedAt = System.currentTimeMillis() - n * 60_000, latestChapter = "第${100+n}话", discussions = n * 12_000L,
                 clicks = n * 300_000L, rank = n, growth = 12.5, rankChange = 2, hotComment = "这一话的伏笔终于揭晓了")
-        })).also { discoverCalls++ }
+        })).also { discoverCalls++; lastQuery = query }
         override suspend fun search(keyword: String) = SourceResult.Success(emptyList<SearchBook>())
         override suspend fun getDetail(bookId: String) = SourceResult.Success(SearchBook(bookId, id, "测试", ""))
         override suspend fun getDownloadInfo(bookId: String): SourceResult<DownloadInfo> = SourceResult.Error(SourceException.ParseError("测试"))
@@ -292,7 +295,7 @@ class DiscoverUiTest {
     private fun capture(name: String, overlay: Boolean = false) {
         val root = generateSequence(java.io.File(requireNotNull(System.getProperty("user.dir")))) { it.parentFile }
             .first { java.io.File(it, "gradlew.bat").exists() }
-        val directory = java.io.File(root, "artifacts/discover-rework-2026-10-14/screenshots").apply { mkdirs() }
+        val directory = java.io.File(root, "artifacts/discover-ui/screenshots").apply { mkdirs() }
         compose.waitForIdle()
         captureScreenRoboImage(java.io.File(directory, name).absolutePath)
     }
@@ -349,10 +352,24 @@ class DiscoverUiTest {
         compose.onAllNodes(hasText("完结") and !hasAnyAncestor(hasTestTag("discover_status_filters"))).onFirst().performClick()
         compose.waitForIdle()
         compose.onNodeWithText("星海冒险 1").assertExists()
-        compose.onNode(hasText("连载") and hasAnyAncestor(hasTestTag("discover_status_filters"))).performClick()
-        compose.onNodeWithText("星海冒险 1").assertDoesNotExist()
-        compose.onNode(hasText("全部") and hasAnyAncestor(hasTestTag("discover_status_filters"))).performClick()
+        compose.onNodeWithTag("discover_status_filters").assertDoesNotExist()
+        compose.onNodeWithText("仅显示已确认完结的作品").assertIsDisplayed()
+        assertTrue(fixtures.all { it.lastQuery?.range == "完结" && it.lastQuery?.status == null })
+        compose.onNodeWithText("热门").performClick()
+        compose.onNodeWithTag("discover_status_filters").assertExists()
         compose.onNodeWithText("星海冒险 1").assertExists()
+    }
+    @Test fun newWorksExplainTheirOrderWithoutAContradictoryThirdLevel() {
+        mount(DiscoverLayout.LIST, dimension = DiscoverDimension.RANKING)
+        compose.onNode(hasText("完结") and hasAnyAncestor(hasTestTag("discover_status_filters"))).performClick()
+        compose.waitForIdle()
+        assertTrue(fixtures.all { it.lastQuery?.range == "热门" && it.lastQuery?.status == null })
+        compose.onNodeWithText("新作").performClick()
+        compose.onNodeWithTag("discover_status_filters").assertDoesNotExist()
+        compose.onNodeWithText("按原站新上架排序，作品可能仍在连载").assertIsDisplayed()
+        compose.onNodeWithText("星海冒险 1").assertExists()
+        assertTrue(fixtures.all { it.lastQuery?.range == "新作" && it.lastQuery?.status == null })
+        capture("discover-new-142.png")
     }
     @Test fun layoutPreferenceAndCategoriesSurviveStoreRecreation() {
         val context = ApplicationProvider.getApplicationContext<Context>()

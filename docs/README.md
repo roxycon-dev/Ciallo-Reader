@@ -8,6 +8,8 @@
 
 ## 内容
 
+- [Ciallo Reader 1.4.2 发布验证](release-1.4.2-2026-10-17.md)
+
 - [Ciallo Reader 1.3.3 发布验证](release-1.3.3-2026-10-12.md)
 - [Ciallo Reader 1.3.2 发布验证](release-1.3.2-2026-10-12.md)
 - [Ciallo Reader 1.3.1 发布验证](release-1.3.1-2026-10-11.md)

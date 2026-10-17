@@ -206,8 +206,8 @@ fun CollapsingTabScreenHeader(
     // （"LIBRARY & SEARCH" 的 Y / & 下缘）裁掉 —— 厂商字体 descent 越大裁得越狠。
     // 槽位放大后配合 clipToBounds 只在折叠收起时裁切。
     val subH = with(LocalDensity.current) { 12.sp.toDp() * 1.65f }.coerceAtLeast(20.dp) * subAlpha
-    val outerV = (10 * (1f - collapse) * (1f - collapse)).dp
-    val innerV = (12 - 8 * compact).dp
+    val outerV = (4 * (1f - collapse) * (1f - collapse)).dp
+    val innerV = (8 - 4 * compact).dp
 
     GlassCard(
         modifier = modifier
@@ -230,7 +230,7 @@ fun CollapsingTabScreenHeader(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = innerV).heightIn(min = 52.dp * (1f - compact)),
+                .padding(horizontal = 20.dp, vertical = innerV).heightIn(min = 48.dp * (1f - compact)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             leading?.invoke(this)

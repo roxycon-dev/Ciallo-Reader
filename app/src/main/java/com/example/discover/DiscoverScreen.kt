@@ -102,14 +102,10 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
     val haptics = LocalHapticFeedback.current
     val hapticsEnabled = LocalHapticsEnabled.current
     fun light() { if (hapticsEnabled) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+    val statusScope = discoverStatusScope(dimension, range, nativeFeed, nativeCategory, state.catalogs[sourceId])
+    val effectiveStatus = statusScope.effectiveStatus(statusFilter)
     val rows = remember(state.entries, sourceId, dimension, range, state.catalogs, selected, blocked, statusFilter, favorites, readingTitles, revision, nativeFeed, nativeCategory) {
-        val completedFeed = sourceId != "aggregate" && nativeFeed != null && state.catalogs[sourceId]?.feeds?.let { feeds ->
-            (if (nativeFeed == "native") feeds.firstOrNull() else feeds.firstOrNull { it.id == nativeFeed })?.label?.contains(Regex("完结|完結|completed|finished", RegexOption.IGNORE_CASE))
-        } == true
-        val completedOnly = completedFeed || (nativeFeed == null && nativeCategory == null && dimension == DiscoverDimension.RANKING && range == "完结")
-        val completed = filterWorkStatus(DiscoverEngine.merge(state.entries, dimension, sourceId == "aggregate"),
-            if (completedOnly) "完结" else "全部")
-        val merged = filterWorkStatus(completed, statusFilter).filter { work ->
+        val merged = filterWorkStatus(DiscoverEngine.merge(state.entries, dimension, sourceId == "aggregate"), effectiveStatus).filter { work ->
             work.key !in blocked && work.variants.none { DiscoverEngine.identity(it) in blocked } && DiscoverTaxonomy.matches(work.tags, selected)
         }
         val favoriteAuthors = favorites.map { it.favorite.author }.filter { it.isKnownComicAuthor() }.toSet()
@@ -122,7 +118,7 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
     LaunchedEffect(refreshRequest) {
         if (model.consumeRefreshRequest(refreshRequest)) { grid.scrollToItem(0); model.refresh() }
     }
-    LaunchedEffect(sources, enabled, sourceId, dimension, range, nativeFeed, nativeCategory, selected, statusFilter) {
+    LaunchedEffect(sources, enabled, sourceId, dimension, range, nativeFeed, nativeCategory, selected, effectiveStatus) {
         if (sourceId != "aggregate" && sources.none { it.id == sourceId }) { sourceId = "aggregate"; return@LaunchedEffect }
         model.configure(sourceId, dimension, range, nativeFeed, nativeCategory, selected)
         store.put("last_source", sourceId); store.put("last_dimension", dimension.name)
@@ -136,7 +132,7 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
     var filterScanCount by remember(viewportKey, statusFilter) { mutableIntStateOf(0) }
     LaunchedEffect(rows.size, state.loading, state.more, viewportKey, statusFilter) {
         if (!state.loading && rows.size < 4 && state.more.isNotEmpty() && filterScanCount < 3 &&
-            (selected.isNotEmpty() || statusFilter != "全部" || (nativeFeed == null && dimension == DiscoverDimension.UPDATES && range != "最新"))) {
+            (selected.isNotEmpty() || effectiveStatus != "全部" || (nativeFeed == null && dimension == DiscoverDimension.UPDATES && range != "最新"))) {
             filterScanCount++; model.more()
         }
     }
@@ -210,8 +206,8 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
                             refreshing = state.loading, onRefresh = { light(); model.refresh() },
                             sorts = if (feeds.isNotEmpty()) feeds.map { it.label to (nativeFeed == it.id || (nativeFeed == "native" && it == feeds.first())) } else ranges.map { it to (range == it) },
                             onSort = { index -> light(); if (feeds.isNotEmpty()) { nativeFeed = feeds[index].id; nativeCategory = null; statusFilter = "全部" } else { range = ranges[index]; statusFilter = "全部" } },
-                            statuses = if (statusKnown) listOf("全部", "连载", "完结") + (if (state.entries.any { serialLabel(it.book.comicInfo?.status) == "停更" }) listOf("停更") else emptyList()) + (if (unknownStatus) listOf("状态未知") else emptyList()) else emptyList(),
-                            status = statusFilter, onStatus = { light(); statusFilter = it })
+                            statuses = if (statusKnown && statusScope.showStatusChoices) listOf("全部", "连载", "完结") + (if (state.entries.any { serialLabel(it.book.comicInfo?.status) == "停更" }) listOf("停更") else emptyList()) + (if (unknownStatus) listOf("状态未知") else emptyList()) else emptyList(),
+                            status = effectiveStatus, statusHint = statusScope.hint, onStatus = { light(); statusFilter = it })
                     }
                     if (sourceId == "aggregate") item(span = { GridItemSpan(maxLineSpan) }) {
                         Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {

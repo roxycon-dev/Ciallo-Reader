@@ -11,7 +11,7 @@
 
 [🌐 产品主页](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.4.1 更新说明与验证](docs/release-1.4.1-2026-10-15.md) ·
+[1.4.2 更新说明与验证](docs/release-1.4.2-2026-10-17.md) ·
 [查看截图](#界面预览) ·
 [全部功能](#功能亮点) ·
 [提交问题或建议](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -27,7 +27,7 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 **English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
 
-**1.4.1 / 224**：修复禁漫天堂旧线路、连接中断与旧缓存补丁迁移，记住可用线路；移除发现「热议」入口，保持榜单热门/飙升/新作/完结结构；补齐设置内更新目录至 1.4.1。 沿用固定发布签名，详见 [验证记录](docs/release-1.4.1-2026-10-15.md)。
+**1.4.2 / 225**：顶部上移并压缩留白，增加内容可视区域；优化发现榜单与状态分类联动，消除完结榜下的连载选项及新作下的重复状态层。 新作不等于完结；完结榜严格展示已确认完结的作品。沿用固定发布签名，详见 [验证记录](docs/release-1.4.2-2026-10-17.md)。
 
 包含 1.3.11 的旧 Android API、玻璃弹窗清理、EPUB 路径兼容性和 Compose 状态订阅修复。
 
@@ -112,7 +112,7 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 - **系统要求：** Android 7.0（API 24）及以上。
 - **当前 Release：** 提供 arm64-v8a APK，适用于大多数 Android 手机和平板；Release 暂不包含 x86_64 模拟器版本。
-- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.4.1](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.1/Ciallo-Reader-v1.4.1.apk)。
+- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.4.2](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.2/Ciallo-Reader-v1.4.2.apk)。
 - 下载后按 Android 提示允许安装该来源的应用，再打开 APK 安装。
 
 ## 快速开始

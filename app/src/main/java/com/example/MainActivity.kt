@@ -647,6 +647,9 @@ class MainActivity : ComponentActivity() {
                                     )
                             ) {
                             Scaffold(
+                                // Each tab owns its status-bar inset; applying it here too
+                                // leaves a second status-bar-sized gap above every header.
+                                contentWindowInsets = WindowInsets(0, 0, 0, 0),
                                 containerColor = if (LocalAppBackgroundActive.current) {
                                     Color.Transparent
                                 } else {

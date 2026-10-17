@@ -34,11 +34,11 @@ internal fun DiscoverFilters(tabs: List<Pair<String, Boolean>>, onTab: (Int) -> 
     source: String, onSource: () -> Unit, selected: Set<String>, onCategory: () -> Unit,
     onRemove: (String) -> Unit, onClear: () -> Unit, refreshing: Boolean, onRefresh: () -> Unit,
     sorts: List<Pair<String, Boolean>>, onSort: (Int) -> Unit, statuses: List<String>,
-    status: String, onStatus: (String) -> Unit) {
+    status: String, statusHint: String? = null, onStatus: (String) -> Unit) {
     val colors = MaterialTheme.colorScheme
     val accentInk = discoverAccentText()
     val duration = if (LocalReduceMotion.current) 0 else 180
-    GlassCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), contentPadding = PaddingValues(start = 14.dp, top = 12.dp, end = 16.dp, bottom = 12.dp)) {
+    GlassCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), contentPadding = PaddingValues(start = 14.dp, top = 4.dp, end = 16.dp, bottom = 6.dp)) {
         LazyRow(Modifier.testTag("discover_dimension_tabs"), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             items(tabs.size) { i ->
                 val (label, checked) = tabs[i]
@@ -50,7 +50,7 @@ internal fun DiscoverFilters(tabs: List<Pair<String, Boolean>>, onTab: (Int) -> 
             }
         }
         HorizontalDivider(thickness = .5.dp, color = colors.outline.copy(alpha = .24f))
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(2.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.weight(1f).heightIn(min = 48.dp).quietSelect(false, onSource), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Storage, null, Modifier.size(18.dp), tint = colors.primary)
@@ -77,7 +77,7 @@ internal fun DiscoverFilters(tabs: List<Pair<String, Boolean>>, onTab: (Int) -> 
             }
         }
         if (sorts.isNotEmpty()) {
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(2.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(sorts.size) { i ->
                     val (label, checked) = sorts[i]
@@ -90,8 +90,9 @@ internal fun DiscoverFilters(tabs: List<Pair<String, Boolean>>, onTab: (Int) -> 
             }
         }
         if (statuses.isNotEmpty()) {
-            Row(Modifier.testTag("discover_status_filters").padding(top = if (sorts.isEmpty()) 12.dp else 10.dp, start = if (sorts.isEmpty()) 0.dp else 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (sorts.isNotEmpty()) { Icon(Icons.Outlined.SubdirectoryArrowRight, null, Modifier.size(16.dp), tint = colors.onSurfaceVariant.copy(alpha = .5f)); Spacer(Modifier.width(8.dp)) }
+            Row(Modifier.testTag("discover_status_filters").padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("状态", fontSize = 12.sp, color = colors.onSurfaceVariant)
+                Spacer(Modifier.width(8.dp))
                 Row(Modifier.horizontalScroll(rememberScrollState()).drawBehind {
                     val h = 32.dp.toPx().coerceAtMost(size.height)
                     drawRoundRect(colors.surfaceVariant.copy(alpha = .35f), topLeft = Offset(0f, (size.height - h) / 2), size = Size(size.width, h), cornerRadius = CornerRadius(h / 2))
@@ -107,6 +108,8 @@ internal fun DiscoverFilters(tabs: List<Pair<String, Boolean>>, onTab: (Int) -> 
                 }
             }
         }
+        statusHint?.let { Text(it, Modifier.padding(top = 4.dp, bottom = 2.dp).testTag("discover_status_hint"),
+            fontSize = 12.sp, lineHeight = 18.sp, color = colors.onSurfaceVariant) }
     }
 }
 

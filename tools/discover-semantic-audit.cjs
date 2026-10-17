@@ -18,6 +18,20 @@ const h=host({fileName:'comick.js'});
  await h.run(`delete src.__categoryCursors; __cialloDiscover(src,{dimension:'ranking',range:'热门',categoryId:'category:0:0',page:3,cursor:'saved-cursor',offset:2})`);
  assert((await h.run('requests.at(-1).url')).includes('cursor=saved-cursor'));
  assert.deepEqual(JSON.parse(JSON.stringify(await h.run(`__cialloDiscoverCapabilities([{label:'新作上架',kind:'ranking'}])`))),{ranking:['新作']});
+ // Negative completion labels must not advertise or invent a completed status.
+ for (const label of ['未完结','未完結','uncompleted','unfinished','not completed','not yet finished','连载 / 完结']) {
+  assert.equal(await h.run(`__cialloDiscoverCompletedLabel(${JSON.stringify(label)})`),false,label);
+  const capabilities=await h.run(`__cialloDiscoverCapabilities([{label:${JSON.stringify(label)},kind:'ranking'}])`);
+  assert(!capabilities.ranking?.includes('完结'),label);
+ }
+ await h.run(`globalThis.negativeFeed={explore:[{title:'未完结',type:'multiPageComicList',load:async()=>({comics:[{id:'serial',title:'仍在连载'}],maxPage:1})}]}`);
+ const negative=await h.run(`__cialloDiscover(negativeFeed,{dimension:'ranking',range:'热门',feedId:'native',page:1})`);
+ assert.equal(negative.entries[0].status,null,'A negative feed name must not fabricate completion');
+ for (const label of ['已完结','完結排行','Completed ranking','Finished']) assert.equal(await h.run(`__cialloDiscoverCompletedLabel(${JSON.stringify(label)})`),true,label);
+ await h.run(`globalThis.completedFeed={explore:[{title:'完结排行',type:'singlePageWithMultiPart',load:async()=>({'精选':[{id:'end',title:'已完结作品'}],'未完结':[{id:'serial',title:'仍在连载'}]})}]}`);
+ const completedParts=await h.run(`__cialloDiscover(completedFeed,{dimension:'ranking',range:'完结',page:1})`);
+ assert.deepEqual([...completedParts.entries.map(e=>e.id)],['end'],'Generic sections inherit a proven completed parent, negative sections do not');
+ assert.equal(completedParts.entries[0].status,'完结');
  // Native option values are opaque: choose matching labels, retaining negative keys and the right window.
  await h.run(`globalThis.fake={key:'fixture',category:{parts:[{name:'题材',categories:['奇幻'],categoryParams:['fantasy']}]},categoryComics:{optionList:[{options:['-day-日点击','-week-周点击','-month-月点击']},{options:['all-全部','ongoing-连载','completed-完结']}],load:async(c,p,o,page)=>{globalThis.actualOptions=o;return {comics:[{id:'one',title:'结果',clicks:100}],maxPage:1}}}}`);
  for(const [range,key] of [['周','-week'],['月','-month']]){
