@@ -25,7 +25,7 @@ class Wenku8LibrarySource(
     client: OkHttpClient? = null
 ) : UpdatableNovelSource {
     override val id = "wenku8_library"
-    override val name = "轻小说中文文库"
+    override val name = "Wenku8 Library"
     override suspend fun getShareUrl(bookId: String): String {
         bookUrl(bookId)
         return baseUrl.newBuilder().addPathSegment("books").addPathSegment(bookId).build().toString()
@@ -45,10 +45,10 @@ class Wenku8LibrarySource(
     private suspend fun json(url: HttpUrl): JSONObject {
         val request = Request.Builder().url(url).header("Accept", "application/json")
             .header("Referer", baseUrl.toString()).build()
-        return http.newCall(request).executeCancellable().use { response ->
+        return guestNovelIoRetry { http.newCall(request).executeCancellable().use { response ->
             if (!response.isSuccessful) throw SourceException.NetworkError("中文文库返回 HTTP ${response.code}")
             SourceResponse.jsonObject(response.readSourceText())
-        }
+        } }
     }
     private fun book(data: JSONObject): SearchBook {
         val bookId = data.optLong("id").toString()

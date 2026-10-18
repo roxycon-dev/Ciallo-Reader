@@ -1,6 +1,7 @@
 package com.example.data.favorite
 
 import com.example.source.ComicChapter
+import com.example.source.ComicChapterTitle
 import com.example.source.anilist.TitleNormalizer
 import java.text.Normalizer
 
@@ -42,32 +43,10 @@ object ComicChapterMatching {
         volume(a).isBlank() || volume(b).isBlank() || volume(a) == volume(b)
 
     private fun number(raw: String): String? {
-        val title = Regex("第\\s*([零〇一二两兩三四五六七八九十百千]+)\\s*([话話回章])")
-            .replace(Normalizer.normalize(raw, Normalizer.Form.NFKC).trim()) { match ->
-                chineseNumber(match.groupValues[1])?.let { "第$it${match.groupValues[2]}" } ?: match.value
-            }
-        if (Regex("(?i)番外|特別|特别|extra|special|omake|附录|附錄|上篇|下篇|前篇|后篇|後篇|上半|下半|part|[（(]\\s*[上下前后後]\\s*[）)]").containsMatchIn(title)) return null
-        val explicit = Regex("(?i)第\\s*(\\d+(?:\\.\\d+)?)\\s*[话話回章]|(?<![\\p{L}\\p{N}])(?:chapter\\s*|ch\\.?\\s*|episode\\s*|ep\\.?\\s*)(\\d+(?:\\.\\d+)?)").find(title)
-        val bare = Regex("^(\\d+(?:\\.\\d+)?)(?:$|\\s|[话話回章:：])").find(title)
-        val value = explicit?.groupValues?.drop(1)?.firstOrNull { it.isNotBlank() } ?: bare?.groupValues?.get(1) ?: return null
-        return value.takeIf { it.length <= 16 }?.toBigDecimalOrNull()?.stripTrailingZeros()?.toPlainString()
-    }
-
-    private fun chineseNumber(raw: String): Int? {
-        val digits = mapOf('零' to 0, '〇' to 0, '一' to 1, '二' to 2, '两' to 2, '兩' to 2,
-            '三' to 3, '四' to 4, '五' to 5, '六' to 6, '七' to 7, '八' to 8, '九' to 9)
-        if (raw.all { it in digits }) return raw.map { digits.getValue(it) }.joinToString("").toIntOrNull()
-        var total = 0
-        var current = 0
-        for (char in raw) {
-            val digit = digits[char]
-            if (digit != null) current = digit else {
-                val unit = when (char) { '十' -> 10; '百' -> 100; '千' -> 1000; else -> return null }
-                total += (if (current == 0) 1 else current) * unit
-                current = 0
-            }
-        }
-        return total + current
+        val title = Normalizer.normalize(raw, Normalizer.Form.NFKC).trim()
+        if (Regex("(?i)上篇|下篇|前篇|后篇|後篇|上半|下半|part|[（(]\\s*[上下前后後]\\s*[）)]").containsMatchIn(title)) return null
+        val withoutVolume = title.replace(Regex("(?i)^(?:第\\s*\\d+\\s*[卷巻]|vol(?:ume)?\\.?\\s*\\d+)\\s+"), "")
+        return ComicChapterTitle.numberText(withoutVolume)
     }
 }
 

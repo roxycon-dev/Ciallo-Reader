@@ -30,7 +30,7 @@ class IxdzsSource(
     override val capabilities = SourceCapabilities(supportEbook = true)
     private val http = client ?: JsSourceProxy.failoverClient(context.applicationContext,
         SharedHttpTransport.builder().connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS).callTimeout(30, TimeUnit.SECONDS).build())
+            .readTimeout(30, TimeUnit.SECONDS).callTimeout(60, TimeUnit.SECONDS).build())
     private data class Detail(val at: Long, val book: SearchBook, val download: String)
     private val cache = LruCache<String, Detail>(16)
     private val mutex = Mutex()
@@ -42,12 +42,12 @@ class IxdzsSource(
     private suspend fun page(url: HttpUrl): org.jsoup.nodes.Document {
         val request = Request.Builder().url(url).header("Referer", baseUrl.toString())
             .header("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/139.0.0.0 Mobile Safari/537.36").build()
-        return http.newCall(request).executeCancellable().use { response ->
+        return guestNovelIoRetry { http.newCall(request).executeCancellable().use { response ->
             if (!response.isSuccessful) throw SourceException.NetworkError("爱下电子书返回 HTTP ${response.code}")
             val html = response.readSourceText()
             SourceResponse.problem(html)?.let { throw SourceException.ParseError(it) }
             Jsoup.parse(html, url.toString())
-        }
+        } }
     }
     private suspend fun detail(bookId: String, fresh: Boolean = false): Detail = mutex.withLock {
         cache[bookId]?.takeIf { !fresh && SystemClock.elapsedRealtime() - it.at < 60_000 } ?: run {

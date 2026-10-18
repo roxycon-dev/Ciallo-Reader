@@ -11,6 +11,7 @@ Read local ebooks, novels, and comics in one Android app.
 
 [🌐 Product site](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ Download the latest APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
+[1.4.8 release notes](docs/release-1.4.8-2026-10-19.md) ·
 [See screenshots](#screenshots) ·
 [Features](#features) ·
 [Report an issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -24,7 +25,11 @@ Read local ebooks, novels, and comics in one Android app.
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
 
-**1.4.7 / 230** adds anonymous Xipi and 19 Manga sources with native categories, status filters, sorting and pagination. Verified online reading, complete chapter downloads and offline image decoding for Money-First Hero 180.5, SPY×FAMILY 141, Frieren 147 and One Piece 1195. Includes the 1.4.6 transfer merge fixes. See the [release notes](docs/release-1.4.7-2026-10-18.md).
+**1.4.8 / 231** adds three sources that require no account: **全本小说网 (Quanben)**, **话本小说 (Huaben)** and **SF轻小说 (SFACG)**. Download complete EPUBs with inline illustrations for offline reading. Existing source labels become **Novelia** and **Wenku8 Library**. Integrity checks reject detected chapter gaps, invalid text, missing images and known placeholder content before import. This release also includes favorite cover and fractional manga episode label fixes. See the [release notes and download](docs/release-1.4.8-2026-10-19.md).
+
+The three new sources were checked through search, whole-book download, import and the production reader using public sample books. They provide offline EPUB reading; locked chapters prevent whole-book export. Generated EPUB downloads restart after a pause. All 31 executed Android tests and 22 JVM regression tests passed; two experimental source tests remain explicitly ignored. These samples do not establish coverage of every title, source-text completeness or updates matching every original platform. See the [verification report](docs/novel-guest-sources-verification-2026-10-19.md).
+
+1.4.7 added anonymous Xipi and 19 Manga sources with native categories, status filters, sorting and pagination, plus the transfer merge fixes. Previous chapter checks are recorded in the [1.4.7 release notes](docs/release-1.4.7-2026-10-18.md).
 
 Enable **嬉皮漫画 (Xipi)** for Money-First Hero and choose the original chapter title **鹰身女妖&天使** for episode 180.5. Use **19漫画 (19 Manga)** for the other three titles. Native category labels and routes are read from the sites, then mapped to the app's shared taxonomy. Verification reflects availability on 2026-10-18; see the [source audit](docs/latest-comic-source-verification-2026-10-18.md) for episode identity, page counts and scope.
 

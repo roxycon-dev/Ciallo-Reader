@@ -1,6 +1,7 @@
 package com.example.data.favorite
 
 import com.example.source.ComicChapter
+import com.example.source.ComicChapterTitle
 
 /**
  * 漫画阅读顺序 / 续读定位 / 章节状态的**纯函数**集合（无 Android 依赖、可单测）。
@@ -20,8 +21,8 @@ data class OrderedChapter(
     val order: Int,
     val chapter: ComicChapter,
     val orderKey: Float,
-    /** 从标题里解析出的话数（用于「继续阅读 · 第12话」文案）；解析不到则为序号+1 */
-    val displayNumber: Int,
+    /** 只有明确的整数话数才有值；特殊条目及小数话数用原题/精确标签显示。 */
+    val displayNumber: Int?,
 )
 
 object ComicReadingLogic {
@@ -47,7 +48,7 @@ object ComicReadingLogic {
                 order = order,
                 chapter = chapter,
                 orderKey = orderKey(chapter, rawIndex, hasSourceOrder),
-                displayNumber = chapterNumber(chapter.title) ?: (order + 1),
+                displayNumber = chapterNumber(chapter.title),
             )
         }
     }
@@ -65,8 +66,8 @@ object ComicReadingLogic {
 
     /** 从「第 12 话 / 第12话 / 12話 / Chapter 12」等标题里取话数。 */
     fun chapterNumber(title: String): Int? {
-        val m = Regex("""(\d+(?:\.\d+)?)""").find(title) ?: return null
-        return m.groupValues[1].toFloatOrNull()?.toInt()
+        val number = ComicChapterTitle.number(title) ?: return null
+        return try { number.intValueExact() } catch (_: ArithmeticException) { null }
     }
 
     /**
@@ -97,7 +98,7 @@ object ComicReadingLogic {
     }
 
     private fun chapterDecimal(title: String): java.math.BigDecimal? =
-        Regex("""(\d+(?:\.\d+)?)""").find(title)?.value?.takeIf { it.length<=64 }?.toBigDecimalOrNull()
+        ComicChapterTitle.number(title)
 
     /** 已读判定：最后一页 或 进度 ≥ 90%。 */
     fun isFinished(pageIndex: Int, pageCount: Int): Boolean {
@@ -157,14 +158,14 @@ object ComicReadingLogic {
     /** 「继续阅读」按钮文案（带上下文）。 */
     fun continueLabel(target: ContinueTarget, chapters: List<ComicChapter>): String {
         val seq = ordered(chapters)
-        fun number(index: Int): Int = seq.getOrNull(index)?.displayNumber ?: (index + 1)
+        fun label(index: Int): String = seq.getOrNull(index)?.chapter?.title?.let(ComicChapterTitle::label) ?: "未命名章节"
         return when (target) {
             ContinueTarget.Start -> "开始阅读"
             is ContinueTarget.Resume -> {
                 val page = (target.pageIndex + 1).coerceAtLeast(1)
-                "继续阅读 · 第${number(target.chapterIndex)}话 · 第${page}页"
+                "继续阅读 · ${label(target.chapterIndex)} · 第${page}页"
             }
-            is ContinueTarget.Next -> "继续阅读 · 第${number(target.chapterIndex)}话"
+            is ContinueTarget.Next -> "继续阅读 · ${label(target.chapterIndex)}"
             ContinueTarget.UpToDate -> "已读到最新"
         }
     }

@@ -428,11 +428,9 @@ fun ComicChaptersScreen(
                                         )
                                     ) {
                                         if (cont != null) {
-                                            val num = ComicReadingLogic.chapterNumber(cont.first.title)
-                                                ?: (ordered.indexOfFirst { it.chapter.id == cont.first.id } + 1)
-                                            append("第 $num 话 · P${cont.second + 1}")
+                                            append("${com.example.source.ComicChapterTitle.label(cont.first.title)} · P${cont.second + 1}")
                                         } else {
-                                            append("第 1 话")
+                                            append(ordered.firstOrNull()?.chapter?.title?.let(com.example.source.ComicChapterTitle::label) ?: "开始阅读")
                                         }
                                     }
                                 },
@@ -683,8 +681,6 @@ fun ComicChaptersScreen(
                                 val pageCount = st?.pageCount?.takeIf { it > 0 }
                                     ?: if (progress?.lastChapterId == chapter.id) progress.lastPageCount else 0
                                 ChapterCardSpec(
-                                    number = ComicReadingLogic.chapterNumber(chapter.title)
-                                        ?: (entry.order + 1),
                                     title = chapter.title,
                                     visual = visual,
                                     lastPage = pageIndex,
@@ -794,7 +790,6 @@ private fun QuickPill(text: String, onClick: () -> Unit) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChapterCardSpec(
-    number: Int,
     title: String,
     visual: com.example.ui.favorite.ChapterVisual,
     lastPage: Int,
@@ -953,11 +948,14 @@ private fun ChapterCardSpec(
 
             // 中列
             Column(modifier = Modifier.weight(1f)) {
-                val caption = when {
-                    isCurrent && pageCount > 0 -> "第 $number 话 · 读到 ${lastPage + 1} / $pageCount 页"
-                    isRead -> "第 $number 话 · 已读"
-                    else -> "第 $number 话" + if (isNew) " · 新" else ""
+                val label = com.example.source.ComicChapterTitle.numberText(title)?.let { "第 $it 话" }
+                val status = when {
+                    isCurrent && pageCount > 0 -> "读到 ${lastPage + 1} / $pageCount 页"
+                    isRead -> "已读"
+                    isNew -> "新"
+                    else -> "未读"
                 }
+                val caption = listOfNotNull(label, status).joinToString(" · ")
                 Text(
                     text = caption,
                     fontSize = 12.sp,

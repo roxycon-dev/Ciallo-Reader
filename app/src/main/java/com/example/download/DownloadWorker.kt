@@ -25,6 +25,7 @@ import kotlinx.coroutines.sync.withPermit
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -103,7 +104,19 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                 dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), total, null)
                 // Failed imports can be retried from the completed file without consuming another download.
                 val metadata = runCatching { JSONObject(resume.readText()) }.getOrNull()
+                var guestIntegrityChecked = false
                 if (!(finalFile.isFile && metadata?.optString("url") == task.downloadUrl && metadata.optBoolean("complete"))) {
+                    val publicNovel = com.example.source.impl.PublicNovelSources.create(context, task.sourceId)
+                    if (publicNovel != null) {
+                        require(format == "epub") { "此源整本下载格式为 EPUB" }
+                        GuestNovelEpub.write(publicNovel, task.downloadUrl, temp) { completed, count ->
+                            currentCoroutineContext().ensureActive()
+                            DownloadProgressBroadcaster.updateState(taskId,
+                                DownloadState.Downloading(temp.length(), 0L, completed.toFloat() / count))
+                            dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), 0L, null)
+                        }
+                        resume.writeText(JSONObject().put("url", task.downloadUrl).put("complete", false).toString())
+                    } else {
                     var offset = temp.takeIf { it.isFile }?.length() ?: 0L
                     val validator = metadata?.optString("validator")?.takeIf { it.isNotBlank() }
                     if (metadata?.optString("url") != task.downloadUrl || validator == null) offset = 0L
@@ -121,7 +134,9 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                             // A 416 is not proof of file completeness. Restart safely once.
                             if (response.code == 416 && offset > 0 && !rangeRestarted) return@withResponse true
                             require(response.isSuccessful) { when (response.code) {
-                                401, 403 -> "下载授权已失效，请重新登录或重新获取链接（HTTP ${response.code}）"
+                                401, 403 -> if (com.example.source.WholeBookNovelSources.contains(task.sourceId))
+                                    "源站拒绝免登录下载，请稍后重试或换源（HTTP ${response.code}）"
+                                    else "下载授权已失效，请重新登录或重新获取链接（HTTP ${response.code}）"
                                 429 -> "请求过于频繁，请稍后重试（HTTP 429）"
                                 else -> "下载失败（HTTP ${response.code}）"
                             } }
@@ -190,9 +205,12 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                             } finally { text.delete() }
                         }
                     }
+                    }
                     val integrity = DownloadFileValidator.validateFileIntegrity(temp, format)
                     require(integrity.valid) { integrity.htmlErrorHint ?: "下载文件格式校验失败" }
                     val actualFormat = integrity.actualFormat ?: format
+                    verifyGuestNovel(temp, task.sourceId, actualFormat, task.downloadUrl)
+                    guestIntegrityChecked = true
                     val actualFile = File(downloads, "${finalFile.nameWithoutExtension}.$actualFormat")
                     check(!actualFile.exists() || actualFile.delete()) { "无法替换旧下载文件" }
                     check(temp.renameTo(actualFile)) { "无法保存下载文件" }
@@ -206,6 +224,7 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                 val integrity = DownloadFileValidator.validateFileIntegrity(file, latest.format)
                 require(integrity.valid) { "下载文件损坏，请重新下载" }
                 latest = latest.copy(format = integrity.actualFormat ?: latest.format)
+                if (!guestIntegrityChecked) verifyGuestNovel(file, task.sourceId, latest.format, task.downloadUrl)
                 val novelStore = NovelDownloadStore(context)
                 val novel = novelStore.pending(taskId)?.takeIf {
                     com.example.source.WholeBookNovelSources.contains(task.sourceId) && it.book.sourceId == task.sourceId &&
@@ -288,6 +307,26 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
             chain.proceed(safe)
         }.build()
         return guarded.newCall(request).executeCancellable().use { block(it) }
+    }
+
+    private suspend fun verifyGuestNovel(file: File, sourceId: String, format: String, downloadUrl: String) {
+        if (!com.example.source.WholeBookNovelSources.contains(sourceId)) return
+        if (format == "epub") {
+            val summary = GuestNovelIntegrity.epub(file)
+            if (sourceId == "auto_novel") {
+                val path = downloadUrl.toHttpUrl().pathSegments
+                require(path.size >= 5 && path[0] == "api" && path[1] == "novel" && path[4] == "file") { "Novelia 下载地址异常" }
+                val toc = when (val result = com.example.source.impl.AutoNovelSource(context).getChapters(path[2] + "/" + path[3])) {
+                    is com.example.source.SourceResult.Success -> result.data
+                    is com.example.source.SourceResult.Error -> throw result.exception
+                }
+                fun compact(value: String) = value.filterNot(Char::isWhitespace)
+                require(summary.titles.map(::compact) == toc.map { compact(it.title) }) {
+                    "Novelia 下载文件与完整目录不一致，未导入缺章或乱序译本"
+                }
+            }
+        } else if (format == "txt") GuestNovelIntegrity.text(file)
+        else error("小说下载格式不完整或不受支持")
     }
 
     private fun isHtmlError(response: Response, format: String): Boolean {

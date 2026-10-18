@@ -99,6 +99,12 @@ class JsChapterOrderTest {
         assertEquals(titles(raw), titles(JsChapterOrder.normalize(raw, "unknown")))
     }
 
+    @Test fun datedNoticesDoNotHideTheDescendingEpisodeTrend() {
+        val raw = listOf(ch("2026 停更公告"), ch("第3话"), ch("10 休刊通知"),
+            ch("第2话"), ch("第1话"), ch("1 请假公告"))
+        assertEquals(titles(raw.reversed()), titles(JsChapterOrder.normalize(raw, "unknown")))
+    }
+
     @Test fun inconsistentTitlesAreNotNumericallyResorted() {
         val raw = listOf(ch("第4话"), ch("第1话"), ch("第3话"), ch("第2话"))
         assertEquals(titles(raw), titles(JsChapterOrder.normalize(raw, "unknown")))

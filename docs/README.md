@@ -8,6 +8,10 @@
 
 ## 内容
 
+- [Ciallo Reader 1.4.8 发布说明与下载](release-1.4.8-2026-10-19.md)
+- [收藏封面与漫画回数识别修复](favorite-covers-chapter-labels-2026-10-18.md)
+- [Ciallo Reader 1.4.8 中文小说免登录源验收](novel-guest-sources-verification-2026-10-19.md)
+- [中文小说书源候选调查](novel-source-candidates-2026-10-18.md)
 - [Ciallo Reader 1.4.7 漫画源与动态分类](release-1.4.7-2026-10-18.md)
 - [四部漫画最新话查源与验收](latest-comic-source-verification-2026-10-18.md)
 - [Ciallo Reader 1.4.6 合并去重修复](release-1.4.6-2026-10-18.md)

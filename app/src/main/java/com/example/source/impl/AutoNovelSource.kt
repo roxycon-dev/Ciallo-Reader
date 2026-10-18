@@ -25,7 +25,7 @@ class AutoNovelSource(
     client: OkHttpClient? = null
 ) : ComicSource, UpdatableNovelSource {
     override val id = "auto_novel"
-    override val name = "轻小说机翻机器人"
+    override val name = "Novelia"
     override suspend fun getShareUrl(bookId: String): String {
         path(bookId) // Reuse the source's identity validation.
         return baseUrl.newBuilder().addPathSegments("novel/$bookId").build().toString()
@@ -56,11 +56,11 @@ class AutoNovelSource(
         val request = Request.Builder().url(url).header("Accept", "application/json")
             .header("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/119.0.0.0 Mobile Safari/537.36")
             .header("Referer", baseUrl.toString()).build()
-        return http.newCall(request).executeCancellable().use { response ->
-            if (response.code == 401) throw SourceException.LoginRequired
+        return guestNovelIoRetry { http.newCall(request).executeCancellable().use { response ->
+            if (response.code == 401) throw SourceException.NetworkError("Novelia 当前未开放免登录访问（HTTP 401），请稍后重试或换源")
             if (!response.isSuccessful) throw SourceException.NetworkError("轻小说源返回 HTTP ${response.code}")
             SourceResponse.jsonObject(response.readSourceText())
-        }
+        } }
     }
 
     private suspend fun detail(bookId: String, fresh: Boolean = false): JSONObject = metadataMutex.withLock {

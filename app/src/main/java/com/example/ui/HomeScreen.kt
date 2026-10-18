@@ -1911,6 +1911,7 @@ fun HomeScreen(
                                     val favSelected = favKey in shelfSelection.selected
                                     com.example.ui.favorite.FavoriteCard(
                                         item = item,
+                                        source = favoriteShareSource(item.favorite.sourceId),
                                         onClick = { onOpenFavorite(item) },
                                         modifier = Modifier
                                             .animateItem(

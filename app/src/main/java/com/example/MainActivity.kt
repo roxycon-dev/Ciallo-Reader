@@ -1549,7 +1549,7 @@ class MainActivity : ComponentActivity() {
                                 downloadProgress = comicDownloadProgress,
                                 pausedChapters = comicPaused,
                                 textMode = comicIsTextMode,
-                                onDownloadNovel = if (comicBook?.sourceId == "auto_novel") ({
+                                onDownloadNovel = if (comicIsTextMode && com.example.source.WholeBookNovelSources.contains(comicBook?.sourceId)) ({
                                     comicBook?.let { libraryViewModel.startDownload(it, "epub") }
                                     AppToast.makeText(comicContext, "已请求整本下载，可在下载管理查看进度", Toast.LENGTH_SHORT).show()
                                 }) else null,

@@ -1,18 +1,15 @@
 package com.example.source.js
 
 import com.example.source.ComicChapter
+import com.example.source.ComicChapterTitle
 import java.math.BigDecimal
 import java.text.Normalizer
 
 /** Convert a JS catalogue to reading order once, before caching or handing it to consumers. */
 internal object JsChapterOrder {
     private const val numeral = "[0-9零〇一二两兩三四五六七八九十百千]+(?:\\.[0-9]+)?"
-    private val episode = Regex("^(?:第\\s*)?($numeral)\\s*[话話章回]")
-    private val englishEpisode = Regex("^(?:chapter|ch\\.?|episode|ep\\.?)\\s*([0-9]+(?:\\.[0-9]+)?)(?=$|\\s|[:：.(（-])", RegexOption.IGNORE_CASE)
-    private val bareEpisode = Regex("^([0-9]+(?:\\.[0-9]+)?)(?=$|\\s|[:：])")
     private val volume = Regex("^(?:(?:单行本|單行本)\\s*)?(?:第\\s*)?($numeral)\\s*[卷巻册冊]$")
     private val englishVolume = Regex("^(?:vol(?:ume)?\\.?|book)\\s*([0-9]+)$", RegexOption.IGNORE_CASE)
-    private val special = Regex("番外|特別|特别|附录|附錄|extra|special|omake", RegexOption.IGNORE_CASE)
 
     fun normalize(
         chapters: List<ComicChapter>,
@@ -89,13 +86,7 @@ internal object JsChapterOrder {
 
     private fun episodeNumber(raw: String): BigDecimal? {
         val title = clean(raw)
-        if (special.containsMatchIn(title)) return null
-        val token = episode.find(title)?.groupValues?.get(1)
-            ?: englishEpisode.find(title)?.groupValues?.get(1)
-            ?: volume.matchEntire(title)?.groupValues?.get(1)
-            ?: englishVolume.matchEntire(title)?.groupValues?.get(1)
-            ?: bareEpisode.find(title)?.groupValues?.get(1)
-        return token?.let(::number)
+        return ComicChapterTitle.number(title) ?: volumeNumber(title)
     }
 
     private fun volumeNumber(raw: String): BigDecimal? {

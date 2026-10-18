@@ -16,6 +16,8 @@
 - `DownloadTaskEntity.kt`
 - `DownloadTransferPolicy.kt`
 - `DownloadWorker.kt`
+- `GuestNovelEpub.kt`：逐章生成含插图的 EPUB，任一章失败不入库
+- `GuestNovelIntegrity.kt`：公开小说的文件 CRC、正文/插图引用、编码及可检测缺章检查
 - `NovelDownloadStore.kt`
 - 其余 2 项按名称和同层模块组织。
 

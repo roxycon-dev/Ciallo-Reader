@@ -8,10 +8,12 @@
 
 ## 内容
 - `AutoNovelSource.kt`
+- `GuestNovelTransport.kt`：公开请求的一次可取消网络重试
 - `IxdzsSource.kt`
 - `JsonBookSource.kt`
 - `MangaDexSource.kt`
 - `MockBookSource.kt`
+- `PublicNovelSource.kt`：全本小说网、话本小说、SF轻小说的免登录公开正文；未通过整本审计的适配不注册
 - `README.md`
 - `Wenku8LibrarySource.kt`
 

@@ -24,7 +24,7 @@ data class NovelInfo(
 
 /** Only these public whole-book sources opt into novel UI and update handling. */
 object WholeBookNovelSources {
-    val ids = setOf("auto_novel", "wenku8_library", "ixdzs8")
+    val ids = setOf("auto_novel", "wenku8_library", "ixdzs8") + com.example.source.impl.PublicNovelSources.ids
     fun contains(id: String?) = id in ids
 }
 

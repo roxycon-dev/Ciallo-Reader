@@ -53,7 +53,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -62,7 +61,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.example.data.CategoryEntity
 import com.example.data.favorite.ComicReadingLogic
 import com.example.data.favorite.FavoriteItem
@@ -113,6 +111,7 @@ fun FavoritesPanel(
     /** 多选态：显示左上角圆形勾选框 */
     isSelecting: Boolean = false,
     selectedKeys: Set<String> = emptySet(),
+    sourceOf: (String) -> com.example.source.BookSource? = { null },
 ) {
     val filtered = remember(items, selectedCategory) {
         if (selectedCategory == ALL_FAV_CATEGORY) items
@@ -234,6 +233,7 @@ fun FavoritesPanel(
                 items(items = sorted, key = { it.key }) { item ->
                     FavoriteCard(
                         item = item,
+                        source = sourceOf(item.favorite.sourceId),
                         onClick = { onItemClick(item) },
                         // 排序/筛选变化时条目是"挪过去"的，不是瞬间重排
                         modifier = itemBounds(item.key).animateItemPlacement(),
@@ -286,6 +286,7 @@ fun FavoriteCard(
     pressed: Boolean = false,
     /** 封面几何登记：归位动画的落点依据（与书架书卡同一套机制） */
     coverModifier: Modifier = Modifier,
+    source: com.example.source.BookSource? = null,
 ) {
     val fav = item.favorite
     val cardAlpha by animateFloatAsState(
@@ -299,6 +300,9 @@ fun FavoriteCard(
         label = "fav_card_press",
     )
     val latestNum = ComicReadingLogic.chapterNumber(fav.latestChapterTitle.orEmpty())
+    val latestLabel = fav.latestChapterTitle?.takeIf { it.isNotBlank() }?.let { title ->
+        com.example.source.ComicChapterTitle.numberText(title)?.let { "更新至第 $it 话" } ?: "最新：$title"
+    }
     val readNum = (item.progress?.lastChapterIndex ?: -1).let { if (it >= 0) it + 1 else 0 }
     // 「有更新」= 快照 id 与已见快照不同。⚠️ 要再加一道话数兜底：
     // 有的源每次拉取 chapterId 都不同（URL 带时间戳/hash），裸 id 比较会让
@@ -343,15 +347,11 @@ fun FavoriteCard(
                     )
                 ),
         ) {
-            val cover = fav.localThumbPath ?: fav.coverUrl
-            if (!cover.isNullOrBlank()) {
-                AsyncImage(
-                    model = cover,
-                    contentDescription = fav.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
+            FavoriteCover(
+                local = fav.localThumbPath, remote = fav.coverUrl,
+                sourceId = fav.sourceId, source = source, title = fav.title,
+                modifier = Modifier.fillMaxSize(),
+            )
             // 更新角标
             if (hasUpdate) {
                 Box(
@@ -441,8 +441,8 @@ fun FavoriteCard(
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = buildString {
-                if (latestNum != null) append("更新至第 ${latestNum} 话")
-                if (readNum > 0) append(if (latestNum != null) " · 看到第 ${readNum} 话" else "看到第 ${readNum} 话")
+                if (latestLabel != null) append(latestLabel)
+                if (readNum > 0) append(if (latestLabel != null) " · 读到目录第 ${readNum} 项" else "读到目录第 ${readNum} 项")
                 if (isEmpty()) append(if (dead) "来源暂不可用" else "尚未开始阅读")
             },
             fontSize = 10.sp,

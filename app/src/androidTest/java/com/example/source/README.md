@@ -10,6 +10,9 @@
 - `js/`
 - `AutoNovelSourceDeviceTest.kt`
 - `IxdzsSourceDeviceTest.kt`
+- `PublicNovelSourceDeviceTest.kt`：真实搜索、正式 WorkManager 整本下载、Room 入库及逐段内容核对；使用 `livePublicNovel=true`
+- `GuestNovelIntegrityDeviceTest.kt`：缺章、空章、乱码和损坏/缺失插图的拒绝路径
+- `PublicNovelReaderDeviceTest.kt`：下载后实际本地阅读器显示与截图；须先完成实网下载用例
 - `NovelSearchInteractionDeviceTest.kt`
 - `README.md`
 - `SourceIsolationDeviceTest.kt`

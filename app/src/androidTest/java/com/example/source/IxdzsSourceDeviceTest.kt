@@ -105,6 +105,60 @@ class IxdzsSourceDeviceTest {
         } finally { file.delete() }
     }
 
+    @Test fun liveCompleteGuestBookPreservesWholeText() = runBlocking {
+        if (androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("liveNovel") != "true") return@runBlocking
+        withTimeout(180_000) {
+            val context = context()
+            val source = IxdzsSource(context)
+            val book = value(source.search("朝花夕拾")).first { it.id == "1857" }
+            assertEquals("晚若", book.author)
+            assertFalse(source.requiresLogin)
+            val detail = value(source.getDetail(book.id))
+            val info = value(source.getDownloadInfo(detail.id))
+            val resource = book.id + "#audit-" + System.nanoTime()
+            val taskId = DownloadManager.taskId(source.id, resource)
+            val manager = DownloadManager(context)
+            manager.enqueueDownload(DownloadRequest(resource, book.title, book.author, source.id, info.url, info.format), info.referer, info.headers)
+            val task = manager.allTasksFlow.first { rows -> rows.any { it.id == taskId && it.status in setOf(DownloadStatus.COMPLETED, DownloadStatus.FAILED) } }.first { it.id == taskId }
+            assertEquals(task.errorMessage, DownloadStatus.COMPLETED, task.status)
+            val db = AppDatabase.getDatabase(context)
+            val local = db.bookDao().getBookBySourceResource(source.id, resource) ?: error("TXT 未进入书架")
+            val chapters = db.bookDao().getChaptersListForBook(local.id)
+            val sourceText = File(task.filePath).readText()
+            val offline = chapters.joinToString("\n") { it.content }
+            assertFalse(offline.contains('\uFFFD'))
+            val heading = Regex("^第[0-9一二三四五六七八九十百千万]+[章回卷节\\s].*")
+            fun normalized(text: String) = text.lineSequence().filterNot { heading.matches(it.trim().removePrefix("\uFEFF")) }
+                .joinToString("").filterNot(Char::isWhitespace)
+            assertEquals("TXT 正文在本地阅读器入库后必须逐字保留", normalized(sourceText), normalized(offline))
+            assertTrue(chapters.isNotEmpty() && offline.count { it in '\u4e00'..'\u9fff' } > 10_000)
+            val report = JSONObject().put("source", source.id).put("title", book.title).put("author", book.author)
+                .put("bookId", book.id).put("offlineChapters", chapters.size).put("bytes", File(task.filePath).length())
+                .put("allTextPreserved", true).put("login", false).put("status", "search_download_room_offline_whole_text_passed")
+            File(context.filesDir, "public-novel-ixdzs8-audit.json").writeText(report.toString())
+        }
+    }
+
+    @Test fun liveSourcePlaceholderCannotEnterBookshelf() = runBlocking {
+        if (androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("liveNovel") != "true") return@runBlocking
+        withTimeout(180_000) {
+            val context = context()
+            val source = IxdzsSource(context)
+            val book = value(source.getDetail("110953"))
+            val info = value(source.getDownloadInfo(book.id))
+            val resource = book.id + "#placeholder-audit-" + System.nanoTime()
+            val taskId = DownloadManager.taskId(source.id, resource)
+            val manager = DownloadManager(context)
+            manager.enqueueDownload(DownloadRequest(resource, book.title, book.author, source.id, info.url, info.format), info.referer, info.headers)
+            val task = manager.allTasksFlow.first { rows -> rows.any { it.id == taskId && it.status in setOf(DownloadStatus.COMPLETED, DownloadStatus.FAILED) } }.first { it.id == taskId }
+            assertEquals(DownloadStatus.FAILED, task.status)
+            assertTrue(task.errorMessage.orEmpty().contains("缺章占位"))
+            assertNull(AppDatabase.getDatabase(context).bookDao().getBookBySourceResource(source.id, resource))
+            File(context.filesDir, "ixdzs-placeholder-rejection.json").writeText(JSONObject()
+                .put("bookId", book.id).put("status", "rejected_placeholder_not_imported").put("reason", task.errorMessage).toString())
+        }
+    }
+
     @Test fun liveOngoingChineseNovelsDownloadAndReadAsOfflineTextBooks() = runBlocking {
         if (androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("liveNovel") != "true") return@runBlocking
         withTimeout(240_000) {
@@ -133,6 +187,14 @@ class IxdzsSourceDeviceTest {
                     info.url, info.format), info.referer, info.headers)
                 val task = manager.allTasksFlow.first { tasks -> tasks.any { it.id == taskId &&
                     it.status in setOf(DownloadStatus.COMPLETED, DownloadStatus.FAILED) } }.first { it.id == taskId }
+                if (task.status == DownloadStatus.FAILED) {
+                    assertTrue("Only detected source-package defects may reject this audit: ${task.errorMessage}",
+                        listOf("缺章", "只有标题", "重复章节", "缺少开头", "缺章占位").any { task.errorMessage.orEmpty().contains(it) })
+                    assertNull("A rejected partial book must never enter the shelf", db.bookDao().getBookBySourceResource(source.id, auditBookId))
+                    row.put("status", "rejected_incomplete_source_package").put("reason", task.errorMessage)
+                    rows.put(row)
+                    continue
+                }
                 assertEquals(task.errorMessage, DownloadStatus.COMPLETED, task.status)
                 assertEquals("txt", task.format)
                 val file = File(task.filePath)
