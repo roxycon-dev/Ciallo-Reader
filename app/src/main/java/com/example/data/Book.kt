@@ -45,7 +45,7 @@ data class Book(
     var isCoverValid: Boolean = false
 }
 
-@Entity(tableName = "chapters")
+@Entity(tableName = "chapters", indices = [Index(value = ["bookId", "chapterOrder"])])
 data class Chapter(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val bookId: Int,

@@ -24,6 +24,19 @@ private val Context.godDataStore: DataStore<Preferences> by preferencesDataStore
  */
 class GodMomentSettingsStore(private val context: Context) {
 
+    suspend fun exportPortable(): org.json.JSONObject = org.json.JSONObject()
+        .put("ranking_style", rankingStyle.first().code)
+        .put("last_page_hint", hintCapsuleEnabled.first())
+        .put("gyro_parallax", gyroParallaxEnabled.first())
+
+    suspend fun importPortable(value: org.json.JSONObject) {
+        context.godDataStore.edit {
+            it[Keys.RANKING_STYLE] = GodRankingStyle.of(value.getString("ranking_style")).code
+            it[Keys.HINT_CAPSULE] = value.getBoolean("last_page_hint")
+            it[Keys.GYRO_PARALLAX] = value.getBoolean("gyro_parallax")
+        }
+    }
+
     private object Keys {
         val RANKING_STYLE = stringPreferencesKey("ranking_style")
         val HINT_CAPSULE = booleanPreferencesKey("last_page_hint")

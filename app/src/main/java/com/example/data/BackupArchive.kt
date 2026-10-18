@@ -16,13 +16,13 @@ import java.util.zip.ZipOutputStream
 
 /** Portable, streamed user data backup. Auth stores, models and active downloads are excluded. */
 internal object BackupArchive {
-    private val tables = listOf("books", "chapters", "bookmarks", "highlights", "categories",
+    internal val tables = listOf("books", "chapters", "bookmarks", "highlights", "categories",
         "reading_records", "reading_sessions", "favorites", "comic_progress", "comic_chapter_read",
         "favorite_categories", "god_moments")
     private val ownedNames = setOf("imports", "epub_images", "docx_images", "fb2_images", "mobi_images",
         "epub_covers", "fb2_covers", "mobi_covers", "comic_covers", "god_covers", "sample_comic", "chapter_catalogs")
     private fun owned(name: String) = name in ownedNames || name.startsWith("comics_") || name.startsWith("restored_") || name.startsWith("custom_poster_") || name.startsWith("custom_background_") || name.startsWith("custom_app_bg_") || name.startsWith("custom_font_")
-    private fun safeSetting(key: String): Boolean = !Regex("(?i)(cookie|token|password|credential|secret|api.?key|pin_|salt|auth)").containsMatchIn(key)
+    internal fun safeSetting(key: String): Boolean = !Regex("(?i)(cookie|token|password|credential|secret|api.?key|pin_|salt|auth)").containsMatchIn(key)
     private val settingTypes = buildMap<String, String> {
         listOf("reading_totals_reconciled_v1","first_line_indent","splash_pure_mode","auto_night_mode","blue_light_filter","preload_wifi_only","keep_screen_on","haptics_enabled","incognito_browsing_enabled","favorites_protected","multi_language_search","multi_language_online_lookup","show_overlay_header_footer","card_tweaks_migrated_v2","has_seen_onboarding","has_seen_welcome","has_configured_source","has_imported_local_book","has_imported_community_comics_v1","show_adult_sources","js_source_health_checked_v3").forEach { put(it,"boolean") }
         listOf("font_size","line_height","blue_light_alpha","tts_speed","tts_pitch","reader_brightness","card_blur_dp","card_corner_dp","card_tilt_deg","card_cam_mult","card_ripple_a","card_tint_mix","card_press_s","card_press_r","card_alpha").forEach { put(it,"float") }
@@ -30,7 +30,7 @@ internal object BackupArchive {
         listOf("total_read_time_seconds","legacy_unattributed_read_seconds").forEach { put(it,"long") }
         listOf("custom_splash_poster_uri","custom_app_background_uri","custom_font_path","js_source_repo_url","search_history_v1").forEach { put(it,"string") }
     }
-    private fun settingType(key: String) = settingTypes[key] ?: "long".takeIf { Regex("daily_read_time_\\d{4}-\\d{2}-\\d{2}").matches(key) }
+    internal fun settingType(key: String) = settingTypes[key] ?: "long".takeIf { Regex("daily_read_time_\\d{4}-\\d{2}-\\d{2}").matches(key) }
     private fun encode(value:Any?):JSONObject {
         val type=when(value) { is Boolean -> "boolean"; is Int -> "int"; is Long -> "long"; is Float -> "float"; is Set<*> -> "set"; else -> "string" }
         return JSONObject().put("type",type).put("value",if(value is Set<*>) org.json.JSONArray(value.toList()) else value)

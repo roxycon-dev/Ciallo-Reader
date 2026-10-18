@@ -239,8 +239,8 @@ data class AniListTitleEntity(
 )
 
 @Database(
-    entities = [Book::class, Chapter::class, Bookmark::class, Highlight::class, CategoryEntity::class, ReadingRecord::class, ReadingSession::class, com.example.download.DownloadTaskEntity::class, AniListTitleEntity::class, com.example.data.favorite.FavoriteEntity::class, com.example.data.favorite.ComicProgressEntity::class, com.example.data.favorite.ChapterReadEntity::class, com.example.data.favorite.FavoriteCategoryEntity::class, com.example.god.GodMomentEntity::class],
-    version = 12,
+    entities = [Book::class, Chapter::class, Bookmark::class, Highlight::class, CategoryEntity::class, ReadingRecord::class, ReadingSession::class, com.example.download.DownloadTaskEntity::class, AniListTitleEntity::class, com.example.data.favorite.FavoriteEntity::class, com.example.data.favorite.ComicProgressEntity::class, com.example.data.favorite.ChapterReadEntity::class, com.example.data.favorite.FavoriteCategoryEntity::class, com.example.god.GodMomentEntity::class, com.example.transfer.TransferIdentityEntity::class, com.example.transfer.TransferReceiptEntity::class],
+    version = 13,
     exportSchema = true
 )
 @TypeConverters(com.example.download.DownloadTypeConverters::class)
@@ -254,6 +254,14 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
+
+        val MIGRATION_12_13 = object : androidx.room.migration.Migration(12, 13) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS transfer_identities (localKey TEXT NOT NULL, stableId TEXT NOT NULL, PRIMARY KEY(localKey))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS transfer_receipts (packageId TEXT NOT NULL, importedAt INTEGER NOT NULL, PRIMARY KEY(packageId))")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_chapters_bookId_chapterOrder ON chapters(bookId,chapterOrder)")
+            }
+        }
 
         /** v5 -> v6：新增 reading_sessions 表，保留既有数据。 */
         val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
@@ -509,9 +517,14 @@ abstract class AppDatabase : RoomDatabase() {
                         LegacyDatabaseMigration(3), LegacyDatabaseMigration(4),
                         MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
                         MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
-                        MIGRATION_11_12
+                        MIGRATION_11_12, MIGRATION_12_13
                     )
                     
+                    .addCallback(object : RoomDatabase.Callback() {
+                        override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                            com.example.transfer.ImportJournal.recover(context.applicationContext, db)
+                        }
+                    })
                     .build()
                 INSTANCE = instance
                 instance

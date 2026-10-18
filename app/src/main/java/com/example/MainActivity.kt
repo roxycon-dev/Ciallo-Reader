@@ -101,6 +101,8 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         sharedDetail = com.example.library.SharedWorkLink.parse(intent.data)
+        com.example.transfer.TransferManager.sharedUri(intent)?.let { com.example.transfer.TransferManager.get(this).openShared(it) }
+        if(intent.getBooleanExtra("open_transfer",false)) com.example.transfer.TransferManager.get(this).show()
     }
 
     /**
@@ -132,6 +134,8 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         sharedDetail = com.example.library.SharedWorkLink.parse(intent.data)
+        com.example.transfer.TransferManager.sharedUri(intent)?.let { com.example.transfer.TransferManager.get(this).openShared(it) }
+        if(intent.getBooleanExtra("open_transfer",false)) com.example.transfer.TransferManager.get(this).show()
         com.example.data.AppUpdateManager.get(applicationContext)
         com.example.source.js.JsActivityTracker.register(this)
         // 启动看门狗：若"极致"画质在 20 秒内连续两次发生崩溃，自动降回"高"，
@@ -236,6 +240,16 @@ class MainActivity : ComponentActivity() {
             ) {
                 val renderQualityIdx by viewModel.renderQuality.collectAsStateWithLifecycle()
                 val renderQuality = com.example.ui.components.RenderQuality.of(renderQualityIdx)
+                CompositionLocalProvider(com.example.ui.components.LocalRenderQuality provides renderQuality) {
+                    com.example.transfer.TransferHost(viewModel.backupManager,viewModel::enablePrivacyMode) {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            libraryViewModel.sourceManager.reloadAfterTransfer()
+                            com.example.source.js.JsSourceRepo.loadCached(application,viewModel.prefs.showAdultSources).forEach {
+                                libraryViewModel.sourceManager.registerSource(it,defaultEnabled=true)
+                            }
+                        }
+                    }
+                }
                 val liquidGlass = if (renderQuality.realtimeGlass) rememberLiquidGlassProviderState() else null
 
                 // ── A1 系统字体缩放钳制 ────────────────────────────────────

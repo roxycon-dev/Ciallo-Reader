@@ -11,7 +11,7 @@
 
 [🌐 产品主页](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.4.2 更新说明与验证](docs/release-1.4.2-2026-10-17.md) ·
+[1.4.3 更新说明与验证](docs/release-1.4.3-2026-10-18.md) ·
 [查看截图](#界面预览) ·
 [全部功能](#功能亮点) ·
 [提交问题或建议](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -27,11 +27,17 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 **English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
 
-**1.4.2 / 225**：顶部上移并压缩留白，增加内容可视区域；优化发现榜单与状态分类联动，消除完结榜下的连载选项及新作下的重复状态层。 新作不等于完结；完结榜严格展示已确认完结的作品。沿用固定发布签名，详见 [验证记录](docs/release-1.4.2-2026-10-17.md)。
+**1.4.3 / 226**：新增设备互传与便携备份，支持按类别发送、合并导入、断点续传和分享 `.ciallo` 文件；重做卡片流转动效，精简页面文案。沿用固定发布签名。39 项自动测试通过，双机无线链路与第三方分享仍待真机验证，详见 [验证记录](docs/release-1.4.3-2026-10-18.md)。
 
 包含 1.3.11 的旧 Android API、玻璃弹窗清理、EPUB 路径兼容性和 Compose 状态订阅修复。
 
 ## 界面预览
+
+### 设备互传与备份
+
+<img src="./docs/screenshots/demo-transfer143.gif" width="360" alt="设备互传的卡片流转、进度与完成动效演示"/>
+
+以上为 Compose 界面状态演示，不是真实双机传输录屏。
 
 ### 阅读设置与排版
 
@@ -65,6 +71,14 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 > 部分旧截图来自较早版本；应用仍在持续更新，当前界面可能已有调整。演示正文为样例内容。
 
 ## 功能亮点
+
+### 设备互传与便携备份
+
+- 从「设置 → 设备互传与备份」发送或接收，按类别选择书籍、收藏、标注、历史、设置、资源与书源。
+- 实现同 Wi-Fi／热点发现与附近 Wi-Fi Direct，双方核对校验码后开始加密传输；支持进度、取消与断点续传。
+- 默认合并并保留本机设置，进度取最近记录；支持单独确认的整机迁移和最近一次迁移撤销。
+- 可通过系统分享发送 `.ciallo` 文件，另一台设备打开后检查并导入；兼容旧 ZIP。受保护内容默认排除，PIN、登录状态和密钥不迁移。
+- 两端需安装支持该功能的 Android 版本。不同品牌双机、无谷歌服务、无线链路及微信／QQ 文件接收尚待真机验证，详见 [使用与验证范围](docs/device-transfer.md)。
 
 ### 发现漫画与统一分类
 
@@ -112,7 +126,7 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 - **系统要求：** Android 7.0（API 24）及以上。
 - **当前 Release：** 提供 arm64-v8a APK，适用于大多数 Android 手机和平板；Release 暂不包含 x86_64 模拟器版本。
-- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.4.2](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.2/Ciallo-Reader-v1.4.2.apk)。
+- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.4.3](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.3/Ciallo-Reader-v1.4.3.apk)。
 - 下载后按 Android 提示允许安装该来源的应用，再打开 APK 安装。
 
 ## 快速开始

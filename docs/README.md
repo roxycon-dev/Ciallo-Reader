@@ -8,6 +8,9 @@
 
 ## 内容
 
+- [Ciallo Reader 1.4.3 发布验证](release-1.4.3-2026-10-18.md)
+- [设备互传与便携备份](device-transfer.md)
+
 - [Ciallo Reader 1.4.2 发布验证](release-1.4.2-2026-10-17.md)
 
 - [Ciallo Reader 1.3.3 发布验证](release-1.3.3-2026-10-12.md)

@@ -24,11 +24,17 @@ Read local ebooks, novels, and comics in one Android app.
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
 
-**1.4.2 / 225** moves all five page headers up by removing duplicate status-bar spacing and reducing padding. Discover now separates ranking order from publication status: New means recently added and can include ongoing works; Completed only shows confirmed completed editions. Redundant status rows are hidden for these two lists, and negative labels such as “unfinished” no longer imply completion. Uses the existing release signing identity. See the [verification record](docs/release-1.4.2-2026-10-17.md).
+**1.4.3 / 226** adds device transfer and portable backups with category selection, merge import, resumable transfers, and shared `.ciallo` files. Transfer animations now use moving cards with simpler interface text. Uses the existing release signing identity. All 39 selected automated tests pass; wireless transfers between physical devices and third-party file sharing still need hardware validation. See the [verification record](docs/release-1.4.3-2026-10-18.md).
 
 Also repairs legacy Android API compatibility, glass effect cleanup, EPUB path handling and Compose state subscriptions found during release checks.
 
 ## Screenshots
+
+### Device transfer and backups
+
+<img src="./docs/screenshots/demo-transfer143.gif" width="360" alt="Device transfer cards, progress and completion animation preview"/>
+
+This is a Compose UI state demonstration, not a recording of a real transfer between two devices.
 
 ### Reading settings and layouts
 
@@ -62,6 +68,14 @@ These 12 earlier screenshots show source management, library search, the bookshe
 > Some older screenshots may differ from the current interface. Reading text and comic pages are sample content.
 
 ## Features
+
+### Device transfer and portable backups
+
+- Open Settings → Device transfer and backups to send or receive selected categories: books, favorites, annotations, history, settings, resources, and sources.
+- Implements same-network/hotspot discovery and nearby Wi-Fi Direct, encrypted transfer after code confirmation, progress, cancellation, and resume.
+- Merge keeps local settings and the latest reading position. Full migration requires separate confirmation and keeps one undo snapshot.
+- Share a `.ciallo` file through Android and open it on the receiving device to inspect and import. Legacy ZIP backups remain readable. Protected content is excluded by default; PINs, login sessions, and keys are not transferred.
+- Both devices need a compatible Android version. Cross-brand devices, environments without Google services, wireless links, and WeChat/QQ file reception still need physical-device validation. See [usage and validation scope](docs/device-transfer.md).
 
 ### Discover comics
 
@@ -108,7 +122,7 @@ Version 1.3.8 adds Discover and restores Aiman and MYCOMIC reading. Its APK reta
 
 - **Android:** 7.0 (API 24) or newer.
 - **Architecture:** Current release APKs target arm64-v8a, supported by most Android phones and tablets. The release APK does not include an x86_64 emulator build.
-- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.4.2 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.2/Ciallo-Reader-v1.4.2.apk).
+- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.4.3 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.3/Ciallo-Reader-v1.4.3.apk).
 - Open the downloaded APK and follow Android's prompt to allow installation from that source.
 
 ## Get started

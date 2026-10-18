@@ -142,65 +142,6 @@ fun SettingsTabScreen(
     val updateChecker = remember(context.applicationContext) { GithubUpdateChecker(context.applicationContext) }
     val appUpdate = remember(context.applicationContext) { AppUpdateManager.get(context) }
     val appUpdateState by appUpdate.state.collectAsStateWithLifecycle()
-    var backupBusy by remember { mutableStateOf(false) }
-    var restoreUri by remember { mutableStateOf<Uri?>(null) }
-    val exportBackupLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
-        if(uri!=null && !backupBusy) scope.launch {
-            backupBusy=true
-            val temp=java.io.File(context.cacheDir,"backup_${java.util.UUID.randomUUID()}.zip")
-            try {
-                backupManager.exportBackupArchive(temp)
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.use { out -> temp.inputStream().use { it.copyTo(out,64*1024) } }
-                        ?: error("无法写入选择的位置")
-                }
-                AppToast.makeText(context,"备份已保存",Toast.LENGTH_SHORT).show()
-            } catch(e:Exception) {
-                if(e is kotlinx.coroutines.CancellationException) throw e
-                AppToast.makeText(context,"备份失败：${e.message}",Toast.LENGTH_LONG).show()
-            } finally { temp.delete(); backupBusy=false }
-        }
-    }
-    val importBackupLauncher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if(uri!=null && !backupBusy) restoreUri=uri
-    }
-    if(restoreUri!=null) AlertDialog(
-        onDismissRequest={ if(!backupBusy) restoreUri=null },
-        title={ Text("恢复备份") },
-        text={ Text("恢复将替换当前书架、标注、收藏和阅读记录，暂停正在下载的任务，并重新打开应用。") },
-        confirmButton={ TextButton(enabled=!backupBusy,onClick={
-            val uri=restoreUri ?: return@TextButton
-            scope.launch {
-                backupBusy=true
-                val temp=java.io.File(context.cacheDir,"restore_${java.util.UUID.randomUUID()}.zip")
-                try {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        context.contentResolver.openInputStream(uri)?.use { input -> temp.outputStream().use { output ->
-                            val buffer=ByteArray(64*1024); var total=0L
-                            while(true) {
-                                val read=input.read(buffer); if(read<0) break
-                                kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                                total+=read; require(total<=4L*1024*1024*1024) { "备份文件过大" }
-                                output.write(buffer,0,read)
-                            }
-                        } } ?: error("无法打开备份")
-                    }
-                    check(backupManager.restoreBackupArchive(temp)) { "备份恢复失败" }
-                    restoreUri=null
-                    AppToast.makeText(context,"恢复完成",Toast.LENGTH_SHORT).show()
-                    context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
-                        it.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                        context.startActivity(it)
-                    }
-                } catch(e:Exception) {
-                    if(e is kotlinx.coroutines.CancellationException) throw e
-                    AppToast.makeText(context,"恢复失败：${e.message}",Toast.LENGTH_LONG).show()
-                } finally { temp.delete(); backupBusy=false }
-            }
-        }) { Text(if(backupBusy) "正在恢复…" else "恢复并重新打开") } },
-        dismissButton={ TextButton(enabled=!backupBusy,onClick={ restoreUri=null }) { Text("取消") } },
-    )
-
     var restReminderMinutes by remember { mutableStateOf(prefs.restReminderMinutes) }
     var showCustomMinutes by remember { mutableStateOf(false) }
     var autoNightMode by remember(autoNightModeVal) { mutableStateOf(autoNightModeVal) }
@@ -1292,17 +1233,11 @@ LazyColumn(
                 }
 
                 item(key="user_backup") {
-                    SettingsSectionHeader("数据备份")
+                    SettingsSectionHeader("设备互传与备份")
                     GlassCard(modifier=Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(com.example.ui.design.DesignTokens.SpaceLg),verticalArrangement=Arrangement.spacedBy(com.example.ui.design.DesignTokens.SpaceMd)) {
-                            Text("备份书籍、原文件、标注、收藏、阅读记录与设置。登录凭据不包含在备份中。")
-                            Row(horizontalArrangement=Arrangement.spacedBy(com.example.ui.design.DesignTokens.SpaceMd)) {
-                                AppActionButton(text=if(backupBusy) "正在处理…" else "导出备份",enabled=!backupBusy,
-                                    onClick={ exportBackupLauncher.launch("Ciallo-backup.zip") },buttonSize=AppButtonSize.Small)
-                                AppActionButton(text="恢复备份",enabled=!backupBusy,
-                                    onClick={ importBackupLauncher.launch(arrayOf("application/zip","application/octet-stream")) },
-                                    variant=AppButtonVariant.Secondary,buttonSize=AppButtonSize.Small)
-                            }
+                            AppActionButton(text="打开设备互传",onClick={ com.example.transfer.TransferManager.get(context).show() })
+
                         }
                     }
                 }

@@ -23,6 +23,53 @@ import java.util.concurrent.TimeUnit
  */
 object JsSourceRepo {
 
+    /** Export script definitions only. Engine storage, cookies and account caches are deliberately separate. */
+    internal fun exportPortable(context: Context, warnings: MutableList<String>): JSONArray {
+        val output=JSONArray(); val index=indexFile(context)
+        if(!index.isFile)return output
+        var bytes=0
+        for(meta in parseIndex(index.readText())) {
+            val file=File(dir(context),meta.fileName)
+            if(!file.isFile || file.length()>512*1024)continue
+            val script=file.readText()
+            if(!validScript(script) || Regex("(?i)(?:password|authorization|api_key|access_token|refresh_token)\\s*[:=]\\s*['\"][^'\"]+['\"]").containsMatchIn(script)) {
+                warnings.add("书源 ${meta.name} 含不明确的认证常量，未发送");continue
+            }
+            bytes+=script.toByteArray().size
+            if(bytes>6*1024*1024){warnings.add("其余书源脚本超过便携配置容量，需在新设备重新安装");break}
+            output.put(JSONObject().put("key",meta.key).put("name",meta.name).put("fileName",meta.fileName).put("version",meta.version).put("script",script))
+        }
+        return output
+    }
+
+    internal fun validatePortable(scripts: JSONArray) {
+        require(scripts.length()<=500)
+        for(i in 0 until scripts.length()) {
+            val item=scripts.getJSONObject(i)
+            require(parseIndex(JSONArray().put(item).toString()).size==1) { "书源定义无效" }
+            require(item.getString("script").toByteArray().size<=512*1024 && validScript(item.getString("script"))) { "书源脚本无效" }
+        }
+    }
+
+    internal fun importPortable(context: Context, scripts: JSONArray, replace: Boolean) {
+        validatePortable(scripts)
+        val index=indexFile(context)
+        val original=if(index.isFile)JSONArray(index.readText()) else JSONArray()
+        val records=linkedMapOf<String,JSONObject>()
+        for(i in 0 until original.length()) original.optJSONObject(i)?.let { records[it.optString("key")]=it }
+        for(i in 0 until scripts.length()) {
+            val item=scripts.getJSONObject(i);val key=item.getString("key")
+            if(!replace && key in records)continue
+            // Use a content-independent, collision-free local filename rather than trusting sender filenames.
+            val name="transfer_"+java.security.MessageDigest.getInstance("SHA-256").digest(key.toByteArray()).joinToString(""){"%02x".format(it.toInt() and 255)}+".js"
+            val atomic=android.util.AtomicFile(File(dir(context),name));val stream=atomic.startWrite()
+            try{stream.write(item.getString("script").toByteArray());atomic.finishWrite(stream)}catch(e:Exception){atomic.failWrite(stream);throw e}
+            records[key]=JSONObject(item.toString()).apply {remove("script");put("fileName",name)}
+        }
+        val atomic=android.util.AtomicFile(index);val stream=atomic.startWrite()
+        try{stream.write(JSONArray(records.values.toList()).toString().toByteArray());atomic.finishWrite(stream)}catch(e:Exception){atomic.failWrite(stream);throw e}
+    }
+
     /** 本地补丁版本：升级后尝试更新源脚本，失败时仍可使用旧缓存。 */
     private const val PATCH_VERSION = 48
     // Raw cache format stays stable when compatibility patches change.

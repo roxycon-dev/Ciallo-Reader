@@ -15,6 +15,28 @@ import org.robolectric.annotation.Config
 @Config(sdk = [33])
 class AppDatabaseMigrationTest {
     @Test
+    fun versionTwelveAddsTransferTablesAndIndexWithoutLosingBooks()=runBlocking {
+        val context=ApplicationProvider.getApplicationContext<Context>()
+        val name="m12-${System.nanoTime()}.db"
+        try {
+            val seed=Room.databaseBuilder(context,AppDatabase::class.java,name)
+                .setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE).allowMainThreadQueries().build()
+            seed.bookDao().insertBookWithChapters(Book(title="升级前的书",filePath="",totalChapters=1),listOf(Chapter(bookId=0,chapterOrder=0,title="第一章",content="保留正文")))
+            val sql=seed.openHelper.writableDatabase
+            sql.execSQL("DROP TABLE transfer_identities");sql.execSQL("DROP TABLE transfer_receipts")
+            sql.execSQL("DROP INDEX index_chapters_bookId_chapterOrder");sql.version=12;seed.close()
+            val upgraded=Room.databaseBuilder(context,AppDatabase::class.java,name).addMigrations(AppDatabase.MIGRATION_12_13)
+                .setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE).allowMainThreadQueries().build()
+            try {
+                val book=upgraded.bookDao().getAllBooksSync().single()
+                assertEquals("升级前的书",book.title)
+                assertEquals("保留正文",upgraded.bookDao().getChaptersListForBook(book.id).single().content)
+                upgraded.openHelper.readableDatabase.query("SELECT COUNT(*) FROM transfer_receipts").use {it.moveToFirst();assertEquals(0,it.getInt(0))}
+            }finally{upgraded.close()}
+        }finally{context.deleteDatabase(name)}
+    }
+
+    @Test
     fun upgradingVersion11PreservesChapterStateAndAddsBookmarkAndGodMomentTables() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "migration-11-12-${System.nanoTime()}.db"
@@ -22,6 +44,7 @@ class AppDatabaseMigrationTest {
             // Start from a complete Room schema, then restore the two v11 table shapes.
             // This makes the reopened database run Room's full schema validation.
             val seed = Room.databaseBuilder(context, AppDatabase::class.java, name)
+                .setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE)
                 .allowMainThreadQueries()
                 .build()
             val sql = seed.openHelper.writableDatabase
@@ -52,7 +75,8 @@ class AppDatabaseMigrationTest {
             seed.close()
 
             val upgraded = Room.databaseBuilder(context, AppDatabase::class.java, name)
-                .addMigrations(AppDatabase.MIGRATION_11_12)
+                .setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE)
+                .addMigrations(AppDatabase.MIGRATION_11_12, AppDatabase.MIGRATION_12_13)
                 .allowMainThreadQueries()
                 .build()
             try {

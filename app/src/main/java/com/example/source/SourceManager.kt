@@ -42,6 +42,11 @@ class SourceManager(private val storage: SourceStorage? = null) {
         initialize()
     }
 
+    /** Refresh only local definitions after a portable import; no network installation. */
+    suspend fun reloadAfterTransfer() {
+        mutex.withLock { loadPersistedDataInternal() }
+    }
+
     private suspend fun loadPersistedDataInternal() {
         storage?.let { store ->
             val savedStates = store.getSourceStates()

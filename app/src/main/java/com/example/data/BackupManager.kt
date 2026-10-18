@@ -19,41 +19,82 @@ class BackupManager(
     private val godRepository: com.example.god.GodMomentRepository? = null,
 ) {
 
-    suspend fun exportBackupArchive(target: File): File {
-        ContentMutationGate.mutex.lock()
-        return try { BackupArchive.export(context,target) } finally { ContentMutationGate.mutex.unlock() }
+    suspend fun authorizeProtectedExport(pin: String, selection: com.example.transfer.ExportSelection): com.example.transfer.ExportSelection = withContext(Dispatchers.Default) {
+        require(PrivacyManager(context).verifyPin(pin)) { "隐私 PIN 不正确或暂时处于冷却期" }
+        selection.copy(protectedAuthorized = true)
     }
 
-    suspend fun restoreBackupArchive(archive: File): Boolean = withContext(Dispatchers.IO) {
+    suspend fun exportArchive(target: File, selection: com.example.transfer.ExportSelection = com.example.transfer.ExportSelection(),
+        progress: (com.example.transfer.TransferProgress) -> Unit = {}): File = withContext(Dispatchers.IO) {
+        ContentMutationGate.mutex.lock()
+        try { com.example.transfer.PortableArchive.export(context,target,selection,progress) }
+        finally { ContentMutationGate.mutex.unlock() }
+    }
+
+    suspend fun inspectArchive(archive: File): com.example.transfer.ArchivePreview = com.example.transfer.PortableArchive.inspect(context,archive)
+
+    suspend fun estimateArchive(selection: com.example.transfer.ExportSelection): com.example.transfer.TransferEstimate =
+        com.example.transfer.PortableArchive.estimate(context,selection)
+
+    suspend fun importArchive(archive: File, mode: com.example.transfer.ImportMode = com.example.transfer.ImportMode.MERGE,
+        progress: (com.example.transfer.TransferProgress) -> Unit = {}): com.example.transfer.ImportResult = withContext(Dispatchers.IO) {
+        val preview=inspectArchive(archive)
+        require(!preview.containsProtected || PrivacyManager(context).isEnabled()) { "请先在接收设备设置隐私 PIN" }
         com.example.download.DownloadManager.withControlLock {
             com.example.library.ComicDownloadManager.withControlLock {
-                val dao=AppDatabase.getDatabase(context).downloadTaskDao()
-                val work=androidx.work.WorkManager.getInstance(context)
-                for(task in dao.getAllTasksSync()) {
-                    if(task.status in setOf(com.example.download.DownloadStatus.PENDING,com.example.download.DownloadStatus.DOWNLOADING)) {
+                if(mode == com.example.transfer.ImportMode.REPLACE) {
+                    val dao=AppDatabase.getDatabase(context).downloadTaskDao()
+                    val work=androidx.work.WorkManager.getInstance(context)
+                    for(task in dao.getAllTasksSync()) if(task.status in setOf(com.example.download.DownloadStatus.PENDING,com.example.download.DownloadStatus.DOWNLOADING)) {
                         work.cancelUniqueWork("download_${task.id}").result.get()
                         com.example.download.DownloadWorker.withTaskLock(task.id) {
-                            val fresh=dao.getTaskById(task.id)
-                            if(fresh!=null && fresh.status!=com.example.download.DownloadStatus.COMPLETED)
-                                dao.updateProgressAndStatus(task.id,com.example.download.DownloadStatus.PAUSED,fresh.downloadedBytes,fresh.totalBytes,null)
+                            dao.getTaskById(task.id)?.let { fresh -> dao.updateProgressAndStatus(fresh.id,com.example.download.DownloadStatus.PAUSED,fresh.downloadedBytes,fresh.totalBytes,null) }
                         }
                     }
+                    com.example.library.ComicDownloadManager.pauseAllLocked(context)
+                    dao.getAllTasksSync().forEach { com.example.download.DownloadProgressBroadcaster.removeState(it.id) }
                 }
-                dao.getAllTasksSync().forEach { com.example.download.DownloadProgressBroadcaster.removeState(it.id) }
-                com.example.library.ComicDownloadManager.pauseAllLocked(context)
                 ContentMutationGate.mutex.lock()
-                try { BackupArchive.restore(context,archive).also { if(it) ContentMutationGate.invalidatePendingWrites() } } finally { ContentMutationGate.mutex.unlock() }
+                try { com.example.transfer.ArchiveImporter.import(context,archive,mode,progress).also { ContentMutationGate.invalidatePendingWrites() } }
+                finally { ContentMutationGate.mutex.unlock() }
             }
         }
     }
 
+    fun hasMigrationUndo(): Boolean = com.example.transfer.ImportJournal.hasUndo(context)
+    suspend fun undoMigration() = withContext(Dispatchers.IO) {
+        com.example.download.DownloadManager.withControlLock { com.example.library.ComicDownloadManager.withControlLock {
+            val dao=AppDatabase.getDatabase(context).downloadTaskDao()
+            val work=androidx.work.WorkManager.getInstance(context)
+            for(task in dao.getAllTasksSync())if(task.status in setOf(com.example.download.DownloadStatus.PENDING,com.example.download.DownloadStatus.DOWNLOADING)) {
+                work.cancelUniqueWork("download_${task.id}").result.get()
+                com.example.download.DownloadWorker.withTaskLock(task.id) {dao.getTaskById(task.id)?.let {fresh ->
+                    dao.updateProgressAndStatus(fresh.id,com.example.download.DownloadStatus.PAUSED,fresh.downloadedBytes,fresh.totalBytes,null)
+                }}
+            }
+            com.example.library.ComicDownloadManager.pauseAllLocked(context)
+            ContentMutationGate.mutex.lock()
+            try {
+                com.example.transfer.ImportJournal.activateUndo(context)
+                val db=AppDatabase.getDatabase(context)
+                com.example.transfer.ImportJournal.recover(context,db.openHelper.writableDatabase)
+                ContentMutationGate.invalidatePendingWrites(); db.invalidationTracker.refreshVersionsAsync()
+            } finally { ContentMutationGate.mutex.unlock() }
+        } }
+    }
+
+    suspend fun exportBackupArchive(target: File): File = exportArchive(target)
+
+    suspend fun restoreBackupArchive(archive: File): Boolean {
+        importArchive(archive, com.example.transfer.ImportMode.REPLACE)
+        return true
+    }
     suspend fun exportBackupJson(): String = withContext(Dispatchers.IO) {
         val archive = exportBackupArchive(File(context.cacheDir, "backup_${java.util.UUID.randomUUID()}.zip"))
         val encoded = try {
             require(archive.length() <= 16L * 1024 * 1024) { "备份超过 JSON 容量，请使用 ZIP 备份接口" }
             android.util.Base64.encodeToString(archive.readBytes(), android.util.Base64.NO_WRAP)
         } finally { archive.delete() }
-        val godArray = godRepository?.runCatching { exportJson() }?.getOrNull()
         val payload = BackupPayload(
             booksCount = AppDatabase.getDatabase(context).bookDao().getBooksCount(),
             preferences = mapOf(
@@ -71,7 +112,6 @@ class BackupManager(
             .put("exportTime", payload.exportTime)
             .put("booksCount", payload.booksCount)
             .put("preferences", JSONObject(payload.preferences))
-            .apply { if (godArray != null) put("godMoments", godArray) }
             .toString()
 
         val file = File(context.filesDir, "novel_reader_backup.json")
