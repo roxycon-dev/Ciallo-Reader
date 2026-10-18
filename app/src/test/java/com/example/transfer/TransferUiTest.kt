@@ -57,6 +57,22 @@ class TransferUiTest {
         compose.onNodeWithText("50%").assertIsDisplayed()
         compose.onRoot().captureRoboImage(File("../artifacts/device-transfer/discovery-transfer-completion.png").absolutePath)
     }
+    @Test fun settingsEntryUsesTheWholeCardWithoutAnExtraOpenButton() {
+        val prefs=PreferencesManager(context)
+        val manager=TransferManager.get(context)
+        compose.setContent {com.example.ui.theme.MyApplicationTheme(darkTheme=false) {
+            CompositionLocalProvider(LocalRenderQuality provides RenderQuality.MINIMAL) {
+                com.example.ui.SettingsTabScreen(prefs,BackupManager(context,prefs),emptyList(),{})
+            }
+        }}
+        compose.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasTestTag("device_transfer_entry"))
+        compose.onNodeWithText("设备互传与备份").assertIsDisplayed()
+        compose.onNodeWithText("打开设备互传").assertDoesNotExist()
+        compose.onRoot().captureRoboImage(File("../artifacts/device-transfer/settings-transfer-entry.png").absolutePath)
+        compose.onNodeWithTag("device_transfer_entry").performClick()
+        org.junit.Assert.assertTrue(manager.openPage.value)
+        manager.hide()
+    }
     @Test fun captureRealMotionFramesForReview() {
         for(key in listOf(Settings.Global.ANIMATOR_DURATION_SCALE,Settings.Global.TRANSITION_ANIMATION_SCALE,Settings.Global.WINDOW_ANIMATION_SCALE))Settings.Global.putFloat(context.contentResolver,key,1f)
         compose.mainClock.autoAdvance=false

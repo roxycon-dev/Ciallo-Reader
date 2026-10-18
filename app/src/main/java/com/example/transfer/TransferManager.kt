@@ -20,7 +20,6 @@ import java.io.RandomAccessFile
 import java.net.InetSocketAddress
 import java.security.SecureRandom
 import java.util.UUID
-import javax.net.ssl.SSLServerSocket
 import javax.net.ssl.SSLSocket
 
 /** One application-scoped task owner. UI, service and discovery observe the same state. */
@@ -47,21 +46,27 @@ class TransferManager private constructor(private val context:Context) {
     private val mutableOpen=MutableStateFlow(false); val openPage=mutableOpen.asStateFlow()
     private val mutableEnabled=MutableStateFlow(prefs.getBoolean("enabled",false)); val enabled=mutableEnabled.asStateFlow()
     private var foreground=false
-    private var server:SSLServerSocket?=null
+    private var server:java.net.ServerSocket?=null
     private var serverJob:Job?=null
     private var task:Job?=null
     private var connectionTimeout:Job?=null
     @Volatile private var socket:SSLSocket?=null
+    @Volatile private var connectingSocket:java.net.Socket?=null
+    private var directJob:Job?=null
     @Volatile private var claimed=false
     private var outgoing:JSONObject?=null
     private var localDecision:CompletableDeferred<Boolean>?=null
     private var importDecision:CompletableDeferred<ImportMode>?=null
     private var receiveMode=ImportMode.MERGE
     private val discovery=TransferDiscovery(context,id,deviceName) { owner,host,port ->
-        if(!owner && socket==null && !claimed) scope.launch {
+        if(!owner && socket==null && !claimed && directJob?.isActive!=true && state.value.phase!=TransferPhase.CANCELLED) directJob=scope.launch {
             try { val outgoingSession=outgoing
                 val endpoint=TransferPeer(outgoingSession?.optString("peerId")?:"p2p","附近设备",host,port)
-                connectSocket(endpoint)
+                // A newly formed group may notify its client before the owner's listener is reachable.
+                for(attempt in 0..2) {
+                    try {connectSocket(endpoint);break}
+                    catch(e:java.io.IOException){if(attempt==2 || e.cause !is java.net.ConnectException)throw e;delay(500L*(attempt+1))}
+                }
             } catch(e:Exception) { fail(e) }
         }
     }
@@ -106,20 +111,29 @@ class TransferManager private constructor(private val context:Context) {
         if(!state.value.busy) change(TransferPhase.DISCOVERING,"请让另一台设备打开 Ciallo Reader")
     }
     private fun startListening() {
-        if(serverJob?.isActive==true) { scope.launch(Dispatchers.Main.immediate) { discovery.start(server?.localPort?:TransferDiscovery.PORT) }; return }
+        if(serverJob?.isActive==true) {
+            server?.localPort?.let {port -> scope.launch(Dispatchers.Main.immediate) {discovery.start(port)}}
+            return
+        }
         serverJob=scope.launch {
             try {
-                val tls=TransferTls.context()
-                val listener=(tls.serverSocketFactory.createServerSocket() as SSLServerSocket).apply {
+                val listener=java.net.ServerSocket().apply {
                     reuseAddress=true
                     try { bind(InetSocketAddress(TransferDiscovery.PORT)) } catch(_:java.net.BindException) { bind(InetSocketAddress(0)) }
-                    enabledProtocols=supportedProtocols.filter { it in setOf("TLSv1.2","TLSv1.3") }.toTypedArray(); needClientAuth=true
                 }
                 server=listener
                 withContext(Dispatchers.Main) { discovery.start(listener.localPort) }
                 while(isActive && !listener.isClosed) {
-                    val accepted=listener.accept() as SSLSocket
-                    scope.launch { if(!claim()) accepted.close() else runSocket(accepted,true) }
+                    val accepted=listener.accept()
+                    scope.launch {
+                        if(!claim()) {accepted.close();return@launch}
+                        try {
+                            change(TransferPhase.CONNECTING,"正在建立加密连接")
+                            val secure=TransferConnection.accept(TransferTls.context(),accepted,track={connectingSocket=it})
+                            runSocket(secure,true)
+                        } catch(e:Exception) {if(e !is CancellationException)fail(e)}
+                        finally {runCatching {accepted.close()};connectingSocket=null;claimed=false;stopServiceIfIdle()}
+                    }
                 }
             } catch(e:Exception) { if(e !is CancellationException && enabled.value && foreground) fail(e) }
             finally { server?.close(); server=null }
@@ -165,7 +179,7 @@ class TransferManager private constructor(private val context:Context) {
         val session=outgoing
         if(session==null) { scan();change(TransferPhase.DISCOVERING,"已准备接收，请在发送设备继续传输");return }
         if(state.value.busy || claimed || task?.isActive==true) return
-        task=scope.launch { try { startService(); connectOutgoing(peer(session).let { if(useNearby)it.copy(host=null) else it }) }
+        task=scope.launch { try { startService(); connectOutgoing(peer(session).let { if(useNearby)it.copy(host=null,routes=emptyList()) else it }) }
             catch(e:Exception) { if(e !is CancellationException) fail(e) } finally { stopServiceIfIdle() } }
     }
     private suspend fun connectOutgoing(peer:TransferPeer) {
@@ -180,30 +194,55 @@ class TransferManager private constructor(private val context:Context) {
         }
         var last:Exception?=null
         for(attempt in 0..3) {
-            try { connectSocket(peer); return }
+            var established=false
+            try { connectSocket(peers.value.firstOrNull {it.id==peer.id}?:peer) {established=true}; return }
             catch(e:Exception) {
                 if(e is CancellationException)throw e
                 last=e
                 if(e is RejectedException || e is SecurityException || e is IllegalArgumentException)throw e
+                // Initial dial already tries the discovered routes. Do not spend minutes redialling a dead address.
+                if(!established)break
                 if(attempt<3) { change(TransferPhase.WAITING_TO_RESUME,"连接中断，正在尝试继续（${attempt+1}/3）",peer); delay((attempt+1)*1000L) }
             }
         }
         change(TransferPhase.WAITING_TO_RESUME,"${last?.message?:"连接中断"}。可继续传输${if(peer.p2pAddress!=null)"或改用附近直连" else ""}",peer)
     }
-    private suspend fun connectSocket(peer:TransferPeer) {
+    private suspend fun connectSocket(peer:TransferPeer,onEstablished:()->Unit={}) {
         check(claim()) { "当前已有连接" }
-        val connection=TransferTls.context().socketFactory.createSocket() as SSLSocket
         try {
-            // Keep local traffic on its matching Wi-Fi network even when cellular/VPN is the default.
-            val address=java.net.InetAddress.getByName(peer.host)
+            val deadline=android.os.SystemClock.elapsedRealtime()+18_000
+            var last:Exception?=null
             val connectivity=context.getSystemService(android.net.ConnectivityManager::class.java)
-            connectivity.allNetworks.firstOrNull { network ->
-                connectivity.getNetworkCapabilities(network)?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)==true &&
-                    connectivity.getLinkProperties(network)?.linkAddresses?.any { link -> sameSubnet(address.address,link.address.address,link.prefixLength) }==true
-            }?.bindSocket(connection)
-            connection.connect(InetSocketAddress(address,peer.port),10_000); runSocket(connection,false,peer)
+            val tls=TransferTls.context()
+            for(route in connectionRoutes(peer)) {
+                currentCoroutineContext().ensureActive()
+                val remaining=(deadline-android.os.SystemClock.elapsedRealtime()).toInt()
+                if(remaining<=0)break
+                var authenticated=false
+                try {
+                    val address=java.net.InetAddress.getByName(route.host)
+                    val network=connectivity.allNetworks.firstOrNull {it.networkHandle==route.networkHandle}
+                        ?:connectivity.allNetworks.firstOrNull { candidate ->
+                            connectivity.getNetworkCapabilities(candidate)?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)==true &&
+                                connectivity.getLinkProperties(candidate)?.linkAddresses?.any {link ->sameSubnet(address.address,link.address.address,link.prefixLength)}==true
+                        }
+                    val connection=TransferConnection.connect(tls,route,bind={raw -> network?.bindSocket(raw)},
+                        track={connectingSocket=it},stage={message ->change(TransferPhase.CONNECTING,message,peer)},
+                        connectTimeout=minOf(4_000,remaining),handshakeTimeout=minOf(8_000,(remaining-4_000).coerceAtLeast(1_000)))
+                    onEstablished()
+                    authenticated=true
+                    runSocket(connection,false,peer)
+                    return
+                } catch(e:Exception) {
+                    if(e is CancellationException || e is RejectedException || e is SecurityException || state.value.phase==TransferPhase.CANCELLED)throw e
+                    last=e
+                    // Once authenticated, only the session resume policy may open another connection.
+                    if(authenticated)throw e
+                }
+            }
+            throw last?:java.io.IOException("设备地址已失效，请重新发现设备")
         }
-        catch(e:Exception) { claimed=false; runCatching { connection.close() }; throw e }
+        finally {runCatching {connectingSocket?.close()};connectingSocket=null;claimed=false}
     }
     private class RejectedException(message:String):Exception(message)
     private suspend fun runSocket(connection:SSLSocket,accepted:Boolean,endpoint:TransferPeer?=null) {
@@ -211,7 +250,7 @@ class TransferManager private constructor(private val context:Context) {
         connectionTimeout?.cancel()
         var controlOutput:DataOutputStream?=null
         try {
-            TransferTls.configure(connection); connection.startHandshake()
+            TransferTls.configure(connection); connection.soTimeout=8_000
             val input=DataInputStream(connection.inputStream.buffered(CHUNK_SIZE+4096)); val output=DataOutputStream(connection.outputStream.buffered(CHUNK_SIZE+4096))
             controlOutput=output
             val nonce=ByteArray(24).also { SecureRandom().nextBytes(it) }.hex()
@@ -378,6 +417,7 @@ class TransferManager private constructor(private val context:Context) {
     fun cancel() {
         if(state.value.phase==TransferPhase.IMPORTING) return
         localDecision?.complete(false); importDecision?.cancel(); task?.cancel()
+        directJob?.cancel();connectionTimeout?.cancel();runCatching {connectingSocket?.close()}
         runCatching { socket?.close() }; socket=null; claimed=false
         outgoing?.optString("file")?.let { File(it).delete() }; outgoing=null
         File(directory,"outgoing.json").delete()

@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -31,6 +32,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -39,8 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -51,7 +52,13 @@ import com.example.data.BackupManager
 import com.example.data.PrivacyManager
 import com.example.ui.components.AppActionButton
 import com.example.ui.components.AppButtonVariant
-import com.example.ui.components.GlassCard
+import com.example.ui.components.AcrylicDialog
+import com.example.ui.components.AppSwitch
+import com.example.ui.glasskit.GlassKitHost
+import com.example.ui.glasskit.GlassKitCard
+import com.example.ui.glasskit.GlassTopBarStrip
+import com.example.ui.glasskit.GlassTokens
+import com.example.ui.glasskit.GlassManagementTopBar
 import com.example.ui.design.DesignTokens as D
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -80,10 +87,7 @@ fun TransferHost(backup:BackupManager,onEnablePrivacy:suspend(String)->Boolean={
     val open by manager.openPage.collectAsStateWithLifecycle()
     val state by manager.state.collectAsStateWithLifecycle()
     LaunchedEffect(state.phase,state.incoming) { if(state.phase==TransferPhase.COMPLETED && state.incoming)onImported() }
-    if(open) Dialog(onDismissRequest={manager.hide()},properties=DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)) {
-        TransferScreen(manager,backup,onEnablePrivacy)
-    }
-    else if(state.phase==TransferPhase.AWAITING_CONFIRMATION && state.incoming) AlertDialog(
+    if(!open && state.phase==TransferPhase.AWAITING_CONFIRMATION && state.incoming) AcrylicDialog(
         onDismissRequest={manager.confirm(false)},title={Text("${state.peer?.name?:"附近设备"} 想发送数据")},
         text={Column(verticalArrangement=Arrangement.spacedBy(D.SpaceMd)) {
             Text("请核对两台设备的校验码一致，再接收。")
@@ -138,16 +142,19 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
     val open=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if(uri!=null)manager.openShared(uri) }
     val activeState=localProgress?.let { TransferSessionState(it.phase,progress=it,message=it.message) }?:state
     val colors=MaterialTheme.colorScheme
-    Surface(color=colors.background,modifier=Modifier.fillMaxSize()) {
-        LazyColumn(modifier=Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().testTag("device_transfer_screen"),
-            contentPadding=PaddingValues(horizontal=D.SpacePage,vertical=D.SpaceSm),verticalArrangement=Arrangement.spacedBy(D.SpaceLg)) {
-            item(key="header",contentType="header") {
-                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                    IconButton(onClick={manager.hide()}) {Icon(Icons.AutoMirrored.Filled.ArrowBack,"返回")}
-                    Text("设备互传",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold,modifier=Modifier.weight(1f))
-                    IconButton(onClick={showHistory=true}) {Icon(Icons.Default.History,"传输记录")}
-                }
+    BackHandler { manager.hide() }
+    val scrollBehavior=TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    val statusTop=WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    GlassKitHost(topGradientHeight=statusTop+GlassTokens.ManagementTitleHeight+D.SpaceXxl) {
+        Scaffold(containerColor=Color.Transparent,modifier=Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),topBar={
+            Box {
+                GlassTopBarStrip(scrollBehavior.state.collapsedFraction,Modifier.fillMaxWidth().height(statusTop+GlassTokens.TopBarHeight))
+                GlassManagementTopBar("设备互传",scrollBehavior,manager::hide,
+                    actions={IconButton(onClick={showHistory=true}) {Icon(Icons.Default.History,"传输记录")}})
             }
+        }) { padding ->
+        LazyColumn(modifier=Modifier.fillMaxSize().padding(padding).navigationBarsPadding().testTag("device_transfer_screen"),
+            contentPadding=PaddingValues(horizontal=D.SpacePage,vertical=D.SpaceSm),verticalArrangement=Arrangement.spacedBy(D.SpaceMd)) {
             item(key="hero",contentType="hero") {
                 Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally) {
                     TransferArtwork(activeState)
@@ -155,7 +162,7 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                         Text(phase.label,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                     }
                     activeState.peer?.let { Text(it.name,style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant) }
-                    if(activeState.phase in setOf(TransferPhase.FAILED,TransferPhase.WAITING_TO_RESUME,TransferPhase.RECEIVED) && activeState.message.isNotBlank()) {
+                    if(activeState.phase in setOf(TransferPhase.CONNECTING,TransferPhase.FAILED,TransferPhase.WAITING_TO_RESUME,TransferPhase.RECEIVED) && activeState.message.isNotBlank()) {
                         Spacer(Modifier.height(D.SpaceSm));Text(activeState.message,color=colors.onSurfaceVariant,style=MaterialTheme.typography.bodyMedium)
                     }
                     if(activeState.progress.totalBytes>0) {
@@ -166,7 +173,7 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                 }
             }
             if(activeState.phase==TransferPhase.AWAITING_CONFIRMATION) item(key="pair",contentType="pair") {
-                GlassCard(Modifier.fillMaxWidth()) {Column(Modifier.padding(D.SpaceXl),verticalArrangement=Arrangement.spacedBy(D.SpaceMd)) {
+                GlassKitCard(Modifier.fillMaxWidth()) {Column(Modifier.padding(D.SpaceXl),verticalArrangement=Arrangement.spacedBy(D.SpaceMd)) {
                     if(state.verificationCode!=null) {
                         Text("两台设备显示相同的校验码",style=MaterialTheme.typography.labelLarge)
                         Text(state.verificationCode.orEmpty().chunked(3).joinToString("  "),style=MaterialTheme.typography.displaySmall,fontWeight=FontWeight.Bold,color=colors.primary,modifier=Modifier.testTag("transfer_pairing_code"))
@@ -179,7 +186,7 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                 } }
             }
             if(state.phase==TransferPhase.RECEIVED && state.incoming) item(key="received",contentType="received") {
-                GlassCard(Modifier.fillMaxWidth()) {Column(Modifier.padding(D.SpaceXl),verticalArrangement=Arrangement.spacedBy(D.SpaceMd)) {
+                GlassKitCard(Modifier.fillMaxWidth()) {Column(Modifier.padding(D.SpaceXl),verticalArrangement=Arrangement.spacedBy(D.SpaceMd)) {
                     Text("已识别的内容",style=MaterialTheme.typography.titleMedium)
                     Text(summary(state.preview),style=MaterialTheme.typography.bodyMedium)
                     state.preview?.warnings?.forEach { Text(it,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant) }
@@ -191,7 +198,7 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                 } }
             }
             if(state.phase==TransferPhase.COMPLETED) item(key="result",contentType="result") {
-                GlassCard(Modifier.fillMaxWidth()) {Column(Modifier.padding(D.SpaceXl),verticalArrangement=Arrangement.spacedBy(D.SpaceMd)) {
+                GlassKitCard(Modifier.fillMaxWidth()) {Column(Modifier.padding(D.SpaceXl),verticalArrangement=Arrangement.spacedBy(D.SpaceMd)) {
                     state.result?.let { Text("新增 ${it.added} 项 · 合并 ${it.merged} 项 · 跳过 ${it.skipped} 项",style=MaterialTheme.typography.bodyMedium) }
                     if(!state.incoming)Text("对方已收到 ✓   对方已导入 ✓",color=colors.primary)
                     state.result?.warnings?.forEach { Text(it,style=MaterialTheme.typography.bodySmall) }
@@ -213,7 +220,7 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                     }
                 }
                 item(key="selection",contentType="selection") {
-                    GlassCard(Modifier.fillMaxWidth()) {Column(Modifier.padding(D.SpaceLg)) {
+                    GlassKitCard(Modifier.fillMaxWidth()) {Column(Modifier.padding(D.SpaceLg)) {
                         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                             Text("传输内容",style=MaterialTheme.typography.titleMedium,modifier=Modifier.weight(1f))
                             TextButton(onClick={showDetails=!showDetails}) {Text(if(showDetails)"收起" else if(selected.categories.size==TransferCategory.entries.size)"全部 · 调整" else "调整")}
@@ -233,7 +240,7 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                     item(key="nearby_title",contentType="label") {Text("可发送到",style=MaterialTheme.typography.titleMedium)}
                     items(peers,key={it.id},contentType={"peer"}) { peer ->
                         AnimatedVisibility(true,enter=fadeIn(tween(280))) {
-                            GlassCard(Modifier.fillMaxWidth().clickable(enabled=selected.categories.isNotEmpty()) {manager.startSend(peer,selected)}) {
+                            GlassKitCard(Modifier.fillMaxWidth().clickable(enabled=selected.categories.isNotEmpty()) {manager.startSend(peer,selected)}) {
                                 Row(Modifier.fillMaxWidth().padding(D.SpaceXl),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(D.SpaceLg)) {
                                     Box(Modifier.size(D.SpaceSection+D.SpaceLg).background(colors.primary.copy(alpha=.12f),CircleShape),contentAlignment=Alignment.Center) {Icon(Icons.Default.PhoneAndroid,"接收设备",tint=colors.primary)}
                                     Column(Modifier.weight(1f)) {Text(peer.name,fontWeight=FontWeight.SemiBold);Text(peer.routeLabel,style=MaterialTheme.typography.labelMedium,color=colors.onSurfaceVariant)}
@@ -245,15 +252,15 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                     if(peers.isEmpty()) item(key="empty",contentType="empty") {Text("未发现设备。请打开对方的设备互传，或连接同一 Wi-Fi / 热点。",style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)}
                     item(key="scan",contentType="scan") {TextButton(onClick={manager.scan()}) {Text("重新发现设备")}}
                 }
-                item(key="availability",contentType="availability") {GlassCard(Modifier.fillMaxWidth()) {
+                item(key="availability",contentType="availability") {GlassKitCard(Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(D.SpaceLg),verticalAlignment=Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {Text("允许接收",style=MaterialTheme.typography.bodyMedium)
                             Text("${manager.deviceName} · ${if(enabled)"正在等待接收" else "尚未开启"}",style=MaterialTheme.typography.labelMedium,color=colors.onSurfaceVariant)}
-                        Switch(checked=enabled,onCheckedChange={if(it && !TransferDiscovery.allowed(context))permissions.launch(permissionRequests())else manager.enable(it)})
+                        AppSwitch(checked=enabled,onCheckedChange={if(it && !TransferDiscovery.allowed(context))permissions.launch(permissionRequests())else manager.enable(it)})
                     }
                 } }
                 if(discoveryMessage.isNotBlank())item(key="discovery_message",contentType="message") {Text(discoveryMessage,color=colors.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)}
-                item(key="backup",contentType="backup") {GlassCard(Modifier.fillMaxWidth()) {Column(Modifier.padding(D.SpaceLg),verticalArrangement=Arrangement.spacedBy(D.SpaceSm)) {
+                item(key="backup",contentType="backup") {GlassKitCard(Modifier.fillMaxWidth()) {Column(Modifier.padding(D.SpaceLg),verticalArrangement=Arrangement.spacedBy(D.SpaceSm)) {
                     Text("备份与分享文件",style=MaterialTheme.typography.titleMedium)
                     TextButton(enabled=selected.categories.isNotEmpty(),onClick={scope.launch {
                         try {localProgress=TransferProgress(TransferPhase.PREPARING);val file=prepare()
@@ -276,14 +283,15 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
             }
         }
     }
-    if(localError!=null)AlertDialog(onDismissRequest={localError=null},title={Text("操作提示")},text={Text(localError.orEmpty())},confirmButton={TextButton(onClick={localError=null}){Text("知道了")}})
-    if(replaceConfirm)AlertDialog(onDismissRequest={replaceConfirm=false},title={Text("确认整机迁移")},text={Text("将替换所选类别的本机内容，并暂停下载。替换书籍时也会替换其关联的标注与阅读记录。迁移前会保存回退快照。")},
+    }
+    if(localError!=null)AcrylicDialog(onDismissRequest={localError=null},title={Text("操作提示")},text={Text(localError.orEmpty())},confirmButton={TextButton(onClick={localError=null}){Text("知道了")}})
+    if(replaceConfirm)AcrylicDialog(onDismissRequest={replaceConfirm=false},title={Text("确认整机迁移")},text={Text("将替换所选类别的本机内容，并暂停下载。替换书籍时也会替换其关联的标注与阅读记录。迁移前会保存回退快照。")},
         confirmButton={TextButton(onClick={replaceConfirm=false
             if(state.phase==TransferPhase.AWAITING_CONFIRMATION)manager.confirm(true,ImportMode.REPLACE)
             else if(state.preview?.containsProtected==true && !PrivacyManager(context).isEnabled()){pinPurpose="receive";pin="";pinAgain=""}
             else {manager.importShared(ImportMode.REPLACE);manager.continueProtectedImport(ImportMode.REPLACE)}
         }){Text("确认迁移")}},dismissButton={TextButton(onClick={replaceConfirm=false}){Text("取消")}})
-    if(pinPurpose!=null)AlertDialog(onDismissRequest={if(!pinBusy){pinPurpose=null;pin="";pinAgain=""}},title={Text(if(pinPurpose=="send")"解锁受保护内容" else "设置本机隐私 PIN")},text={Column(verticalArrangement=Arrangement.spacedBy(D.SpaceMd)) {
+    if(pinPurpose!=null)AcrylicDialog(onDismissRequest={if(!pinBusy){pinPurpose=null;pin="";pinAgain=""}},title={Text(if(pinPurpose=="send")"解锁受保护内容" else "设置本机隐私 PIN")},text={Column(verticalArrangement=Arrangement.spacedBy(D.SpaceMd)) {
         Text(if(pinPurpose=="send")"验证本机 6 位 PIN 后，受保护内容才会加入本次发送。" else "受保护内容需要本机独立的 6 位 PIN。发送机的 PIN 不会迁移。")
         OutlinedTextField(value=pin,onValueChange={pin=it.filter(Char::isDigit).take(6)},label={Text("6 位 PIN")},visualTransformation=PasswordVisualTransformation(),singleLine=true)
         if(pinPurpose=="receive")OutlinedTextField(value=pinAgain,onValueChange={pinAgain=it.filter(Char::isDigit).take(6)},label={Text("再次输入 PIN")},visualTransformation=PasswordVisualTransformation(),singleLine=true)
@@ -293,7 +301,7 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
             pinPurpose=null;pin="";pinAgain=""
         }catch(e:Exception){localError=e.message}finally{pinBusy=false}
     }}){Text(if(pinBusy)"正在验证…" else "确认")}},dismissButton={TextButton(enabled=!pinBusy,onClick={pinPurpose=null;pin="";pinAgain=""}){Text("取消")}})
-    if(showHistory)AlertDialog(onDismissRequest={showHistory=false},title={Text("最近传输")},text={Text(manager.history().joinToString("\n\n").ifBlank {"还没有传输记录"})},confirmButton={TextButton(onClick={showHistory=false}){Text("关闭")}})
+    if(showHistory)AcrylicDialog(onDismissRequest={showHistory=false},title={Text("最近传输")},text={Text(manager.history().joinToString("\n\n").ifBlank {"还没有传输记录"})},confirmButton={TextButton(onClick={showHistory=false}){Text("关闭")}})
 }
 
 @Composable

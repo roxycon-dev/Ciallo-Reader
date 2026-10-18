@@ -392,6 +392,15 @@ class MainActivity : ComponentActivity() {
                                     else com.example.ui.feedback.MutingHapticFeedback),
                             ) {
                         val navController = rememberNavController()
+                        val transferManager = remember { com.example.transfer.TransferManager.get(this@MainActivity) }
+                        val transferOpen by transferManager.openPage.collectAsStateWithLifecycle()
+                        LaunchedEffect(transferOpen) {
+                            if (transferOpen) {
+                                navController.navigate("device_transfer") { launchSingleTop = true }
+                            } else if (navController.currentDestination?.route == "device_transfer") {
+                                navController.popBackStack()
+                            }
+                        }
                         val sharedEntry by navController.currentBackStackEntryAsState()
                         val sharedSources by libraryViewModel.sourceManager.availableSources.collectAsStateWithLifecycle()
                         val sharedSourcesReady by libraryViewModel.sourcesReady.collectAsStateWithLifecycle()
@@ -1827,6 +1836,10 @@ class MainActivity : ComponentActivity() {
                                 viewModel = sourceViewModel,
                                 onBack = { navController.popBackStack() }
                             )
+                        }
+
+                        composable("device_transfer") {
+                            com.example.transfer.TransferScreen(transferManager,viewModel.backupManager,viewModel::enablePrivacyMode)
                         }
 
                     }

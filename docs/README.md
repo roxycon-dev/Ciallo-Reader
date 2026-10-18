@@ -8,6 +8,8 @@
 
 ## 内容
 
+- [Ciallo Reader 1.4.4 互传连接与界面修复](release-1.4.4-2026-10-18.md)
+
 - [Ciallo Reader 1.4.3 发布验证](release-1.4.3-2026-10-18.md)
 - [设备互传与便携备份](device-transfer.md)
 

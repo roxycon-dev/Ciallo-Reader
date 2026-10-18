@@ -1,9 +1,7 @@
 # releases
 
-本地安装包副本不纳入 Git；正式包与校验文件上传 GitHub Release。
+本地 APK 不纳入 Git，正式包与校验文件上传 GitHub Release。
 
-[下载 Ciallo Reader 1.4.3 / 226](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.3/Ciallo-Reader-v1.4.3.apk) · [SHA256SUMS](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.3/SHA256SUMS.txt) · [发布验证](../docs/release-1.4.3-2026-10-18.md)。
+[下载 Ciallo Reader 1.4.4 / 227](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.4/Ciallo-Reader-v1.4.4.apk) · [SHA256SUMS](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.4/SHA256SUMS.txt) · [发布验证](../docs/release-1.4.4-2026-10-18.md)。
 
-arm64-v8a，29,065,083 B，沿用固定发布签名，与 1.4.2 满足保留数据覆盖升级的包标识、证书和版本条件。39 项相关自动测试通过；未执行真机安装与双机无线传输测试。
-
-SHA256：`f55500aa95f4372f8ad8edf211bcb15acedbda8964116728920d41a9c9920e04`，亦附于 Release 的 `SHA256SUMS.txt`。
+Android 7.0+，arm64-v8a，沿用固定发布签名。两端均需更新，旧传输任务取消后重新发送。选定自动测试与 Android 原生 TLS 仪器测试通过；双机无线仍待真机验证。

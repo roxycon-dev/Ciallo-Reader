@@ -80,6 +80,7 @@ import androidx.compose.foundation.layout.widthIn
 import com.example.ui.adaptive.AdaptiveSpec
 import com.example.ui.components.AppToast
 import com.example.BuildConfig
+import com.example.ui.design.DesignTokens as D
 import com.example.data.GithubUpdateChecker
 import com.example.data.AppUpdateManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -1233,11 +1234,18 @@ LazyColumn(
                 }
 
                 item(key="user_backup") {
-                    SettingsSectionHeader("设备互传与备份")
-                    GlassCard(modifier=Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(com.example.ui.design.DesignTokens.SpaceLg),verticalArrangement=Arrangement.spacedBy(com.example.ui.design.DesignTokens.SpaceMd)) {
-                            AppActionButton(text="打开设备互传",onClick={ com.example.transfer.TransferManager.get(context).show() })
-
+                    SettingsSectionHeader("数据管理")
+                    GlassCard(
+                        modifier=Modifier.fillMaxWidth()
+                            .clickableWithFeedback { com.example.transfer.TransferManager.get(context).show() }
+                            .testTag("device_transfer_entry"),
+                        shape=RoundedCornerShape(D.RadiusMd)
+                    ) {
+                        Row(Modifier.fillMaxWidth().padding(D.SpaceLg),verticalAlignment=Alignment.CenterVertically) {
+                            Icon(Icons.Default.SwapHoriz,null,tint=MintPrimary,modifier=Modifier.size(D.SpaceXxl))
+                            Spacer(Modifier.width(D.SpaceMd))
+                            Text("设备互传与备份",fontWeight=FontWeight.SemiBold,fontSize=D.TypeSection,modifier=Modifier.weight(1f))
+                            Icon(Icons.Default.ChevronRight,"打开设备互传",tint=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.5f))
                         }
                     }
                 }

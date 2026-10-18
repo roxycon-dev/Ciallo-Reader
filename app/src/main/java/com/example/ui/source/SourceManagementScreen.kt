@@ -178,11 +178,9 @@ private val SourceExpandRowHeight = 44.dp     // 「展开其余 N 个」
 private val SourceImportRowHeight = 48.dp     // D 导入行
 private val SourceDividerWidth = 0.5.dp       // 细分割线（卡内）
 /** Material3 LargeTopAppBar 展开态高度（用于顶部渐变遮罩的高度计算）。 */
-private val SourceLargeTitleHeight = 152.dp
+private val SourceLargeTitleHeight = GlassTokens.ManagementTitleHeight
 /** 页面级壁纸模糊半径（sigma ≈ 16，功能页规格：壁纸只留氛围色、看不出线条）。 */
 
-private const val TITLE_EXPANDED_SP = 28f
-private const val TITLE_COLLAPSED_SP = 20f
 
 /** 漫画组折叠态默认露出前 N 个，其余走「展开其余 N 个」。 */
 private const val COMIC_GROUP_PREVIEW_COUNT = 6
@@ -779,34 +777,7 @@ private fun SourceCollapsingTopBar(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val collapsedFraction = scrollBehavior.state.collapsedFraction
-
-    // ⚠️ 顶栏自身**完全透明**：折叠后的那层玻璃由外层的 [GlassTopBarStrip] 提供。
-    // 顶栏不再自己挂背景，避免出现"玻璃条 + 顶栏底"两层叠加导致的重复着色与硬切边。
-    LargeTopAppBar(
-        title = {
-            Text(
-                text = "书源管理",
-                fontWeight = FontWeight.Bold,
-                // 主文字 onSurface 100%：大标题是整页唯一压在"背景"上的文字，
-                // 由顶部渐变遮罩保护，这里不再降透明度。
-                color = primaryText(),
-                fontSize = (TITLE_EXPANDED_SP -
-                    (TITLE_EXPANDED_SP - TITLE_COLLAPSED_SP) * collapsedFraction).sp
-            )
-        },
-        navigationIcon = {
-            AppIconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-            }
-        },
-        scrollBehavior = scrollBehavior,
-        colors = TopAppBarDefaults.largeTopAppBarColors(
-            containerColor = Color.Transparent,
-            scrolledContainerColor = Color.Transparent
-        ),
-        modifier = modifier
-    )
+    com.example.ui.glasskit.GlassManagementTopBar("书源管理",scrollBehavior,onBack,modifier)
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

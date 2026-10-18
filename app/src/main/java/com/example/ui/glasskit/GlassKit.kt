@@ -81,6 +81,7 @@ import me.trishiraj.shadowglow.consistentShadow
  * ══════════════════════════════════════════════════════════════════════════ */
 
 object GlassTokens {
+    val ManagementTitleHeight = 152.dp
     /** 大卡圆角（连续曲率）。 */
     val Radius = 24.dp
     /** 头像 / 输入框等小元素。 */

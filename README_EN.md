@@ -24,7 +24,7 @@ Read local ebooks, novels, and comics in one Android app.
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
 
-**1.4.3 / 226** adds device transfer and portable backups with category selection, merge import, resumable transfers, and shared `.ciallo` files. Transfer animations now use moving cards with simpler interface text. Uses the existing release signing identity. All 39 selected automated tests pass; wireless transfers between physical devices and third-party file sharing still need hardware validation. See the [verification record](docs/release-1.4.3-2026-10-18.md).
+**1.4.4 / 227** unifies transfer with the frosted-glass source-management interface and replaces the Settings button with a standard clickable row. Fixes Android native TLS key authorization, advertised ports, network routing, and long connection waits. Update both devices and restart any old transfer task. See the [verification record](docs/release-1.4.4-2026-10-18.md).
 
 Also repairs legacy Android API compatibility, glass effect cleanup, EPUB path handling and Compose state subscriptions found during release checks.
 
@@ -32,9 +32,9 @@ Also repairs legacy Android API compatibility, glass effect cleanup, EPUB path h
 
 ### Device transfer and backups
 
-<img src="./docs/screenshots/demo-transfer143.gif" width="360" alt="Device transfer cards, progress and completion animation preview"/>
+<img src="./docs/screenshots/shot-transfer144-glass.jpg" width="360" alt="Device transfer using the shared frosted-glass interface"/>
 
-This is a Compose UI state demonstration, not a recording of a real transfer between two devices.
+This is an Android emulator screenshot with a test background. Wireless transfers between physical devices still need validation.
 
 ### Reading settings and layouts
 
@@ -122,7 +122,7 @@ Version 1.3.8 adds Discover and restores Aiman and MYCOMIC reading. Its APK reta
 
 - **Android:** 7.0 (API 24) or newer.
 - **Architecture:** Current release APKs target arm64-v8a, supported by most Android phones and tablets. The release APK does not include an x86_64 emulator build.
-- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.4.3 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.3/Ciallo-Reader-v1.4.3.apk).
+- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.4.4 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.4/Ciallo-Reader-v1.4.4.apk).
 - Open the downloaded APK and follow Android's prompt to allow installation from that source.
 
 ## Get started

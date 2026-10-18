@@ -33,8 +33,9 @@ enum class TransferPhase(val label: String) {
     CANCELLED("已取消"), FAILED("传输未完成")
 }
 enum class TransferError { PERMISSION, WIFI_DISABLED, UNSUPPORTED, BUSY, CONNECTION, REJECTED, SPACE, CORRUPT, VERSION, IMPORT, UNKNOWN }
+data class TransferRoute(val host:String,val port:Int,val networkHandle:Long?=null)
 data class TransferPeer(val id: String, val name: String, val host: String? = null, val port: Int = 0,
-    val p2pAddress: String? = null, val protocol: Int = 1) {
+    val p2pAddress: String? = null, val protocol: Int = 1, val routes:List<TransferRoute> = emptyList(),val directPort:Int?=null) {
     val routeLabel: String get() = if (host != null) "同 Wi-Fi · 加密连接" else "附近直连 · 无需网络"
 }
 data class TransferSessionState(
