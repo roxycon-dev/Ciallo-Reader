@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 
 internal data class ReleaseSummary(val version: String, val date: String, val summary: String)
 internal val releaseHistory = listOf(
+    ReleaseSummary("1.4.5", "10-18", "附近连接建组与角色修复 · 独立直连握手"),
     ReleaseSummary("1.4.4", "10-18", "互传毛玻璃界面统一 · 连接与 TLS 握手修复"),
     ReleaseSummary("1.4.3", "10-18", "设备互传与便携备份 · 卡片流转动效 · 精简文案"),
     ReleaseSummary("1.4.2", "10-17", "顶部留白压缩 · 发现榜单与状态分类联动"),

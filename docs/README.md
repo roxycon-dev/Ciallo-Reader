@@ -8,6 +8,8 @@
 
 ## 内容
 
+- [Ciallo Reader 1.4.5 附近连接修复](release-1.4.5-2026-10-18.md)
+
 - [Ciallo Reader 1.4.4 互传连接与界面修复](release-1.4.4-2026-10-18.md)
 
 - [Ciallo Reader 1.4.3 发布验证](release-1.4.3-2026-10-18.md)

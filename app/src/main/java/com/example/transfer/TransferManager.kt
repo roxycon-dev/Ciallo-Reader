@@ -48,6 +48,12 @@ class TransferManager private constructor(private val context:Context) {
     private var foreground=false
     private var server:java.net.ServerSocket?=null
     private var serverJob:Job?=null
+    private var nearbyServer:java.net.ServerSocket?=null
+    private var nearbyServerJob:Job?=null
+    @Volatile private var nearbyProbeSocket:java.net.Socket?=null
+    @Volatile private var pendingNearby=false
+    private var nearbyGroupSeen=false
+    @Volatile private var nearTask=false
     private var task:Job?=null
     private var connectionTimeout:Job?=null
     @Volatile private var socket:SSLSocket?=null
@@ -58,16 +64,58 @@ class TransferManager private constructor(private val context:Context) {
     private var localDecision:CompletableDeferred<Boolean>?=null
     private var importDecision:CompletableDeferred<ImportMode>?=null
     private var receiveMode=ImportMode.MERGE
-    private val discovery=TransferDiscovery(context,id,deviceName) { owner,host,port ->
-        if(!owner && socket==null && !claimed && directJob?.isActive!=true && state.value.phase!=TransferPhase.CANCELLED) directJob=scope.launch {
-            try { val outgoingSession=outgoing
-                val endpoint=TransferPeer(outgoingSession?.optString("peerId")?:"p2p","附近设备",host,port)
-                // A newly formed group may notify its client before the owner's listener is reachable.
-                for(attempt in 0..2) {
-                    try {connectSocket(endpoint);break}
-                    catch(e:java.io.IOException){if(attempt==2 || e.cause !is java.net.ConnectException)throw e;delay(500L*(attempt+1))}
-                }
-            } catch(e:Exception) { fail(e) }
+    private val discovery=TransferDiscovery(context,id,deviceName,::nearbyGroup,::nearbyStage,::nearbyFailure)
+    private fun sendIntent():Boolean=outgoing!=null && state.value.phase in setOf(
+        TransferPhase.CONNECTING,TransferPhase.AWAITING_CONFIRMATION,TransferPhase.TRANSFERRING,TransferPhase.VERIFYING)
+    private fun nearbyOffer(requester:String?=null):NearbyOffer {
+        val sending=sendIntent()
+        val wrongPeer=sending && requester!=null && outgoing!!.optString("peerFingerprint").isEmpty() && outgoing!!.optString("peerId")!=requester
+        val busy=claimed || state.value.phase in setOf(TransferPhase.PREPARING,TransferPhase.IMPORTING,TransferPhase.VERIFYING,TransferPhase.RECEIVED) ||
+            outgoing!=null && !sending || wrongPeer
+        return NearbyOffer(id,deviceName,sending,busy)
+    }
+    private fun nearbyStage(message:String) {if(pendingNearby && !claimed)change(TransferPhase.CONNECTING,message)}
+    private fun nearbyFailure(message:String) {
+        if(!pendingNearby || claimed)return
+        pendingNearby=false;connectionTimeout?.cancel()
+        change(TransferPhase.WAITING_TO_RESUME,message);stopServiceIfIdle()
+    }
+    private fun nearbyTimeout(millis:Long,message:String) {
+        connectionTimeout?.cancel()
+        connectionTimeout=scope.launch {delay(millis);if(pendingNearby && !claimed && state.value.phase==TransferPhase.CONNECTING) {
+            withContext(Dispatchers.Main){discovery.cancelConnection()}
+            nearbyFailure(message)
+        }}
+    }
+    private fun nearbyGroup(group:NearbyGroup) {
+        if(pendingNearby && !nearbyGroupSeen) {
+            nearbyGroupSeen=true
+            nearbyStage(if(group.owner)"附近网络已建立，等待对方连接" else "附近网络已建立，正在连接对方")
+            nearbyTimeout(18_000,"附近网络已建立，但未能连接到对方的互传服务。请确认双方均已更新附近连接版本后重试")
+        }
+        if(group.owner || claimed || socket!=null || directJob?.isActive==true)return
+        directJob=scope.launch {
+            var ownsClaim=false;var handedOff=false;var probe:java.net.Socket?=null;var tracked:java.net.Socket?=null
+            try {
+                val local=nearbyOffer()
+                if(local.busy)return@launch
+                val route=TransferRoute(group.host,NearbyHandshake.PORT,localAddress=group.localAddress,nearby=true)
+                val linked=TransferConnection.connectNearby({TransferTls.context()},route,local,
+                    if(local.sending)outgoing?.optString("peerId") else null,
+                    claim={claim().also {ownsClaim=it;if(it){nearTask=true;pendingNearby=false;connectionTimeout?.cancel();change(TransferPhase.CONNECTING,"正在建立加密连接")}}},
+                    trackProbe={probe=it;nearbyProbeSocket=it},track={tracked=it;connectingSocket=it})?:return@launch
+                val endpoint=TransferPeer(linked.remote.id,linked.remote.name,group.host,NearbyHandshake.PORT,routes=listOf(route),nearbyProtocol=NearbyHandshake.VERSION)
+                handedOff=true
+                runSocket(linked.socket,false,endpoint)
+            } catch(e:Exception) {
+                if(e !is CancellationException && ownsClaim)fail(e)
+                else if(e !is CancellationException && pendingNearby && e !is java.io.IOException)nearbyFailure(e.message?:"附近服务连接失败")
+            } finally {
+                runCatching {probe?.close()};runCatching {tracked?.close()}
+                if(nearbyProbeSocket===probe)nearbyProbeSocket=null
+                if(connectingSocket===tracked)connectingSocket=null
+                if(ownsClaim && !handedOff){claimed=false;stopServiceIfIdle()}
+            }
         }
     }
     val peers=discovery.peers
@@ -102,7 +150,7 @@ class TransferManager private constructor(private val context:Context) {
     fun enable(value:Boolean) {
         check(prefs.edit().putBoolean("enabled",value).commit())
         mutableEnabled.value=value
-        if(value && foreground) startListening() else if(!value && !state.value.busy) stopIdle()
+        if(value && foreground) startListening() else if(!value && !state.value.busy) stopIdle(disconnectNearby=true)
     }
     fun scan() {
         if(!enabled.value) enable(true)
@@ -112,31 +160,58 @@ class TransferManager private constructor(private val context:Context) {
     }
     private fun startListening() {
         if(serverJob?.isActive==true) {
-            server?.localPort?.let {port -> scope.launch(Dispatchers.Main.immediate) {discovery.start(port)}}
+            server?.localPort?.let {port ->scope.launch(Dispatchers.Main.immediate){discovery.start(port,nearbyServer?.isClosed==false)}}
             return
         }
         serverJob=scope.launch {
+            var listener:java.net.ServerSocket?=null
+            var direct:java.net.ServerSocket?=null
             try {
-                val listener=java.net.ServerSocket().apply {
+                listener=java.net.ServerSocket().apply {
                     reuseAddress=true
-                    try { bind(InetSocketAddress(TransferDiscovery.PORT)) } catch(_:java.net.BindException) { bind(InetSocketAddress(0)) }
+                    try {bind(InetSocketAddress(TransferDiscovery.PORT))}catch(_:java.net.BindException){bind(InetSocketAddress(0))}
                 }
                 server=listener
-                withContext(Dispatchers.Main) { discovery.start(listener.localPort) }
-                while(isActive && !listener.isClosed) {
-                    val accepted=listener.accept()
-                    scope.launch {
-                        if(!claim()) {accepted.close();return@launch}
-                        try {
-                            change(TransferPhase.CONNECTING,"正在建立加密连接")
-                            val secure=TransferConnection.accept(TransferTls.context(),accepted,track={connectingSocket=it})
-                            runSocket(secure,true)
-                        } catch(e:Exception) {if(e !is CancellationException)fail(e)}
-                        finally {runCatching {accepted.close()};connectingSocket=null;claimed=false;stopServiceIfIdle()}
-                    }
+                direct=runCatching {java.net.ServerSocket().apply {reuseAddress=true;bind(InetSocketAddress(NearbyHandshake.PORT))}}.getOrNull()
+                nearbyServer=direct
+                direct?.let {fixed ->nearbyServerJob=scope.launch {acceptConnections(fixed,true)}}
+                withContext(Dispatchers.Main){discovery.start(listener.localPort,direct!=null)}
+                acceptConnections(listener,false)
+            } catch(e:Exception){if(e !is CancellationException && enabled.value && foreground)fail(e)}
+            finally {
+                runCatching {listener?.close()};runCatching {direct?.close()}
+                if(server===listener)server=null
+                if(nearbyServer===direct)nearbyServer=null
+            }
+        }
+    }
+    private suspend fun acceptConnections(listener:java.net.ServerSocket,nearby:Boolean) {
+        while(currentCoroutineContext().isActive && !listener.isClosed) {
+            val accepted=try {listener.accept()}catch(e:java.io.IOException){if(listener.isClosed)return else throw e}
+            scope.launch {
+                var ownsClaim=false;var handedOff=false;var tracked:java.net.Socket?=null
+                fun takeClaim():Boolean=claim().also {got ->
+                    if(got){ownsClaim=true;nearTask=nearby;pendingNearby=false;connectionTimeout?.cancel();tracked=accepted;connectingSocket=accepted}
                 }
-            } catch(e:Exception) { if(e !is CancellationException && enabled.value && foreground) fail(e) }
-            finally { server?.close(); server=null }
+                try {
+                    val linked=if(nearby)TransferConnection.acceptNearby({TransferTls.context()},accepted,
+                        offer={remote ->nearbyOffer(remote.id)},claim=::takeClaim,track={tracked=it;connectingSocket=it})
+                    else {
+                        if(!takeClaim())return@launch
+                        TransferConnection.NearbyAccepted(TransferConnection.accept(TransferTls.context(),accepted,track={tracked=it;connectingSocket=it}),NearbyOffer("","",false))
+                    }
+                    if(linked==null)return@launch
+                    change(TransferPhase.CONNECTING,"正在建立加密连接")
+                    val endpoint=if(nearby)TransferPeer(linked.remote.id,linked.remote.name,routes=listOf(TransferRoute(accepted.inetAddress.hostAddress,NearbyHandshake.PORT,nearby=true)),nearbyProtocol=NearbyHandshake.VERSION)else null
+                    handedOff=true
+                    runSocket(linked.socket,true,endpoint)
+                } catch(e:Exception){if(ownsClaim && e !is CancellationException)fail(e)}
+                finally {
+                    runCatching {accepted.close()};runCatching {tracked?.close()}
+                    if(connectingSocket===tracked)connectingSocket=null
+                    if(ownsClaim && !handedOff){claimed=false;stopServiceIfIdle()}
+                }
+            }
         }
     }
     @Synchronized private fun claim():Boolean {
@@ -144,10 +219,12 @@ class TransferManager private constructor(private val context:Context) {
             outgoing==null && state.value.phase in setOf(TransferPhase.VERIFYING,TransferPhase.RECEIVED))return false
         claimed=true; return true
     }
-    private fun stopIdle() {
+    private fun stopIdle(disconnectNearby:Boolean=false) {
         if(claimed || state.value.busy) return
-        serverJob?.cancel(); runCatching { server?.close() }; serverJob=null
-        scope.launch(Dispatchers.Main.immediate) { discovery.stop() }
+        serverJob?.cancel();runCatching {server?.close()};serverJob=null
+        nearbyServerJob?.cancel();runCatching {nearbyServer?.close()};nearbyServerJob=null
+        directJob?.cancel();runCatching {nearbyProbeSocket?.close()}
+        scope.launch(Dispatchers.Main.immediate) {discovery.stop(disconnectNearby)}
     }
     fun startSend(peer:TransferPeer,selection:ExportSelection) {
         if(state.value.busy || task?.isActive==true) return
@@ -169,6 +246,7 @@ class TransferManager private constructor(private val context:Context) {
                 val session=JSONObject().put("sessionId",sessionId).put("token",token).put("file",target.absolutePath)
                     .put("size",target.length()).put("sha256",fileHash(target)).put("createdAt",System.currentTimeMillis())
                     .put("peerId",peer.id).put("peerName",peer.name).put("host",peer.host?:"").put("port",peer.port).put("p2pAddress",peer.p2pAddress?:"")
+                    .put("nearbyProtocol",peer.nearbyProtocol).put("directPort",peer.directPort?:NearbyHandshake.PORT)
                 outgoing=session; save(File(directory,"outgoing.json"),session)
                 connectOutgoing(peer)
             } catch(e:Exception) { if(e !is CancellationException) fail(e) }
@@ -185,13 +263,14 @@ class TransferManager private constructor(private val context:Context) {
     private suspend fun connectOutgoing(peer:TransferPeer) {
         change(TransferPhase.CONNECTING,"正在建立加密连接",peer)
         if(peer.host==null) {
-            withContext(Dispatchers.Main) { discovery.connect(peer) }
-            connectionTimeout?.cancel()
-            connectionTimeout=scope.launch { delay(35_000);if(state.value.phase==TransferPhase.CONNECTING && !claimed) {
-                change(TransferPhase.WAITING_TO_RESUME,"附近连接超时，请检查系统连接提示，或让两台设备连接同一 Wi-Fi 后重试",peer);stopServiceIfIdle()
-            } }
+            try {withContext(Dispatchers.Main){
+                pendingNearby=true;nearbyGroupSeen=false
+                nearbyTimeout(35_000,"附近网络未建立，连接请求已超时。可重新连接")
+                discovery.connect(peer)
+            }}catch(e:Exception){nearbyFailure(e.message?:"附近连接启动失败")}
             return
         }
+        nearTask=false;pendingNearby=false
         var last:Exception?=null
         for(attempt in 0..3) {
             var established=false
@@ -209,6 +288,7 @@ class TransferManager private constructor(private val context:Context) {
     }
     private suspend fun connectSocket(peer:TransferPeer,onEstablished:()->Unit={}) {
         check(claim()) { "当前已有连接" }
+        var handedOff=false;var tracked:java.net.Socket?=null
         try {
             val deadline=android.os.SystemClock.elapsedRealtime()+18_000
             var last:Exception?=null
@@ -221,16 +301,16 @@ class TransferManager private constructor(private val context:Context) {
                 var authenticated=false
                 try {
                     val address=java.net.InetAddress.getByName(route.host)
-                    val network=connectivity.allNetworks.firstOrNull {it.networkHandle==route.networkHandle}
+                    val network=if(route.nearby)null else (connectivity.allNetworks.firstOrNull {it.networkHandle==route.networkHandle}
                         ?:connectivity.allNetworks.firstOrNull { candidate ->
                             connectivity.getNetworkCapabilities(candidate)?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)==true &&
                                 connectivity.getLinkProperties(candidate)?.linkAddresses?.any {link ->sameSubnet(address.address,link.address.address,link.prefixLength)}==true
-                        }
-                    val connection=TransferConnection.connect(tls,route,bind={raw -> network?.bindSocket(raw)},
-                        track={connectingSocket=it},stage={message ->change(TransferPhase.CONNECTING,message,peer)},
+                        })
+                    val connection=TransferConnection.connect(tls,route,bind={raw ->network?.bindSocket(raw);route.localAddress?.let {raw.bind(InetSocketAddress(it,0))}},
+                        track={tracked=it;connectingSocket=it},stage={message ->change(TransferPhase.CONNECTING,message,peer)},
                         connectTimeout=minOf(4_000,remaining),handshakeTimeout=minOf(8_000,(remaining-4_000).coerceAtLeast(1_000)))
                     onEstablished()
-                    authenticated=true
+                    authenticated=true;handedOff=true
                     runSocket(connection,false,peer)
                     return
                 } catch(e:Exception) {
@@ -242,7 +322,7 @@ class TransferManager private constructor(private val context:Context) {
             }
             throw last?:java.io.IOException("设备地址已失效，请重新发现设备")
         }
-        finally {runCatching {connectingSocket?.close()};connectingSocket=null;claimed=false}
+        finally {runCatching {tracked?.close()};if(connectingSocket===tracked)connectingSocket=null;if(!handedOff)claimed=false}
     }
     private class RejectedException(message:String):Exception(message)
     private suspend fun runSocket(connection:SSLSocket,accepted:Boolean,endpoint:TransferPeer?=null) {
@@ -261,7 +341,8 @@ class TransferManager private constructor(private val context:Context) {
             val remote=read(input); require(remote.getString("type")=="hello" && remote.getInt("v")==1)
             require(remote.getString("nonce").matches(Regex("[a-f0-9]{48}")))
             if(sending==remote.getBoolean("sending"))throw RejectedException("双方都在发送或都在等待，请让一台设备选择发送")
-            val remotePeer=endpoint?:TransferPeer(remote.getString("id"),remote.getString("name").take(64))
+            if(endpoint?.routes?.any {it.nearby}==true && endpoint.id!=remote.getString("id"))throw SecurityException("附近握手设备身份不一致")
+            val remotePeer=endpoint?.copy(id=remote.getString("id"),name=remote.getString("name").take(64))?:TransferPeer(remote.getString("id"),remote.getString("name").take(64))
             if(sending && outgoing!!.optString("peerFingerprint").isEmpty() && outgoing!!.optString("peerId")!=remote.getString("id"))
                 throw SecurityException("连接的设备与所选设备不一致，请重新发现")
             val fingerprint=TransferTls.peerFingerprint(connection)
@@ -417,7 +498,9 @@ class TransferManager private constructor(private val context:Context) {
     fun cancel() {
         if(state.value.phase==TransferPhase.IMPORTING) return
         localDecision?.complete(false); importDecision?.cancel(); task?.cancel()
-        directJob?.cancel();connectionTimeout?.cancel();runCatching {connectingSocket?.close()}
+        directJob?.cancel();connectionTimeout?.cancel();runCatching {connectingSocket?.close()};runCatching {nearbyProbeSocket?.close()}
+        if(pendingNearby || nearTask)scope.launch(Dispatchers.Main.immediate){discovery.cancelConnection()}
+        pendingNearby=false;nearTask=false
         runCatching { socket?.close() }; socket=null; claimed=false
         outgoing?.optString("file")?.let { File(it).delete() }; outgoing=null
         File(directory,"outgoing.json").delete()
@@ -458,7 +541,9 @@ class TransferManager private constructor(private val context:Context) {
             e.message?.contains("版本")==true -> TransferError.VERSION; e is java.io.IOException -> TransferError.CONNECTION; else -> TransferError.UNKNOWN }
         mutableState.update { it.copy(phase=phase,error=error,message=e.message?:"传输未完成，请重试",verificationCode=null) }
     }
-    private fun peer(session:JSONObject)=TransferPeer(session.getString("peerId"),session.getString("peerName"),session.optString("host").takeIf { it.isNotEmpty() },session.getInt("port"),session.optString("p2pAddress").takeIf { it.isNotEmpty() })
+    private fun peer(session:JSONObject)=peers.value.firstOrNull {it.id==session.optString("peerId")}
+        ?:TransferPeer(session.getString("peerId"),session.getString("peerName"),session.optString("host").takeIf {it.isNotEmpty()},session.getInt("port"),session.optString("p2pAddress").takeIf {it.isNotEmpty()},
+            directPort=session.optInt("directPort",NearbyHandshake.PORT),nearbyProtocol=session.optInt("nearbyProtocol",0))
     private fun cleanup() { val cutoff=System.currentTimeMillis()-TRANSFER_RETENTION
         directory.listFiles()?.filter { it.lastModified()<cutoff }?.forEach { it.delete() }
         File(context.cacheDir,"share_temp").listFiles()?.filter { it.extension=="ciallo" && it.lastModified()<cutoff }?.forEach { it.delete() }

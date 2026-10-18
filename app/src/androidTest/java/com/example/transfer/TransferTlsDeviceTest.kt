@@ -16,6 +16,48 @@ import java.util.concurrent.TimeUnit
 /** Runs against Android's real Keystore and Conscrypt, rather than JVM stand-ins. */
 @RunWith(AndroidJUnit4::class)
 class TransferTlsDeviceTest {
+    @Test fun nearbyRendezvousCarriesDataWithEitherGroupOwnerRoleAndAfterAnIdleProbe() {
+        val clientAlias="ciallo_nearby_test_client"
+        val ownerAlias="ciallo_nearby_test_owner"
+        val store=KeyStore.getInstance("AndroidKeyStore").apply {load(null)}
+        val executor=Executors.newSingleThreadExecutor()
+        try {
+            val clientContext=TransferTls.context(clientAlias);val ownerContext=TransferTls.context(ownerAlias)
+            for(ownerSends in listOf(true,false)) {
+                val payload=ByteArray(CHUNK_SIZE+193){(it%239).toByte()}
+                ServerSocket(0).use {server ->
+                    val response=executor.submit<String> {
+                        assertNull(TransferConnection.acceptNearby({error("Idle probe must not initialize TLS")},server.accept(),
+                            offer={NearbyOffer("owner","owner",false)},claim={error("Idle probe must not claim")}))
+                        val link=TransferConnection.acceptNearby({ownerContext},server.accept(),
+                            offer={NearbyOffer("owner","owner",ownerSends)},claim={true})!!
+                        link.socket.use {tls ->
+                            assertEquals(!ownerSends,link.remote.sending)
+                            val input=DataInputStream(tls.inputStream);val output=DataOutputStream(tls.outputStream)
+                            if(ownerSends){output.writeInt(payload.size);output.write(payload);output.flush()}
+                            else {val bytes=ByteArray(input.readInt());input.readFully(bytes);assertArrayEquals(payload,bytes)}
+                            val code=TransferTls.code(tls,"owner-nonce","client-nonce")
+                            output.writeUTF(code);output.flush()
+                            code
+                        }
+                    }
+                    val route=TransferRoute("127.0.0.1",server.localPort,localAddress="127.0.0.1",nearby=true)
+                    assertNull(TransferConnection.connectNearby({error("Idle probe must not initialize TLS")},route,
+                        NearbyOffer("client","client",false),"owner",claim={error("Idle probe must not claim")}))
+                    val link=TransferConnection.connectNearby({clientContext},route,NearbyOffer("client","client",!ownerSends),"owner",claim={true})!!
+                    link.socket.use {tls ->
+                        assertEquals(ownerSends,link.remote.sending)
+                        val input=DataInputStream(tls.inputStream);val output=DataOutputStream(tls.outputStream)
+                        if(ownerSends){val bytes=ByteArray(input.readInt());input.readFully(bytes);assertArrayEquals(payload,bytes)}
+                        else {output.writeInt(payload.size);output.write(payload);output.flush()}
+                        val code=input.readUTF()
+                        assertEquals(code,TransferTls.code(tls,"client-nonce","owner-nonce"))
+                        assertEquals(code,response.get(15,TimeUnit.SECONDS))
+                    }
+                }
+            }
+        } finally {executor.shutdownNow();store.deleteEntry(clientAlias);store.deleteEntry(ownerAlias)}
+    }
     @Test fun nativeKeystoreAuthorizesTlsSigning() {
         TransferTls.context()
         val store=KeyStore.getInstance("AndroidKeyStore").apply {load(null)}

@@ -7,7 +7,8 @@ internal fun mergePeer(old:TransferPeer?,fresh:TransferPeer):TransferPeer {
     return fresh.copy(host=fresh.host?:old?.host,
         port=if(fresh.host!=null)fresh.port else old?.takeIf {it.host!=null}?.port?:fresh.port,
         p2pAddress=fresh.p2pAddress?:old?.p2pAddress,
-        directPort=fresh.directPort?:old?.directPort,routes=routes)
+        directPort=fresh.directPort?:old?.directPort,routes=routes,
+        nearbyProtocol=if(fresh.p2pAddress!=null)fresh.nearbyProtocol else old?.nearbyProtocol?:fresh.nearbyProtocol)
 }
 
 internal fun connectionRoutes(peer:TransferPeer):List<TransferRoute> =
