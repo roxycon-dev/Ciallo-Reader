@@ -1,0 +1,9 @@
+The Xipi image-list protocol and public API adapter in js_extra/xipi.js are
+ported from Keiyoushi extensions-source, XipiManhua.kt and Dto.kt, at commit
+cfc019928453a4650669d0514723360629c4af56 (Apache License, Version 2.0).
+
+https://github.com/keiyoushi/extensions-source/tree/cfc019928453a4650669d0514723360629c4af56/src/zh/xipimanhua
+
+Changes: JavaScript host integration, bounded catalogue paging, input and
+response validation. The upstream license is included in this directory as
+keiyoushi-xipi-LICENSE.txt. This notice concerns adapter code, not manga content.

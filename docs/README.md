@@ -8,6 +8,8 @@
 
 ## 内容
 
+- [Ciallo Reader 1.4.7 漫画源与动态分类](release-1.4.7-2026-10-18.md)
+- [四部漫画最新话查源与验收](latest-comic-source-verification-2026-10-18.md)
 - [Ciallo Reader 1.4.6 合并去重修复](release-1.4.6-2026-10-18.md)
 
 - [Ciallo Reader 1.4.5 附近连接修复](release-1.4.5-2026-10-18.md)

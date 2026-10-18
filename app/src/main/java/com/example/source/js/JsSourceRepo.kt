@@ -114,6 +114,8 @@ object JsSourceRepo {
         Triple("vomic", "vomic漫画", "vomic.js"),
         Triple("pufei", "扑飞漫画", "pufei.js"),
         Triple("aimanhua", "爱漫画", "aimanhua.js"),
+        Triple("nineteen", "19漫画", "nineteen.js"),
+        Triple("xipi", "嬉皮漫画", "xipi.js"),
     )
 
     /** 从 assets 读取本地内置源并包装成 JsComicSource（不受远端仓库可用性影响）。 */

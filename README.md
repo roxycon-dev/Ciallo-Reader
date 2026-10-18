@@ -11,7 +11,7 @@
 
 [🌐 产品主页](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.4.6 更新说明与验证](docs/release-1.4.6-2026-10-18.md) ·
+[1.4.7 更新说明与验证](docs/release-1.4.7-2026-10-18.md) ·
 [查看截图](#界面预览) ·
 [全部功能](#功能亮点) ·
 [提交问题或建议](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -27,7 +27,7 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 **English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
 
-**1.4.6 / 229**：修复互传合并后书架重复：原文件缺失时增加完整正文匹配，漫画图片按实际字节识别，处理同包重复与在线书缓存差异。保留已有书籍和分类，关联标注与较新进度。详见 [验证记录](docs/release-1.4.6-2026-10-18.md)。
+**1.4.7 / 230**：新增免登录的「嬉皮漫画」与「19漫画」，接入源站动态分类、状态筛选、原站排序及分页。已验证勇者180.5话、间谍过家家141话、芙莉莲147话与海贼王1195话的在线阅读、整章下载和离线读图。包含1.4.6的互传合并去重修复。详见 [更新说明](docs/release-1.4.7-2026-10-18.md)。
 
 包含 1.3.11 的旧 Android API、玻璃弹窗清理、EPUB 路径兼容性和 Compose 状态订阅修复。
 
@@ -81,6 +81,17 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 - 两端需安装支持该功能的 Android 版本。不同品牌双机、无谷歌服务、无线链路及微信／QQ 文件接收尚待真机验证，详见 [使用与验证范围](docs/device-transfer.md)。
 
 ### 发现漫画与统一分类
+
+新增源随安装包提供，在书源管理中启用后即可搜索和参与发现，无需注册登录。发现分类读取源站当前入口，保留原站分组，并映射到应用统一分类；分类编号变化时重新从站点解析，不固定题材编号。
+
+| 作品 | 推荐源 | 本次验证章节 |
+| --- | --- | --- |
+| 这个勇者是金钱至上主义者 | 嬉皮漫画 | 180.5话「鹰身女妖&天使」；加测180话 |
+| 间谍过家家 | 19漫画 | 第141话 |
+| 葬送的芙莉莲 | 19漫画 | 第147话 |
+| 海贼王 | 19漫画 | 第1195话 |
+
+嬉皮使用源站原始章节标题，180.5话选择「鹰身女妖&天使」；站内条目序号包含公告与特典，不能视为正文章节号。上表记录2026-10-18验收结果，具体图片数量、编号依据和测试范围见 [漫画源验证报告](docs/latest-comic-source-verification-2026-10-18.md)。
 
 1.3.8 新增发现并恢复爱漫画与 MYCOMIC 的阅读链路。安装包沿用 1.3.6 签名；另签的 1.3.7 需先备份数据再迁移安装。
 

@@ -24,7 +24,9 @@ Read local ebooks, novels, and comics in one Android app.
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
 
-**1.4.6 / 229** fixes duplicate shelf books after transfer merges: missing originals use a complete chapter fingerprint, comic pages match by image bytes, and duplicate entries and cache differences reuse existing books. Keeps local categories and remaps annotations and newer reading progress. See the [verification scope](docs/release-1.4.6-2026-10-18.md).
+**1.4.7 / 230** adds anonymous Xipi and 19 Manga sources with native categories, status filters, sorting and pagination. Verified online reading, complete chapter downloads and offline image decoding for Money-First Hero 180.5, SPY×FAMILY 141, Frieren 147 and One Piece 1195. Includes the 1.4.6 transfer merge fixes. See the [release notes](docs/release-1.4.7-2026-10-18.md).
+
+Enable **嬉皮漫画 (Xipi)** for Money-First Hero and choose the original chapter title **鹰身女妖&天使** for episode 180.5. Use **19漫画 (19 Manga)** for the other three titles. Native category labels and routes are read from the sites, then mapped to the app's shared taxonomy. Verification reflects availability on 2026-10-18; see the [source audit](docs/latest-comic-source-verification-2026-10-18.md) for episode identity, page counts and scope.
 
 Also repairs legacy Android API compatibility, glass effect cleanup, EPUB path handling and Compose state subscriptions found during release checks.
 
