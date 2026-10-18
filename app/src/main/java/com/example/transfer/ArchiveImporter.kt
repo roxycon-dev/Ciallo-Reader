@@ -26,12 +26,17 @@ internal object ArchiveImporter {
             require(!preview.containsProtected || PrivacyManager(context).isEnabled()) { "请先在接收设备设置隐私 PIN，再导入受保护内容" }
             require(context.filesDir.usableSpace > preview.expandedBytes.coerceAtMost(64L*1024*1024)+16L*1024*1024) { "空间不足以创建恢复快照" }
             val rows=File(stage,"database.rows"); val files=File(stage,"files").absolutePath
-            val incomingIndex=IncomingChapterIndex(stage,rows);chapterIndex=incomingIndex
+            val incomingIndex=IncomingChapterIndex(stage,rows,context);chapterIndex=incomingIndex
             val bookIds=linkedMapOf<Int,Int>(); val chapterIds=linkedMapOf<Int,Int>(); val bookIdentities=hashMapOf<Int,String>()
             var added=0; var merged=0; var skipped=0
             val warnings=preview.warnings.toMutableList()
-            val existingBooks=ArchiveRows.all(sql,"books")
-            val existingFingerprints=existingBooks.associateBy { PortableArchive.bookFingerprint(context,sql,it) }
+            val existingBooks=ArchiveRows.all(sql,"books").toMutableList()
+            val existingFingerprints=existingBooks.groupBy { PortableArchive.bookFingerprint(context,sql,it) }.mapValues {it.value.toMutableList()}.toMutableMap()
+            val localBodies=hashMapOf<Int,String?>()
+            val localOriginals=hashMapOf<Int,String?>()
+            val insertedOrigins=hashMapOf<Int,Int>()
+            val bodyFingerprint=BookBodyFingerprint(context)
+            fun online(book:JSONObject)=book.stringOrNull("sourceId")!=null && book.stringOrNull("comicId")!=null
             val total=preview.counts.values.sum().toLong(); var completed=0L
             ImportJournal.prepare(context,sql,stage.name,mode==ImportMode.REPLACE); prepared=true
             // No cancellation across the commit boundary: a cancellation is observed before it, or after a complete commit.
@@ -47,11 +52,11 @@ internal object ArchiveImporter {
                         } }.forEach { sql.execSQL("DELETE FROM `$it`") }
                         sql.execSQL("DELETE FROM transfer_receipts"); sql.execSQL("DELETE FROM transfer_identities")
                     }
+                    fun portablePath(path:String):Boolean = path.startsWith("http://") || path.startsWith("https://") || path.isBlank() ||
+                        runCatching {File(path.removePrefix("file://")).canonicalPath.startsWith(File(files).canonicalPath+File.separator)}.getOrDefault(false)
                     fun relocated(row: JSONObject): JSONObject {
                         row.keys().asSequence().toList().forEach { key -> (row.opt(key) as? String)?.let { text ->
                             var value=text.replace("@FILES@",files)
-                            fun portablePath(path:String):Boolean = path.startsWith("http://") || path.startsWith("https://") ||
-                                path.removePrefix("file://").startsWith(files+File.separator) || path.isBlank()
                             if(key in setOf("filePath","coverUri","localThumbPath","coverPath") && !portablePath(value))value=""
                             if(key=="content")value=Regex("\\[IMG:([^]]+)]").replace(value){if(portablePath(it.groupValues[1]))it.value else ""}
                             row.put(key,value)
@@ -86,13 +91,23 @@ internal object ArchiveImporter {
                                         payload.exists() -> PortableArchive.bookFingerprint(context,sql,row)
                                         else -> incomingIndex.bodyIdentity(original,row.getString("contentType")) }
                                 }
-                                val mapped=if(mode==ImportMode.MERGE) same("transfer_identities","stableId=? AND localKey LIKE 'books:%'",arrayOf(identity))?.optString("localKey")?.removePrefix("books:")?.toIntOrNull()?.let { id -> same("books","id=?",arrayOf(id)) } else null
-                                val candidates=if(mode==ImportMode.MERGE)listOfNotNull(mapped,existingFingerprints[identity])+
-                                    (if(row.stringOrNull("sourceId")!=null)ArchiveRows.all(sql,"books","sourceId=? AND comicId=?",arrayOf(row.getString("sourceId"),row.getString("comicId")))else emptyList())else emptyList()
+                                val originalFile=if(online(row))null else PortableArchive.originalFileFingerprint(context,row)
+                                val incomingBody by lazy {incomingIndex.contentIdentity(original,row.getString("contentType"))}
+                                val mapped=if(mode==ImportMode.MERGE) ArchiveRows.all(sql,"transfer_identities","stableId=? AND localKey LIKE 'books:%'",arrayOf(identity)).mapNotNull {
+                                    it.optString("localKey").removePrefix("books:").toIntOrNull()?.let {id ->same("books","id=?",arrayOf(id))}
+                                } else emptyList()
+                                val candidates=if(mode==ImportMode.MERGE)mapped+existingFingerprints[identity].orEmpty()+existingFingerprints[originalFile].orEmpty()+
+                                    (if(online(row))ArchiveRows.all(sql,"books","sourceId=? AND comicId=?",arrayOf(row.getString("sourceId"),row.getString("comicId")))else emptyList())else emptyList()
                                 val old=candidates.firstOrNull {
                                     if(envelope.optBoolean("parentOnly")) envelope.optString("bodyVersion").let { version -> version.isBlank() || version==PortableArchive.chapterVersion(sql,it.getInt("id")) }
-                                    else incomingIndex.compatible(sql,original,it.getInt("id"))
-                                }
+                                    else insertedOrigins[it.getInt("id")]?.let {previous ->incomingIndex.compatibleIncoming(original,previous)}
+                                        ?:incomingIndex.compatible(sql,original,it.getInt("id"))
+                                } ?: if(mode==ImportMode.MERGE && !online(row) && !envelope.optBoolean("parentOnly") && incomingBody!=null) existingBooks.firstOrNull { local ->
+                                    val localId=local.getInt("id")
+                                    !online(local) && local.getString("contentType")==row.getString("contentType") &&
+                                        (originalFile==null || localOriginals.getOrPut(localId){PortableArchive.originalFileFingerprint(context,local)}==null) &&
+                                        localBodies.getOrPut(localId){bodyFingerprint.local(sql,localId,local.getString("contentType"))}==incomingBody
+                                } else null
                                 if(old==null && envelope.optBoolean("parentOnly")) {
                                     warnings.add("《${row.getString("title")}》未在本机找到，相关标注和记录已跳过；选择书籍类别可完整传送")
                                     skipped++;return@forEach
@@ -100,11 +115,19 @@ internal object ArchiveImporter {
                                 if(old!=null) {
                                     val id=old.getInt("id"); bookIds[original]=id
                                     if(TransferCategory.HISTORY in preview.categories && row.getLong("lastReadTime")>old.getLong("lastReadTime"))
-                                        sql.execSQL("UPDATE books SET currentChapterIndex=?,scrollOffset=?,lastReadTime=?,isFinished=? WHERE id=?",arrayOf(row.getInt("currentChapterIndex"),row.getInt("scrollOffset"),row.getLong("lastReadTime"),row.getInt("isFinished"),id))
+                                        sql.execSQL("UPDATE books SET currentChapterIndex=?,scrollOffset=?,lastReadTime=?,isFinished=? WHERE id=? AND lastReadTime<?",arrayOf(row.getInt("currentChapterIndex"),row.getInt("scrollOffset"),row.getLong("lastReadTime"),row.getInt("isFinished"),id,row.getLong("lastReadTime")))
                                     merged++
                                 } else {
                                     row.remove("id")
-                                    bookIds[original]=ArchiveRows.insert(sql,table,row).toInt(); added++
+                                    val id=ArchiveRows.insert(sql,table,row).toInt()
+                                    bookIds[original]=id;added++
+                                    // Later rows in this same package must see books inserted before chapters are copied.
+                                    val inserted=JSONObject(row.toString()).put("id",id)
+                                    existingBooks.add(inserted)
+                                    insertedOrigins[id]=original
+                                    existingFingerprints.getOrPut(identity){mutableListOf()}.add(inserted)
+                                    originalFile?.let {existingFingerprints.getOrPut(it){mutableListOf()}.add(inserted)}
+                                    localBodies[id]=incomingBody;localOriginals[id]=originalFile
                                 }
                                 bookIdentities[original]=identity
                                 putIdentity("books:${bookIds.getValue(original)}",identity)
@@ -112,7 +135,13 @@ internal object ArchiveImporter {
                             "chapters" -> {
                                 val oldId=row.getInt("id"); row.put("bookId",bookIds.getValue(row.getInt("bookId")))
                                 val old=same(table,"bookId=? AND chapterOrder=?",arrayOf(row.getInt("bookId"),row.getInt("chapterOrder")))
-                                if(old!=null) { chapterIds[oldId]=old.getInt("id"); skipped++ }
+                                if(old!=null) {
+                                    chapterIds[oldId]=old.getInt("id")
+                                    if(old.getString("content").isBlank() && row.getString("content").isNotBlank()) {
+                                        sql.execSQL("UPDATE chapters SET content=?,startCharIndex=?,endCharIndex=? WHERE id=?",arrayOf(row.getString("content"),row.getLong("startCharIndex"),row.getLong("endCharIndex"),old.getInt("id")))
+                                        merged++
+                                    } else skipped++
+                                }
                                 else { row.remove("id"); chapterIds[oldId]=ArchiveRows.insert(sql,table,row).toInt(); added++ }
                             }
                             "favorites","comic_progress","comic_chapter_read" -> {
@@ -172,7 +201,7 @@ internal object ArchiveImporter {
                     val settings=JSONObject(extracted.settings.toString().replace("@FILES@",files))
                     settings.optJSONObject("novel_reader_prefs")?.let { values ->
                         for(key in listOf("custom_splash_poster_uri","custom_app_background_uri","custom_font_path")) {
-                            values.optJSONObject(key)?.optString("value")?.takeIf {it.removePrefix("file://").startsWith(files+File.separator)!=true}?.let {values.remove(key)}
+                            values.optJSONObject(key)?.optString("value")?.takeUnless(::portablePath)?.let {values.remove(key)}
                         }
                     }
                     PortableSettings.apply(context,settings,mode,bookIds)

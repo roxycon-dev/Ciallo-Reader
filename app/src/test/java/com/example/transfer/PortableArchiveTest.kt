@@ -76,6 +76,123 @@ class PortableArchiveTest {
         ArchiveImporter.import(context,archive,ImportMode.MERGE){}
         assertEquals(2,db.bookDao().getBooksCount())
     }
+    @Test fun missingOriginalOnReceiverStillMergesByBodyAndKeepsLocalBook()=runBlocking {
+        val id=book()
+        val original=File(context.filesDir,"original.txt").apply {writeText("测试正文")}
+        val sql=db.openHelper.writableDatabase
+        sql.execSQL("UPDATE books SET filePath=?,lastReadTime=200,scrollOffset=17 WHERE id=?",arrayOf(original.path,id))
+        ArchiveRows.insert(sql,"highlights",JSONObject().put("bookId",id).put("chapterIndex",0).put("selectedText","片段").put("note","发送方笔记").put("colorHex","#abcdef").put("createdTime",123L))
+        val archive=file();PortableArchive.export(context,archive,ExportSelection()){}
+        original.delete()
+        sql.execSQL("UPDATE books SET category='本机分类',lastReadTime=100,scrollOffset=3 WHERE id=?",arrayOf(id))
+        sql.execSQL("DELETE FROM highlights")
+        ArchiveImporter.import(context,archive,ImportMode.MERGE){}
+        val merged=db.bookDao().getAllBooksSync().single()
+        assertEquals(id,merged.id);assertEquals("本机分类",merged.category);assertEquals(17,merged.scrollOffset)
+        assertEquals(id,ArchiveRows.all(sql,"highlights").single().getInt("bookId"))
+        val again=file();PortableArchive.export(context,again,ExportSelection()){}
+        ArchiveImporter.import(context,again,ImportMode.MERGE){}
+        assertEquals(1,db.bookDao().getBooksCount())
+    }
+    @Test fun missingOriginalOnSenderStillMatchesReceiversOriginal()=runBlocking {
+        val id=book();val archive=file();PortableArchive.export(context,archive,ExportSelection()){}
+        val original=File(context.filesDir,"receiver.txt").apply {writeText("测试正文")}
+        db.openHelper.writableDatabase.execSQL("UPDATE books SET filePath=? WHERE id=?",arrayOf(original.path,id))
+        ArchiveImporter.import(context,archive,ImportMode.MERGE){}
+        assertEquals(id,db.bookDao().getAllBooksSync().single().id)
+    }
+    @Test fun onlineBookWithUncachedIncomingChapterDoesNotDuplicateCachedReceiver()=runBlocking {
+        val id=book(body="");val sql=db.openHelper.writableDatabase
+        sql.execSQL("UPDATE books SET sourceId='source',comicId='resource' WHERE id=?",arrayOf(id))
+        val archive=file();PortableArchive.export(context,archive,ExportSelection()){}
+        sql.execSQL("UPDATE chapters SET content='已缓存的正文' WHERE bookId=?",arrayOf(id))
+        ArchiveImporter.import(context,archive,ImportMode.MERGE){}
+        assertEquals(id,db.bookDao().getAllBooksSync().single().id)
+        assertEquals("已缓存的正文",db.bookDao().getChaptersListForBook(id).single().content)
+    }
+    @Test fun onlineBookWithChangedNonemptyBodyStaysSeparate()=runBlocking {
+        val id=book(body="旧版正文");val sql=db.openHelper.writableDatabase
+        sql.execSQL("UPDATE books SET sourceId='source',comicId='resource' WHERE id=?",arrayOf(id))
+        val archive=file();PortableArchive.export(context,archive,ExportSelection()){}
+        sql.execSQL("UPDATE chapters SET content='不同版本正文' WHERE bookId=?",arrayOf(id))
+        ArchiveImporter.import(context,archive,ImportMode.MERGE){}
+        assertEquals(2,db.bookDao().getBooksCount())
+    }
+    @Test fun samePackageWithFileAndBodyCopiesOnlyAddsOneBook()=runBlocking {
+        val id=book();book()
+        val original=File(context.filesDir,"original.txt").apply {writeText("测试正文")}
+        val sql=db.openHelper.writableDatabase
+        sql.execSQL("UPDATE books SET filePath=? WHERE id=?",arrayOf(original.path,id))
+        val archive=file();PortableArchive.export(context,archive,ExportSelection()){}
+        sql.execSQL("DELETE FROM chapters");sql.execSQL("DELETE FROM books")
+        ArchiveImporter.import(context,archive,ImportMode.MERGE){}
+        assertEquals(1,db.bookDao().getBooksCount())
+    }
+    @Test fun cachedIncomingChapterFillsReceiverWithoutCreatingSecondBook()=runBlocking {
+        val id=book();val sql=db.openHelper.writableDatabase
+        sql.execSQL("UPDATE books SET sourceId='source',comicId='resource' WHERE id=?",arrayOf(id))
+        val archive=file();PortableArchive.export(context,archive,ExportSelection()){}
+        sql.execSQL("UPDATE chapters SET content='' WHERE bookId=?",arrayOf(id))
+        ArchiveImporter.import(context,archive,ImportMode.MERGE){}
+        assertEquals(id,db.bookDao().getAllBooksSync().single().id)
+        assertEquals("测试正文",db.bookDao().getChaptersListForBook(id).single().content)
+    }
+    @Test fun sameBodyWithDifferentReadableOriginalsStaysSeparate()=runBlocking {
+        val id=book();val original=File(context.filesDir,"original.txt").apply {writeText("一种编码的原文件")}
+        val sql=db.openHelper.writableDatabase
+        sql.execSQL("UPDATE books SET filePath=? WHERE id=?",arrayOf(original.path,id))
+        val archive=file();PortableArchive.export(context,archive,ExportSelection()){}
+        original.writeText("另一种原文件")
+        ArchiveImporter.import(context,archive,ImportMode.MERGE){}
+        assertEquals(2,db.bookDao().getBooksCount())
+    }
+    @Test fun portableImagePathsMatchByImageBytesButDifferentImagesStaySeparate()=runBlocking {
+        val image=File(context.filesDir,"page.jpg").apply {writeBytes(byteArrayOf(1,2,3))}
+        val id=book(body="正文[IMG:${image.path}]")
+        val archive=file();PortableArchive.export(context,archive,ExportSelection()){}
+        ArchiveImporter.import(context,archive,ImportMode.MERGE){}
+        assertEquals(id,db.bookDao().getAllBooksSync().single().id)
+        val other=File(context.filesDir,"other.jpg").apply {writeBytes(byteArrayOf(4,5,6))}
+        db.openHelper.writableDatabase.execSQL("UPDATE chapters SET content=? WHERE bookId=?",arrayOf("正文[IMG:${other.path}]",id))
+        // A fresh package from the first device must not merge different image content by title.
+        val reexport=file();rewrite(archive,reexport){name,data ->if(name=="manifest.json")JSONObject(data.toString(Charsets.UTF_8)).put("packageId",UUID.randomUUID().toString()).toString().toByteArray()else data}
+        ArchiveImporter.import(context,reexport,ImportMode.MERGE){}
+        assertEquals(2,db.bookDao().getBooksCount())
+    }
+    @Test fun differentVersionsInsideOnePackageRemainSeparate()=runBlocking {
+        val first=book(body="版本一");val second=book(body="版本二");val sql=db.openHelper.writableDatabase
+        sql.execSQL("UPDATE books SET sourceId='source',comicId='resource' WHERE id IN (?,?)",arrayOf(first,second))
+        val archive=file();PortableArchive.export(context,archive,ExportSelection()){}
+        sql.execSQL("DELETE FROM chapters");sql.execSQL("DELETE FROM books")
+        ArchiveImporter.import(context,archive,ImportMode.MERGE){}
+        assertEquals(2,db.bookDao().getBooksCount())
+    }
+    @Test fun comicPagePathsOnDifferentDevicesMergeUsingPageBytes()=runBlocking {
+        val sender=File(context.filesDir,"sender-pages").apply {mkdirs()}
+        val page=File(sender,"1.jpg").apply {writeBytes(byteArrayOf(1,2,3))}
+        val id=book(body=page.path);val sql=db.openHelper.writableDatabase
+        sql.execSQL("UPDATE books SET contentType='COMIC',filePath=? WHERE id=?",arrayOf(sender.path,id))
+        val archive=file();PortableArchive.export(context,archive,ExportSelection()){}
+        val receiver=File(context.filesDir,"receiver-pages").apply {mkdirs()}
+        val received=File(receiver,"1.jpg").apply {writeBytes(page.readBytes())}
+        sql.execSQL("UPDATE books SET filePath=? WHERE id=?",arrayOf(receiver.path,id))
+        sql.execSQL("UPDATE chapters SET content=? WHERE bookId=?",arrayOf(received.path,id))
+        ArchiveImporter.import(context,archive,ImportMode.MERGE){}
+        assertEquals(id,db.bookDao().getAllBooksSync().single().id)
+        assertEquals(received.path,db.bookDao().getChaptersListForBook(id).single().content)
+    }
+    @Test fun duplicateRowsWithDifferentIdentityFormsKeepTheNewestProgress()=runBlocking {
+        val first=book();val second=book();val third=book();val sql=db.openHelper.writableDatabase
+        val original=File(context.filesDir,"original.txt").apply {writeText("测试正文")}
+        sql.execSQL("UPDATE books SET lastReadTime=100,scrollOffset=10 WHERE id=?",arrayOf(first))
+        sql.execSQL("UPDATE books SET filePath=?,lastReadTime=300,scrollOffset=30 WHERE id=?",arrayOf(original.path,second))
+        sql.execSQL("UPDATE books SET lastReadTime=200,scrollOffset=20 WHERE id=?",arrayOf(third))
+        val archive=file();PortableArchive.export(context,archive,ExportSelection()){}
+        sql.execSQL("DELETE FROM chapters");sql.execSQL("DELETE FROM books")
+        ArchiveImporter.import(context,archive,ImportMode.MERGE){}
+        val merged=db.bookDao().getAllBooksSync().single()
+        assertEquals(300L,merged.lastReadTime);assertEquals(30,merged.scrollOffset)
+    }
     @Test fun protectedCategoriesAndTheirAnnotationsAreExcludedByDefault()=runBlocking {
         ArchiveRows.insert(db.openHelper.writableDatabase,"categories",JSONObject().put("name","私密").put("isProtected",1))
         val id=book(category="私密");book(title="公开书")

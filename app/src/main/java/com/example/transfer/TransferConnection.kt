@@ -74,6 +74,8 @@ internal object TransferConnection {
             tls.soTimeout=timeout
             tls.startHandshake()
             if(tls.isClosed)throw java.net.SocketException("连接已取消")
+            if(!tls.session.isValid || tls.session.protocol=="NONE")
+                throw javax.net.ssl.SSLHandshakeException("加密握手未完成或已取消")
             return tls
         } catch(e:Exception){runCatching {tls.close()};throw e}
     }

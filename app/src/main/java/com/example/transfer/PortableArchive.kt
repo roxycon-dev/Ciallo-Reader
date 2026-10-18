@@ -197,16 +197,9 @@ internal object PortableArchive {
     internal fun bookFingerprint(context: Context, db: androidx.sqlite.db.SupportSQLiteDatabase, book: JSONObject): String {
         val source = book.stringOrNull("sourceId"); val id = book.stringOrNull("comicId")
         if(source != null && id != null) return "online:" + sha256("$source\u0000$id".toByteArray())
+        originalFileFingerprint(context,book)?.let {return it}
         val path = book.optString("filePath").removePrefix("file://")
         val file = File(path)
-        if(file.isFile) return "file:" + fileHash(file)
-        if(path.startsWith("content://")) try {
-            context.contentResolver.openInputStream(Uri.parse(path))?.use { input ->
-                val digest=MessageDigest.getInstance("SHA-256"); val buffer=ByteArray(64*1024)
-                while(true) { val n=input.read(buffer); if(n<0) break; digest.update(buffer,0,n) }
-                return "file:"+digest.digest().hex()
-            }
-        } catch(_: Exception) { /* Body fingerprint below keeps unavailable URI portable. */ }
         val digest=MessageDigest.getInstance("SHA-256")
         if(file.isDirectory) file.walkTopDown().filter { it.isFile }.sortedBy { it.relativeTo(file).invariantSeparatorsPath }.forEach {
             digest.update(it.relativeTo(file).invariantSeparatorsPath.toByteArray()); digest.update(fileHash(it).toByteArray())
@@ -217,6 +210,17 @@ internal object PortableArchive {
         digest.update(book.getString("contentType").toByteArray())
         if(book.optInt("totalChapters")==0) digest.update((book.optString("title")+"\u0000"+book.optString("author")+"\u0000"+path).toByteArray())
         return "body:"+digest.digest().hex()
+    }
+
+    internal fun originalFileFingerprint(context:Context,book:JSONObject):String? {
+        val path=book.optString("filePath").removePrefix("file://")
+        return try {
+            if(path.startsWith("content://")) context.contentResolver.openInputStream(Uri.parse(path))?.use { input ->
+                val digest=MessageDigest.getInstance("SHA-256");val buffer=ByteArray(64*1024)
+                while(true){val n=input.read(buffer);if(n<0)break;digest.update(buffer,0,n)}
+                "file:"+digest.digest().hex()
+            } else File(path).takeIf {it.isFile}?.let {"file:"+fileHash(it)}
+        } catch(_:Exception){null}
     }
 
     internal fun chapterVersion(db:androidx.sqlite.db.SupportSQLiteDatabase,bookId:Int):String {
