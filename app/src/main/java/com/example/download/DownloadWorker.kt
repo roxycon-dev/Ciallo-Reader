@@ -116,6 +116,18 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                             dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), 0L, null)
                         }
                         resume.writeText(JSONObject().put("url", task.downloadUrl).put("complete", false).toString())
+                    } else if (task.sourceId == com.example.source.impl.XbookcnSource.SOURCE_ID) {
+                        // 书阁没有整本文件，逐章抓取后本地打包；原 PublicNovel 分支保持不变。
+                        require(format == "epub") { "此源整本下载格式为 EPUB" }
+                        XbookcnEpub.write(
+                            com.example.source.impl.XbookcnSource(context), task.downloadUrl, temp
+                        ) { completed, count ->
+                            currentCoroutineContext().ensureActive()
+                            DownloadProgressBroadcaster.updateState(taskId,
+                                DownloadState.Downloading(temp.length(), 0L, completed.toFloat() / count))
+                            dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), 0L, null)
+                        }
+                        resume.writeText(JSONObject().put("url", task.downloadUrl).put("complete", false).toString())
                     } else {
                     var offset = temp.takeIf { it.isFile }?.length() ?: 0L
                     val validator = metadata?.optString("validator")?.takeIf { it.isNotBlank() }

@@ -11,7 +11,7 @@
 
 [🌐 产品主页](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.4.9 更新说明与验证](docs/release-1.4.9-2026-10-19.md) ·
+[1.4.10 更新说明与验证](docs/release-1.4.10-2026-10-19.md) ·
 [查看截图](#界面预览) ·
 [全部功能](#功能亮点) ·
 [提交问题或建议](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -26,6 +26,8 @@
 Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电子书阅读器**。你可以导入本地书籍，也可以通过内置或自定义书源搜索内容、下载到书架，再使用可调排版、翻页和阅读进度继续阅读。
 
 **English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
+
+**1.4.10 / 233**：新增免登录小说书源 **书阁（xbookcn）**，支持搜索、详情、完整目录、在线正文与整本 EPUB 下载；该站无整本文件，改由逐章抓取后本地打包，下载前后比对目录，任一章不一致即整本作废。修复 Cloudflare 注入脚本导致正常页面被误判为验证页，源站 TLS 偶发失败增加一次重试。其余书源与下载分支未改动。详见 [更新说明与下载](docs/release-1.4.10-2026-10-19.md)。
 
 **1.4.9 / 232**：修复 Wenku8 与 Z-Library 下载 EPUB 后插图无法显示的问题，旧书无需重下即可兼容读取；修复 Novelia 孤立源站缺字被误判为整本乱码。Z-Library 排除同名隐藏假书卡，下载失败自动选择可用节点；书库增加明显的下载任务入口、进度、文件明细及重试操作。详见 [更新说明与下载](docs/release-1.4.9-2026-10-19.md)。
 
@@ -85,8 +87,11 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 | 全本小说网 | 《小王子》，31 个本地章节 | 整本 EPUB 下载后离线阅读 |
 | 话本小说 | 《KPL九尾：我也不想被他钓》，96 个章节、39 处正文插图 | 整本 EPUB，插图随书保存 |
 | SF轻小说 | 《我的微小说集》，19 个章节 | 整本 EPUB 下载后离线阅读 |
+| 书阁 | 《总裁X总裁》，4 个章节；另验 267 章长篇目录 | 逐章抓取后本地打包 EPUB 离线阅读 |
 
 Novelia、Wenku8 Library、爱下电子书继续提供中文轻小说或网文下载。新增三源以整本 EPUB 提供完整图文，不提供纯文字在线预览；付费或锁定章节无法组成整本时会明确报错。逐章生成的 EPUB 暂停后重新生成文件。
+
+书阁（xbookcn）免登录，提供在线正文与整本 EPUB；该站无整本文件、无正文插图与封面，因此整本下载为逐章抓取后本地打包，下载前后比对目录，不一致即整本作废。
 
 本次 31 项 Android 原生测试、22 项 JVM 回归通过，另有 2 个未通过的实验源用例明确忽略。验收只覆盖指定样书及当时目录，不能承诺覆盖所有作品、原文绝无缺漏或与所有首发平台同步更新。候选未通过原因、逐章与插图核验范围见 [书源验收报告](docs/novel-guest-sources-verification-2026-10-19.md)。
 
@@ -155,7 +160,7 @@ Novelia、Wenku8 Library、爱下电子书继续提供中文轻小说或网文�
 
 - **系统要求：** Android 7.0（API 24）及以上。
 - **当前 Release：** 提供 arm64-v8a APK，适用于大多数 Android 手机和平板；Release 暂不包含 x86_64 模拟器版本。
-- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.4.9](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.9/Ciallo-Reader-v1.4.9.apk)。
+- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.4.10](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.10/Ciallo-Reader-v1.4.10.apk)。
 - 下载后按 Android 提示允许安装该来源的应用，再打开 APK 安装。
 
 ## 快速开始

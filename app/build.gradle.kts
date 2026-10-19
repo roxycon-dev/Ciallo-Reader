@@ -87,8 +87,8 @@ android {
     applicationId = "com.aistudio.novelreader.kxmpzq"
     minSdk = 24
     targetSdk = 35
-    versionCode = 232
-    versionName = "1.4.9"
+    versionCode = 233
+    versionName = "1.4.10"
     externalNativeBuild {
       cmake { arguments += "-DANDROID_STL=c++_static" }
     }
@@ -161,6 +161,15 @@ android {
     }
   }
   packaging {
+    resources {
+      // 依赖附带的开发文档、构建元数据和 proto 源描述不供运行时读取。
+      // 仅排除打包副本；保留业务代码、生成类、服务注册及第三方授权说明。
+      excludes += setOf(
+        "META-INF/README.md",
+        "kotlin-tooling-metadata.json",
+        "google/protobuf/*.proto"
+      )
+    }
     // 2026-09-21 瘦身：YOLO 气泡分割模型（4.0MB，压缩后约 2.3MB）不再打进 APK。
     // 实现方式：把文件从 app/src/main/assets/mt/ 移到仓库根的 models/ —— 它仍在 git 里
     // （jsDelivr CDN 需要），但不在任何 assets sourceSet 中，因此不会打进 APK。

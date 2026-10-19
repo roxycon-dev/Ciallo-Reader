@@ -261,6 +261,8 @@ class LibraryViewModel private constructor(
             sourceManager.registerSource(com.example.source.impl.IxdzsSource(application))
             com.example.source.impl.PublicNovelSources.all(application).forEach { sourceManager.registerSource(it) }
             sourceManager.registerSource(MangaDexSource(context = application))
+            // 书阁（po18 系成人小说）：始终注册，不跟随成人源开关
+            sourceManager.registerSource(com.example.source.impl.XbookcnSource(application))
 
             // 一次性清理上一版内置的社区漫画源（comic_* 自定义书源）
             if (prefs.hasImportedCommunityComics) {

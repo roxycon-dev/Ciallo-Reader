@@ -8,6 +8,8 @@
 
 ## 内容
 
+- [小说书源接入检查与验收清单](novel-source-integration-checklist.md)
+- [书阁（xbookcn）书源验收](xbookcn-source-verification-2026-10-19.md)
 - [Ciallo Reader 1.4.9 发布说明与下载](release-1.4.9-2026-10-19.md)
 - [小说插图、Novelia 下载与隐藏书卡修复](novel-illustrations-repair-2026-10-19.md)
 - [Ciallo Reader 1.4.8 发布说明与下载](release-1.4.8-2026-10-19.md)
