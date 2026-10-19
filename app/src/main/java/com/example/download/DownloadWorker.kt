@@ -77,7 +77,7 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
         withTaskLock(taskId) { performTask() }
     }
 
-    private suspend fun performTask(): Result = withContext(Dispatchers.IO) {
+    private suspend fun performTask(recoveries: Int = 0, failedNodes: Set<String> = emptySet()): Result = withContext(Dispatchers.IO) {
         val taskId = inputData.getString("book_id") ?: return@withContext Result.failure()
         val db = AppDatabase.getDatabase(context)
         val dao = db.downloadTaskDao()
@@ -121,16 +121,29 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                     val validator = metadata?.optString("validator")?.takeIf { it.isNotBlank() }
                     if (metadata?.optString("url") != task.downloadUrl || validator == null) offset = 0L
                     val builder = Request.Builder().url(task.downloadUrl).header("Accept-Encoding", "identity")
-                        .header("User-Agent", "Mozilla/5.0 (Linux; Android) CialloReader/1.1")
+                        .header("User-Agent", if (task.sourceId == "zlibrary")
+                            com.example.source.zlibrary.network.ZLibraryHttpClient.DEFAULT_USER_AGENT else "Mozilla/5.0 (Linux; Android) CialloReader/1.1")
+                    if (task.sourceId == "zlibrary") {
+                        builder.header("Accept", com.example.source.zlibrary.network.ZLibraryHttpClient.DEFAULT_ACCEPT)
+                            .header("Accept-Language", com.example.source.zlibrary.network.ZLibraryHttpClient.DEFAULT_ACCEPT_LANG)
+                    }
                     requestHeaders.filterKeys { !it.equals("Cookie",true) && !it.equals("Range",true) && !it.equals("If-Range",true) && !it.equals("Accept-Encoding",true) }.forEach { (key,value) -> builder.header(key,value) }
                     val host = builder.build().url.host
                     val cookie = requestHeaders.entries.firstOrNull { it.key.equals("Cookie",true) }?.value
-                    if (!cookie.isNullOrBlank() && listOf("ncdn", "cdn-zlib", "s3proxy", "dln").none { it in host }) builder.header("Cookie", cookie)
+                    val sessionHost = requestHeaders.entries.firstOrNull { it.key.equals("Referer", true) }?.value
+                        ?.let { runCatching { it.toHttpUrl().host }.getOrNull() }
+                    val allowSession = task.sourceId != "zlibrary" ||
+                        (sessionHost != null && (host == sessionHost || host.endsWith(".$sessionHost")))
+                    if (task.sourceId == "zlibrary" && allowSession && !cookie.isNullOrBlank())
+                        (client.cookieJar as? EncryptedCookieJar)?.syncFromRawCookieString(cookie, host)
+                    if (!cookie.isNullOrBlank() && allowSession && listOf("ncdn", "cdn-zlib", "s3proxy", "dln").none { it in host }) builder.header("Cookie", cookie)
                     if (offset > 0) builder.header("Range", "bytes=$offset-").header("If-Range", validator!!)
                     var request = builder.build()
                     var rangeRestarted = false
                     while (true) {
                         val restart = withResponse(request, task.sourceId) { response ->
+                            if (task.sourceId == "zlibrary" && com.example.BuildConfig.DEBUG)
+                                android.util.Log.d("ZLibTransfer", "HTTP ${response.code} host=${response.request.url.host} type=${response.header("Content-Type")}")
                             // A 416 is not proof of file completeness. Restart safely once.
                             if (response.code == 416 && offset > 0 && !rangeRestarted) return@withResponse true
                             require(response.isSuccessful) { when (response.code) {
@@ -140,7 +153,11 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                                 429 -> "请求过于频繁，请稍后重试（HTTP 429）"
                                 else -> "下载失败（HTTP ${response.code}）"
                             } }
-                            require(!isHtmlError(response, format)) { "服务器返回了验证或错误页，下载链接可能已过期，请重新获取链接" }
+                            if (isHtmlError(response, format)) {
+                                val quota = if (task.sourceId == "zlibrary")
+                                    com.example.source.zlibrary.zLibraryDownloadPageError(response.peekBody(32 * 1024).string()) else null
+                                error(quota ?: "服务器返回了验证或错误页，下载链接可能已过期，请重新获取链接")
+                            }
                             val body = response.body ?: error("下载响应为空")
                             val append = response.code == 206 && offset > 0
                             if (response.code == 206) {
@@ -289,6 +306,49 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                 currentCoroutineContext().ensureActive()
             }
             val message = if (e.message?.contains("ENOSPC", true) == true) "存储空间不足，请清理后重试" else e.message ?: "下载或入库失败"
+            // A task may outlive its signed CDN URL. Refresh its authorization and
+            // mirror together instead of endlessly resuming the same stale URL.
+            if (task.sourceId == "zlibrary" && recoveries < 2 &&
+                (e is java.io.IOException || e is IllegalArgumentException || e is IllegalStateException) &&
+                com.example.source.zlibrary.shouldRetryZLibraryDownload(message)) {
+                val secrets = com.example.data.EncryptedSecretStore(applicationContext)
+                val previous = runCatching { JSONObject(secrets.read("download:$taskId").orEmpty()) }.getOrNull()
+                val failed = previous?.optString("Referer")?.let { runCatching { it.toHttpUrl().host }.getOrNull() }
+                    ?: runCatching { task.downloadUrl.toHttpUrl().host }.getOrNull()
+                if (recoveries == 0 && previous != null && failed != null &&
+                    (message.contains("服务器未返回完整文件") || message.contains("验证或错误页") || message.contains("HTTP 403"))) {
+                    val browser = com.example.source.zlibrary.ZLibraryWebViewHelper.resolveDownload(context,
+                        previous.optString("Referer"), task.downloadUrl, previous.optString("Cookie"))
+                    if (browser != null) {
+                        (client.cookieJar as? EncryptedCookieJar)?.syncFromRawCookieString(browser.cookies, failed)
+                        previous.put("Cookie", browser.cookies)
+                        secrets.write("download:$taskId", previous.toString())
+                        val latest = dao.getTaskById(taskId) ?: return@withContext Result.success()
+                        dao.insertOrUpdate(latest.copy(downloadUrl = browser.url, status = DownloadStatus.PENDING, errorMessage = null))
+                        return@withContext performTask(recoveries + 1, failedNodes)
+                    }
+                }
+                val excluded = failedNodes + listOfNotNull(failed)
+                DownloadProgressBroadcaster.updateState(taskId, DownloadState.Pending)
+                val refreshed = com.example.source.zlibrary.ZLibrarySource(context).recoverDownloadInfo(
+                    DownloadManager.originalBookId(taskId, task.sourceId), task.format, excluded, task.title, task.author)
+                if (refreshed is com.example.source.SourceResult.Success) {
+                    val info = refreshed.data
+                    val latest = dao.getTaskById(taskId) ?: return@withContext Result.success()
+                    val headers = JSONObject()
+                    info.headers.forEach { (key, value) -> headers.put(key, value) }
+                    info.referer?.let { headers.put("Referer", it) }
+                    secrets.write("download:$taskId", headers.toString())
+                    dao.insertOrUpdate(latest.copy(downloadUrl = info.url, status = DownloadStatus.PENDING,
+                        downloadedBytes = 0L, totalBytes = 0L, errorMessage = null))
+                    return@withContext performTask(recoveries + 1, excluded)
+                }
+                val recoveryMessage = (refreshed as com.example.source.SourceResult.Error).exception.message
+                val failure = if (recoveryMessage.isNullOrBlank()) message else "$message；$recoveryMessage"
+                dao.updateProgressAndStatus(taskId, DownloadStatus.FAILED, temp.length(), total, failure)
+                DownloadProgressBroadcaster.updateState(taskId, DownloadState.Error(failure))
+                return@withContext Result.failure()
+            }
             if (dao.getTaskById(taskId) != null) {
                 dao.updateProgressAndStatus(taskId, DownloadStatus.FAILED, temp.length(), total, message)
                 DownloadProgressBroadcaster.updateState(taskId, DownloadState.Error(message))
@@ -300,7 +360,12 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
     /** Cancellation closes the active socket even during a blocking body read. */
     private suspend fun <T> withResponse(request: Request, sourceId: String, block: suspend (Response) -> T): T {
         val origin=request.url
-        val guarded=(if (sourceId == "zlibrary") client else publicClient).newBuilder().addNetworkInterceptor { chain ->
+        val guarded=(if (sourceId == "zlibrary") client else publicClient).newBuilder()
+            .apply {
+                val node = request.header("Referer")?.let { runCatching { it.toHttpUrl().host }.getOrNull() }
+                if (sourceId == "zlibrary" && node != null && com.example.library.ZLibraryNodeConfig.prefersDirect(node))
+                    proxy(java.net.Proxy.NO_PROXY)
+            }.addNetworkInterceptor { chain ->
             val next=chain.request()
             val safe=if(next.url.host!=origin.host || next.url.scheme!=origin.scheme) next.newBuilder()
                 .removeHeader("Cookie").removeHeader("Authorization").removeHeader("Proxy-Authorization").removeHeader("X-Api-Key").build() else next

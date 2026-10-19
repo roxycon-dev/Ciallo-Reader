@@ -11,6 +11,31 @@ import org.robolectric.annotation.Config
 @Config(sdk = [33])
 class ZLibraryParserTest {
 
+    private fun targetCard(id: String = "decoy") = """<z-bookcard href="/book/$id/title.html" download="/dl/$id" extension="epub"><div slot="title">无职转生未来日记</div><div slot="author">无职转生未来日记</div></z-bookcard>"""
+
+    @Test fun explicitlyHiddenExactTitleCardIsNotAResult() {
+        val html = """<div id="searchResultBox"><div class="book-item resItemBoxBooks" hidden aria-hidden="true">${targetCard()}</div></div>"""
+        assertTrue(ZLibraryParser.parseSearchPage(html, "https://example.com").isEmpty())
+    }
+
+    @Test fun visibilityFilteringKeepsVisibleEditionsEvenWithTheSameTitleAndAuthor() {
+        val html = """<div hidden>${targetCard()}</div>${targetCard("real")}"""
+        val books = ZLibraryParser.parseSearchPage(html, "https://example.com")
+        assertEquals(listOf("book/real/title.html"), books.map { it.id })
+        assertEquals("无职转生未来日记", books.single().title)
+    }
+
+    @Test fun inlineHiddenSubtreesAndAriaHiddenCardsAreExcluded() {
+        for (attribute in listOf("aria-hidden='true'", "style='display: none !important;'", "style='color: red; VISIBILITY : hidden'")) {
+            assertTrue(ZLibraryParser.parseSearchPage("<div $attribute>${targetCard()}</div>", "https://example.com").isEmpty())
+        }
+    }
+
+    @Test fun genericFallbackCannotReintroduceHiddenBookLinks() {
+        val html = """<div hidden><a href="/book/decoy/title.html">无职转生未来日记</a></div>"""
+        assertTrue(ZLibraryParser.parseSearchPage(html, "https://example.com").isEmpty())
+    }
+
     @Test
     fun testParseSearchPageHtml() {
         val mockHtml = """

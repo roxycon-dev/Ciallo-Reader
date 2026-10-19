@@ -11,7 +11,7 @@ Read local ebooks, novels, and comics in one Android app.
 
 [🌐 Product site](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ Download the latest APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.4.8 release notes](docs/release-1.4.8-2026-10-19.md) ·
+[1.4.9 release notes](docs/release-1.4.9-2026-10-19.md) ·
 [See screenshots](#screenshots) ·
 [Features](#features) ·
 [Report an issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -24,6 +24,8 @@ Read local ebooks, novels, and comics in one Android app.
 </div>
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
+
+**1.4.9 / 232** repairs EPUB illustrations from Wenku8 and Z-Library, including already imported books, and prevents isolated missing characters in valid Novelia translations from blocking a whole novel. Z-Library excludes hidden query-reflecting decoy cards and recovers failed downloads across available nodes. A visible download entry shows progress, file details and retry controls. See the [release notes and download](docs/release-1.4.9-2026-10-19.md).
 
 **1.4.8 / 231** adds three sources that require no account: **全本小说网 (Quanben)**, **话本小说 (Huaben)** and **SF轻小说 (SFACG)**. Download complete EPUBs with inline illustrations for offline reading. Existing source labels become **Novelia** and **Wenku8 Library**. Integrity checks reject detected chapter gaps, invalid text, missing images and known placeholder content before import. This release also includes favorite cover and fractional manga episode label fixes. See the [release notes and download](docs/release-1.4.8-2026-10-19.md).
 
@@ -129,7 +131,7 @@ Version 1.3.8 adds Discover and restores Aiman and MYCOMIC reading. Its APK reta
 
 - **Android:** 7.0 (API 24) or newer.
 - **Architecture:** Current release APKs target arm64-v8a, supported by most Android phones and tablets. The release APK does not include an x86_64 emulator build.
-- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.4.6 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.6/Ciallo-Reader-v1.4.6.apk).
+- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.4.9 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.9/Ciallo-Reader-v1.4.9.apk).
 - Open the downloaded APK and follow Android's prompt to allow installation from that source.
 
 ## Get started

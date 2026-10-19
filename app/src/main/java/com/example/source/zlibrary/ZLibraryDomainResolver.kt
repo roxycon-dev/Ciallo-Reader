@@ -15,6 +15,10 @@ class ZLibraryDomainResolver(
         endpointProvider.getEndpoint(forceRefresh = forceScan)
     }
 
+    suspend fun resolveNextDomain(excluded: Set<String>): String? = withContext(Dispatchers.IO) {
+        endpointProvider.nextEndpoint(excluded)
+    }
+
     fun saveToCache(domain: String) {
         endpointProvider.saveCache(domain)
     }

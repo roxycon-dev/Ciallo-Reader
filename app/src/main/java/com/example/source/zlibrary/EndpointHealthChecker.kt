@@ -36,7 +36,7 @@ data class EndpointHealthResult(
  * 4. 搜索服务探针 /s/{kw}：不返回 "Search service temporary unavailable" 且能解析出
  *    书卡片，searchAvailable = true（官网搜索故障时节点仍可达，只是搜索不可用）。
  */
-class EndpointHealthChecker(private val context: Context) {
+class EndpointHealthChecker(private val context: Context, direct: Boolean = false) {
     private val credentialStorage = ZLibraryCredentialStorage(context)
     private val cookieJar = EncryptedCookieJar(credentialStorage)
     private val httpClient = com.example.source.SharedHttpTransport.builder()
@@ -45,6 +45,10 @@ class EndpointHealthChecker(private val context: Context) {
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .writeTimeout(10, TimeUnit.SECONDS)
+        .apply {
+            if (direct) proxy(java.net.Proxy.NO_PROXY)
+            else com.example.source.zlibrary.network.SystemProxyResolver.resolve(context)?.let { proxy(it) }
+        }
         .cookieJar(cookieJar)
         .addInterceptor(DiamWallInterceptor(cookieJar))
         .addInterceptor { chain ->
@@ -64,30 +68,14 @@ class EndpointHealthChecker(private val context: Context) {
         var httpCode = -1
 
         try {
-            try {
-                val addresses = ZLibraryDns.INSTANCE.lookup(domain)
-                dnsOk = addresses.isNotEmpty()
-            } catch (e: Exception) {
-                dnsOk = false
-            }
-
-            if (!dnsOk) {
-                return@withContext EndpointHealthResult(
-                    domain = domain,
-                    isAvailable = false,
-                    rtt = System.currentTimeMillis() - startTime,
-                    isCloudflare = false,
-                    dnsOk = false,
-                    tlsOk = false,
-                    httpCode = -1,
-                    error = "DNS 解析失败"
-                )
-            }
-
+            // OkHttp resolves names on the selected route. An HTTP proxy resolves
+            // the target itself; a separate local lookup would reject working proxies
+            // on networks with poisoned DNS and doubles the direct probe latency.
             // Step 1: 首页（DiamWallInterceptor 会先解 c_token PoW 再返回最终响应）
             val homeUrl = "https://$domain/"
             val homeRequest = Request.Builder().url(homeUrl).get().build()
             val (homeCode,homeBody)=httpClient.newCall(homeRequest).executeCancellable().use { response ->
+                dnsOk=true
                 tlsOk=true
                 response.code to response.peekBody(1024 * 1024).string()
             }

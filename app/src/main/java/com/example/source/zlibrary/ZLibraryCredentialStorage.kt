@@ -55,7 +55,7 @@ class ZLibraryCredentialStorage private constructor(preferencesFactory: () -> Sh
     }
 
     companion object {
-        const val DEFAULT_DOMAIN = "1lib.sk" // 2026-09-04 实测：唯一正确官网（rpc.php/eapi/搜索/下载全链路已验证）；z-lib.li 等为仿冒站
+        const val DEFAULT_DOMAIN = com.example.library.ZLibraryNodeManager.DEFAULT_NODE
         private const val KEY_USER_ID = "userId"
         private const val KEY_USER_KEY = "userKey"
         private const val KEY_DOMAIN = "domain"

@@ -13,11 +13,12 @@ class ZLibrarySessionManager(
     private var activeDomain: String = "z-library.sk"
 
     suspend fun ensureSessionInitialized(domain: String, forceRefresh: Boolean = false): Boolean = withContext(Dispatchers.IO) {
-        activeDomain = domain
-        if (isSessionInitialized && !forceRefresh) {
+        if (isSessionInitialized && activeDomain == domain && !forceRefresh) {
             return@withContext true
         }
 
+        activeDomain = domain
+        isSessionInitialized = false
         return@withContext try {
             val homepageUrl = "https://$domain/"
             Log.d("ZLibSession", "Initializing session at $homepageUrl")
@@ -26,6 +27,7 @@ class ZLibrarySessionManager(
             // OkHttp callTimeout：外层协程超时取消不了阻塞中的 socket read（实测 12s
             // read timeout 照样吃掉聚合搜索 20s 预算，表现为"卡在搜索"）。
             val response = httpClient.get(homepageUrl, callTimeoutMs = 4500L)
+            response.close()
             if (response.isSuccessful || response.code == 517 || response.code == 307) {
                 isSessionInitialized = true
                 Log.d("ZLibSession", "Session initialized successfully for $domain")

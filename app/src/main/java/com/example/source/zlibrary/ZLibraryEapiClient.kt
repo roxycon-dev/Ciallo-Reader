@@ -9,6 +9,8 @@ import com.example.source.zlibrary.network.ZLibraryHttpClient
 import okhttp3.FormBody
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -38,6 +40,7 @@ class ZLibraryEapiClient(
                 SourceResponse.jsonObject(response.readSourceText())
             }
         } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
             Log.w(TAG, "eapi GET failed: $url ${e.message}")
             null
         }
@@ -57,6 +60,7 @@ class ZLibraryEapiClient(
                 SourceResponse.jsonObject(response.readSourceText())
             }
         } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
             Log.w(TAG, "eapi POST failed: $url ${e.message}")
             null
         }
@@ -236,7 +240,7 @@ class ZLibraryEapiClient(
             )
         }
 
-        val raw = file.optString("downloadLink", null).ifBlank { null }
+        val raw = file.optString("downloadLink", "").takeIf { it.isNotBlank() && it != "null" }
         // 部分 CDN 链接是协议相对（//dln1.…）或裸路径，OkHttp 会报
         // "Expected URL scheme 'http' or 'https'"，这里统一补全 scheme
         val normalized = when {

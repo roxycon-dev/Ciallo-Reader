@@ -5,18 +5,13 @@ import com.example.library.ZLibraryNodeConfig
 import com.example.library.ZLibraryNodeManager
 import com.example.source.zlibrary.network.ZLibraryDns
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import com.example.source.executeCancellable
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
@@ -37,48 +32,19 @@ class ZLibraryEndpointProvider(
         private const val PROBE_TTL_MS = 60 * 1000L // 探测结果 60s 内复用，常规搜索不重复探测
         private const val PROBE_TIMEOUT_S = 4L      // 单次探测 4s 超时，不拖慢主链路
 
-        // Preset high-availability mirror domains（2026-09-04 晚 Edge 全核实测，登录态）：
-        // 六个活节点（CN 网络逐一实测：首页真实 + "harry potter" 搜索 51~102 卡片）：
-        // - 1lib.sk：用户指定唯一正确官网（DiamWall 透明 PoW 自动过；账号登录/下载全链路已验证）；
-        // - z-lib.by：导航站"优先尝试"第一位，无任何挑战直通（登录→搜索→对应书→
-        //   EPUB 下载→内容无乱码，全链路实测通过）；
-        // - z-library.sk：无挑战直通；
-        // - zh.z-lib.by：中文界面，登录态与 z-lib.by 共享；
-        // - zh.z-library.sk：中文界面，DiamWall 自动过；
-        // - en.z-lib.by：英文，与 z-lib.by 同基础设施。
-        // 域名级冗余对 CN 用户有效（GFW 按域封锁）；基础设施级共 3 个独立后端。
-        // 其余：z-lib.sk（DiamWall 硬挑战，留池）；CF 域（z-library.co 等，海外/代理兜底）。
-        // 退役：z-lib.is / z-library.se / z-lib.id / z-lib.li / z-lib.cc / zlib.bz /
-        // 101k 系 / zlib.ch / zlib.re / zh.z-lib.rest；当前网络不可达（不入预置，
-        // 仍可被导航站扒取到）：zh.zlib.li / zh.z-lib.gd / zh.intcn.online。
-        val PRESET_DOMAINS = listOf(
-            "1lib.sk",
-            "z-lib.by",
-            "z-library.sk",
-            "zh.z-lib.by",
-            "zh.z-library.sk",
-            "en.z-lib.by",
-            "z-lib.sk",
-            "z-library.co",
-            "z-library.net",
-            "zlib-official.com",
-            "zlibrary-global.com",
-            "z-lib.my",
-            "z-lib.ad"
-        )
+        // Candidates are probed at runtime; old availability reports are not trusted.
+        val PRESET_DOMAINS = ZLibraryNodeManager.INITIAL_SCRAPED_NODES
         private val probeSlots = Semaphore(3)
+        private val failedUntil = java.util.concurrent.ConcurrentHashMap<String, Long>()
         val FALLBACK_DOMAINS = PRESET_DOMAINS
     }
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    // ---- 节点快速可达性体检（容灾第一步）----
-    // 只判断“TCP/TLS/HTTP 能通”：被墙（SNI 阻断/RST）、DNS 污染（ZLibraryDns
-    // 已过滤 Meta 假 IP）、站点挂掉 → 探不通；而 DiamWall/Cloudflare 挑战码
-    // （403/503/513）也算“活着”——挑战随后由 PoW 拦截器 / WebView 兜底自动过，
-    // 不构成换节点的理由。结果带 60s TTL，常规搜索不额外付探测延迟。
+    // Reuse a short-lived successful direct probe; a challenge page is not healthy.
     private val quickCheckClient = com.example.source.SharedHttpTransport.builder()
         .dns(ZLibraryDns.INSTANCE)
+        .callTimeout(PROBE_TIMEOUT_S, TimeUnit.SECONDS)
         .connectTimeout(PROBE_TIMEOUT_S, TimeUnit.SECONDS)
         .readTimeout(PROBE_TIMEOUT_S, TimeUnit.SECONDS)
         .writeTimeout(PROBE_TIMEOUT_S, TimeUnit.SECONDS)
@@ -93,9 +59,15 @@ class ZLibraryEndpointProvider(
         lastProbe?.let { (d, ok, at) ->
             if (d == domain && now - at < PROBE_TTL_MS) return ok
         }
+        if ((failedUntil[domain] ?: 0L) > now) return false
         val ok = try {
-            val request = Request.Builder().url("https://$domain/").head().build()
-            quickCheckClient.newCall(request).executeCancellable().use { it.code > 0 }
+            val request = Request.Builder().url("https://$domain/").get().build()
+            val direct = quickCheckClient.newBuilder().proxy(java.net.Proxy.NO_PROXY).build()
+            val directOk = direct.newCall(request).executeCancellable().use {
+                it.isSuccessful && isZLibraryPage(it.peekBody(256 * 1024).string())
+            }
+            if (directOk) ZLibraryNodeConfig.rememberRoute(domain, true)
+            directOk
         } catch(e: Exception) { currentCoroutineContext().ensureActive(); false }
         lastProbe = Triple(domain, ok, now)
         return ok
@@ -107,61 +79,55 @@ class ZLibraryEndpointProvider(
      * ——最多 3 个并发，首个搜索可用节点立即返回，整轮最多 25 秒；优先取“搜索可用”的节点（可达但搜索故障的只作
      * 下载兜底，否则搜到的全是主页推荐书）。全挂返回 null。
      */
-    private suspend fun scanForLiveNode(): String? {
-        val remoteDomains = try {
-            withTimeoutOrNull(4_000) { remoteProvider.fetchLatestEndpoints() }
-                ?.sortedByDescending { it.priority }
-                ?.map { it.url.trim().removePrefix("https://").removePrefix("http://").trimEnd('/') }
-                ?.filter { it.isNotBlank() }
-        } catch(e: Exception) { currentCoroutineContext().ensureActive(); null }.orEmpty()
-        val candidates = LinkedHashMap<String, Boolean>()
-        remoteDomains.forEach { candidates.putIfAbsent(it, true) }
-        runCatching { ZLibraryNodeManager.getScrapedNodes(context) }
-            .getOrDefault(emptyList())
-            .forEach { candidates.putIfAbsent(it, true) }
-        runCatching { ZLibraryNodeManager.getCustomNodes(context) }
-            .getOrDefault(emptyList())
-            .forEach { candidates.putIfAbsent(it, true) }
-        PRESET_DOMAINS.forEach { candidates.putIfAbsent(it, false) }
-        val candidateList = candidates.keys.take(32)
-        if (candidateList.isEmpty()) return null
-        return coroutineScope {
-            val results = Channel<Pair<String, EndpointHealthResult>>(Channel.UNLIMITED)
-            val jobs = candidateList.map { candidate ->
-                launch(Dispatchers.IO) {
-                    val health = probeSlots.withPermit { healthChecker.checkHealth(candidate) }
-                    results.send(candidate to health)
+    private suspend fun scanForLiveNode(excluded: Set<String> = emptySet()): String? {
+        val local = (ZLibraryNodeManager.getScrapedNodes(context) +
+            ZLibraryNodeManager.getCustomNodes(context) + PRESET_DOMAINS).distinct()
+        val directChecker = EndpointHealthChecker(context, direct = true)
+        suspend fun scan(candidates: List<String>, direct: Boolean, budget: Long): String? {
+            val eligible = candidates.distinct().filter {
+                ZLibraryNodeManager.isAutomaticCandidate(it) && it !in excluded &&
+                    (failedUntil[it] ?: 0L) <= System.currentTimeMillis()
+            }.take(32)
+            return selectHealthyNode(eligible, budget) { candidate ->
+                probeSlots.withPermit {
+                    val health = (if (direct) directChecker else healthChecker).checkHealth(candidate)
+                    if (health.isAvailable && health.isRealZlib && health.searchAvailable) {
+                        ZLibraryNodeConfig.rememberRoute(candidate, direct)
+                        true
+                    } else false
                 }
             }
-            var reachable: String? = null
-            try {
-                withTimeoutOrNull(25_000) {
-                    repeat(candidateList.size) {
-                        val (candidate, health) = results.receive()
-                        if (health.isAvailable && health.searchAvailable) return@withTimeoutOrNull candidate
-                        if (health.isAvailable && reachable == null) reachable = candidate
-                    }
-                    reachable
-                } ?: reachable
-            } finally { jobs.forEach { it.cancel() }; results.close() }
-
         }
+        // Exhaust a bounded direct phase before using the system proxy. A VPN cannot
+        // be detected reliably; NO_PROXY means no explicit HTTP proxy is used.
+        scan(local, direct = true, budget = 12_000)?.let { return it }
+        val remote = try {
+            withTimeoutOrNull(4_000) { remoteProvider.fetchLatestEndpoints() }
+                .orEmpty().sortedByDescending { it.priority }.map { it.url }
+        } catch (e: Exception) { currentCoroutineContext().ensureActive(); emptyList() }
+        val fresh = remote.map { it.removePrefix("https://").removePrefix("http://").trimEnd('/') }
+            .filter { it !in local }
+        scan(fresh, direct = true, budget = 8_000)?.let { return it }
+        return scan(local + fresh, direct = false, budget = 16_000)
     }
 
-    /** 容灾/扫描选中活节点后的固化：写 24h 缓存、内存选中值跟随（本进程内登录/
-     *  搜索/下载立即用新节点，含书库隐藏 WebView 会话）、预热体检缓存避免下一
-     *  次调用重复探测。不覆写节点管理页的持久化选择——临时被墙的网络恢复后
-     *  重启 App 即回到用户手选节点。 */
+    suspend fun nextEndpoint(excluded: Set<String>): String? = withContext(Dispatchers.IO) {
+        excluded.forEach { failedUntil[it] = System.currentTimeMillis() + 5 * 60_000 }
+        scanForLiveNode(excluded)?.also { adoptLiveNode(it) }
+    }
+
+    /** Persist the working mirror so restarting does not return to the failed one. */
     private fun adoptLiveNode(domain: String) {
+        failedUntil.remove(domain)
         saveCache(domain)
-        runCatching { ZLibraryNodeConfig.domain = domain }
+        ZLibraryNodeManager.selectNode(context, domain)
         lastProbe = Triple(domain, true, System.currentTimeMillis())
     }
 
     /** 选中/自定义节点体检失败后的自动容灾：扫描换活节点并固化。
      *  返回 null = 全池不可达（保持原节点，交给 WebView Chromium 指纹/系统代理兜底）。 */
     private suspend fun failoverFrom(deadDomain: String): String? {
-        val winner = scanForLiveNode() ?: return null
+        val winner = scanForLiveNode(setOf(deadDomain)) ?: return null
         if (winner == deadDomain) {
             // 快速体检误报（HEAD 被挡但全量健康检查通过）：预热缓存避免反复重扫
             lastProbe = Triple(deadDomain, true, System.currentTimeMillis())

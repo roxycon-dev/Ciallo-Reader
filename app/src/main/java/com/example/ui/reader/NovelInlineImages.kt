@@ -99,7 +99,23 @@ object NovelInlineImages {
                 val uri = android.net.Uri.parse(location)
                 File(uri.path ?: return null)
             } else File(location)
-            return file to body.substring(sep + 1)
+            val entry = normalizeEpubEntryName(body.substring(sep + 1)) ?: return null
+            return file to entry
+        }
+
+        /** Repair stored Android /data/user/0 vs /data/data aliases without changing chapter text. */
+        internal fun normalizeEpubEntryName(raw: String): String? {
+            val name = raw.replace('\\', '/')
+            val legacy = Regex("""^(?:\.\./)+(?:[^/]+/)*cache/epub_\d+/(.+)$""").matchEntire(name)
+            val relative = legacy?.groupValues?.get(1) ?: name
+            if (relative.startsWith('/') || Regex("^[A-Za-z]:").containsMatchIn(relative)) return null
+            val segments = ArrayList<String>()
+            for (part in relative.split('/')) when (part) {
+                "", "." -> Unit
+                ".." -> if (segments.isEmpty()) return null else segments.removeAt(segments.lastIndex)
+                else -> segments.add(part)
+            }
+            return segments.joinToString("/").takeIf { it.isNotEmpty() }
         }
 
         fun readEpubImageBytes(spec: String): ByteArray? {

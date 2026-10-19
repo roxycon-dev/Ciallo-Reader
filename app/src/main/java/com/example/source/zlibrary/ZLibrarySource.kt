@@ -10,8 +10,12 @@ import com.example.source.zlibrary.network.ZLibraryNetworkLogger
 import com.example.source.zlibrary.network.ZLibrarySessionManager
 import com.example.source.zlibrary.parser.ZLibraryParserManager
 import okhttp3.FormBody
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.jsoup.Jsoup
 import java.net.URLEncoder
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -20,7 +24,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 class ZLibrarySource(
     private val context: Context,
     val credentialStorage: ZLibraryCredentialStorage = ZLibraryCredentialStorage(context),
-    val httpClient: ZLibraryHttpClient = ZLibraryHttpClient(credentialStorage),
+    val httpClient: ZLibraryHttpClient = ZLibraryHttpClient(credentialStorage, context = context),
     val sessionManager: ZLibrarySessionManager = ZLibrarySessionManager(httpClient, credentialStorage)
 ) : BookSource {
 
@@ -43,6 +47,20 @@ class ZLibrarySource(
     )
 
     val domainResolver = ZLibraryDomainResolver(context, credentialStorage)
+    private val downloadBooks = java.util.concurrent.ConcurrentHashMap<String, SearchBook>()
+    private val bookOrigins = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    private fun rememberSearch(books: List<SearchBook>, domain: String): SourceResult<List<SearchBook>> {
+        if (downloadBooks.size > 300) { downloadBooks.clear(); bookOrigins.clear() }
+        books.forEach { book -> downloadBooks[book.id] = book; bookOrigins[book.id] = domain }
+        return SourceResult.Success(books)
+    }
+
+    /** Search cards may carry a valid file link even when the detail page is unavailable. */
+    suspend fun getDownloadInfo(book: SearchBook, preferredFormat: String?): SourceResult<DownloadInfo> {
+        downloadBooks[book.id] = book
+        return getDownloadInfo(book.id, preferredFormat)
+    }
 
     override suspend fun isLoggedIn(): Boolean {
         return credentialStorage.isLoggedIn()
@@ -116,6 +134,7 @@ class ZLibrarySource(
             }.ifEmpty { reachable.take(4) }
 
             var lastError: String? = null
+            var reachedLogin = false
             for (candidate in candidates) {
                 val outcome = withTimeoutOrNull(8000) {
                     runCatching {
@@ -130,6 +149,7 @@ class ZLibrarySource(
                             homeHtml.contains("z-bookcard") ||
                             homeHtml.contains("book-item")
                         if (!looksLikeZlib) return@runCatching null
+                        reachedLogin = true
 
                         // 2) 在真实主机上提交登录表单
                         val loginUrl = "https://$effectiveHost/rpc.php"
@@ -141,7 +161,7 @@ class ZLibrarySource(
                             .build()
 
                         val response = httpClient.postForm(loginUrl, formBody, referer = "https://$effectiveHost/")
-                        val htmlOrJson = response.body?.string() ?: ""
+                        val htmlOrJson = response.use { it.body?.string().orEmpty() }
                         val responseUrl = response.request.url
 
                         if (!response.isSuccessful) {
@@ -157,6 +177,8 @@ class ZLibrarySource(
                                 cookies = credentialStorage.getCookies()
                             )
                             syncCookiesToWebView(effectiveHost)
+                            ZLibraryNodeManager.selectNode(context, effectiveHost)
+                            domainResolver.saveToCache(effectiveHost)
                             return@runCatching "OK"
                         }
                         val doc = Jsoup.parse(htmlOrJson)
@@ -180,11 +202,15 @@ class ZLibrarySource(
                 } ?: false
                 if (ok) {
                     syncCookiesToWebView(candidate)
+                    ZLibraryNodeManager.selectNode(context, candidate)
+                    domainResolver.saveToCache(candidate)
                     return SourceResult.Success(true)
                 }
             }
-            SourceResult.Error(SourceException.ParseError(lastError ?: "登录失败，请检查账号密码或 Cookie"))
+            SourceResult.Error(SourceException.NetworkError(lastError ?: if (reachedLogin)
+                "登录失败，请检查账号密码或 Cookie" else "当前网络无法连接可登录的 Z-Library 节点，已尝试备用入口"))
         } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
             SourceResult.Error(SourceException.NetworkError("登录过程异常: ${e.message}"))
         }
     }
@@ -220,13 +246,14 @@ class ZLibrarySource(
             var response = try {
                 httpClient.get(searchUrl, referer = "https://$domain/")
             } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
                 val fallbackDomain = domainResolver.resolveDomain(forceScan = true)
                 sessionManager.ensureSessionInitialized(fallbackDomain, forceRefresh = true)
                 val fallbackSearchUrl = "https://$fallbackDomain/s/$encodedKw"
                 httpClient.get(fallbackSearchUrl, referer = "https://$fallbackDomain/")
             }
 
-            var html = response.body?.string() ?: ""
+            var html = response.use { it.body?.string().orEmpty() }
             checkCloudflare(response.code, html)
 
             // Z-Library 官网搜索服务故障时（/s/ 与 /eapi/book/search 均返回
@@ -276,7 +303,7 @@ class ZLibrarySource(
                 val eapiBooks = eapiClient.search(keyword, response.request.url.host)
                 if (eapiBooks.isNotEmpty()) {
                     ZLibraryNetworkLogger.logParserResult("SUCCESS_EAPI", eapiBooks.size, "eapi fallback")
-                    return SourceResult.Success(eapiBooks)
+                    return rememberSearch(eapiBooks, response.request.url.host)
                 }
                 // 513/529/500 等 HTTP 层全被挡（eapi 也被挡时返回空）：WebView
                 // （Chromium TLS 指纹 + 会话 Cookie）是唯一能进的入口，再兜一次。
@@ -286,10 +313,10 @@ class ZLibrarySource(
                     keyword,
                     cookies = credentialStorage.getCookies()
                 )
-                syncWebViewCookiesToHttp(webBooks.cookies, response.request.url.host)
+                syncWebViewCookiesToHttp(webBooks.cookies, webBooks.domain ?: response.request.url.host)
                 if (webBooks.books.isNotEmpty()) {
                     ZLibraryNetworkLogger.logParserResult("SUCCESS_WEBVIEW", webBooks.books.size, "HTTP error fallback")
-                    return SourceResult.Success(webBooks.books)
+                    return rememberSearch(webBooks.books, webBooks.domain ?: credentialStorage.getDomain())
                 }
                 return SourceResult.Error(SourceException.NetworkError("搜索请求失败 HTTP ${response.code}"))
             }
@@ -329,7 +356,7 @@ class ZLibrarySource(
                     retryResponse.close()
                     return if (retryBooks.isNotEmpty()) {
                         ZLibraryNetworkLogger.logParserResult("SUCCESS_FALLBACK", retryBooks.size, "fallback domain retry")
-                        SourceResult.Success(retryBooks)
+                        rememberSearch(retryBooks, retryResponse.request.url.host)
                     } else {
                         SourceResult.Error(
                             SourceException.NetworkError("搜索结果与关键词无关（节点返回了无关推荐），请更换节点后重试")
@@ -348,7 +375,7 @@ class ZLibrarySource(
                     val eapiBooks = eapiClient.search(keyword, response.request.url.host)
                     if (eapiBooks.isNotEmpty()) {
                         ZLibraryNetworkLogger.logParserResult("SUCCESS_EAPI", eapiBooks.size, "eapi empty fallback")
-                        return SourceResult.Success(eapiBooks)
+                        return rememberSearch(eapiBooks, response.request.url.host)
                     }
                     return SourceResult.Success(emptyList())
                 }
@@ -359,10 +386,10 @@ class ZLibrarySource(
                     keyword,
                     cookies = credentialStorage.getCookies()
                 )
-                syncWebViewCookiesToHttp(webBooks.cookies, response.request.url.host)
+                syncWebViewCookiesToHttp(webBooks.cookies, webBooks.domain ?: response.request.url.host)
                 if (webBooks.books.isNotEmpty()) {
                     ZLibraryNetworkLogger.logParserResult("SUCCESS_WEBVIEW", webBooks.books.size, "HTML empty, WebView fallback")
-                    return SourceResult.Success(webBooks.books)
+                    return rememberSearch(webBooks.books, webBooks.domain ?: credentialStorage.getDomain())
                 }
                 if (webBooks.stillChallenged) {
                     ZLibraryNetworkLogger.logParserResult("FAILED", 0, "captcha challenge")
@@ -375,7 +402,7 @@ class ZLibrarySource(
                 status = if (books.isNotEmpty()) "SUCCESS" else "EMPTY",
                 bookCount = books.size
             )
-            SourceResult.Success(books)
+            rememberSearch(books, response.request.url.host)
         } catch (e: SourceException) {
             val challengeDomain = domainResolver.resolveDomain()
             val webBooks = ZLibraryWebViewHelper.searchViaWebView(
@@ -384,14 +411,15 @@ class ZLibrarySource(
                 keyword,
                 cookies = credentialStorage.getCookies()
             )
-            syncWebViewCookiesToHttp(webBooks.cookies, challengeDomain)
+            syncWebViewCookiesToHttp(webBooks.cookies, webBooks.domain ?: challengeDomain)
             if (webBooks.books.isNotEmpty()) {
                 ZLibraryNetworkLogger.logParserResult("SUCCESS_WEBVIEW", webBooks.books.size, "Challenge fallback")
-                return SourceResult.Success(webBooks.books)
+                return rememberSearch(webBooks.books, webBooks.domain ?: credentialStorage.getDomain())
             }
             ZLibraryNetworkLogger.logParserResult("FAILED", 0, e.message)
             SourceResult.Error(e)
         } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
             val challengeDomain = domainResolver.resolveDomain()
             val webBooks = ZLibraryWebViewHelper.searchViaWebView(
                 context,
@@ -399,10 +427,10 @@ class ZLibrarySource(
                 keyword,
                 cookies = credentialStorage.getCookies()
             )
-            syncWebViewCookiesToHttp(webBooks.cookies, challengeDomain)
+            syncWebViewCookiesToHttp(webBooks.cookies, webBooks.domain ?: challengeDomain)
             if (webBooks.books.isNotEmpty()) {
                 ZLibraryNetworkLogger.logParserResult("SUCCESS_WEBVIEW", webBooks.books.size, "Exception fallback")
-                return SourceResult.Success(webBooks.books)
+                return rememberSearch(webBooks.books, webBooks.domain ?: credentialStorage.getDomain())
             }
             val translated = translateException(e)
             ZLibraryNetworkLogger.logParserResult("FAILED", 0, translated.message)
@@ -410,24 +438,18 @@ class ZLibrarySource(
         }
     }
 
-    override suspend fun getDetail(bookId: String): SourceResult<SearchBook> {
+    override suspend fun getDetail(bookId: String): SourceResult<SearchBook> =
+        getDetailAtDomain(bookId, bookOrigins[bookId] ?: domainResolver.resolveDomain())
+
+    private suspend fun getDetailAtDomain(bookId: String, domain: String): SourceResult<SearchBook> {
         return try {
-            val domain = domainResolver.resolveDomain()
             sessionManager.ensureSessionInitialized(domain)
 
-            val cleanBookId = bookId.trimStart('/')
-            val detailUrl = if (cleanBookId.startsWith("http")) cleanBookId else "https://$domain/$cleanBookId"
+            val detailUrl = ZLibraryBookReference.url(bookId, domain)
 
-            val response = try {
-                httpClient.get(detailUrl, referer = "https://$domain/")
-            } catch (e: Exception) {
-                val fallbackDomain = domainResolver.resolveDomain(forceScan = true)
-                sessionManager.ensureSessionInitialized(fallbackDomain, forceRefresh = true)
-                val fallbackDetailUrl = if (cleanBookId.startsWith("http")) cleanBookId else "https://$fallbackDomain/$cleanBookId"
-                httpClient.get(fallbackDetailUrl, referer = "https://$fallbackDomain/")
-            }
+            val response = httpClient.get(detailUrl, referer = "https://$domain/")
 
-            val html = response.body?.string() ?: ""
+            val html = response.use { it.body?.string().orEmpty() }
             checkCloudflare(response.code, html)
 
             if (!response.isSuccessful) {
@@ -474,7 +496,7 @@ class ZLibrarySource(
         } catch (e: SourceException) {
             // 兜底：HTML 详情异常时尝试 eapi
             val eapiBook = runCatching {
-                val d = domainResolver.resolveDomain()
+                val d = domain
                 resolveEapiBookKey(d, bookId)?.let { key ->
                     eapiClient.getBookInfo(key.first, key.second, d)
                 }
@@ -485,9 +507,10 @@ class ZLibrarySource(
                 SourceResult.Error(e)
             }
         } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
             val translated = translateException(e)
             val eapiBook = runCatching {
-                val d = domainResolver.resolveDomain()
+                val d = domain
                 resolveEapiBookKey(d, bookId)?.let { key ->
                     eapiClient.getBookInfo(key.first, key.second, d)
                 }
@@ -513,12 +536,65 @@ class ZLibrarySource(
         bookId: String,
         preferredFormat: String?
     ): SourceResult<DownloadInfo> {
+        return downloadWithFailover(bookId, preferredFormat, emptySet())
+    }
+
+    /** Expired CDN links and download-only failures must exclude the failing mirror. */
+    suspend fun recoverDownloadInfo(bookId: String, format: String?, failedDomains: Set<String>,
+        title: String? = null, author: String? = null): SourceResult<DownloadInfo> {
+        if (!title.isNullOrBlank()) downloadBooks[bookId] = SearchBook(bookId, id, title, author.orEmpty(), format = format.orEmpty())
+        return downloadWithFailover(bookId, format, failedDomains)
+    }
+
+    private suspend fun downloadWithFailover(bookId: String, format: String?, failedDomains: Set<String>): SourceResult<DownloadInfo> {
+        if (!isLoggedIn()) return SourceResult.Error(SourceException.LoginRequired)
+        val excluded = failedDomains.toMutableSet()
+        var last: SourceResult<DownloadInfo> = SourceResult.Error(SourceException.NetworkError("没有可用的下载节点"))
+        repeat(3) {
+            currentCoroutineContext().ensureActive()
+            val origin = bookOrigins[bookId]
+            val domain = if (excluded.isEmpty() && origin != null) origin
+                else if (excluded.isEmpty()) domainResolver.resolveDomain()
+                else domainResolver.resolveNextDomain(excluded) ?: return last
+            ZLibraryNodeConfig.domain = domain
+            val known = downloadBooks[bookId]
+            if (excluded.isNotEmpty() && known != null) {
+                val refreshed = refreshBookOnMirror(known, domain, format)
+                if (refreshed == null) {
+                    excluded += domain
+                    last = SourceResult.Error(SourceException.ParseError("备用节点未找到唯一匹配的书籍版本，请稍后重试"))
+                    return@repeat
+                }
+                downloadBooks[bookId] = refreshed
+                bookOrigins[bookId] = domain
+            }
+            last = getDownloadInfoAtDomain(bookId, format, domain)
+            if (last is SourceResult.Success) return last
+            val error = (last as SourceResult.Error).exception
+            if (error is SourceException.LoginRequired || !shouldRetryZLibraryDownload(error.message.orEmpty())) return last
+            excluded += domain
+        }
+        return last
+    }
+
+    private suspend fun refreshBookOnMirror(book: SearchBook, domain: String, format: String?): SearchBook? {
+        return try {
+            val query = URLEncoder.encode(book.title, "UTF-8").replace("+", "%20")
+            val books = httpClient.get("https://$domain/s/$query", referer = "https://$domain/").use { response ->
+                if (!response.isSuccessful || !response.request.url.encodedPath.startsWith("/s/")) return null
+                ZLibraryParserManager.parseSearchPage(response.body?.string().orEmpty(), "https://${response.request.url.host}", id)
+            }
+            uniqueZLibraryEdition(books, book, format)
+        } catch (e: Exception) { currentCoroutineContext().ensureActive(); null }
+    }
+
+    private suspend fun getDownloadInfoAtDomain(bookId: String, preferredFormat: String?, domain: String): SourceResult<DownloadInfo> {
         if (!isLoggedIn()) {
             return SourceResult.Error(SourceException.LoginRequired)
         }
 
         return try {
-            val domain = domainResolver.resolveDomain()
+            sessionManager.ensureSessionInitialized(domain)
 
             // 前置拦截：今日下载额度已用尽时直接提示，避免白白走下载+校验流程
             // （新站 /dl/ 在额度用尽时会返回 HTML 限额页，旧逻辑会误报“HTML 错误页”）
@@ -531,11 +607,10 @@ class ZLibrarySource(
                 )
             }
 
-            val detailResult = getDetail(bookId)
-            if (detailResult is SourceResult.Error) {
-                return SourceResult.Error(detailResult.exception)
-            }
-
+            val known = downloadBooks[bookId]
+            val detailResult = if (!known?.downloadUrl.isNullOrBlank()) SourceResult.Success(known!!)
+                else getDetailAtDomain(bookId, domain)
+            if (detailResult is SourceResult.Error) return SourceResult.Error(detailResult.exception)
             val book = (detailResult as SourceResult.Success).data
             val dlUrl = book.downloadUrl
 
@@ -546,7 +621,8 @@ class ZLibrarySource(
             val wantFormat = preferredFormat?.lowercase()?.trim()
                 ?.takeIf { it.isNotBlank() && it != defaultFormat }
 
-            val cookieHeader = credentialStorage.getCookies() ?: ""
+            val cookieHeader = httpClient.cookieJar.loadForRequest("https://$domain/".toHttpUrl())
+                .joinToString("; ") { "${it.name}=${it.value}" }
 
             // 用户手动选择的非默认格式：走 eapi formats -> 变体 file 链路（多格式下载）
             if (wantFormat != null) {
@@ -598,8 +674,8 @@ class ZLibrarySource(
             // eapi 失败/不可用时再回退详情页 /dl/ 链接 + 会话 Cookie
             // （/dl/ 会先返回 DiamWall 503 挑战页，DownloadWorker 的 DiamWallInterceptor
             // 会自动解 PoW 后重试）。
-            val detailUrl = "https://$domain/${bookId.trimStart('/')}"
-            val eapiLink = runCatching {
+            val detailUrl = ZLibraryBookReference.url(bookId, domain)
+            val eapiLink = if (ZLibraryBookReference.apiKey(bookId) == null && book.eapiHash.isNullOrBlank() && !dlUrl.isNullOrBlank()) null else runCatching {
                 val key = if (!book.eapiId.isNullOrBlank() && !book.eapiHash.isNullOrBlank()) {
                     book.eapiId to book.eapiHash
                 } else {
@@ -613,7 +689,7 @@ class ZLibrarySource(
                     SourceException.NetworkError(eapiLink!!.disallowMessage)
                 )
             }
-            val finalUrl = eapiLink?.url ?: dlUrl
+            val finalUrl = eapiLink?.url?.takeIf { it.isNotBlank() } ?: dlUrl
             if (finalUrl.isNullOrBlank()) {
                 return SourceResult.Error(
                     SourceException.ParseError("未获取到下载链接，请稍后重试或切换节点")
@@ -624,13 +700,15 @@ class ZLibrarySource(
                     url = finalUrl,
                     fileName = "$cleanTitle.$defaultFormat",
                     format = defaultFormat,
-                    referer = detailUrl,
+                    referer = if (known?.downloadUrl != null && ZLibraryBookReference.apiKey(bookId) == null)
+                        "https://$domain/s/" + URLEncoder.encode(book.title, "UTF-8").replace("+", "%20") else detailUrl,
                     headers = mapOf("Cookie" to cookieHeader)
                 )
             )
         } catch (e: SourceException) {
             SourceResult.Error(e)
         } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
             SourceResult.Error(SourceException.NetworkError("获取下载链接失败: ${e.message}"))
         }
     }
@@ -642,6 +720,10 @@ class ZLibrarySource(
      * 3. 尽力通过 eapi 搜索书名解析出 eapi id/hash 后补全多格式。
      */
     override suspend fun getAvailableFormats(book: SearchBook): SourceResult<List<BookFormat>> {
+        downloadBooks[book.id] = book
+        if (!book.downloadUrl.isNullOrBlank() && book.eapiHash.isNullOrBlank() && ZLibraryBookReference.apiKey(book.id) == null) {
+            return SourceResult.Success(listOf(BookFormat(format = book.format, size = book.size, downloadUrl = book.downloadUrl)))
+        }
         return try {
             val domain = domainResolver.resolveDomain()
             sessionManager.ensureSessionInitialized(domain)
@@ -681,6 +763,7 @@ class ZLibrarySource(
                 SourceResult.Success(merged.values.toList())
             }
         } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
             SourceResult.Error(SourceException.NetworkError("获取格式列表失败: ${e.message}"))
         }
     }
@@ -690,9 +773,9 @@ class ZLibrarySource(
      * 详情页有 data-book_id（数字 id），再用 eapi 搜索书名匹配同 id 的书拿到短 hash。
      */
     private suspend fun resolveEapiBookKey(domain: String, bookId: String): Pair<String, String>? {
+        ZLibraryBookReference.apiKey(bookId)?.let { return it }
         return runCatching {
-            val cleanBookId = bookId.trimStart('/')
-            val detailUrl = if (cleanBookId.startsWith("http")) cleanBookId else "https://$domain/$cleanBookId"
+            val detailUrl = ZLibraryBookReference.url(bookId, domain)
             val response = httpClient.get(detailUrl, referer = "https://$domain/")
             val html = response.body?.string() ?: ""
             response.close()

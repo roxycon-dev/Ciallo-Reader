@@ -13,7 +13,7 @@ import java.util.zip.ZipFile
 
 /** Stricter completeness checks for built-in, anonymous Chinese novel downloads only. */
 internal object GuestNovelIntegrity {
-    data class EpubSummary(val titles: List<String>, val images: Int)
+    data class EpubSummary(val titles: List<String>, val images: Int, val replacementCharacters: Int)
     private fun utf8(bytes: ByteArray): String = Charsets.UTF_8.newDecoder()
         .onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT)
         .decode(ByteBuffer.wrap(bytes)).toString().removePrefix("\uFEFF")
@@ -50,13 +50,26 @@ internal object GuestNovelIntegrity {
         val titles = mutableListOf<String>()
         var imageCount = 0
         var chinese = 0
+        var replacementCharacters = 0
         for (ref in spine) {
             val item = items[ref.attr("idref")] ?: error("EPUB 书脊引用缺失")
             val path = resolve(opfPath, item.attr("href"))
-            val doc = Jsoup.parse(utf8(bytes(path)))
+            val html = utf8(bytes(path))
+            // HTML parsing may discard NUL; inspect decoded source before parsing.
+            require(!html.contains('\u0000')) { "EPUB 正文包含乱码" }
+            val doc = Jsoup.parse(html)
             val body = doc.body()
             val text = body.text()
-            require(!text.contains('\uFFFD') && !text.contains('\u0000')) { "EPUB 正文包含乱码" }
+            require(!text.contains('\u0000')) { "EPUB 正文包含乱码" }
+            // utf8() already rejects malformed encoded bytes. A literal U+FFFD may
+            // instead be an isolated missing character in an otherwise valid source
+            // translation. Keep that text verbatim; do not reject a whole long novel
+            // or invent a replacement. Still reject short/broken chapters and bursts.
+            val missing = text.count { it == '\uFFFD' }
+            replacementCharacters += missing
+            require(missing == 0 || (missing == 1 && text.length >= 1_000 && replacementCharacters <= 3)) {
+                "EPUB 正文包含大量缺字或乱码"
+            }
             require(!com.example.source.hasMissingNovelContent(text)) { "源站 EPUB 含缺失正文或缺译章节" }
             chinese += text.count { it in '\u4e00'..'\u9fff' }
             val images = body.select("img[src],image[href],image[xlink:href]")
@@ -74,7 +87,7 @@ internal object GuestNovelIntegrity {
             }
         }
         require(chinese > 20) { "未发现足够的中文正文，未导入空书或错误语言文件" }
-        EpubSummary(titles, imageCount)
+        EpubSummary(titles, imageCount, replacementCharacters)
     }
 
     /** Reject detectable gaps and empty numbered sections instead of silently sorting them away. */

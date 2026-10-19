@@ -640,7 +640,11 @@ object EpubParser {
         val opfDocument=org.jsoup.Jsoup.parse(readTextWithCharsetDetection(opf),"",org.jsoup.parser.Parser.xmlParser())
         val tocFiles=opfDocument.select("item").filter { it.attr("properties").split(' ').contains("nav") || it.attr("media-type")=="application/x-dtbncx+xml" }
         for(item in tocFiles) {
-            val toc=ArchiveBudget.destination(canonicalRoot,opf.parentFile!!.canonicalFile.relativeTo(canonicalRoot).invariantSeparatorsPath+"/"+decodeUrl(item.attr("href")))
+            // A root-level OPF has an empty relative directory. Adding '/' to it
+            // turns a valid toc.ncx/nav.xhtml into an absolute path and rejects the book.
+            val directory = opf.parentFile!!.canonicalFile.relativeTo(canonicalRoot).invariantSeparatorsPath
+            val prefix = if (directory.isEmpty()) "" else "$directory/"
+            val toc=ArchiveBudget.destination(canonicalRoot,prefix+decodeUrl(item.attr("href")))
             if(!toc.isFile) continue
             val doc=org.jsoup.Jsoup.parse(readTextWithCharsetDetection(toc),"",org.jsoup.parser.Parser.xmlParser())
             val links=if(toc.extension.lowercase()=="ncx") doc.select("navPoint") else doc.select("nav[epub:type=toc] a[href], nav a[href]")
@@ -775,7 +779,9 @@ object EpubParser {
             bytes = android.util.Base64.decode(src.substringAfter("base64,", ""), android.util.Base64.DEFAULT)
             epzipEntry = null
         } else {
-            val srcFile = File(xhtmlFile.parentFile, decodeUrl(src.substringBefore('#')))
+            val root = epubRootDir.canonicalFile
+            val srcFile = File(xhtmlFile.parentFile, decodeUrl(src.substringBefore('#'))).canonicalFile
+            if (!srcFile.path.startsWith(root.path.trimEnd(File.separatorChar) + File.separator)) return null
             if (!srcFile.exists() || !srcFile.isFile) {
                 Log.d(TAG, "[IMG] null: src missing '${srcFile.absolutePath}' parent=${xhtmlFile.parentFile?.absolutePath}")
                 return null
@@ -785,7 +791,7 @@ object EpubParser {
             bytes = srcFile.readBytes()
             // zip 内条目 = 临时解压文件相对解压根目录的路径（unzipEpub 按 entry.name 落盘，两者一致）
             epzipEntry = runCatching {
-                srcFile.relativeTo(epubRootDir).invariantSeparatorsPath
+                srcFile.relativeTo(root).invariantSeparatorsPath
             }.getOrNull()
         }
 

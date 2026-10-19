@@ -112,9 +112,9 @@ class DownloadManager(private val context: Context) {
         }?.id ?: id
     }
 
-    fun enqueueDownload(request: DownloadRequest, referer: String? = null, headers: Map<String, String> = emptyMap()) {
+    fun enqueueDownload(request: DownloadRequest, referer: String? = null, headers: Map<String, String> = emptyMap()): kotlinx.coroutines.Job {
         Log.i(TAG, "enqueueDownload requested for bookId=${request.bookId}, title=${request.title}")
-        scope.launch {
+        return scope.launch {
             enqueueMutex.lock()
             try {
             val canonicalId = taskId(request.sourceId, request.bookId)

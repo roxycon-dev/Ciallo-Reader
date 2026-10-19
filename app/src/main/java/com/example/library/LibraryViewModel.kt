@@ -1006,9 +1006,15 @@ class LibraryViewModel private constructor(
     private val _uiState = MutableStateFlow<LibraryUiState>(LibraryUiState.Empty)
     val uiState: StateFlow<LibraryUiState> = _uiState
 
+    data class DownloadPreparation(val book: SearchBook, val state: DownloadState = DownloadState.Pending)
+    private val preparations: MutableStateFlow<Map<String, DownloadPreparation>> = sharedLibrary?.preparations ?: MutableStateFlow(emptyMap())
+    private val downloadJobs: MutableMap<String, Job> = sharedLibrary?.downloadJobs ?: mutableMapOf()
+    val preparingDownloads = preparations.asStateFlow()
+    private val downloadScope get() = sharedLibrary?.viewModelScope ?: viewModelScope
+
     val downloadStates: StateFlow<Map<String, DownloadState>> = kotlinx.coroutines.flow.combine(
-        downloadManager.downloadStates, downloadManager.allTasksFlow
-    ) { states, tasks ->
+        downloadManager.downloadStates, downloadManager.allTasksFlow, preparations
+    ) { states, tasks, preparing ->
         tasks.associate { task ->
             DownloadManager.taskId(task.sourceId, DownloadManager.originalBookId(task.id, task.sourceId)) to
                 (states[task.id] ?: when (task.status) {
@@ -1019,7 +1025,7 @@ class LibraryViewModel private constructor(
                     com.example.download.DownloadStatus.FAILED -> DownloadState.Error(task.errorMessage ?: "下载失败")
                     else -> DownloadState.Pending
                 })
-        }
+        } + preparing.mapValues { it.value.state }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
     val allDownloadTasks: Flow<List<DownloadTaskEntity>> = downloadManager.allTasksFlow
     val errorMessage = MutableStateFlow<String?>(null)
@@ -1120,9 +1126,12 @@ class LibraryViewModel private constructor(
         val source = sourceManager.availableSources.value.firstOrNull { it.id == book.sourceId }
             ?: currentSource.value
             ?: return
+        val key = DownloadManager.taskId(book.sourceId, book.id)
+        if (downloadJobs[key]?.isActive == true) return
+        preparations.update { it + (key to DownloadPreparation(book)) }
         // Z-Library 支持多格式：先取格式列表，多个格式时弹选择框
         if (source is ZLibrarySource) {
-            viewModelScope.launch {
+            downloadJobs[key] = downloadScope.launch {
                 _formatPickerBook.value = book
                 _formatLoading.value = true
                 val fetched = when (val result = source.getAvailableFormats(book)) {
@@ -1146,6 +1155,7 @@ class LibraryViewModel private constructor(
                         errorMessage.value = "该书仅有 " +
                             fetched.joinToString(" / ") { it.format.uppercase() } +
                             " 格式，App 内暂不支持阅读，请换其他版本"
+                        preparations.update { it + (key to DownloadPreparation(book, DownloadState.Error(errorMessage.value.orEmpty()))) }
                     }
                     else -> {
                         // 格式获取失败：按默认格式下载
@@ -1173,21 +1183,31 @@ class LibraryViewModel private constructor(
     }
 
     fun dismissFormatPicker() {
+        _formatPickerBook.value?.let { book ->
+            val key = DownloadManager.taskId(book.sourceId, book.id)
+            downloadJobs.remove(key)?.cancel()
+            preparations.update { it - key }
+        }
         _formatPickerBook.value = null
         _pendingFormats.value = emptyList()
     }
 
     private fun downloadBook(book: SearchBook, source: BookSource, format: String?, replaceNovel: Boolean = false) {
-        viewModelScope.launch {
+        val key = DownloadManager.taskId(book.sourceId, book.id)
+        preparations.update { it + (key to DownloadPreparation(book)) }
+        downloadJobs[key] = downloadScope.launch {
+            try {
             val snapshot = if (WholeBookNovelSources.contains(book.sourceId) && !replaceNovel) {
                 (source.getDetail(book.id) as? SourceResult.Success)?.data ?: book
             } else book
-            when (val result = source.getDownloadInfo(book.id, preferredFormat = format)) {
+            when (val result = if (source is ZLibrarySource) source.getDownloadInfo(book, format)
+                else source.getDownloadInfo(book.id, preferredFormat = format)) {
                 is SourceResult.Success -> {
                     val finalFormat = result.data.format.ifBlank { book.format }
                     // 统一兜底：阅读器不支持的格式（PDF 等）不下载，避免书架出现打不开的书
                     if (finalFormat.lowercase() in READER_UNSUPPORTED_FORMATS) {
                         errorMessage.value = "该书文件为 ${finalFormat.uppercase()} 格式，App 内暂不支持阅读，请换其他版本"
+                        preparations.update { it + (key to DownloadPreparation(book, DownloadState.Error(errorMessage.value.orEmpty()))) }
                         return@launch
                     }
                     val request = DownloadRequest(
@@ -1201,14 +1221,22 @@ class LibraryViewModel private constructor(
                         novelSnapshot = snapshot.takeIf { WholeBookNovelSources.contains(it.sourceId) },
                         replaceExistingNovel = replaceNovel
                     )
-                    downloadManager.enqueueDownload(request, result.data.referer, result.data.headers)
+                    downloadManager.enqueueDownload(request, result.data.referer, result.data.headers).join()
+                    preparations.update { it - key }
                 }
                 is SourceResult.Error -> {
                     errorMessage.value = result.exception.message ?: "获取下载信息失败"
+                    preparations.update { it + (key to DownloadPreparation(book, DownloadState.Error(errorMessage.value.orEmpty()))) }
                     if (replaceNovel) _novelUpdate.value?.takeIf {
                         it.local.sourceId == book.sourceId && it.local.comicId == book.id
                     }?.let { _novelUpdate.value = it.copy(error = errorMessage.value) }
                 }
+            }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                val message = e.message ?: "准备下载失败，请重试"
+                preparations.update { it + (key to DownloadPreparation(book, DownloadState.Error(message))) }
+                errorMessage.value = message
             }
         }
     }
@@ -1304,6 +1332,8 @@ class LibraryViewModel private constructor(
     }
 
     fun cancelDownload(bookId: String) {
+        downloadJobs.remove(bookId)?.cancel()
+        preparations.update { it - bookId }
         downloadManager.cancelDownload(bookId)
     }
 }

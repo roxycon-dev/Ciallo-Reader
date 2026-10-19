@@ -4,6 +4,8 @@ import android.content.Context
 import com.example.source.zlibrary.DiamWallInterceptor
 import com.example.source.zlibrary.EncryptedCookieJar
 import com.example.source.zlibrary.ZLibraryCredentialStorage
+import com.example.source.executeCancellable
+import com.example.library.ZLibraryNodeConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.*
@@ -21,10 +23,15 @@ class ZLibraryHttpClient(
         const val DEFAULT_ACCEPT_LANG = "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7"
     }
 
+    private fun clientFor(url: HttpUrl): OkHttpClient =
+        if (ZLibraryNodeConfig.prefersDirect(url.host)) okHttpClient.newBuilder().proxy(java.net.Proxy.NO_PROXY).build()
+        else okHttpClient
+
     val okHttpClient: OkHttpClient by lazy {
         val builder = com.example.source.SharedHttpTransport.builder()
             .dns(ZLibraryDns.INSTANCE)
             .cookieJar(cookieJar)
+            .callTimeout(25, TimeUnit.SECONDS)
             .connectTimeout(8, TimeUnit.SECONDS)
             .readTimeout(12, TimeUnit.SECONDS)
             .writeTimeout(12, TimeUnit.SECONDS)
@@ -99,14 +106,14 @@ class ZLibraryHttpClient(
         // callTimeoutMs（会话预热等调用方限时）：必须用 OkHttp callTimeout——
         // 外层 withTimeoutOrNull 取消不了阻塞中的 socket read，超时形同虚设
         val call = if (callTimeoutMs != null) {
-            okHttpClient.newBuilder()
+            clientFor(request.url).newBuilder()
                 .callTimeout(callTimeoutMs, TimeUnit.MILLISECONDS)
                 .build()
                 .newCall(request)
         } else {
-            okHttpClient.newCall(request)
+            clientFor(request.url).newCall(request)
         }
-        val response = call.execute()
+        val response = call.executeCancellable()
 
         // Log response
         val respHeaderMap = mutableMapOf<String, String>()
@@ -148,7 +155,7 @@ class ZLibraryHttpClient(
         val currentCookies = cookieJar.loadForRequest(request.url).joinToString("; ") { "${it.name}=${it.value}" }
         ZLibraryNetworkLogger.logRequest(url, "POST", headerMap, currentCookies)
 
-        val response = okHttpClient.newCall(request).execute()
+        val response = clientFor(request.url).newCall(request).executeCancellable()
 
         val respHeaderMap = mutableMapOf<String, String>()
         for (i in 0 until response.headers.size) {

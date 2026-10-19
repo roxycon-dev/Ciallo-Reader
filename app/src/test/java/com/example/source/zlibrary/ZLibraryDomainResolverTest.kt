@@ -2,8 +2,13 @@ package com.example.source.zlibrary
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.runTest
+import com.example.library.ZLibraryNodeConfig
+import kotlinx.coroutines.runBlocking
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
+import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -11,50 +16,56 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class ZLibraryDomainResolverTest {
-
-    private lateinit var context: Context
-    private lateinit var credentialStorage: ZLibraryCredentialStorage
     private lateinit var endpointProvider: ZLibraryEndpointProvider
+    private var previousSelection = ""
+    private val probed = mutableListOf<String>()
 
-    @Before
-    fun setUp() {
-        context = ApplicationProvider.getApplicationContext()
-        credentialStorage = ZLibraryCredentialStorage(context.getSharedPreferences("credential-test", android.content.Context.MODE_PRIVATE))
-        endpointProvider = ZLibraryEndpointProvider(context, credentialStorage)
+    @Before fun setUp() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        previousSelection = ZLibraryNodeConfig.domain
+        ZLibraryNodeConfig.domain = ""
+        val credentials = ZLibraryCredentialStorage(context.getSharedPreferences("credential-test", Context.MODE_PRIVATE))
+        endpointProvider = ZLibraryEndpointProvider(context, credentials)
         endpointProvider.invalidateCache()
-    }
-
-    @Test
-    fun testCacheValidReturnsCachedEndpoint() = runTest {
-        // 2026-09-04 容灾语义更新：缓存节点先做快速体检——可达（有任何 HTTP 应答，
-        // example.com 稳定返回 200）才原样复用，避免死节点直接返回卡死搜索。
-        val testEndpoint = "example.com"
-        endpointProvider.saveCache(testEndpoint)
-
-        val resolved = endpointProvider.getEndpoint()
-        assertEquals(testEndpoint, resolved)
-
-        // 体检不通的缓存节点（挂了/被墙/根本不存在）不再原样返回：
-        // 自动作废重扫换活节点；离线环境下扫描全挂也兜底预置首域，均不等于死域名。
-        endpointProvider.invalidateCache()
-        endpointProvider.saveCache("dead-zlib.invalid")
-        val resolvedAfter = endpointProvider.getEndpoint()
-        assertNotEquals("dead-zlib.invalid", resolvedAfter)
-        assertNotNull(resolvedAfter)
-    }
-
-    @Test
-    fun testCustomEndpointTakesPrecedence() = runTest {
-        // 2026-09-04 容灾语义更新：自定义节点同样先体检，可达才优先返回。
-        val custom = "example.com"
-        endpointProvider.setCustomEndpoint(custom)
-
-        val resolved = endpointProvider.getEndpoint()
-        assertEquals(custom, resolved)
         endpointProvider.setCustomEndpoint(null)
+        // Exercise the production quick-probe and precedence logic with actual
+        // structured Z-Library responses, without depending on example.com's live
+        // HTML/network or treating any HTTP 200 as a healthy library endpoint.
+        val client = OkHttpClient.Builder().addInterceptor { chain ->
+            probed += chain.request().url.host
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("fixture")
+                .body("<script src='/js/zlibrary.js'></script>".toResponseBody()).build()
+        }.build()
+        ZLibraryEndpointProvider::class.java.getDeclaredField("quickCheckClient").apply {
+            isAccessible = true
+            set(endpointProvider, client)
+        }
+    }
+
+    @After fun restoreSelection() { ZLibraryNodeConfig.domain = previousSelection }
+
+    @Test fun validCachedEndpointIsProbedAndReused() = runBlocking {
+        endpointProvider.saveCache("cached-zlib.example")
+        assertEquals("cached-zlib.example", endpointProvider.getEndpoint())
+        assertEquals(listOf("cached-zlib.example"), probed)
+    }
+
+    @Test fun healthyCustomEndpointTakesPrecedenceOverCache() = runBlocking {
+        endpointProvider.saveCache("cached-zlib.example")
+        endpointProvider.setCustomEndpoint("custom-zlib.example")
+        assertEquals("custom-zlib.example", endpointProvider.getEndpoint())
+        assertEquals(listOf("custom-zlib.example"), probed)
+    }
+
+    @Test fun explicitSelectionTakesPrecedenceOverCustomAndCache() = runBlocking {
+        endpointProvider.saveCache("cached-zlib.example")
+        endpointProvider.setCustomEndpoint("custom-zlib.example")
+        ZLibraryNodeConfig.domain = "selected-zlib.example"
+        assertEquals("selected-zlib.example", endpointProvider.getEndpoint())
+        assertEquals(listOf("selected-zlib.example"), probed)
     }
 }

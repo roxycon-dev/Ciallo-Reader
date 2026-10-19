@@ -30,6 +30,16 @@ object ZLibraryParserManager {
         val doc = Jsoup.parse(html)
         ZLibraryAccessChecker.checkResponse(fakeResponse(), doc)
 
+        // Some mirrors insert an explicitly hidden bookcard reflecting the query,
+        // with a random id/format and an empty download endpoint. It is not a visible
+        // search result. Remove hidden subtrees before layout selection so the generic
+        // fallback cannot reintroduce the same decoy via its /book/ link.
+        doc.select("[hidden], [aria-hidden=true]").remove()
+        doc.select("[style]").filter { element ->
+            Regex("(?:^|;)\\s*(?:display\\s*:\\s*none|visibility\\s*:\\s*hidden)\\s*(?:!important)?\\s*(?:;|$)",
+                RegexOption.IGNORE_CASE).containsMatchIn(element.attr("style"))
+        }.forEach { it.remove() }
+
         val selectedParser = parsers.firstOrNull { it.canParseSearch(doc) }
             ?: parsers.last()
 

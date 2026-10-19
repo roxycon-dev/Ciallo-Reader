@@ -14,6 +14,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowLog
 import java.io.File
 import java.io.FileOutputStream
@@ -26,16 +27,20 @@ import java.io.FileOutputStream
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class NovelInlineImagePipelineTest {
 
     private lateinit var context: Context
     private lateinit var db: AppDatabase
 
-    // 1x1 透明 PNG
-    private val pngBytes = android.util.Base64.decode(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=",
-        android.util.Base64.DEFAULT
-    )
+    private val pngBytes: ByteArray get() {
+        val bitmap = android.graphics.Bitmap.createBitmap(4, 4, android.graphics.Bitmap.Config.ARGB_8888)
+        return java.io.ByteArrayOutputStream().use { out ->
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+            bitmap.recycle()
+            out.toByteArray()
+        }
+    }
 
     @Before
     fun setUp() = runBlocking<Unit> {
@@ -82,7 +87,13 @@ class NovelInlineImagePipelineTest {
         }
     }
 
-    private fun fileUri(f: File) = android.net.Uri.fromFile(f)
+    private fun fileUri(f: File): android.net.Uri {
+        // Robolectric's Android Uri adds a Unix slash before a Windows drive.
+        // Use a current-drive-rooted test URI so File(uri.path) opens the same file.
+        val path = f.absolutePath.replace('\\', '/')
+        return if (File.separatorChar == '\\') android.net.Uri.parse("file://" + path.substring(2))
+            else android.net.Uri.fromFile(f)
+    }
 
     @Test
     fun epubImportExtractsInlineImagesAsEpzipRefs() = runBlocking {

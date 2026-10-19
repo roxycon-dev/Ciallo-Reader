@@ -1,5 +1,8 @@
 package com.example.source.zlibrary
 
+import com.example.source.executeCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
@@ -34,8 +37,9 @@ import java.util.concurrent.TimeUnit
 class RemoteEndpointProvider(private val context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("zlib_remote_config", Context.MODE_PRIVATE)
     private val okHttpClient = com.example.source.SharedHttpTransport.builder()
-        .connectTimeout(6, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
+        .callTimeout(3, TimeUnit.SECONDS)
+        .connectTimeout(2, TimeUnit.SECONDS)
+        .readTimeout(3, TimeUnit.SECONDS)
         .build()
 
     /** 六个发现源（并行抓取）：
@@ -77,19 +81,24 @@ class RemoteEndpointProvider(private val context: Context) {
                     async {
                         runCatching {
                             val request = Request.Builder().url(url).header("Accept", "text/html").build()
-                            okHttpClient.newCall(request).execute().use { resp ->
+                            okHttpClient.newCall(request).executeCancellable().use { resp ->
                                 if (resp.isSuccessful) resp.body?.string() else null
                             }
-                        }.getOrNull()
+                        }.onFailure { currentCoroutineContext().ensureActive() }.getOrNull()
                     }
                 }.awaitAll()
             }
             val found = LinkedHashSet<String>()
-            htmls.forEach { html ->
-                if (html.isNullOrBlank()) return@forEach
-                domainRegex.findAll(html).forEach { m ->
+            htmls.forEachIndexed { index, html ->
+                if (html.isNullOrBlank()) return@forEachIndexed
+                // The navigation page also lists phishing/retired sites. Its official
+                // table is the discovery boundary; never harvest its blacklist.
+                val links = if (index == 0) org.jsoup.Jsoup.parse(html)
+                    .select("#official-urls table a[href]").joinToString("\n") { it.attr("href") } else html
+                domainRegex.findAll(links).forEach { m ->
                     val host = m.groupValues[1].lowercase()
-                    if (host.contains('.') && !host.endsWith(".png") && !host.endsWith(".js")) {
+                    if (host.contains('.') && !host.endsWith(".png") && !host.endsWith(".js") &&
+                        com.example.library.ZLibraryNodeManager.isAutomaticCandidate(host)) {
                         found.add(host)
                     }
                 }

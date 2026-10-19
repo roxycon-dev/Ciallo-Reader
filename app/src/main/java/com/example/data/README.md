@@ -16,6 +16,7 @@ Room 数据模型、导入解析、备份、偏好设置和阅读记录。
 - `BookRepository.kt`
 - `ChapterMerger.kt`
 - `CharsetSniffer.kt`
+- `EpubParser.kt`：兼容根目录及嵌套 OPF；图片文件和解压根目录同时 canonicalize，避免 Android 目录别名进入包内引用，保留路径边界校验。
 - `ComicParser.kt`
 - 其余 16 项按名称和同层模块组织。
 

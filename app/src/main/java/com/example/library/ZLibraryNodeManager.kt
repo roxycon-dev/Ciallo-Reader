@@ -10,19 +10,9 @@ import okhttp3.Request
 import org.jsoup.Jsoup
 import java.util.concurrent.TimeUnit
 
-/**
- * Z-Library 节点管理：
- * - 默认节点固定为 1lib.sk（用户实测唯一正确官网，账号可登录、有免费下载额度；
- *   走 DiamWall 挑战，App 的 PoW 拦截器 + WebView 兜底自动过）；
- * - 节点从 https://zlib.wwkejishe.top/ 扒取（#official-urls 表格全部官方入口，
- *   更新勤、含假站黑名单——2026-09-04 用户指定）；
- * - 支持用户自定义节点；
- * - 选择的节点写入 SharedPreferences，并在启动时恢复。
- */
+/** Candidate discovery and manual selection. Availability is measured at runtime. */
 object ZLibraryNodeManager {
-    // 2026-09-04 实测校准：z-lib.li / z-lib.cc 等均为仿冒站（无下载功能或流程不符）；
-    // 1lib.sk 为唯一正确官网（DiamWall 挑战可自动过，rpc.php/eapi/搜索全链路已验证）。
-    const val DEFAULT_NODE = "1lib.sk"
+    const val DEFAULT_NODE = "z-lib.sk"
     const val SCRAPE_URL = "https://zlib.wwkejishe.top/"
 
     private const val PREFS_NAME = "zlib_node_manager"
@@ -30,40 +20,13 @@ object ZLibraryNodeManager {
     private const val KEY_CUSTOM_NODES = "custom_nodes"
     private const val KEY_SELECTED_NODE = "selected_node"
 
-    /** 2026-09-04 晚 Edge 登录态逐个实测的活节点（首页真实 + 搜索出书卡片），
-     *  节点管理页显示"已验证可用"标签的依据。 */
-    val VERIFIED_LIVE_NODES = setOf(
-        "1lib.sk",
-        "z-lib.by",
-        "z-library.sk",
-        "zh.z-lib.by",
-        "zh.z-library.sk",
-        "en.z-lib.by"
-    )
+    // Historical checks are not a live availability guarantee.
+    val VERIFIED_LIVE_NODES = emptySet<String>()
 
-    /** 首次使用即内置的候选节点，扒取成功后可替换刷新（2026-09-04 晚 Edge
-     *  全核实测，含登录态验证）。
-     *  六活节点（CN 网络逐一实测搜索出书卡片）：1lib.sk（唯一正确官网）→
-     *  z-lib.by（无挑战直通，全链路含下载验证）→ z-library.sk → zh.z-lib.by
-     *  （中文）→ zh.z-library.sk（中文）→ en.z-lib.by → z-lib.sk（DiamWall 硬
-     *  挑战留池）→ CF 域（海外/代理兜底）。
-     *  退役：z-lib.is（指纹网关 fp=-7）、z-library.se（ww38 停放页）、z-lib.id
-     *  （停放页，官方发布页证实钓鱼）、z-lib.li / z-lib.cc（仿冒站）、zlib.bz /
-     *  101k 系 / zlib.ch / zlib.re / zh.z-lib.rest（死透或 301 归拢枢纽）。 */
     val INITIAL_SCRAPED_NODES = listOf(
-        "1lib.sk",
-        "z-lib.by",
-        "z-library.sk",
-        "zh.z-lib.by",
-        "zh.z-library.sk",
-        "en.z-lib.by",
-        "z-lib.sk",
-        "z-library.co",
-        "z-library.net",
-        "zlib-official.com",
-        "zlibrary-global.com",
-        "z-lib.my",
-        "z-lib.ad"
+        "z-lib.sk", "z-lib.fm", "zh.z-lib.gd", "z-library.website",
+        "z-library.qa", "z-library.im", "z-lib.by", "z-library.sk",
+        "zh.z-lib.by", "zh.z-library.sk", "en.z-lib.by", "1lib.sk"
     )
 
     /** 已退役域名（2026-09-04 22:10 Edge 全核实测：死透 / 归拢枢纽已灭 / 仿冒站 /
@@ -82,6 +45,9 @@ object ZLibraryNodeManager {
         "zh.z-library.by"
     )
 
+    fun isAutomaticCandidate(node: String): Boolean =
+        cleanNode(node)?.let { it !in RETIRED_NODES } ?: false
+
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -89,7 +55,7 @@ object ZLibraryNodeManager {
         val raw = prefs(context).getString(KEY_SCRAPED_NODES, null) ?: return INITIAL_SCRAPED_NODES
         val nodes = raw.split("\n").map { it.trim() }
             .filter { it.isNotBlank() && it !in RETIRED_NODES }
-        return nodes.ifEmpty { INITIAL_SCRAPED_NODES }
+        return (INITIAL_SCRAPED_NODES + nodes).distinct()
     }
 
     fun saveScrapedNodes(context: Context, nodes: List<String>) {

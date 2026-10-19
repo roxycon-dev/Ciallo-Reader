@@ -8,6 +8,8 @@
 
 ## 内容
 
+- [Ciallo Reader 1.4.9 发布说明与下载](release-1.4.9-2026-10-19.md)
+- [小说插图、Novelia 下载与隐藏书卡修复](novel-illustrations-repair-2026-10-19.md)
 - [Ciallo Reader 1.4.8 发布说明与下载](release-1.4.8-2026-10-19.md)
 - [收藏封面与漫画回数识别修复](favorite-covers-chapter-labels-2026-10-18.md)
 - [Ciallo Reader 1.4.8 中文小说免登录源验收](novel-guest-sources-verification-2026-10-19.md)
@@ -52,3 +54,5 @@
 - `comic-god-entry-and-navigation-2026-10-02.md`
 - `comic-metadata-and-favorite-migration-2026-10-01.md`
 - 其余 31 项按名称和同层模块组织。
+
+- [Z-Library 下载、节点自动切换与任务可见性（含未通过的目标书实网结果）](zlibrary-download-recovery-2026-10-19.md)

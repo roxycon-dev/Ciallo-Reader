@@ -12,4 +12,10 @@ package com.example.library
 object ZLibraryNodeConfig {
     @Volatile
     var domain: String = ""
+
+    private val directNodes = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    fun prefersDirect(host: String): Boolean = host in directNodes
+    fun rememberRoute(host: String, direct: Boolean) {
+        if (direct) directNodes.add(host) else directNodes.remove(host)
+    }
 }

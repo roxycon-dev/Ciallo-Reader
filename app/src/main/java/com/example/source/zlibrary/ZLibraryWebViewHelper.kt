@@ -13,6 +13,7 @@ import com.example.source.zlibrary.parser.ZLibraryParserManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONTokener
 import org.jsoup.Jsoup
 import java.net.URLEncoder
@@ -36,10 +37,61 @@ data class WebViewSearchResult(
     val pageHasZlibMarkers: Boolean = false,
     val stillChallenged: Boolean = false,
     /** WebView 侧拿到的该域完整 Cookie 串（含 DiamWall 验证 Cookie），可为 null。 */
-    val cookies: String? = null
+    val cookies: String? = null,
+    val domain: String? = null
 )
 
 object ZLibraryWebViewHelper {
+
+    data class DownloadHandoff(val url: String, val cookies: String)
+
+    /** Give JavaScript verification one bounded browser attempt before changing mirrors. */
+    suspend fun resolveDownload(context: Context, entryUrl: String, downloadUrl: String,
+        cookies: String?): DownloadHandoff? = withContext(Dispatchers.Main) {
+        suspendCancellableCoroutine { cont ->
+            val handler = Handler(Looper.getMainLooper())
+            var view: WebView? = null
+            var finished = false
+            var openedDownload = false
+            fun finish(result: DownloadHandoff?) {
+                if (finished) return
+                finished = true
+                handler.removeCallbacksAndMessages(null)
+                view?.stopLoading()
+                view?.destroy()
+                if (cont.isActive) cont.resume(result)
+            }
+            try {
+                val node = entryUrl.toHttpUrlOrNull()?.host ?: return@suspendCancellableCoroutine finish(null)
+                val manager = CookieManager.getInstance()
+                manager.setAcceptCookie(true)
+                cookies?.split(';')?.filter { it.contains('=') }?.forEach {
+                    manager.setCookie("https://$node/", it.trim() + "; Path=/; Secure")
+                }
+                manager.flush()
+                view = WebView(context).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.userAgentString = com.example.source.zlibrary.network.ZLibraryHttpClient.DEFAULT_USER_AGENT
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(webView: WebView, url: String) {
+                            if (!openedDownload) {
+                                openedDownload = true
+                                handler.postDelayed({ if (!finished) webView.loadUrl(downloadUrl) }, 800)
+                            }
+                        }
+                    }
+                    setDownloadListener { url, _, _, _, _ ->
+                        if (url.toHttpUrlOrNull() != null)
+                            finish(DownloadHandoff(url, manager.getCookie("https://$node/").orEmpty()))
+                    }
+                }
+                view?.loadUrl(entryUrl)
+                handler.postDelayed({ finish(null) }, 15_000)
+            } catch (e: Exception) { finish(null) }
+            cont.invokeOnCancellation { handler.post { finish(null) } }
+        }
+    }
 
     private const val CHROME_UA =
         "Mozilla/5.0 (Linux; Android 12; TGR-W10G) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -85,7 +137,7 @@ object ZLibraryWebViewHelper {
             }
 
             fun extractCookies(): String? = runCatching {
-                CookieManager.getInstance().getCookie("https://$node")
+                CookieManager.getInstance().getCookie(webView?.url ?: "https://$node")
             }.getOrNull()
 
             fun clickDiamWallGate() {
@@ -141,10 +193,11 @@ object ZLibraryWebViewHelper {
                             return@evaluateJavascript
                         }
                         val books = runCatching {
-                            ZLibraryParserManager.parseSearchPage(html, "https://$node", "zlibrary")
+                            val effective = webView?.url?.toHttpUrlOrNull()?.host ?: node
+                            ZLibraryParserManager.parseSearchPage(html, "https://$effective", "zlibrary")
                         }.getOrDefault(emptyList())
                         if (books.isNotEmpty()) {
-                            finish(WebViewSearchResult(books = books, pageHasZlibMarkers = true, cookies = extractCookies()))
+                            finish(WebViewSearchResult(books = books, pageHasZlibMarkers = true, cookies = extractCookies(), domain = webView?.url?.toHttpUrlOrNull()?.host ?: node))
                             return@evaluateJavascript
                         }
                         if (hasMarkers) {
@@ -183,7 +236,7 @@ object ZLibraryWebViewHelper {
                         CookieManager.getInstance().flush()
                     }
                 }
-                val url = "https://$node/s/" + URLEncoder.encode(keyword, "UTF-8")
+                val url = "https://$node/s/" + URLEncoder.encode(keyword, "UTF-8").replace("+", "%20")
                 webView?.loadUrl(url)
                 handler.postDelayed({ poll() }, 2200)
             } catch (e: Exception) {

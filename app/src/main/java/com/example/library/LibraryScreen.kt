@@ -217,6 +217,8 @@ fun LibraryScreen(
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val downloadStatesState = viewModel.downloadStates.collectAsStateWithLifecycle()
     val downloadStates by downloadStatesState
+    val allDownloadTasks by viewModel.allDownloadTasks.collectAsStateWithLifecycle(initialValue = emptyList())
+    val preparingDownloads by viewModel.preparingDownloads.collectAsStateWithLifecycle()
     val downloadedNovelKeys by viewModel.downloadedNovelKeys.collectAsStateWithLifecycle()
     val comicDownloading by viewModel.comicDownloading.collectAsStateWithLifecycle()
     val comicDownloadProgress by viewModel.comicDownloadProgress.collectAsStateWithLifecycle()
@@ -600,33 +602,11 @@ fun LibraryScreen(
             }
         },
                 trailing = {
-                    val latestSt = activeDownloadBook?.let { downloadStates[com.example.download.DownloadManager.taskId(it.sourceId, it.id)] }
-                    val comicActive = comicDownloading.isNotEmpty()
-                    IconButton(onClick = { showDownloadPanel = !showDownloadPanel }) {
-                        Box(contentAlignment = Alignment.Center) {
-                            if (latestSt is DownloadState.Downloading || comicActive) {
-                                CircularProgressIndicator(
-                                    progress = {
-                                        if (latestSt is DownloadState.Downloading) {
-                                            latestSt.progress.coerceIn(0f, 1f)
-                                        } else {
-                                            val task = comicDownloading.firstOrNull()
-                                            (if (task != null) comicDownloadProgress[task] else null)
-                                                ?.coerceIn(0f, 1f) ?: 0f
-                                        }
-                                    },
-                                    modifier = Modifier.size(30.dp),
-                                    strokeWidth = 2.5.dp,
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                            }
-                            Icon(
-                                imageVector = Icons.Default.Download,
-                                contentDescription = "下载任务",
-                                tint = if (latestSt is DownloadState.Downloading || comicActive) MaterialTheme.colorScheme.secondary
-                                else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+                    val activeCount = downloadStates.values.count { it is DownloadState.Pending || it is DownloadState.Downloading } + comicDownloading.size
+                    TextButton(onClick = { showDownloadPanel = true }, modifier = Modifier.testTag("download_tasks_entry")) {
+                        Icon(Icons.Default.Download, contentDescription = "下载任务", modifier = Modifier.size(DesignTokens.SpaceXl))
+                        Spacer(Modifier.width(DesignTokens.SpaceXs))
+                        Text(if (activeCount > 0) "下载中 $activeCount" else "下载任务")
                     }
                 }
             )
@@ -643,6 +623,23 @@ fun LibraryScreen(
                     // （视觉零差异），代价仅是不再跟随键盘做逐帧位移。
                     .windowInsetsPadding(WindowInsets.imeAnimationTarget)
             ) {
+                val visibleDownloads = downloadStates.values.filter { it !is DownloadState.Idle && it !is DownloadState.Success }
+                if (visibleDownloads.isNotEmpty() || comicDownloading.isNotEmpty()) {
+                    Surface(onClick = { showDownloadPanel = true }, color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(DesignTokens.SpaceComfortable), modifier = Modifier.fillMaxWidth().padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceCompact)
+                            .testTag("download_progress_banner")) {
+                        Row(Modifier.padding(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceMd), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Download, null)
+                            Spacer(Modifier.width(DesignTokens.SpaceTight))
+                            Column(Modifier.weight(1f)) {
+                                Text("下载任务 · ${visibleDownloads.size + comicDownloading.size} 项", fontWeight = FontWeight.SemiBold)
+                                Text(visibleDownloads.firstOrNull()?.let { downloadStatusLabel(it) } ?: "漫画正在下载",
+                                    style = MaterialTheme.typography.bodySmall)
+                            }
+                            Text("查看进度", style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
                 // 一体化搜索组件：书源入口整合进搜索框左侧（任务书「删除独立书源区域+搜索框重新设计」）
                 Column(modifier = Modifier.padding(horizontal = DesignTokens.SpacePage)) {
                     UnifiedSearchField(
@@ -1103,8 +1100,13 @@ fun LibraryScreen(
                         val source = availableSources.firstOrNull { it.id == book.sourceId }
                         if (source?.capabilities?.downloadRequiresLogin == true && !source.isLoggedIn()) {
                             loginDialogSource = source
-                        } else if (book.sourceId == "zlibrary") viewModel.startDownload(book)
-                        else viewModel.startDownload(book, book.format)
+                        } else {
+                            activeDownloadBook = book
+                            novelDetailBook = null
+                            showDownloadPanel = true
+                            if (book.sourceId == "zlibrary") viewModel.startDownload(book)
+                            else viewModel.startDownload(book, book.format)
+                        }
                     }
                 },
                 onRead = { scope.launch { viewModel.localNovel(book)?.let { local -> novelDetailBook = null; onOpenLocalNovel(local) } } },
@@ -1127,43 +1129,18 @@ fun LibraryScreen(
         if (showDownloadPanel) {
             AcrylicBottomOverlay(onDismissRequest = { showDownloadPanel = false }) {
                 val closeDownloadPanel = com.example.ui.components.LocalOverlayClose.current
-                val book = activeDownloadBook
-                val st = book?.let { downloadStates[com.example.download.DownloadManager.taskId(it.sourceId, it.id)] } ?: DownloadState.Idle
-                val comicTasks = comicDownloadTasks.values.toList()
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp)
-                ) {
-                    if (comicTasks.isNotEmpty()) {
-                        ComicDownloadGlassCard(
-                            tasks = comicTasks,
-                            onPause = { viewModel.pauseComicChapter(it) },
-                            onResume = { id ->
-                                comicDownloadTasks[id]?.let { t ->
-                                    viewModel.downloadComicChapter(t.book, t.chapter)
-                                }
-                            },
-                            onRetry = { id ->
-                                comicDownloadTasks[id]?.let { t ->
-                                    viewModel.retryComicChapter(t.book, t.chapter)
-                                }
-                            },
-                            onCancel = { viewModel.cancelComicChapter(it) },
-                            onDismiss = { closeDownloadPanel {} }
-                        )
-                    } else {
-                        DownloadGlassCard(
-                            book = book,
-                            state = st,
-                            hazeState = hazeState,
-                            onDismiss = { closeDownloadPanel {} },
-                            onPause = { book?.let { viewModel.pauseDownload(com.example.download.DownloadManager.taskId(it.sourceId, it.id)) } },
-                            onResume = { book?.let { viewModel.resumeDownload(com.example.download.DownloadManager.taskId(it.sourceId, it.id)) } },
-                            onCancel = { book?.let { viewModel.cancelDownload(com.example.download.DownloadManager.taskId(it.sourceId, it.id)) } },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+                Box(Modifier.fillMaxWidth().padding(20.dp)) {
+                    NovelDownloadPanel(allDownloadTasks, preparingDownloads, downloadStates,
+                        onPause = viewModel::pauseDownload, onResume = viewModel::resumeDownload,
+                        onCancel = viewModel::cancelDownload, onRetry = { viewModel.startDownload(it, it.format.takeIf(String::isNotBlank)) },
+                        onDismiss = { closeDownloadPanel {} },
+                        comicContent = if (comicDownloadTasks.isEmpty()) null else ({
+                            ComicDownloadGlassCard(tasks = comicDownloadTasks.values.toList(),
+                                onPause = { viewModel.pauseComicChapter(it) },
+                                onResume = { id -> comicDownloadTasks[id]?.let { viewModel.downloadComicChapter(it.book, it.chapter) } },
+                                onRetry = { id -> comicDownloadTasks[id]?.let { viewModel.retryComicChapter(it.book, it.chapter) } },
+                                onCancel = { viewModel.cancelComicChapter(it) }, onDismiss = { closeDownloadPanel {} })
+                        }))
                 }
             }
         }

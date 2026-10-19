@@ -19,16 +19,18 @@ import java.util.zip.ZipOutputStream
 class EpubCompatibilityTest {
     @Test fun canonicalChapterAndTocPathsRetainValidNestedEpubs() = checkImport("chapter.xhtml", true)
     @Test fun canonicalChapterPathsRejectTraversalOutsideTheExtractionRoot() = checkImport("../../outside.xhtml", false)
+    @Test fun rootLevelOpfImportsWithNavigationTitles() = checkImport("chapter.xhtml", true, "")
+    @Test fun rootLevelOpfStillRejectsTraversal() = checkImport("../outside.xhtml", false, "")
 
-    private fun checkImport(href: String, valid: Boolean) = runBlocking {
+    private fun checkImport(href: String, valid: Boolean, directory: String = "OPS/") = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
         val archive = File(context.cacheDir, "compatibility.epub")
         val entries = mapOf(
-            "META-INF/container.xml" to """<container><rootfiles><rootfile full-path="OPS/book.opf"/></rootfiles></container>""",
-            "OPS/book.opf" to """<package><metadata><title>路径验证</title></metadata><manifest><item id="chapter" href="$href" media-type="application/xhtml+xml"/><item id="toc" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/></manifest><spine><itemref idref="chapter"/></spine></package>""",
-            "OPS/chapter.xhtml" to """<html><body><p>测试正文</p></body></html>""",
-            "OPS/nav.xhtml" to """<html><body><nav><a href="chapter.xhtml">目录章节</a><a href="../../outside.xhtml">越界目录</a></nav></body></html>"""
+            "META-INF/container.xml" to """<container><rootfiles><rootfile full-path="${directory}book.opf"/></rootfiles></container>""",
+            "${directory}book.opf" to """<package><metadata><title>路径验证</title></metadata><manifest><item id="chapter" href="$href" media-type="application/xhtml+xml"/><item id="toc" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/></manifest><spine><itemref idref="chapter"/></spine></package>""",
+            "${directory}chapter.xhtml" to """<html><body><p>测试正文</p></body></html>""",
+            "${directory}nav.xhtml" to """<html><body><nav><a href="chapter.xhtml">目录章节</a><a href="../../outside.xhtml">越界目录</a></nav></body></html>"""
         )
         try {
             ZipOutputStream(archive.outputStream()).use { zip -> entries.forEach { (path, text) ->
@@ -39,6 +41,7 @@ class EpubCompatibilityTest {
             if (valid) {
                 val chapters = db.bookDao().getChaptersListForBook(result.getOrThrow().id)
                 assertTrue(chapters.any { it.content.contains("测试正文") })
+                assertEquals("目录章节", chapters.first().title)
                 assertTrue(chapters.none { it.title == "越界目录" })
             }
         } finally { db.close(); archive.delete() }

@@ -105,4 +105,24 @@ class NovelImageCacheTest {
         )
         assertNull(bad)
     }
+
+    @Test fun storedAndroidAliasImageReferenceReadsWithoutReimportingTheBook() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val png = redPngBytes()
+        val epub = File(context.cacheDir, "legacy_alias.epub")
+        java.util.zip.ZipOutputStream(epub.outputStream()).use { zip ->
+            zip.putNextEntry(java.util.zip.ZipEntry("OEBPS/Images/pic.png"))
+            zip.write(png); zip.closeEntry()
+        }
+        val staleEntry = "../../../../../data/com.example/cache/epub_1792383412667/OEBPS/Images/pic.png"
+        // Use the plain-path form on JVM: Android file:// URIs use Unix paths,
+        // whereas this test also runs on Windows. Device acceptance covers file://.
+        val spec = "epzip:${epub.absolutePath}!$staleEntry"
+        assertEquals(png.toList(), NovelInlineImages.NovelImageCache.readEpubImageBytes(spec)?.toList())
+        assertNotNull(NovelInlineImages.NovelImageCache.decodeEpubImage(spec, 2048))
+        assertEquals("OEBPS/Images/pic.png", NovelInlineImages.NovelImageCache.epubImageRef(spec)?.second)
+        assertNull(NovelInlineImages.NovelImageCache.normalizeEpubEntryName("../../outside.png"))
+        assertNull(NovelInlineImages.NovelImageCache.normalizeEpubEntryName("../../data/pkg/cache/epub_1/../../outside.png"))
+        assertEquals("OEBPS/Images/pic.png", NovelInlineImages.NovelImageCache.normalizeEpubEntryName("OEBPS/Text/../Images/pic.png"))
+    }
 }
