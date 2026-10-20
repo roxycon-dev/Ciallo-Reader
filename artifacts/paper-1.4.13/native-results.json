@@ -1,0 +1,33 @@
+{
+  "device": "Android 15 / API 35 emulator, host GPU, 720x1520 at 280dpi",
+  "cases": {
+    "discoverSourceSelectorHasARealOriginAndWaitsForItsExit": {
+      "passed": true,
+      "run": "device/prior-five-cases.txt"
+    },
+    "dismissingDuringOpeningRestoresItsSourceAndTheNextOpeningStillWorks": {
+      "passed": true,
+      "run": "device/prior-five-cases.txt"
+    },
+    "denseGlassKeepsItsMeshAndSourceAcrossEightOpenCloseCycles": {
+      "passed": true,
+      "run": "device/final-two-cases.txt"
+    },
+    "realManualAndCacheHaveOnlyOneHeaderAndCloseThroughThePaper": {
+      "passed": true,
+      "run": "device/final-two-cases.txt"
+    },
+    "verticalScrollAcrossASliderDoesNotSeekButHorizontalDragStillDoes": {
+      "passed": true,
+      "run": "device/prior-five-cases.txt"
+    }
+  },
+  "scope": "Five relevant cases passed in batches; final rerun covered the changed dense-glass and real manual/cache paths only.",
+  "performanceLimit": "Debug emulator timings are not physical ARM64 frame-rate measurements.",
+  "priorRunNote": "The prior run had one staged-screenshot harness timeout while its manual clock was frozen. The two affected cases were rerun after correcting frame advancement and the shared press capture boundary; both passed.",
+  "receipts": {
+    "device/prior-five-cases.txt": "22b9a9d46b228962fee10a933b766dcf5e1a4c4c7ac9e7fad5e2bb9dd2ca1ed9",
+    "device/final-two-cases.txt": "9ebc70a098989c596423afe85b6c08018c7b72a3c977423dfffff593ae5fd2ea"
+  },
+  "receiptEncoding": "UTF-8 with normalized line endings"
+}

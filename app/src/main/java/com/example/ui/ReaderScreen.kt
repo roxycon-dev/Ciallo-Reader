@@ -3717,7 +3717,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("目录 (${chapters.size}章)", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    if (onCheckNovelUpdate != null) PullOutTextButton(onClick = { showTocSheet = false; onCheckNovelUpdate() }) {
+                    if (onCheckNovelUpdate != null) PullOutTextButton(onClick = com.example.ui.components.paperDismiss { onCheckNovelUpdate() }) {
                         Icon(Icons.Filled.Refresh, null, Modifier.size(DesignTokens.SpaceLg))
                         Spacer(Modifier.width(5.dp)); Text("检查更新")
                     }
@@ -3762,15 +3762,13 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                         PullOutTextButton(
 
-                            onClick = {
+                            onClick = com.example.ui.components.paperDismiss {
 
                                 previousPosition = currentChapterIndex to scrollState.value
 
                                 showReturnChip = true
 
                                 currentChapterIndex = index
-
-                                showTocSheet = false
 
                                 scope.launch { scrollState.scrollTo(0) }
 
@@ -4358,6 +4356,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
             containerColor = MaterialTheme.colorScheme.surface
 
         ) {
+            val closeAnnotations = com.example.ui.components.LocalOverlayClose.current
 
                         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
 Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidth().padding(DesignTokens.SpaceLg).padding(bottom = DesignTokens.SpaceSection)) {
@@ -4388,7 +4387,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                                     .fillMaxWidth()
 
-                                    .clickableWithFeedback {
+                                    .clickableWithFeedback { closeAnnotations {
 
                                         previousPosition = currentChapterIndex to scrollState.value
 
@@ -4396,11 +4395,9 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                                         currentChapterIndex = bm.chapterIndex
 
-                                        showAnnotationsSheet = false
-
                                         scope.launch { scrollState.scrollTo(bm.scrollOffset) }
 
-                                    }
+                                    } }
 
                                     .padding(vertical = DesignTokens.SpaceSm),
 

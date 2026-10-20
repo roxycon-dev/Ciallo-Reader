@@ -204,7 +204,7 @@ class TouchZoneInteractionDeviceTest {
     }
 
     @Test fun paperModalKeepsTheTriggerHiddenUntilTheIndependentClosingSpringEnds() {
-        PaperRenderStats.reset(); PaperRenderHealth.useLightweightFallback = false
+        PaperRenderStats.reset()
         var open by mutableStateOf(false)
         var actions = 0
         compose.setContent { MyApplicationTheme {
@@ -235,7 +235,7 @@ class TouchZoneInteractionDeviceTest {
         assertFalse(originalSource?.hidden == true)
         compose.onNodeWithText("书库使用手册").assertExists()
         assertTrue("A real window must use hardware mesh frames", PaperRenderStats.gpuFrames > 0)
-        val stats = "gpuFrames=${PaperRenderStats.gpuFrames}\nmaxMeshBuildMs=${PaperRenderStats.maxMeshBuildNanos / 1e6}\nsnapshots=${PaperRenderStats.snapshots}\nfallback=${PaperRenderHealth.useLightweightFallback}\n"
+        val stats = "gpuFrames=${PaperRenderStats.gpuFrames}\nmaxMeshBuildMs=${PaperRenderStats.maxMeshBuildNanos / 1e6}\nsnapshots=${PaperRenderStats.snapshots}\nfallbackFrames=${PaperRenderStats.fallbackFrames}\n"
         val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "paper-1.4.12").apply { mkdirs() }
         File(dir, "render-stats.txt").writeText(stats)
     }

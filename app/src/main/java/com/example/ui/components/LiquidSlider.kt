@@ -114,6 +114,15 @@ internal class LiquidSliderView(context: Context) : View(context) {
     private val d = resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val path = Path()
+    private val trackPath = Path()
+    private val liquidPath = Path()
+    private val sampleY = FloatArray(LiquidSliderConfig.SAMPLES + 1)
+    private val sampleHalfWidth = FloatArray(LiquidSliderConfig.SAMPLES + 1)
+    private val bubbleTypeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    private val bitmapDestination = Rect()
+    private var bitmapCanvas: Canvas? = null
+    private var liquidStart = 0f
+    private var liquidEnd = 0f
     private val oval = RectF()
     private var buffer: Bitmap? = null
     private var lower = 0f
@@ -138,7 +147,10 @@ internal class LiquidSliderView(context: Context) : View(context) {
     private var active = -1
     private var downX = 0f
     private var downY = 0f
-    private var offset = 0f
+    private var pointerId = MotionEvent.INVALID_POINTER_ID
+    private var thumbPress = false
+    private var dragging = false
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop / d
     private var horizontal = false
     private var abandoned = false
     private var published = false
@@ -157,12 +169,14 @@ internal class LiquidSliderView(context: Context) : View(context) {
     private fun value(f: Float) = lower + f * (upper - lower)
     fun configure(range: ClosedFloatingPointRange<Float>, steps: Int, enabled: Boolean, reverse: Boolean,
                   minGap: Float, color: Int, dark: Boolean, reduce: Boolean, haptics: Boolean) {
+        if (active >= 0 && (!enabled || lower != range.start || upper != range.endInclusive || this.reverse != reverse)) release(false)
         lower = range.start; upper = range.endInclusive.coerceAtLeast(lower); stops = steps.coerceIn(0, 200)
         gap = if (upper > lower) (minGap / (upper - lower)).coerceIn(0f, 1f) else 0f
         this.reverse = reverse; accent = color; this.dark = dark; reduced = reduce; this.haptics = haptics
         isEnabled = enabled; alpha = if (enabled) 1f else .4f
     }
     fun setValues(a: Float, b: Float?) {
+        if (active >= 0 && ranged != (b != null)) release(false)
         ranged = b != null
         if (active < 0) {
             target[0] = norm(a).coerceAtMost(if (ranged) 1f - gap else 1f); target[1] = norm(b ?: upper).coerceAtLeast(target[0] + if (ranged) gap else 0f)
@@ -204,12 +218,13 @@ internal class LiquidSliderView(context: Context) : View(context) {
             }
         return moving
     }
-    fun stop() { removeCallbacks(frame); running = false; buffer?.recycle(); buffer = null; active = -1 }
+    fun stop() { release(false); removeCallbacks(frame); running = false; buffer?.recycle(); buffer = null; bitmapCanvas = null; active = -1 }
     override fun onDetachedFromWindow() { stop(); super.onDetachedFromWindow() }
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) { buffer?.recycle(); buffer = null; wake() }
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) { release(false); buffer?.recycle(); buffer = null; bitmapCanvas = null; wake() }
     private fun publish(f: Float) {
         if (active < 0) return
         val bounded = f.coerceIn(if (active == 1) target[0] + gap else 0f, if (active == 0 && ranged) target[1] - gap else 1f)
+        if (abs(bounded - target[active]) < .000001f) return
         target[active] = bounded
         published = true
         if (stops > 0) {
@@ -225,37 +240,47 @@ internal class LiquidSliderView(context: Context) : View(context) {
     }
     override fun onTouchEvent(e: MotionEvent): Boolean {
         if (!isEnabled || upper <= lower) return false
-        val x = e.x / d; val y = e.y / d
+        val index = if (e.actionMasked == MotionEvent.ACTION_DOWN) 0 else e.findPointerIndex(pointerId)
+        if (index < 0) { release(false); return false }
+        val x = e.getX(index) / d; val y = e.getY(index) / d
         fun fraction(at: Float): Float { val f = ((at - inset) / trackWidth).coerceIn(0f, 1f); return if (reverse) 1f - f else f }
+        fun requested() = if (thumbPress) initialTarget + (x - downX) / trackWidth * (if (reverse) -1f else 1f) else fraction(x)
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                // The reserved bubble space is not a seek target. A scrolling finger may
+                // cross this View without changing playback, brightness or a range endpoint.
+                if (abs(y - cy) > 28f + cfg.BEND) return false
                 val distance0 = abs(x - px(0)); val distance1 = abs(x - px(1))
                 active = if (ranged && (distance1 < distance0 || abs(distance1 - distance0) < .01f &&
                     (if (reverse) x < px(0) else x > px(0)))) 1 else 0
                 downX = x; downY = y; horizontal = false; abandoned = false
+                pointerId = e.getPointerId(0); dragging = false
                 published = false; initialTarget = target[active]
-                offset = if (abs(x - px(active)) <= 28f) x - px(active) else 0f
-                if (offset == 0f) {
-                    target[active] = fraction(x).coerceIn(if (active == 1) target[0] + gap else 0f,
-                        if (active == 0 && ranged) target[1] - gap else 1f)
-                    position[active] = target[active]; velocity[active] = 0f
-                }
+                thumbPress = abs(x - px(active)) <= 28f
                 lastStop = if (stops > 0) (target[active] * (stops + 1)).roundToInt() else -1
-                draggingChanged(true); wake(); return true
+                wake(); return true
             }
             MotionEvent.ACTION_POINTER_DOWN -> { abandoned = true; release(false); return false }
             MotionEvent.ACTION_MOVE -> {
                 if (abandoned || active < 0) return false
-                val slop = ViewConfiguration.get(context).scaledTouchSlop / d
-                if (!horizontal && abs(y - downY) > slop && abs(y - downY) >= abs(x - downX)) {
+                if (!horizontal && abs(y - downY) > touchSlop && abs(y - downY) >= abs(x - downX)) {
                     abandoned = true; release(false); parent?.requestDisallowInterceptTouchEvent(false); return false
                 }
-                if (abs(x - downX) > slop) horizontal = true
-                if (horizontal) { parent?.requestDisallowInterceptTouchEvent(true); publish(fraction(x - offset)) }
+                if (!horizontal && abs(x - downX) > touchSlop && abs(x - downX) > abs(y - downY)) {
+                    horizontal = true; dragging = true; draggingChanged(true)
+                }
+                if (horizontal) {
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                    publish(requested())
+                }
                 return true
             }
             MotionEvent.ACTION_UP -> {
-                if (!abandoned && active >= 0) { publish(fraction(x - offset)); performClick(); release(true) }
+                if (!abandoned && active >= 0) {
+                    if (horizontal) publish(requested())
+                    else if (!thumbPress && abs(x - downX) <= touchSlop && abs(y - downY) <= touchSlop) publish(fraction(x))
+                    performClick(); release(true)
+                }
                 return true
             }
             MotionEvent.ACTION_CANCEL -> { release(false); return true }
@@ -267,7 +292,9 @@ internal class LiquidSliderView(context: Context) : View(context) {
         if (!commit && !published) target[active] = initialTarget
         if (stops > 0) target[active] = ((target[active] * (stops + 1)).roundToInt().toFloat() / (stops + 1))
             .coerceIn(if (active == 1) target[0] + gap else 0f, if (active == 0 && ranged) target[1] - gap else 1f)
-        active = -1; draggingChanged(false); if (published) finished()
+        active = -1; pointerId = MotionEvent.INVALID_POINTER_ID
+        if (dragging) { dragging = false; draggingChanged(false) }
+        if (published) finished()
         parent?.requestDisallowInterceptTouchEvent(false); wake()
     }
     override fun performClick(): Boolean { super.performClick(); return true }
@@ -287,19 +314,33 @@ internal class LiquidSliderView(context: Context) : View(context) {
             (4.5f * (abs(velocity[i] * trackWidth) / 900f).coerceIn(0f, 1f) + 3f * press[i]) * exp(-((x - px(i)) / 34f).pow(2))
         return thickness
     }
+    /** Build the physical curves once, then replay exactly the same paths through each lens. */
+    private fun buildBaseGeometry() {
+        trackPath.reset()
+        for (j in 0..cfg.SAMPLES) {
+            val x = inset + trackWidth * j / cfg.SAMPLES
+            if (j == 0) trackPath.moveTo(x, y(x)) else trackPath.lineTo(x, y(x))
+        }
+        liquidStart = if (ranged) min(px(0), px(1)) else if (reverse) px(0) else inset
+        liquidEnd = if (ranged) max(px(0), px(1)) else if (reverse) inset + trackWidth else px(0)
+        liquidPath.reset()
+        for (j in 0..cfg.SAMPLES) {
+            val x = liquidStart + (liquidEnd - liquidStart) * j / cfg.SAMPLES
+            sampleY[j] = y(x); sampleHalfWidth[j] = liquidWidth(x) / 2f
+            if (j == 0) liquidPath.moveTo(x, sampleY[j] - sampleHalfWidth[j]) else liquidPath.lineTo(x, sampleY[j] - sampleHalfWidth[j])
+        }
+        for (j in cfg.SAMPLES downTo 0) liquidPath.lineTo(liquidStart + (liquidEnd - liquidStart) * j / cfg.SAMPLES, sampleY[j] + sampleHalfWidth[j])
+        liquidPath.close()
+    }
     private fun base(c: Canvas) {
         paint.shader = null; paint.style = Paint.Style.STROKE; paint.strokeCap = Paint.Cap.ROUND; paint.strokeJoin = Paint.Join.ROUND
         paint.strokeWidth = cfg.TRACK; paint.color = if (dark) 0x29ffffff else 0x1a000000
-        path.reset()
-        for (j in 0..cfg.SAMPLES) { val x = inset + trackWidth * j / cfg.SAMPLES; if (j == 0) path.moveTo(x, y(x)) else path.lineTo(x, y(x)) }
-        c.drawPath(path, paint)
-        val start = if (ranged) min(px(0), px(1)) else if (reverse) px(0) else inset
-        val end = if (ranged) max(px(0), px(1)) else if (reverse) inset + trackWidth else px(0)
-        paint.style = Paint.Style.FILL; paint.color = accent; path.reset()
-        for (j in 0..cfg.SAMPLES) { val x = start + (end - start) * j / cfg.SAMPLES; if (j == 0) path.moveTo(x, y(x) - liquidWidth(x) / 2) else path.lineTo(x, y(x) - liquidWidth(x) / 2) }
-        for (j in cfg.SAMPLES downTo 0) { val x = start + (end - start) * j / cfg.SAMPLES; path.lineTo(x, y(x) + liquidWidth(x) / 2) }
-        path.close(); c.drawPath(path, paint)
-        c.drawCircle(start, y(start), liquidWidth(start) / 2, paint); c.drawCircle(end, y(end), liquidWidth(end) / 2, paint)
+        c.drawPath(trackPath, paint)
+        val start = liquidStart; val end = liquidEnd
+        paint.style = Paint.Style.FILL; paint.color = accent
+        c.drawPath(liquidPath, paint)
+        c.drawCircle(start, sampleY[0], sampleHalfWidth[0], paint)
+        c.drawCircle(end, sampleY[cfg.SAMPLES], sampleHalfWidth[cfg.SAMPLES], paint)
         if (stops > 0) for (j in 0..stops + 1) {
             val x = inset + trackWidth * j / (stops + 1)
             paint.color = if (x in start..end) 0xe6ffffff.toInt() else if (dark) 0x66ffffff else 0x55000000
@@ -314,9 +355,11 @@ internal class LiquidSliderView(context: Context) : View(context) {
         val scale = min(d, 2f)
         val bw = max(1, (width / d * scale).roundToInt()); val bh = max(1, (height / d * scale).roundToInt())
         var bitmap = buffer
-        if (bitmap == null || bitmap.width != bw || bitmap.height != bh) { bitmap?.recycle(); bitmap = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888); buffer = bitmap }
+        if (bitmap == null || bitmap.width != bw || bitmap.height != bh) { bitmap?.recycle(); bitmap = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888); buffer = bitmap; bitmapCanvas = Canvas(bitmap) }
         bitmap.eraseColor(Color.TRANSPARENT)
-        val c = Canvas(bitmap); c.scale(scale, scale)
+        val c = bitmapCanvas ?: return
+        val saved = c.save(); c.scale(scale, scale)
+        buildBaseGeometry()
         base(c)
         for (i in 0 until if (ranged) 2 else 1) {
             val p = press[i]; val x = px(i); val centerY = y(x)
@@ -343,7 +386,7 @@ internal class LiquidSliderView(context: Context) : View(context) {
             paint.style = Paint.Style.FILL; c.drawCircle(x + rx * .43f, centerY + ry * .4f, 1.6f, paint)
             if (p > .005f) {
                 val text = label(value(if (stops > 0) (target[i] * (stops + 1)).roundToInt().toFloat() / (stops + 1) else target[i]))
-                paint.textSize = 12f; paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                paint.textSize = 12f; paint.typeface = bubbleTypeface
                 val half = min(width / d / 2f, paint.measureText(text) / 2 + 9f)
                 val bx = (x - v * .03f).coerceIn(half, max(half, width / d - half))
                 val by = centerY - 42f - 4f * p
@@ -353,6 +396,8 @@ internal class LiquidSliderView(context: Context) : View(context) {
             }
         }
         paint.shader = null; paint.color = Color.WHITE
-        canvas.drawBitmap(bitmap, null, Rect(0, 0, width, height), paint)
+        c.restoreToCount(saved)
+        bitmapDestination.set(0, 0, width, height)
+        canvas.drawBitmap(bitmap, null, bitmapDestination, paint)
     }
 }

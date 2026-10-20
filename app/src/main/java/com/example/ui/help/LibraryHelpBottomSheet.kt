@@ -1,6 +1,7 @@
 package com.example.ui.help
 
 import com.example.ui.components.PullOutBottomSheet
+import com.example.ui.components.paperSheetDragHandle
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -56,6 +57,8 @@ fun LibraryHelpBottomSheet(
             .testTag("library_help_bottom_sheet"),
         shape = RoundedCornerShape(24.dp)
     ) {
+                val close = com.example.ui.components.paperDismiss {}
+                val openSourceManager = com.example.ui.components.paperDismiss(onOpenSourceManager)
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
 Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize()) {
             // 顶部标题栏
@@ -63,6 +66,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp)
+                    .paperSheetDragHandle()
                     .clip(RoundedCornerShape(24.dp))
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))
             ) {
@@ -89,7 +93,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize
                         )
                     }
                     AppIconButton(
-                        onClick = onDismissRequest,
+                        onClick = close,
                         modifier = Modifier.testTag("close_help_bottom_sheet_button")
                     ) {
                         Icon(
@@ -228,8 +232,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize
                         modifier = Modifier
                             .weight(1f)
                             .clickableWithFeedback {
-                                onDismissRequest()
-                                onOpenSourceManager()
+                                openSourceManager()
                             }
                             .testTag("shortcut_open_source_manager"),
                         colors = CardDefaults.cardColors(containerColor = MintPrimary.copy(alpha = 0.08f)),

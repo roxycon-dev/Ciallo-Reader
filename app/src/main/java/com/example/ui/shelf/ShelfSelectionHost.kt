@@ -548,6 +548,7 @@ fun MoreActionSheet(
     onDismiss: () -> Unit,
 ) {
     PullOutBottomSheet(onDismissRequest = onDismiss) {
+        val close = com.example.ui.components.LocalOverlayClose.current
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Text("更多操作", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
@@ -555,7 +556,7 @@ fun MoreActionSheet(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .pullOutClickable { onPick(title) }
+                        .pullOutClickable { close { onPick(title) } }
                         .padding(vertical = 14.dp),
                 ) {
                     Text(title, fontSize = 14.sp)
@@ -581,6 +582,7 @@ fun CategoryPickerSheet(
     var newName by remember { mutableStateOf("") }
     var creating by remember { mutableStateOf(false) }
     PullOutBottomSheet(onDismissRequest = onDismiss, modifier = modifier) {
+        val close = com.example.ui.components.LocalOverlayClose.current
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
@@ -588,7 +590,7 @@ fun CategoryPickerSheet(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .pullOutClickable { onPick(name) }
+                        .pullOutClickable { close { onPick(name) } }
                         .padding(vertical = 13.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -624,9 +626,8 @@ fun CategoryPickerSheet(
                             text = "创建并放入",
                             onClick = {
                                 if (newName.isNotBlank()) {
-                                    onCreate?.invoke(newName.trim())
-                                    creating = false
-                                    newName = ""
+                                    val name = newName.trim()
+                                    close { onCreate?.invoke(name) }
                                 }
                             },
                             enabled = newName.isNotBlank(),

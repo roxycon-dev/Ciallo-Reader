@@ -6,12 +6,19 @@ import android.graphics.Paint as NativePaint
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.Indication
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.platform.LocalGraphicsContext
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.*
@@ -21,6 +28,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import java.lang.ref.WeakReference
 import java.util.WeakHashMap
+import kotlinx.coroutines.flow.first
 import kotlin.math.*
 
 /** One configuration for native GPU paper, its reduced-motion fallback and all modal hosts. */
@@ -42,8 +50,6 @@ object PullOutConfig {
     const val MAX_TEXTURE_PIXELS = 1_000_000f
     const val MAX_TEXTURE_SIDE = 1600f
     const val SOURCE_LIFETIME_MS = 900L
-    const val SLOW_FRAME_NS = 66_000_000L
-    const val SLOW_FRAME_LIMIT = 4
     const val FALLBACK_OPEN_K = 800f
     const val FALLBACK_OPEN_D = 50f
     const val FALLBACK_CLOSE_K = 1000f
@@ -68,6 +74,9 @@ internal class PullOutSource {
     var disposed = false
     var claimed = false
     var activatedAt = 0L
+    var capture by mutableStateOf<kotlinx.coroutines.CompletableDeferred<GraphicsLayer>?>(null)
+    var capturedLayer: GraphicsLayer? = null
+    var releaseCapture: (() -> Unit)? = null
     fun returnSource(): PullOutSource {
         var origin = this
         repeat(8) {
@@ -113,7 +122,15 @@ internal fun rememberPaperTrigger(): PullOutSource {
 fun Modifier.pullOutAnchor(): Modifier = composed { pullOutAnchor(rememberPaperTrigger()) }
 internal fun Modifier.pullOutAnchor(source: PullOutSource): Modifier = composed {
     val view = LocalView.current
+    val graphics = LocalGraphicsContext.current
     source.view = WeakReference(view)
+    DisposableEffect(source, graphics) {
+        source.releaseCapture = {
+            source.capturedLayer?.let { graphics.releaseGraphicsLayer(it) }
+            source.capturedLayer = null; source.capture = null
+        }
+        onDispose { source.capture?.cancel(); source.releaseCapture?.invoke(); source.releaseCapture = null }
+    }
     onGloballyPositioned { source.bounds = it.boundsInWindow().translate(view.paperWindowOffset()) }
         .pointerInput(source) {
             awaitPointerEventScope {
@@ -122,7 +139,39 @@ internal fun Modifier.pullOutAnchor(source: PullOutSource): Modifier = composed 
                     if (event.changes.any { it.pressed && !it.previousPressed }) PullOutSources.activate(source)
                 }
             }
-        }.drawWithContent { if (!source.hidden) drawContent() }
+        }.drawWithContent {
+            if (!source.hidden || source.capture?.isCompleted == false) {
+                val request = source.capture
+                if (request != null && !request.isCompleted && size.width > 0 && size.height > 0) {
+                    val captured = graphics.createGraphicsLayer()
+                    source.capturedLayer = captured
+                    val ratio = min(1f, min(PullOutConfig.MAX_TEXTURE_SIDE / max(size.width, size.height),
+                        sqrt(PullOutConfig.MAX_TEXTURE_PIXELS / (size.width * size.height))))
+                    captured.record(size = IntSize((size.width * ratio).toInt().coerceAtLeast(1), (size.height * ratio).toInt().coerceAtLeast(1))) {
+                        withTransform({ scale(ratio, ratio, Offset.Zero) }) { this@drawWithContent.drawContent() }
+                    }
+                    if (!source.hidden) withTransform({ scale(1f / ratio, 1f / ratio, Offset.Zero) }) { drawLayer(captured) }
+                    request.complete(captured)
+                } else if (!source.hidden) drawContent()
+            }
+        }
+}
+/** Selection and long presses register at activation, including accessibility and held presses. */
+fun Modifier.pullOutSelectable(selected: Boolean, interactionSource: MutableInteractionSource?, indication: Indication?,
+    enabled: Boolean = true, role: Role? = null, onClick: () -> Unit): Modifier = composed {
+    val source = rememberPaperTrigger()
+    pullOutAnchor(source).selectable(selected, interactionSource, indication, enabled, role) { PullOutSources.activate(source); onClick() }
+}
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun Modifier.pullOutCombinedClickable(enabled: Boolean = true, onClickLabel: String? = null, role: Role? = null,
+    onLongClickLabel: String? = null, onLongClick: (() -> Unit)? = null, onDoubleClick: (() -> Unit)? = null,
+    interactionSource: MutableInteractionSource? = null, indication: Indication? = androidx.compose.foundation.LocalIndication.current, onClick: () -> Unit): Modifier {
+    val source = rememberPaperTrigger()
+    return pullOutAnchor(source).combinedClickable(interactionSource = interactionSource ?: remember { MutableInteractionSource() },
+        indication = indication, enabled = enabled, onClickLabel = onClickLabel, role = role, onLongClickLabel = onLongClickLabel,
+        onLongClick = onLongClick?.let { { PullOutSources.activate(source); it() } },
+        onDoubleClick = onDoubleClick?.let { { PullOutSources.activate(source); it() } }) { PullOutSources.activate(source); onClick() }
 }
 fun Modifier.pullOutClickable(enabled: Boolean = true, onClickLabel: String? = null, role: Role? = null, onClick: () -> Unit): Modifier = composed {
     val source = rememberPaperTrigger()
@@ -148,8 +197,8 @@ internal class PaperLifecycle {
     var hostAttached = false
     var afterDismiss: (() -> Unit)? = null
     var meshEnabled = false
-    var shadowEnabled = true
     var origin: PullOutSource? = null
+    var carriedByParent = false
     val spring = PaperSpring()
 }
 private val paperLifecycles = WeakHashMap<MutableTransitionState<Boolean>, PaperLifecycle>()
@@ -239,56 +288,62 @@ internal class PaperSpring {
 @Composable
 fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: Modifier = Modifier,
     content: @Composable AnimatedVisibilityScope.() -> Unit) {
-    if (LocalPaperOwner.current != null) {
-        // Nested expansion must not snapshot and animate the entire enclosing paper again.
-        AnimatedVisibility(visibleState, modifier, enter = fadeIn(tween(160)), exit = fadeOut(tween(120)), content = content)
-        return
-    }
     val life = rememberPaperLifecycle(visibleState)
+    val parentPaper = LocalPaperOwner.current
     val reduce = com.example.ui.feedback.LocalReduceMotion.current || LocalRenderQuality.current.minimal
     val parentOrigin = LocalPaperOrigin.current
-    val dragTarget = LocalPaperVisibleTarget.current
+    val dragTarget = if (parentPaper == null) LocalPaperVisibleTarget.current else 1f
+    val currentDragTarget by rememberUpdatedState(dragTarget)
     val target = visibleState.targetState
     var previousTarget by remember { mutableStateOf(target) }
     if (target && !life.retained) {
-        life.origin = parentOrigin ?: PullOutSources.claim()
-        life.meshEnabled = !reduce && android.os.Build.VERSION.SDK_INT >= 26 && life.origin != null && life.origin?.virtual == false && !PaperRenderHealth.useLightweightFallback
+        life.origin = PullOutSources.claim() ?: parentOrigin ?: PullOutSource().apply { virtual = true }
+        life.meshEnabled = !reduce && android.os.Build.VERSION.SDK_INT >= 26
         life.retained = true; life.closed = false; life.ready = !life.meshEnabled
+        if (parentPaper != null && !parentPaper.flat) {
+            // Initial visible children belong to the parent's one texture. Do not
+            // read back/animate a whole stack of nested papers at the same time.
+            life.carriedByParent = true; life.meshEnabled = false; life.ready = true
+            life.spring.position = 1f; life.progress = 1f; life.flat = true; life.inputBlocked = false
+        }
     }
     if (previousTarget != target) {
         previousTarget = target
         life.inputBlocked = true
+        if (!target && life.carriedByParent) {
+            life.carriedByParent = false
+            life.origin = PullOutSources.claim() ?: life.origin
+            life.meshEnabled = !reduce && android.os.Build.VERSION.SDK_INT >= 26
+        }
         if (!target && life.flat && life.meshEnabled) {
             life.ready = false; life.captureRevision++ // Capture current content, not its opening snapshot.
         }
+    }
+    if (target && life.flat && dragTarget != 1f && life.meshEnabled) {
+        // Data and controls may have changed since opening. The first header drag
+        // freezes the current surface once, never an old loading/skeleton frame.
+        life.flat = false; life.inputBlocked = true
+        life.ready = false; life.captureRevision++
     }
     SideEffect { life.registered = true }
     DisposableEffect(life) { onDispose { life.registered = false } }
     // Keep legacy callers' state observable without letting its transition dispose the real paper.
     AnimatedVisibility(visibleState, enter = EnterTransition.None, exit = ExitTransition.None) { }
-    LaunchedEffect(target, life.ready, dragTarget, reduce) {
+    LaunchedEffect(target, life.ready, reduce) {
         if (!target && !life.ready) {
             // An opening dismissed before capture finishes has nothing visible to animate back.
             if (life.spring.position == 0f) { life.retained = false; life.closed = true; return@LaunchedEffect }
         }
         if (!life.ready || !life.retained) return@LaunchedEffect
-        val destination = if (target) dragTarget else 0f
+        var destination = if (target) currentDragTarget else 0f
+        while (life.retained && life.ready) {
+        life.inputBlocked = true; life.flat = false
         if (reduce) { life.spring.position = destination; life.spring.velocity = 0f; life.progress = destination }
         else {
             var last = withFrameNanos { it }
-            var slowFrames = 0
-            var frameCount = 0
             do {
                 val now = withFrameNanos { it }
-                frameCount++
-                if (life.meshEnabled && frameCount > 2) {
-                    slowFrames = if (now - last > PullOutConfig.SLOW_FRAME_NS) slowFrames + 1 else 0
-                    if (slowFrames >= 2) life.shadowEnabled = false
-                    if (slowFrames >= PullOutConfig.SLOW_FRAME_LIMIT) {
-                        life.meshEnabled = false
-                        PaperRenderHealth.useLightweightFallback = true
-                    }
-                }
+                destination = if (target) currentDragTarget else 0f
                 var remaining = ((now - last) / 1e9f).coerceIn(0f, .5f)
                 var moving = true
                 while (remaining > 0f) {
@@ -300,7 +355,12 @@ fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: M
         }
         life.flat = target && destination == 1f
         life.inputBlocked = !life.flat
-        if (!target) { life.retained = false; life.closed = true }
+        if (!target) { life.retained = false; life.closed = true; break }
+        // Stay asleep at rest. Moving the header changes the destination sampled by
+        // the running clock; it never cancels/restarts that clock on every MOVE.
+        val settled = destination
+        destination = snapshotFlow { currentDragTarget }.first { it != settled }
+        }
     }
     if (life.retained) {
         AnimatedVisibility(true, modifier, enter = EnterTransition.None, exit = ExitTransition.None) {

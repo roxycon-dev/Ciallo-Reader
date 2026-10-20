@@ -274,10 +274,13 @@ fun GlassCard(
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val paperSource = if (onClick != null) rememberPaperTrigger() else null
+    val anchoredModifier = if (paperSource != null) modifier.pullOutAnchor(paperSource) else modifier
+    val paperAction: () -> Unit = if (paperSource != null) ({ PullOutSources.activate(paperSource); onClick?.invoke() }) else ({})
     if (LocalRenderQuality.current.minimal) {
         val flatShape = shape ?: RoundedCornerShape(16.dp)
-        Column(modifier.clip(flatShape).background(MaterialTheme.colorScheme.surface)
-            .then(if (onClick != null) Modifier.pullOutClickable(onClick = onClick) else Modifier)
+        Column(anchoredModifier.clip(flatShape).background(MaterialTheme.colorScheme.surface)
+            .then(if (onClick != null) Modifier.clickable(onClick = paperAction) else Modifier)
             .padding(contentPadding), content = content)
         return
     }
@@ -410,7 +413,7 @@ fun GlassCard(
     val hslBuf = remember { FloatArray(3) }
 
     Column(
-        modifier = modifier
+        modifier = anchoredModifier
             // C2 入场 + 卡片透明度 + B1 3D 倾斜
             .graphicsLayer {
                 val e = if (isMax) entrance else 1f
@@ -960,10 +963,10 @@ fun GlassCard(
             )
             .then(
                 if (onClick != null) {
-                    Modifier.pullOutClickable(
+                    Modifier.clickable(
                         interactionSource = interactionSource,
                         indication = null,
-                        onClick = onClick
+                        onClick = paperAction
                     )
                 } else {
                     Modifier

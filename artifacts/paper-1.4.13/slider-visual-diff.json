@@ -1,0 +1,12 @@
+{
+  "light": {
+    "samePixels": true,
+    "samePngBytes": true,
+    "maxChannelDifference": 0
+  },
+  "dark": {
+    "samePixels": true,
+    "samePngBytes": true,
+    "maxChannelDifference": 0
+  }
+}

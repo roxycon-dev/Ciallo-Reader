@@ -10,6 +10,7 @@ import com.example.ui.components.PullOutButton
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutAlertDialog
 import com.example.ui.components.PullOutBottomSheet
+import com.example.ui.components.paperSheetDragHandle
 import com.example.ui.components.PullOutVisibility
 import android.os.StatFs
 import android.os.Build
@@ -485,6 +486,7 @@ fun CacheManagementScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp)
+                    .paperSheetDragHandle()
                     .clip(RoundedCornerShape(24.dp))
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))
             ) {
@@ -503,7 +505,7 @@ fun CacheManagementScreen(
                         Spacer(Modifier.width(8.dp))
                         Text("缓存管理", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
                     }
-                    AppIconButton(onClick = onBack) {
+                    AppIconButton(onClick = com.example.ui.components.paperDismiss {}) {
                         Icon(Icons.Default.Close, "关闭", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }

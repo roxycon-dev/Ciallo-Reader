@@ -54,7 +54,12 @@ internal fun rememberPaperClose(state: MutableTransitionState<Boolean>, dismiss:
             val followUp: () -> Unit = {
                 if (!followedUp) {
                     followedUp = true; executing = true
-                    try { action?.invoke() } finally { executing = false }
+                    try {
+                        // The exit can outlast the click-source TTL. A chained panel
+                        // starts at the living return trigger after this window retires.
+                        if (action != null) life.origin?.returnSource()?.let(PullOutSources::activate)
+                        action?.invoke()
+                    } finally { executing = false }
                 }
             }
             val awaitWindowDisposal = life.hostAttached
@@ -64,7 +69,7 @@ internal fun rememberPaperClose(state: MutableTransitionState<Boolean>, dismiss:
             if (!awaitWindowDisposal) followUp()
         }
     }
-    return { action -> if (executing) action() else if (state.targetState) { pending = action; state.targetState = false } }
+    return { action -> if (executing) action() else if (state.targetState) { pending = action.takeUnless { it === latest }; state.targetState = false } }
 
 }
 
@@ -96,7 +101,9 @@ fun PullOutDialog(
     if (!animateContent) {
         androidx.compose.ui.window.Dialog(onDismissRequest = onDismissRequest, properties = properties) {
             DisablePlatformWindowMotion(); WindowPaperFinalizer(lifecycleState)
-            CompositionLocalProvider(LocalPaperOrigin provides origin, LocalPaperOwner provides null) { content() }
+            CompositionLocalProvider(LocalPaperOrigin provides origin, LocalPaperOwner provides null) {
+                DialogLiquidGlass(fillMaxSize = false) { content() }
+            }
         }
         return
     }
@@ -108,6 +115,7 @@ fun PullOutDialog(
         decorFitsSystemWindows = properties.decorFitsSystemWindows)) {
         DisablePlatformWindowMotion(); WindowPaperFinalizer(state)
         CompositionLocalProvider(LocalOverlayClose provides close, LocalPaperOrigin provides origin, LocalPaperOwner provides null) {
+            DialogLiquidGlass(fillMaxSize = false) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 val life = rememberPaperLifecycle(state)
                 Box(Modifier.fillMaxSize().graphicsLayer { alpha = life.progress.coerceIn(0f, 1f) }
@@ -116,6 +124,7 @@ fun PullOutDialog(
                 PullOutVisibility(state, if (properties.usePlatformDefaultWidth) Modifier.widthIn(max = 560.dp).fillMaxWidth(.9f) else Modifier) {
                     Box { content() }
                 }
+            }
             }
         }
     }
@@ -149,9 +158,17 @@ fun PullOutBottomSheet(
     val close = rememberPaperClose(state, onDismissRequest)
     var dragTarget by remember { mutableFloatStateOf(1f) }
     var dragged by remember { mutableFloatStateOf(0f) }
+    val headerDrag = Modifier.pointerInput(Unit) {
+        detectVerticalDragGestures(onDragStart = { dragged = 0f },
+            onDragCancel = { dragTarget = 1f },
+            onDragEnd = { if (dragged > PullOutConfig.DISMISS_DISTANCE.dp.toPx()) close {} else dragTarget = 1f }) { change, amount ->
+            change.consume(); dragged = (dragged + amount).coerceAtLeast(0f)
+            dragTarget = 1f - (dragged / PullOutConfig.DRAG_TRAVEL.dp.toPx()).coerceIn(0f, .65f)
+        }
+    }
     PullOutDialog(onDismissRequest = { close {} }, animateContent = false, lifecycleState = state,
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false, decorFitsSystemWindows = false)) {
-        CompositionLocalProvider(LocalOverlayClose provides close) {
+        CompositionLocalProvider(LocalOverlayClose provides close, LocalPaperSheetDrag provides headerDrag) {
             BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val life = rememberPaperLifecycle(state)
                 Box(Modifier.fillMaxSize().graphicsLayer { alpha = life.progress.coerceIn(0f, 1f) }.background(scrimColor)
@@ -161,14 +178,7 @@ fun PullOutBottomSheet(
                     Surface(modifier.widthIn(max = 840.dp).fillMaxWidth().heightIn(max = maxHeight * .94f),
                         shape = shape, color = containerColor, contentColor = contentColor, tonalElevation = tonalElevation) {
                         Column(Modifier.navigationBarsPadding().imePadding()) {
-                            Row(Modifier.fillMaxWidth().pointerInput(Unit) {
-                                detectVerticalDragGestures(onDragStart = { dragged = 0f },
-                                    onDragCancel = { dragTarget = 1f },
-                                    onDragEnd = { if (dragged > PullOutConfig.DISMISS_DISTANCE.dp.toPx()) close {} else dragTarget = 1f }) { change, amount ->
-                                    change.consume(); dragged = (dragged + amount).coerceAtLeast(0f)
-                                    dragTarget = 1f - (dragged / PullOutConfig.DRAG_TRAVEL.dp.toPx()).coerceIn(0f, .65f)
-                                }
-                            }, verticalAlignment = Alignment.CenterVertically) {
+                            if (dragHandle != null) Row(Modifier.fillMaxWidth().then(headerDrag), verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { dragHandle?.invoke() }
                                 IconButton(onClick = { close {} }) { Icon(Icons.Default.Close, "关闭面板") }
                             }
@@ -250,6 +260,11 @@ fun PullOutDropdownMenu(
 internal val LocalPaperButtonAction = compositionLocalOf<((() -> Unit) -> Unit)?> { null }
 internal val LocalPaperVisibility = compositionLocalOf<MutableTransitionState<Boolean>?> { null }
 internal val LocalPaperVisibleTarget = compositionLocalOf { 1f }
+private val LocalPaperSheetDrag = compositionLocalOf<Modifier> { Modifier }
+
+/** Custom headers keep swipe-to-dismiss without adding a second title/close row. */
+@Composable
+fun Modifier.paperSheetDragHandle(): Modifier = then(LocalPaperSheetDrag.current)
 
 /** Lifecycle for overlays drawn inside the screen rather than in a separate window. */
 @Composable

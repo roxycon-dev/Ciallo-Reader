@@ -1,0 +1,8 @@
+total source files: 723
+NOT mentioned in guide: 0
+
+names referenced in ch.4: 438
+STALE (in guide but not on disk): 3
+CustomSwitch.kt                                > 已删除的旧文件（历史文档仍会提到）：`CustomSwitch.kt`、`JellySwitch.kt`（统一为 `AppSwitch`）、`InkSlider`（被 FluidSlider 取代）。
+DiscoverNativeCatalog.kt                       | `DiscoverNativeCatalog.kt`（已删除） | — | 原固定分类栏已由 DiscoverPanels.kt 的独立弹窗替代 |
+JellySwitch.kt                                 > 已删除的旧文件（历史文档仍会提到）：`CustomSwitch.kt`、`JellySwitch.kt`（统一为 `AppSwitch`）、`InkSlider`（被 FluidSlider 取代）。

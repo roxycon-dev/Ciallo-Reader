@@ -1,6 +1,6 @@
 package com.example.discover
 
-import com.example.ui.components.pullOutAnchor
+import com.example.ui.components.pullOutCombinedClickable
 import com.example.ui.components.pullOutClickable
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -58,7 +58,7 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
             .then(if (rank == 1 && medal != null) Modifier.shadow(8.dp, shape, ambientColor = medal.copy(alpha = .16f), spotColor = medal.copy(alpha = .24f)) else Modifier)
             .then(if (medal != null) Modifier.border(if (rank == 1) 1.5.dp else 1.dp, Brush.linearGradient(listOf(medal.copy(alpha = .40f), medal, medal.copy(alpha = .56f))), shape) else Modifier)
             .clip(shape).background(MaterialTheme.colorScheme.surface.copy(alpha = .88f))
-            .pullOutAnchor().combinedClickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClick = onClick, onLongClick = { onMenu(bounds); haptics.perform(HapticKind.MEDIUM) })
+            .pullOutCombinedClickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClick = onClick, onLongClick = { onMenu(bounds); haptics.perform(HapticKind.MEDIUM) })
             // Consume a horizontal drag after touch slop so releasing it cannot open a work.
             .pointerInput(Unit) { detectHorizontalDragGestures { change, _ -> change.consume() } }
         Column(cardModifier) {

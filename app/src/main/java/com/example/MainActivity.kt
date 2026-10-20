@@ -288,7 +288,6 @@ class MainActivity : ComponentActivity() {
                     Surface(
                         modifier = Modifier
                             .fillMaxSize()
-                            .then(if (liquidGlass != null) Modifier.liquidGlassProvider(liquidGlass) else Modifier)
                             .drawWithContent {
                             drawContent()
                             if (blueLightFilter) {
@@ -346,6 +345,10 @@ class MainActivity : ComponentActivity() {
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
+                                    // A backdrop must contain only the scene behind its glass.
+                                    // Recording the entire Surface also records its consumers and
+                                    // creates a RenderNode cycle during paper texture readback.
+                                    .then(if (liquidGlass != null) Modifier.liquidGlassProvider(liquidGlass) else Modifier)
                                     .background(MaterialTheme.colorScheme.background)
                                     .then(
                                         if (glassEnabled) Modifier.layerBackdrop(bgBackdrop) else Modifier

@@ -20,6 +20,24 @@ import kotlin.math.abs
 @Config(sdk = [33], qualifiers = "w411dp-h891dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PaperAndSliderTest {
+    @Test fun offscreenRowsPreservePixelBytesAndTruncatedFinalPadding() {
+        val rows = PaperPixelBuffer(2, 2)
+        for (stride in listOf(8, 16)) {
+            val data = java.nio.ByteBuffer.allocateDirect(stride + 8)
+            data.put(byteArrayOf(-1, 0, 0, -1, 0, -1, 0, -1))
+            data.position(stride); data.put(byteArrayOf(0, 0, -1, -1, -128, 64, 32, -128))
+            val bitmap = rows.copy(data, stride, 4)
+            // Native Robolectric's desktop Skia N32 order differs from Android's
+            // RGBA surface. Verify byte preservation, including premultiplied alpha,
+            // independently of the host's getPixel channel interpretation.
+            val copied = java.nio.ByteBuffer.allocateDirect(16)
+            bitmap.copyPixelsToBuffer(copied); copied.rewind()
+            val bytes = ByteArray(16); copied.get(bytes)
+            assertArrayEquals(byteArrayOf(-1, 0, 0, -1, 0, -1, 0, -1,
+                0, 0, -1, -1, -128, 64, 32, -128), bytes)
+            bitmap.recycle()
+        }
+    }
     @Test fun firstAndFinalMeshFramesAreExactAtEveryVertex() {
         val anchor = Rect(180f, 700f, 340f, 748f)
         for (row in 0..150) for (col in 0..26) {
@@ -74,7 +92,7 @@ class PaperAndSliderTest {
         assertEquals(0, changes)
     }
     @Test fun nearbyThumbPressRetainsRelativeOffset() {
-        val view = slider(); var result = 0f
+        val view = slider(); var result = .25f
         view.change = { a, _ -> result = a }
         val x = 26f + (411 - 52) * .25f
         view.event(MotionEvent.ACTION_DOWN, x + 15)
@@ -86,6 +104,59 @@ class PaperAndSliderTest {
         view.change = { a, _ -> result = a }
         view.event(MotionEvent.ACTION_DOWN, 350f); view.event(MotionEvent.ACTION_UP, 350f, time = 150L)
         assertEquals((350f - 26f) / 359f, result, .001f)
+    }
+    @Test fun trackDownDoesNotMoveTheLensBeforeScrollIntentIsKnown() {
+        val view = slider()
+        fun image() = Bitmap.createBitmap(411, 110, Bitmap.Config.ARGB_8888).also { view.draw(Canvas(it)) }
+        val before = image()
+        view.event(MotionEvent.ACTION_DOWN, 350f)
+        val during = image()
+        assertTrue("DOWN must not pre-seek while a parent scroll is still possible", before.sameAs(during))
+        view.event(MotionEvent.ACTION_MOVE, 350f, 145f, 150L)
+        view.event(MotionEvent.ACTION_CANCEL, 350f, 145f, 160L)
+        repeat(1000) { view.advancePhysics(1f / 120) }
+        val after = image()
+        assertTrue("Vertical scroll must leave the original lens position intact", before.sameAs(after))
+        before.recycle(); during.recycle(); after.recycle()
+    }
+    @Test fun touchingASettlingLensDoesNotPublishItsLaggingVisualPosition() {
+        val view = slider(.25f); var changes = 0; var dragging = 0
+        view.change = { _, _ -> changes++ }; view.draggingChanged = { dragging++ }
+        view.setValues(.8f, null)
+        view.advancePhysics(1f / 120)
+        view.event(MotionEvent.ACTION_DOWN, 120f)
+        view.event(MotionEvent.ACTION_UP, 120f, time = 140L)
+        assertEquals(0, changes); assertEquals(0, dragging)
+    }
+    @Test fun bubbleSpaceIsNotAHiddenSeekTarget() {
+        val view = slider(); var changes = 0
+        view.change = { _, _ -> changes++ }
+        val e = MotionEvent.obtain(100L, 100L, MotionEvent.ACTION_DOWN, 350f, 15f, 0)
+        assertFalse(view.onTouchEvent(e)); e.recycle()
+        assertEquals(0, changes)
+    }
+    @Test fun aSecondFingerCannotTakeOverTheSlider() {
+        val view = slider(); var changes = 0
+        view.change = { _, _ -> changes++ }
+        view.event(MotionEvent.ACTION_DOWN, 115f)
+        val props = arrayOf(MotionEvent.PointerProperties().apply { id = 0 }, MotionEvent.PointerProperties().apply { id = 9 })
+        val coords = arrayOf(MotionEvent.PointerCoords().apply { x = 115f; y = 68f }, MotionEvent.PointerCoords().apply { x = 380f; y = 68f })
+        val e = MotionEvent.obtain(100L, 120L, MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2,
+            props, coords, 0, 0, 1f, 1f, 0, 0, android.view.InputDevice.SOURCE_TOUCHSCREEN, 0)
+        view.onTouchEvent(e); e.recycle()
+        view.event(MotionEvent.ACTION_MOVE, 380f, time = 140L)
+        view.event(MotionEvent.ACTION_UP, 380f, time = 150L)
+        assertEquals(0, changes)
+    }
+    @Test fun horizontalIntentAndCompletionNotifyExactlyOneDragLifecycle() {
+        val view = slider(); val dragging = mutableListOf<Boolean>(); var finishes = 0
+        view.draggingChanged = { dragging += it }; view.finished = { finishes++ }
+        view.event(MotionEvent.ACTION_DOWN, 115f)
+        assertTrue(dragging.isEmpty())
+        view.event(MotionEvent.ACTION_MOVE, 200f, time = 140L)
+        view.event(MotionEvent.ACTION_UP, 220f, time = 160L)
+        view.event(MotionEvent.ACTION_CANCEL, 220f, time = 170L)
+        assertEquals(listOf(true, false), dragging); assertEquals(1, finishes)
     }
     @Test fun rangeLensesCannotCrossOrViolateTheMinimumGap() {
         val view = slider(.2f, .7f, .15f); var result = 0f to 0f
@@ -153,7 +224,10 @@ class PaperAndSliderTest {
         val colors = IntArray(27 * 151); val sourceColors = IntArray(colors.size)
         for (source in listOf(Rect(20f, -90f, 150f, -40f), Rect(120f, 540f, 280f, 588f))) {
             for (p in listOf(0f, .1f, .4f, .7f, 1f, 1.07f)) {
-                fillPaperMesh(vertices, colors, sourceColors, 390f, 620f, source, p, 1.5f)
+                val contributions = fillPaperMesh(vertices, colors, sourceColors, 390f, 620f, source, p, 1.5f)
+                val expected = (if (colors.any { it ushr 24 > 0 }) 1 else 0) or
+                    (if (sourceColors.any { it ushr 24 > 0 }) 2 else 0)
+                assertEquals("Only zero-contribution texture passes may be omitted", expected, contributions)
                 for (row in 0..150) for (col in 0..26) {
                     val expected = PaperMesh.vertex(col / 26f, row / 150f, 390f, 620f, source, p, 1.5f)
                     val index = (row * 27 + col) * 2

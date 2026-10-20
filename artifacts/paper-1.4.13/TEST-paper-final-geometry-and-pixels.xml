@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ui.components.PaperAndSliderTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-20T21:00:34.533Z" hostname="DESKTOP-PIFGGNS" time="14.937">
+  <properties/>
+  <testcase name="optimizedRowsPreserveTheOriginalSoftPaperGeometry" classname="com.example.ui.components.PaperAndSliderTest" time="7.495"/>
+  <testcase name="offscreenRowsPreservePixelBytesAndTruncatedFinalPadding" classname="com.example.ui.components.PaperAndSliderTest" time="7.441"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

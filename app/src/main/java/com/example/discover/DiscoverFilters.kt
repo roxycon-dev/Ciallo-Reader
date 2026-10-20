@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
+import com.example.ui.components.pullOutSelectable
 import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -129,5 +130,5 @@ private fun ToolLabel(icon: ImageVector, label: String, checked: Boolean, onClic
 }
 
 @Composable
-private fun Modifier.quietSelect(checked: Boolean, onClick: () -> Unit): Modifier = selectable(checked,
+private fun Modifier.quietSelect(checked: Boolean, onClick: () -> Unit): Modifier = pullOutSelectable(checked,
     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, role = Role.Tab, onClick = onClick)

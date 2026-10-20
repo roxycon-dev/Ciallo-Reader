@@ -4,6 +4,8 @@ import com.example.ui.components.pullOutClickable
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutIconButton
 import com.example.ui.components.PullOutBottomSheet
+import com.example.ui.components.LocalOverlayClose
+import com.example.ui.components.pullOutSelectable
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -261,11 +263,12 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
         }
         choice?.let { work ->
             PullOutBottomSheet(onDismissRequest = { choice = null }) {
+                val close = LocalOverlayClose.current
                 Column(Modifier.padding(16.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(work.book.title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     Text("${work.variants.size} 个源可读 · 选择阅读书源", fontSize = 13.sp)
                     work.variants.forEach { entry ->
-                        DiscoverGlass(Modifier.fillMaxWidth().pullOutClickable { choice = null; onOpen(entry.book) }) {
+                        DiscoverGlass(Modifier.fillMaxWidth().pullOutClickable { close { onOpen(entry.book) } }) {
                             Text(sources.firstOrNull { it.id == entry.book.sourceId }?.name ?: entry.book.sourceId, fontWeight = FontWeight.SemiBold)
                             Text(metric(DiscoverWork(work.key, listOf(entry), 0.0), dimension), fontSize = 12.sp)
                             entry.book.comicInfo?.status?.let { Text(serialLabel(it), fontSize = 11.sp) }
@@ -308,7 +311,7 @@ internal fun DiscoverChip(label: String, selected: Boolean, onClick: () -> Unit,
     visualHeight: Int = 32, dimmed: Boolean = false, icon: ImageVector? = null, outlined: Boolean = false, modifier: Modifier = Modifier) {
     val primary = MaterialTheme.colorScheme.primary
     Box(modifier.heightIn(min = 48.dp).widthIn(min = 48.dp).alpha(if (dimmed) .5f else 1f)
-        .selectable(selected, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, role = Role.Checkbox, onClick = onClick), contentAlignment = Alignment.Center) {
+        .pullOutSelectable(selected, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, role = Role.Checkbox, onClick = onClick), contentAlignment = Alignment.Center) {
         Row(Modifier.heightIn(min = visualHeight.dp).clip(CircleShape)
             .background(if (selected) { if (solid) primary else discoverTint() } else if (solid) MaterialTheme.colorScheme.surface.copy(alpha = .40f) else Color.Transparent)
             .then(if (outlined) Modifier.border(1.dp, if (selected) primary else discoverInk().copy(alpha = .12f), CircleShape) else Modifier)

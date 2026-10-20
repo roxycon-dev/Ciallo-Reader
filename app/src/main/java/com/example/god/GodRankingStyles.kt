@@ -1,6 +1,6 @@
 package com.example.god
 
-import com.example.ui.components.pullOutAnchor
+import com.example.ui.components.pullOutCombinedClickable
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutAlertDialog
 import com.example.ui.components.pullOutClickable
@@ -265,7 +265,7 @@ fun GodItemCard(
                 scaleX = press.value
                 scaleY = press.value
             }
-            .pullOutAnchor().combinedClickable(
+            .pullOutCombinedClickable(
                 onClick = { (onTap ?: { onItemClick(moment) }).invoke() },
                 onLongClick = {
                     if (HapticsGate.enabled) {

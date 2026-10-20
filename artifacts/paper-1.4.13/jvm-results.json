@@ -1,0 +1,30 @@
+{
+  "uniqueCases": 24,
+  "allPassed": true,
+  "cases": [
+    "com.example.ui.OverlayPolishTest.confirmationWaitsForExitAndRepeatedTapsCannotRepeatTheAction",
+    "com.example.ui.components.PaperAndSliderTest.aCollapsedRangeCanBeExpandedAgain",
+    "com.example.ui.components.PaperAndSliderTest.aSecondFingerCannotTakeOverTheSlider",
+    "com.example.ui.components.PaperAndSliderTest.bubbleSpaceIsNotAHiddenSeekTarget",
+    "com.example.ui.components.PaperAndSliderTest.closingUsesTheFasterSpringWithoutRebound",
+    "com.example.ui.components.PaperAndSliderTest.discreteSliderOnlyPublishesStopsAndEventuallySleeps",
+    "com.example.ui.components.PaperAndSliderTest.disposedMenuItemReturnsToItsLivingParentTrigger",
+    "com.example.ui.components.PaperAndSliderTest.emptyTrackTapSelectsTheRequestedPosition",
+    "com.example.ui.components.PaperAndSliderTest.endpointsHaveNoHiddenDiscontinuityForSourcesOutsideThePanel",
+    "com.example.ui.components.PaperAndSliderTest.firstAndFinalMeshFramesAreExactAtEveryVertex",
+    "com.example.ui.components.PaperAndSliderTest.horizontalIntentAndCompletionNotifyExactlyOneDragLifecycle",
+    "com.example.ui.components.PaperAndSliderTest.meshHasNoReversedRowsOrNonFiniteVerticesThroughoutOpeningAndOvershoot",
+    "com.example.ui.components.PaperAndSliderTest.nativeSliderRendersBothThemesAndTheMagnifyingLens",
+    "com.example.ui.components.PaperAndSliderTest.nearbyThumbPressRetainsRelativeOffset",
+    "com.example.ui.components.PaperAndSliderTest.offscreenRowsPreservePixelBytesAndTruncatedFinalPadding",
+    "com.example.ui.components.PaperAndSliderTest.optimizedRowsPreserveTheOriginalSoftPaperGeometry",
+    "com.example.ui.components.PaperAndSliderTest.paperOpensWithASmallSpringReboundAndLandsExactlyFlat",
+    "com.example.ui.components.PaperAndSliderTest.pendingTriggerIsClaimedOnceAndCannotLeakIntoTheNextUnrelatedOverlay",
+    "com.example.ui.components.PaperAndSliderTest.rangeLensesCannotCrossOrViolateTheMinimumGap",
+    "com.example.ui.components.PaperAndSliderTest.reversingTheTargetPreservesCurrentPositionAndMomentum",
+    "com.example.ui.components.PaperAndSliderTest.springMotionIsIndependentOfFrameSubdivision",
+    "com.example.ui.components.PaperAndSliderTest.touchingASettlingLensDoesNotPublishItsLaggingVisualPosition",
+    "com.example.ui.components.PaperAndSliderTest.trackDownDoesNotMoveTheLensBeforeScrollIntentIsKnown",
+    "com.example.ui.components.PaperAndSliderTest.verticalScrollingDoesNotChangeTheValue"
+  ]
+}

@@ -1,6 +1,6 @@
 package com.example.ui
 
-import com.example.ui.components.pullOutAnchor
+import com.example.ui.components.pullOutCombinedClickable
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutAlertDialog
 import com.example.ui.components.PullOutVisibility
@@ -2392,7 +2392,7 @@ private fun HomeActionChip(
                 else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f),
                 RoundedCornerShape(18.dp)
             )
-            .pullOutAnchor().combinedClickable(
+            .pullOutCombinedClickable(
                 interactionSource = interaction,
                 indication = null,
                 onClick = onClick
@@ -2445,7 +2445,7 @@ private fun HomeCategoryChip(
             .clip(RoundedCornerShape(17.dp))
             .background(baseColor.copy(alpha = bgAlpha))
             .border(0.5.dp, baseColor.copy(alpha = borderAlpha), RoundedCornerShape(17.dp))
-            .pullOutAnchor().combinedClickable(
+            .pullOutCombinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,

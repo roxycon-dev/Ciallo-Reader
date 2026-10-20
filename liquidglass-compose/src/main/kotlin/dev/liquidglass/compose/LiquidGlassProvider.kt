@@ -25,17 +25,19 @@ import kotlin.math.ceil
  *
  * One state belongs to exactly one provider at a time.
  */
-public fun Modifier.liquidGlassProvider(state: LiquidGlassProviderState): Modifier =
-    this then LiquidGlassProviderElement(state)
+public fun Modifier.liquidGlassProvider(state: LiquidGlassProviderState, visible: Boolean = true): Modifier =
+    this then LiquidGlassProviderElement(state, visible)
 
 private class LiquidGlassProviderElement(
     private val state: LiquidGlassProviderState,
+    private val visible: Boolean,
 ) : ModifierNodeElement<LiquidGlassProviderNode>() {
 
-    override fun create(): LiquidGlassProviderNode = LiquidGlassProviderNode(state)
+    override fun create(): LiquidGlassProviderNode = LiquidGlassProviderNode(state, visible)
 
     override fun update(node: LiquidGlassProviderNode) {
         node.updateState(state)
+        node.visible = visible
     }
 
     override fun InspectorInfo.inspectableProperties() {
@@ -44,13 +46,14 @@ private class LiquidGlassProviderElement(
     }
 
     override fun equals(other: Any?): Boolean =
-        other is LiquidGlassProviderElement && other.state === state
+        other is LiquidGlassProviderElement && other.state === state && other.visible == visible
 
-    override fun hashCode(): Int = System.identityHashCode(state)
+    override fun hashCode(): Int = 31 * System.identityHashCode(state) + visible.hashCode()
 }
 
 private class LiquidGlassProviderNode(
     private var state: LiquidGlassProviderState,
+    var visible: Boolean,
 ) : Modifier.Node(),
     DrawModifierNode,
     GlobalPositionAwareModifierNode,
@@ -93,7 +96,7 @@ private class LiquidGlassProviderNode(
         ) {
             this@draw.drawContent()
         }
-        drawLayer(contentLayer)
+        if (visible) drawLayer(contentLayer)
     }
 
     private fun attachToState() {

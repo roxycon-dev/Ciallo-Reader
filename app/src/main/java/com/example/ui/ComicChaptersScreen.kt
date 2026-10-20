@@ -1,6 +1,6 @@
 package com.example.ui
 
-import com.example.ui.components.pullOutAnchor
+import com.example.ui.components.pullOutCombinedClickable
 import com.example.ui.components.PullOutButton
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutIconButton
@@ -887,7 +887,7 @@ private fun ChapterCardSpec(
                 if (selecting) {
                     Modifier.pullOutClickable(onClick = onClick)
                 } else {
-                    Modifier.pullOutAnchor().combinedClickable(
+                    Modifier.pullOutCombinedClickable(
                         onClick = onClick,
                         onLongClick = {
                             if (HapticsGate.enabled) {
@@ -1104,7 +1104,7 @@ private fun GodCardSpec(
                 SolidColor(if (isSelected) MintPrimary else GodGoldStroke),
                 shape,
             )
-            .pullOutAnchor().combinedClickable(
+            .pullOutCombinedClickable(
                 onClick = onOpen,
                 onLongClick = {
                     if (HapticsGate.enabled) {

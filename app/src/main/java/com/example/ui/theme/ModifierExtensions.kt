@@ -67,17 +67,19 @@ fun Modifier.clickableWithFeedback(
     }
 
     this
-        .graphicsLayer {
-            scaleX = scaleState.value
-            scaleY = scaleState.value
-            alpha = dimState.value
-        }
+        // Capture the complete pressed appearance, including its scale and dim.
+        // Otherwise the paper takes over with an unpressed, brighter texture.
         .pullOutClickable(
             interactionSource = interactionSource,
             indication = null,
             enabled = enabled,
             onClick = onClick
         )
+        .graphicsLayer {
+            scaleX = scaleState.value
+            scaleY = scaleState.value
+            alpha = dimState.value
+        }
 }
 
 /**

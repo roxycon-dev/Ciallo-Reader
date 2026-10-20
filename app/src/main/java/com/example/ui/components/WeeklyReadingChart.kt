@@ -461,7 +461,7 @@ private fun DayCoverCard(
     Column(
         modifier = Modifier
             .width(84.dp)
-            .pullOutAnchor().combinedClickable(
+            .pullOutCombinedClickable(
                 onClick = {
                     when {
                         book != null -> onOpenBook(book)

@@ -10,6 +10,8 @@ package com.example.ui.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocal
@@ -17,6 +19,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.graphics.vector.ImageVector
 import dev.liquidglass.compose.LiquidGlassProviderState
 import dev.liquidglass.compose.rememberLiquidGlassProviderState
@@ -25,6 +28,7 @@ import dev.liquidglass.compose.liquidGlassProvider
 /** 全局液态玻璃 Provider 状态（由 MainActivity 提供，弹窗内由 DialogLiquidGlass 提供）。 */
 val LocalLiquidGlassState: ProvidableCompositionLocal<LiquidGlassProviderState?> =
     staticCompositionLocalOf { null }
+private val LocalGlassWindowOwner = staticCompositionLocalOf<android.view.View?> { null }
 
 /**
  * 弹窗/底部弹层专用：为独立窗口创建属于该窗口自己的 LiquidGlass Provider。
@@ -40,13 +44,22 @@ fun DialogLiquidGlass(
         CompositionLocalProvider(LocalLiquidGlassState provides null) { content() }
         return
     }
+    val view = LocalView.current
+    if (LocalGlassWindowOwner.current === view) {
+        // Existing call sites may request glass again inside the same modal. Keep
+        // their layout, but share its one provider instead of recording it twice.
+        Box(Modifier.then(if (fillMaxSize) Modifier.fillMaxSize() else Modifier)) { content() }
+        return
+    }
     val glass = rememberLiquidGlassProviderState()
-    CompositionLocalProvider(LocalLiquidGlassState provides glass) {
-        Box(
-            modifier = Modifier
-                .then(if (fillMaxSize) Modifier.fillMaxSize() else Modifier)
-                .liquidGlassProvider(glass)
-        ) {
+    CompositionLocalProvider(LocalLiquidGlassState provides glass, LocalGlassWindowOwner provides view) {
+        Box(modifier = Modifier.then(if (fillMaxSize) Modifier.fillMaxSize() else Modifier)) {
+            // The optical source is a sibling, never an ancestor of its own lenses.
+            // Keep the full shader/refraction pipeline without a cyclic display list.
+            val colors = MaterialTheme.colorScheme
+            Box(Modifier.matchParentSize().liquidGlassProvider(glass, visible = false)
+                .background(Brush.linearGradient(listOf(colors.surface,
+                    colors.primary.copy(alpha = .08f), colors.secondary.copy(alpha = .06f)))))
             content()
         }
     }

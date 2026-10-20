@@ -6,7 +6,8 @@
 
 package com.example.library
 
-import com.example.ui.components.pullOutAnchor
+import com.example.ui.components.pullOutCombinedClickable
+import com.example.ui.components.paperSheetDragHandle
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutIconButton
 import com.example.ui.components.PullOutAlertDialog
@@ -1652,7 +1653,7 @@ private fun HistoryChip(
             // 规范：胶囊高 32、水平内边距 14、字号 13、**平涂**无描边无渐变
             .height(32.dp)
             .background(primary.copy(alpha = if (muted) 0.06f else 0.10f))
-            .pullOutAnchor().combinedClickable(
+            .pullOutCombinedClickable(
                 interactionSource = interaction,
                 indication = null,
                 onClick = { if (!editing) onPick() },
@@ -3225,12 +3226,14 @@ private fun AggregateJumpSheet(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         shape = RoundedCornerShape(24.dp)
     ) {
+        val close = com.example.ui.components.LocalOverlayClose.current
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
 Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
+                    .paperSheetDragHandle()
                     .clip(RoundedCornerShape(24.dp))
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))
             ) {
@@ -3256,7 +3259,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 6.dp)) {
                 item(key = "jump_top") {
                     Surface(
-                        modifier = Modifier.fillMaxWidth().pullOutClickable { onJump(-1) },
+                        modifier = Modifier.fillMaxWidth().pullOutClickable { close { onJump(-1) } },
                         color = Color.Transparent
                     ) {
                         Row(
@@ -3276,7 +3279,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize
                 }
                 itemsIndexed(groups, key = { _, g -> "jump_${g.sourceId}" }) { idx, group ->
                     Surface(
-                        modifier = Modifier.fillMaxWidth().pullOutClickable { onJump(idx) },
+                        modifier = Modifier.fillMaxWidth().pullOutClickable { close { onJump(idx) } },
                         color = Color.Transparent
                     ) {
                         Row(

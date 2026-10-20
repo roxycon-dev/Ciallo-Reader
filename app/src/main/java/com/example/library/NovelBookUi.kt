@@ -203,6 +203,7 @@ fun NovelDetailSheet(book: SearchBook, sourceName: String, imageLoader: ImageLoa
     onRead: () -> Unit, onPause: () -> Unit, onResume: () -> Unit, onCancel: () -> Unit) {
     PullOutBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
+        val read = com.example.ui.components.paperDismiss(onRead)
         Column(Modifier.fillMaxWidth().fillMaxHeight(.94f)) {
             NovelDetailContent(book, sourceName, imageLoader, loading, error,
                 Modifier.weight(1f).verticalScroll(rememberScrollState()))
@@ -218,7 +219,7 @@ fun NovelDetailSheet(book: SearchBook, sourceName: String, imageLoader: ImageLoa
                         }
                         is DownloadState.Pending -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("准备整本文件…", fontSize = 12.sp); PullOutTextButton(onClick = onCancel) { Text("取消") } }
                         is DownloadState.Paused -> PullOutButton(onClick = onResume, colors = novelActionColors(), modifier = Modifier.fillMaxWidth()) { Text("继续整本下载") }
-                        is DownloadState.Success -> PullOutButton(onClick = if (hasLocal) onRead else onDownload, colors = novelActionColors(), modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) { Icon(Icons.Default.MenuBook, null); Spacer(Modifier.width(8.dp)); Text(if (hasLocal) "打开书架里的小说" else "整本下载到书架") }
+                        is DownloadState.Success -> PullOutButton(onClick = if (hasLocal) read else onDownload, colors = novelActionColors(), modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) { Icon(Icons.Default.MenuBook, null); Spacer(Modifier.width(8.dp)); Text(if (hasLocal) "打开书架里的小说" else "整本下载到书架") }
                         else -> {
                             if (state is DownloadState.Error) Text(state.message, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
                             PullOutButton(onClick = onDownload, enabled = !loading, colors = novelActionColors(), modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) {
@@ -226,7 +227,7 @@ fun NovelDetailSheet(book: SearchBook, sourceName: String, imageLoader: ImageLoa
                             }
                         }
                     }
-                    if (hasLocal && state !is DownloadState.Success) PullOutOutlinedButton(onClick = onRead, modifier = Modifier.fillMaxWidth()) { Text("阅读已下载版本") }
+                    if (hasLocal && state !is DownloadState.Success) PullOutOutlinedButton(onClick = read, modifier = Modifier.fillMaxWidth()) { Text("阅读已下载版本") }
                 }
             }
         }

@@ -124,7 +124,8 @@ fun AppActionButton(
     loading: Boolean = false,
     fullWidth: Boolean = false
 ) {
-    val paperAction = paperClick(onClick)
+    val paperSource = rememberPaperTrigger()
+    val paperAction = paperClick(onClick, paperSource)
     if (LocalRenderQuality.current.minimal) {
         val cs = MaterialTheme.colorScheme
         val bg = when (variant) {
@@ -139,9 +140,9 @@ fun AppActionButton(
             AppButtonVariant.Secondary -> cs.onSecondaryContainer
             AppButtonVariant.Tertiary -> cs.primary
         }
-        Row(modifier.then(if (fullWidth) Modifier.fillMaxWidth() else Modifier)
+        Row(modifier.pullOutAnchor(paperSource).then(if (fullWidth) Modifier.fillMaxWidth() else Modifier)
             .height(buttonSize.height).clip(RoundedCornerShape(12.dp))
-            .background(bg).pullOutClickable(enabled = enabled && !loading, onClick = paperAction)
+            .background(bg).clickable(enabled = enabled && !loading, onClick = paperAction)
             .padding(horizontal = buttonSize.horizontalPadding),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             icon?.let { Icon(it, null, tint = ink, modifier = Modifier.size(buttonSize.iconSize)); Spacer(Modifier.width(6.dp)) }
@@ -184,7 +185,7 @@ fun AppActionButton(
     val shape = RoundedCornerShape(percent = 50)
     val disabledAlpha = 0.4f
 
-    val pressModifier = modifier
+    val pressModifier = modifier.pullOutAnchor(paperSource)
         .graphicsLayer {
             scaleX = scale
             scaleY = scale
@@ -326,7 +327,7 @@ fun AppActionButton(
                 }
                 .border(1.dp, colors.destructive.copy(alpha = 0.35f), shape)
         }
-            .pullOutClickable(
+            .clickable(
                 interactionSource = interactionSource,
                 indication = null,
                 enabled = enabled,

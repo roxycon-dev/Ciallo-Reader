@@ -1,0 +1,72 @@
+
+=== 书架自检 ===
+PASS  括号平衡 · HomeScreen
+PASS  括号平衡 · ShelfMultiSelect
+PASS  括号平衡 · ShelfSelectionHost
+PASS  书籍卡不抢手势（长按才有机会）
+PASS  书籍卡已登记几何 itemBounds
+PASS  阅读统计卡存在
+PASS  「我喜欢的」排在阅读统计之前
+PASS  「我喜欢的」排在书籍网格之后
+PASS  「我喜欢的」没有排序胶囊（与分类栏重复）
+PASS  「我喜欢的」分类栏不单独列出「默认」
+PASS  「我喜欢的」锁跟随隐私模式总开关
+PASS  长按宿主尊重交互子控件，取消不误触点击
+PASS  宿主同时接管短按（onTap）
+PASS  长按等待捕获的是宽判的 CancellationException（而非具体 Timeout 子类）
+PASS  宽判取消时区分「真·宿主销毁」与「长按到时」
+PASS  ShelfMultiSelect 无残留调试日志
+PASS  无残留 detectTapGestures 导入
+PASS  多选顶栏是浮层（align(TopCenter)），不占布局高度
+PASS  多选顶栏不再用展开式入场（会导致内容位移）
+PASS  底部让位用的是 NoTabBar inset（不含被隐藏的 Tab 栏）
+PASS  操作栏没有误用含 Tab 栏的 inset
+PASS  呼吸动画已停用，或在滚动时冻结
+PASS  呼吸动画已停用，或在多选/拖拽时冻结
+PASS  原位占位框用 Modifier.layout 做像素级定位
+PASS  已移除底部放置坞 DropDock
+PASS  分类胶囊已注册为拖拽落点（书架 + 我喜欢的）
+PASS  落点高亮不改文案（用 dropHighlight 只动配色与缩放）
+PASS  归位用封面几何（coverRect），不是整卡矩形
+PASS  书卡不再同时叠加 1.05 与 0.94 两个 scale
+PASS  边缘滚动用 root 坐标判定（不能拿局部 at.y 直接比 hostTop）
+PASS  边缘滚动有驻留延迟，且计时在宿主的滚动循环里（不是 moveDrag）
+PASS  落点带迟滞 + 要求完整可见（防半露胶囊误命中与高亮闪烁）
+PASS  边缘滚动节奏固定，且不再重复乘 density
+PASS  拖拽期禁掉分类栏自己的横向滚动
+PASS  HomeScreen 的 dimTarget 把 flyingHome 也算作「隐藏」
+PASS  宿主在松手时调用 beginReturnFlight（进入归位态）
+PASS  幽灵卡落位时才 endReturnFlight + 清 pendingFlight（同一帧交班）
+PASS  归位落点每帧重读**每个条目自己的**真实封面矩形（不能用起飞快照）
+PASS  归位幽灵卡收敛到选中态缩放（SELECTED_SCALE），不是 1.0
+PASS  幽灵卡在归位全程 alpha 保持 1（落位前不淡出）
+PASS  HeartArt 美工文件存在（按钮 / 角标 / 书架 HeartBurst 共用）
+PASS  「喜欢」按钮的实心态用 HeartArt（不是 Material 扁平剪影）
+PASS  心形颜色只有一套（HeartMid = #FF4D6D）
+PASS  ShelfFly.kt 已删除（飞行控制器/覆盖层/落点弹跳）
+PASS  全工程不再引用 ShelfFly / ShelfFlyOverlay / MiniHeartBadge
+PASS  Motion 里的飞行令牌已清干净（FLY_MS / FLY_TRAILS / LAND_RING_MS / easeThrow）
+PASS  「喜欢」按钮不再上报飞行锚点（positionInWindow / onMeasured 簿记已删）
+PASS  「喜欢」按钮不再接收 coverUrl（飞行缩略图的唯一用途）
+PASS  收藏卡片不抢手势（hostOwnsGesture），长按才有机会
+PASS  收藏卡片已登记几何（itemBounds + coverBoundsModifier）
+PASS  收藏卡用 fav:: 前缀与书籍卡区分
+PASS  SnackbarHost 按语义分流（不能一律渲染成红色错误卡）
+PASS  「撤销」提示走 TOAST 语义，不是 ERROR
+PASS  拖到分类时必须按 fav:: 前缀分流（书架书 ↔ 我喜欢的）
+PASS  收藏落到分类要真的调用 onMoveFavoritesToCategory
+PASS  收藏分类的撤销要还原到原分类（移动前先记下来）
+PASS  DragFlight 携带每个条目各自的原位（origins map）
+PASS  飞行层按条目逐个绘制（不是只画 first()）
+PASS  每本用各自的落点（origins[key]），不是统一的 flight.to
+PASS  收藏卡片有 hidden（被拖起/归位中 → alpha 0）
+PASS  HomeScreen 把 dragging / flyingHome 传给收藏卡片的 hidden
+PASS  状态机能按「真实存在的名单」裁剪几何表
+PASS  宿主在 aliveKeys / aliveTargets 变化时触发裁剪
+PASS  HomeScreen 把真实条目集合与收藏分类交给宿主
+PASS  落点分类不存在时拒绝移动（书被写进不存在的分类 = 凭空消失）
+PASS  新飞行起飞前先把上一批 flyingHome 交班（旧的 onDone 永远不会再被调用）
+PASS  无残留调试脚手架（SLOWMO / DEBUG 浮层 / 品红占位块）
+PASS  模拟器动画时长已开启（否则拍摄到的动画全是降级分支）
+
+68 项通过，0 项失败

@@ -128,6 +128,7 @@ fun SourceMigrateSheet(
     onDismiss: () -> Unit,
 ) {
     PullOutBottomSheet(onDismissRequest = onDismiss) {
+        val close = com.example.ui.components.LocalOverlayClose.current
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -177,7 +178,7 @@ fun SourceMigrateSheet(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         items(candidates, key = { it.key }) { c ->
-                            SourceCandidateRow(candidate = c, onClick = { onPick(c) })
+                            SourceCandidateRow(candidate = c, onClick = { close { onPick(c) } })
                         }
                     }
                 }

@@ -1,0 +1,10 @@
+meshFrames=47
+fallbackFrames=0
+captureFailures=0
+snapshots=2
+buttonCaptures=2
+maxMeshBuildMs=24.268384
+maxCaptureMs=667.082731
+asyncSnapshots=4
+legacySnapshots=0
+readbackFallbacks=0

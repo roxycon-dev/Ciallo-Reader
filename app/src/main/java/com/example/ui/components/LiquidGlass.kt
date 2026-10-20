@@ -190,13 +190,7 @@ fun GlassDialogWindowEffect(
 
         val decorView = activity?.window?.decorView
         if (decorView != null && supportsRealtimeBlur) {
-            decorView.setRenderEffect(
-                android.graphics.RenderEffect.createBlurEffect(
-                    blurRadiusPx,
-                    blurRadiusPx,
-                    android.graphics.Shader.TileMode.CLAMP
-                )
-            )
+            GlassWindowBlur.acquire(decorView, window ?: view, blurRadiusPx)
         } else if (decorView != null) {
             // ── 跨机型降级（API < 31 无 RenderEffect）──────────────────
             // 宿主窗口无法实时模糊，弹窗背后的内容会以清晰原样透出，
@@ -206,8 +200,30 @@ fun GlassDialogWindowEffect(
             window?.setDimAmount(0.42f)
         }
         onDispose {
-            if (android.os.Build.VERSION.SDK_INT >= 31) decorView?.setRenderEffect(null)
+            if (android.os.Build.VERSION.SDK_INT >= 31 && decorView != null) GlassWindowBlur.release(decorView, window ?: view)
         }
+    }
+}
+
+/** Multiple dialog windows share one activity blur; closing a child must not clear its parent. */
+internal object GlassWindowBlur {
+    private val owners = java.util.WeakHashMap<android.view.View, LinkedHashMap<Any, Float>>()
+    @androidx.annotation.RequiresApi(31)
+    fun acquire(view: android.view.View, owner: Any, radius: Float) {
+        val entries = owners.getOrPut(view) { linkedMapOf() }
+        entries[owner] = radius
+        apply(view, entries.values.last())
+    }
+    @androidx.annotation.RequiresApi(31)
+    fun release(view: android.view.View, owner: Any) {
+        val entries = owners[view] ?: return
+        entries.remove(owner)
+        if (entries.isEmpty()) { owners.remove(view); view.setRenderEffect(null) }
+        else apply(view, entries.values.last())
+    }
+    @androidx.annotation.RequiresApi(31)
+    private fun apply(view: android.view.View, radius: Float) {
+        view.setRenderEffect(android.graphics.RenderEffect.createBlurEffect(radius, radius, android.graphics.Shader.TileMode.CLAMP))
     }
 }
 

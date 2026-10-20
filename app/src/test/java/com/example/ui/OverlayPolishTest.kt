@@ -31,19 +31,28 @@ class OverlayPolishTest {
         var open by mutableStateOf(true)
         var actions = 0
         var dismissals = 0
+        var paper: com.example.ui.components.PaperLifecycle? = null
         compose.setContent { MyApplicationTheme {
             if (open) AcrylicDialog(onDismissRequest = { dismissals++; open = false },
-                title = { Text("确认操作") }, confirmButton = {
+                title = { paper = com.example.ui.components.LocalPaperOwner.current; Text("确认操作") }, confirmButton = {
                     val close = LocalOverlayClose.current
                     TextButton(onClick = { close { actions++ } }) { Text("执行") }
                 })
         } }
         compose.waitForIdle()
+        // Robolectric's dialog root does not produce an HWUI surface. This test
+        // exercises the close clock: explicitly supply the texture-ready signal.
+        // Real capture/mesh/source ownership is covered by PaperPolishDeviceTest.
+        compose.runOnIdle { checkNotNull(paper).ready = true }
+        compose.mainClock.advanceTimeBy(1800)
+        compose.runOnIdle { check(checkNotNull(paper).flat) }
         compose.mainClock.autoAdvance = false
         compose.onNodeWithText("执行").performClick().performClick()
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithText("确认操作").assertExists()
         assertEquals(0, actions)
+        // Closing freezes the current content again; supply that handshake too.
+        compose.runOnIdle { checkNotNull(paper).ready = true }
         compose.mainClock.advanceTimeBy(1000)
         compose.waitForIdle()
         compose.onNodeWithText("确认操作").assertDoesNotExist()
@@ -87,6 +96,19 @@ class OverlayPolishTest {
         compose.onNodeWithText("旧弹层").assertDoesNotExist()
         compose.onNodeWithText("新弹层").assertExists()
         assertEquals(1, actions)
+    }
+    @Test fun explicitCloseCannotInvokeTheHostDismissCallbackTwice() {
+        var open by mutableStateOf(true); var dismissals = 0
+        val dismiss: () -> Unit = { dismissals++; open = false }
+        compose.setContent { MyApplicationTheme {
+            if (open) AcrylicBottomOverlay(onDismissRequest = dismiss) {
+                TextButton(onClick = com.example.ui.components.paperDismiss(dismiss)) { Text("关闭一次") }
+            }
+        } }
+        compose.waitForIdle()
+        compose.onNodeWithText("关闭一次").performClick()
+        compose.mainClock.advanceTimeBy(1800); compose.waitForIdle()
+        assertEquals(1, dismissals)
     }
 
 }
