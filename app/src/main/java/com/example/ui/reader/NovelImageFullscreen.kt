@@ -73,11 +73,8 @@ fun NovelImageFullscreenViewer(
     val reduce = LocalReduceMotion.current
     val scope = rememberCoroutineScope()
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
-    val latestDismiss by rememberUpdatedState(onDismiss)
-    val close = { visibility.targetState = false }
-    LaunchedEffect(visibility.isIdle, visibility.currentState, visibility.targetState) {
-        if (visibility.isIdle && !visibility.currentState && !visibility.targetState) latestDismiss()
-    }
+    val dismiss = com.example.ui.components.rememberPaperClose(visibility, onDismiss)
+    val close = { dismiss {} }
     var loaded by remember(path) { mutableStateOf(false) }
     val bitmap by com.example.ui.components.rememberAsyncState<android.graphics.Bitmap?>(initialValue = null, path) {
         value = withContext(Dispatchers.IO) {
@@ -98,7 +95,7 @@ fun NovelImageFullscreenViewer(
     }
 
     PullOutDialog(
-        animateContent = false,
+        animateContent = false, lifecycleState = visibility,
         onDismissRequest = close,
         properties = DialogProperties(
             usePlatformDefaultWidth = false,

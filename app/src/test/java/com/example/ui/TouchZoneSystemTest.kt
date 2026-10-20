@@ -38,10 +38,30 @@ class TouchZoneSystemTest {
         decision.update(-71.99f, 0f); assertFalse(decision.isSwipe(false))
         decision.update(-72f, 0f); assertTrue(decision.isSwipe(false)); assertFalse(decision.isTap())
     }
-    @Test fun perpendicularMotionIsNeverPageIntent() {
+    @Test fun diagonalAndCornerMotionUsesTheFullTwoDimensionalDistance() {
         val decision = TouchGestureDecision(8f, 60f)
+        decision.update(6f, 6f)
+        assertFalse("Diagonal motion over native radial slop cannot become a click", decision.isTap())
         decision.update(65f, 100f)
-        assertFalse(decision.isSwipe(false)); assertTrue(decision.isSwipe(true)); assertFalse(decision.isTap())
+        assertTrue(decision.isSwipe(false)); assertTrue(decision.isSwipe(true)); assertFalse(decision.isTap())
+    }
+    @Test fun calibratedDistanceOnlyOverridesFastReleaseAndNeverSlowNativeCornerSettlement() {
+        val shortCorner = Offset(-30f, -40f)
+        for (native in listOf(false, true)) {
+            assertEquals(native, fastPageCommit(200f, shortCorner, Offset(-100f, -100f), 1f, native))
+            assertEquals(native, fastPageCommit(null, shortCorner, Offset(-2000f, -2000f), 1f, native))
+        }
+        assertFalse(fastPageCommit(51f, shortCorner, Offset(-1000f, -1000f), 1f, true))
+        assertTrue(fastPageCommit(50f, shortCorner, Offset(-1000f, -1000f), 1f, false))
+        assertFalse("A quick return gesture must not finish the page", fastPageCommit(12f, shortCorner, Offset(1000f, 1000f), 1f, true))
+        assertTrue(fastPageCommit(50f, Offset(0f, -100f), Offset(0f, -2000f), 2f, false))
+        assertFalse(fastPageCommit(51f, Offset(-60f, -80f), Offset(-2000f, -2000f), 2f, true))
+    }
+    @Test fun forwardAndBackwardGuidesPointInOppositeDirectionsIncludingRtl() {
+        assertEquals(-1f, swipeGuideSign(TouchAction.NEXT, false))
+        assertEquals(1f, swipeGuideSign(TouchAction.PREVIOUS, false))
+        assertEquals(1f, swipeGuideSign(TouchAction.NEXT, true))
+        assertEquals(-1f, swipeGuideSign(TouchAction.PREVIOUS, true))
     }
     @Test fun pinchCancelsTheWholeGestureEvenAfterOneFingerLifts() {
         val decision = TouchGestureDecision(8f, 60f)

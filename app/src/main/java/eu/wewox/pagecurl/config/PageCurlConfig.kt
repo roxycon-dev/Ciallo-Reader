@@ -209,6 +209,9 @@ public class PageCurlConfig(
     dragInteraction: DragInteraction,
     tapInteraction: TapInteraction,
     public val onCustomTap: Density.(IntSize, Offset) -> Boolean,
+    /** Optional app policy; the native 2D fold geometry is never modified. */
+    public val dragStartAllowed: ((Offset, IntSize) -> Boolean)? = null,
+    public val dragRelease: ((Offset, Offset, Offset, IntSize, Boolean) -> Boolean)? = null,
 ) {
     /**
      * The color of the back-page. In majority of use-cases it should be set to the content background color.

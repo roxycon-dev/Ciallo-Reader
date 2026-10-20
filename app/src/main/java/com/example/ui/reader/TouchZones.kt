@@ -70,10 +70,24 @@ class TouchGestureDecision(private val slop: Float, private val threshold: Float
     var dy = 0f; private set
     fun update(x: Float, y: Float, pointers: Int = 1, consumed: Boolean = false) {
         dx = x; dy = y; maxPointers = maxOf(maxPointers, pointers)
-        if (abs(x) > slop || abs(y) > slop) moved = true
+        if (kotlin.math.hypot(x, y) > slop) moved = true
         if (maxPointers > 1 || consumed) cancelled = true
     }
     fun isTap() = !moved && !cancelled
-    fun isSwipe(vertical: Boolean) = moved && !cancelled &&
-        (if (vertical) abs(dy) >= threshold && abs(dy) > abs(dx) * 1.1f else abs(dx) >= threshold && abs(dx) > abs(dy) * 1.1f)
+    fun isSwipe(@Suppress("UNUSED_PARAMETER") vertical: Boolean) = moved && !cancelled &&
+        kotlin.math.hypot(dx, dy) >= threshold
 }
+
+/** Only a fast release overrides the native completion decision. No axis lock or path rewriting. */
+internal fun fastPageCommit(distanceDp: Float?, delta: androidx.compose.ui.geometry.Offset,
+                            velocity: androidx.compose.ui.geometry.Offset, density: Float,
+                            nativeCommit: Boolean): Boolean {
+    if (distanceDp == null || velocity.getDistance() < 850f * density) return nativeCommit
+    // A fast flick back toward the grab point means return, even after a long outward curl.
+    if (delta.x * velocity.x + delta.y * velocity.y < 0f) return false
+    return delta.getDistance() >= distanceDp * density
+}
+
+/** Positive means physical right/down. PAGE remains bidirectional, independent of tap action. */
+internal fun swipeGuideSign(action: TouchAction, reverse: Boolean): Float =
+    (if (action == TouchAction.PREVIOUS) 1f else -1f) * if (reverse) -1f else 1f

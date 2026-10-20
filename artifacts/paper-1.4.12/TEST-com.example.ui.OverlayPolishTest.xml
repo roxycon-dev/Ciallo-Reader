@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ui.OverlayPolishTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-20T17:06:34.423Z" hostname="DESKTOP-PIFGGNS" time="8.402">
+  <properties/>
+  <testcase name="dismissalCannotEraseThePanelOpenedByTheSelectedAction" classname="com.example.ui.OverlayPolishTest" time="7.962"/>
+  <testcase name="confirmationWaitsForExitAndRepeatedTapsCannotRepeatTheAction" classname="com.example.ui.OverlayPolishTest" time="0.162"/>
+  <testcase name="tappingOutsideBottomOverlayFinishesItsExitBeforeRemoval" classname="com.example.ui.OverlayPolishTest" time="0.274"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

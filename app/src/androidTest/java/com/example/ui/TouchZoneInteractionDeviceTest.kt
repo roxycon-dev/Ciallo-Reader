@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
@@ -57,6 +58,42 @@ class TouchZoneInteractionDeviceTest {
         compose.waitForIdle(); assertEquals(1, bars); assertEquals(0, pages)
         compose.onNodeWithTag("reader").performTouchInput { swipe(Offset(width - 40f, center.y), Offset(40f, center.y), 500) }
         compose.waitForIdle(); assertEquals(1, bars); assertEquals(1, pages)
+    }
+
+    @Test fun nativeCurlKeepsSlowPartialCornersAndUsesDistanceOnlyForFastDiagonalFlips() {
+        var pages = 0; var bars = 0
+        var distance by mutableFloatStateOf(12f)
+        val zone = TouchZone(left = 0f, top = 0f, right = 1f, bottom = 1f, tap = TouchAction.CONTROLS)
+        compose.setContent { MyApplicationTheme {
+            com.example.ui.pageturn.PageCurlReaderContainer(
+                touchBinding = ReaderTouchBinding(listOf(zone.copy(distanceDp = distance))) { if (it == TouchAction.CONTROLS) bars++ },
+                currentContent = { Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.White)) { Text("跟随手指的原生书角") } },
+                nextContent = { Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Blue)) },
+                prevContent = { Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Green)) },
+                onNextPage = { pages++ }, onPrevPage = { pages-- }, onClickCenter = { bars++ },
+                menuVisible = false, modifier = Modifier.testTag("native-curl"))
+        } }
+        val reader = compose.onNodeWithTag("native-curl")
+        reader.performTouchInput { click(center) }
+        compose.waitForIdle(); assertEquals(1, bars); assertEquals(0, pages)
+        val before = reader.captureToImage().asAndroidBitmap()
+        reader.performTouchInput {
+            down(Offset(width - 8f, height - 8f))
+            moveTo(Offset(width - 100f, height - 90f), 900)
+        }
+        compose.waitForIdle()
+        val folded = reader.captureToImage().asAndroidBitmap()
+        assertFalse("A slow diagonal corner must visibly fold before release", before.sameAs(folded))
+        reader.performTouchInput { advanceEventTime(300); up() }
+        compose.waitForIdle(); assertEquals("A slow partial corner ignores the 12dp fast threshold", 0, pages)
+        assertEquals(1, bars)
+        compose.runOnIdle { distance = 300f }
+        reader.performTouchInput { swipe(Offset(width * .8f, height * .65f), Offset(width * .8f - 120f, height * .65f - 180f), 64) }
+        compose.waitForIdle(); assertEquals("Fast diagonal below the calibrated distance returns", 0, pages)
+        compose.runOnIdle { distance = 60f }
+        reader.performTouchInput { swipe(Offset(width * .8f, height * .65f), Offset(width * .8f - 120f, height * .65f - 180f), 64) }
+        compose.waitForIdle(); assertEquals("The same diagonal fast flick now completes", 1, pages)
+        assertEquals(1, bars)
     }
 
     @Test fun scrollingReaderHasOneVerticalGestureOwnerAndNoHorizontalPageTurn() {
@@ -167,6 +204,7 @@ class TouchZoneInteractionDeviceTest {
     }
 
     @Test fun paperModalKeepsTheTriggerHiddenUntilTheIndependentClosingSpringEnds() {
+        PaperRenderStats.reset(); PaperRenderHealth.useLightweightFallback = false
         var open by mutableStateOf(false)
         var actions = 0
         compose.setContent { MyApplicationTheme {
@@ -196,6 +234,10 @@ class TouchZoneInteractionDeviceTest {
         assertEquals(1, actions)
         assertFalse(originalSource?.hidden == true)
         compose.onNodeWithText("书库使用手册").assertExists()
+        assertTrue("A real window must use hardware mesh frames", PaperRenderStats.gpuFrames > 0)
+        val stats = "gpuFrames=${PaperRenderStats.gpuFrames}\nmaxMeshBuildMs=${PaperRenderStats.maxMeshBuildNanos / 1e6}\nsnapshots=${PaperRenderStats.snapshots}\nfallback=${PaperRenderHealth.useLightweightFallback}\n"
+        val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "paper-1.4.12").apply { mkdirs() }
+        File(dir, "render-stats.txt").writeText(stats)
     }
     @Test fun rangeAndDiscreteLensesRemainUsableWithARealAndroidCanvas() {
         var low by mutableFloatStateOf(18f); var high by mutableFloatStateOf(64f)
@@ -297,4 +339,17 @@ class TouchZoneInteractionDeviceTest {
         compose.waitUntil(15_000) { page.get() == 1 }
         shot("manga-native-curl-rtl")
     }
+    @Test fun ordinaryButtonClicksNeverCaptureTexturesOrAllocatePaperSnapshots() {
+        PaperRenderStats.reset()
+        var clicks by mutableIntStateOf(0)
+        compose.setContent { MyApplicationTheme {
+            Column { PullOutButton(onClick = { clicks++ }) { Text("普通按钮") }; Text("$clicks") }
+        } }
+        repeat(8) { compose.onNodeWithText("普通按钮").performTouchInput { click(center) } }
+        compose.waitForIdle()
+        assertEquals(8, clicks)
+        assertEquals(0, PaperRenderStats.snapshots)
+        assertEquals(0, PaperRenderStats.gpuFrames)
+    }
+
 }

@@ -148,4 +148,36 @@ class PaperAndSliderTest {
         repeat(10) { whole.advance(1f, true, 1f/60); repeat(2) { half.advance(1f, true, 1f/120) } }
         assertEquals(whole.position, half.position, .00001f); assertEquals(whole.velocity, half.velocity, .0001f)
     }
+    @Test fun optimizedRowsPreserveTheOriginalSoftPaperGeometry() {
+        val vertices = FloatArray(27 * 151 * 2)
+        val colors = IntArray(27 * 151); val sourceColors = IntArray(colors.size)
+        for (source in listOf(Rect(20f, -90f, 150f, -40f), Rect(120f, 540f, 280f, 588f))) {
+            for (p in listOf(0f, .1f, .4f, .7f, 1f, 1.07f)) {
+                fillPaperMesh(vertices, colors, sourceColors, 390f, 620f, source, p, 1.5f)
+                for (row in 0..150) for (col in 0..26) {
+                    val expected = PaperMesh.vertex(col / 26f, row / 150f, 390f, 620f, source, p, 1.5f)
+                    val index = (row * 27 + col) * 2
+                    assertEquals(expected.x, vertices[index], .02f)
+                    assertEquals(expected.y, vertices[index + 1], .02f)
+                }
+            }
+        }
+    }
+
+    @Test fun pendingTriggerIsClaimedOnceAndCannotLeakIntoTheNextUnrelatedOverlay() {
+        val source = PullOutSource().apply { bounds = Rect(10f, 10f, 80f, 60f) }
+        PullOutSources.activate(source)
+        assertSame(source, PullOutSources.claim())
+        assertNull(PullOutSources.claim())
+        PullOutSources.activate(source)
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofSeconds(2))
+        assertNull(PullOutSources.claim())
+    }
+    @Test fun disposedMenuItemReturnsToItsLivingParentTrigger() {
+        val parent = PullOutSource().apply { bounds = Rect(10f, 10f, 80f, 60f) }
+        val item = PullOutSource().apply { bounds = Rect(40f, 100f, 180f, 150f); this.parent = parent; disposed = true }
+        PullOutSources.activate(item)
+        assertSame(parent, PullOutSources.claim())
+    }
+
 }

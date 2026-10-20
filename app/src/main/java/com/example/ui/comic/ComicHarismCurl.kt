@@ -377,13 +377,16 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                     onZoomMotion?.invoke(me)
                     return true
                 }
-                if (touchZones != null) {
+                val customPageDrag = touchZones?.let {
+                    TouchZone.hit(it, downX / width.coerceAtLeast(1), downY / height.coerceAtLeast(1))?.swipe == SwipeAction.PAGE
+                } == true
+                if (touchZones != null && !customPageDrag) {
                     if (touchTravel > slopPx) view.removeCallbacks(longPressRunnable)
                     return true
                 }
                 val edgePx = 24f * resources.displayMetrics.density
                 val inward = if (downX <= edgePx) me.x - downX else downX - me.x
-                if (edgeSwipeEnabled && !dragForwarded &&
+                if (touchZones == null && edgeSwipeEnabled && !dragForwarded &&
                     (downX <= edgePx || downX >= width - edgePx) && inward > slopPx &&
                     inward > abs(me.y - downY) * 1.5f) {
                     edgeClosing = true
@@ -401,21 +404,21 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                     view.removeCallbacks(longPressRunnable)
                     val dx = me.x - downX
                     val dy = me.y - downY
-                    if (abs(dx) <= slopPx || abs(dx) < abs(dy) * 1.2f) return true
+                    if (!customPageDrag && (abs(dx) <= slopPx || abs(dx) < abs(dy) * 1.2f)) return true
                     val forward = dx * forwardSign
-                    if (swipeEnabled && onChapterEdge != null && abs(dx) >= abs(dy) &&
+                    if ((swipeEnabled || customPageDrag) && onChapterEdge != null && abs(dx) >= abs(dy) &&
                         (startedAtForwardEdge && forward > 0f || startedAtBackwardEdge && forward < 0f)
                     ) {
                         chapterEdgeActive = true
                         return true
                     }
                     // 禁用滑动翻页只拦真实手势；自动翻页的合成拖拽是显式用户选项，放行
-                    if (!swipeEnabled && !syntheticDrag) return true
+                    if (!swipeEnabled && !customPageDrag && !syntheticDrag) return true
                     if (com.example.BuildConfig.DEBUG) {
                         android.util.Log.d("CURLDBG", "drag start -> forward to harism (moved=$moved anim=${isAnimating()} idx=${currentIndex})")
                     }
                     // Direction follows the swipe, regardless of which side was touched.
-                    dragFromLeft = dx > 0f
+                    dragFromLeft = if (abs(dx) > slopPx) dx > 0f else downX < width / 2f
                     curlStartX = bookX(if (dragFromLeft) 0.03f else 0.97f)
                     dispatchSynthetic(MotionEvent.ACTION_DOWN, curlStartX, downY, downTime)
                     dragForwarded = true
@@ -429,15 +432,17 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                 velocityTracker?.addMovement(me)
                 velocityTracker?.computeCurrentVelocity(1000)
                 val releaseVelocity = velocityTracker?.xVelocity ?: 0f
+                val releaseVelocityY = velocityTracker?.yVelocity ?: 0f
+                val releaseZone = touchZones?.let { TouchZone.hit(it, downX / width.coerceAtLeast(1), downY / height.coerceAtLeast(1)) }
                 velocityTracker?.recycle()
                 velocityTracker = null
                 view.removeCallbacks(longPressRunnable)
-                if (touchZones != null && touchTravel > slopPx && !longPressFired && !doubleTapActive) {
+                if (touchZones != null && releaseZone?.swipe != SwipeAction.PAGE && touchTravel > slopPx && !longPressFired && !doubleTapActive) {
                     if (me.actionMasked == MotionEvent.ACTION_UP) {
                         val zone = TouchZone.hit(touchZones.orEmpty(), downX / width.coerceAtLeast(1), downY / height.coerceAtLeast(1))
                         val dx = me.x - downX; val dy = me.y - downY
                         val threshold = zone?.distanceDp?.times(resources.displayMetrics.density) ?: comicTurnTravel(width.toFloat(), resources.displayMetrics.density)
-                        if (abs(dx) >= threshold && abs(dx) > abs(dy) * 1.1f) {
+                        if (hypot(dx, dy) >= threshold) {
                             when (zone?.swipe) {
                                 SwipeAction.PAGE -> onZoneAction(if ((dx < 0).xor(isRightToLeftZones)) TouchAction.NEXT else TouchAction.PREVIOUS)
                                 SwipeAction.CONTROLS -> onZoneAction(TouchAction.CONTROLS)
@@ -495,10 +500,14 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                 }
                 val intent = if (me.actionMasked == MotionEvent.ACTION_UP)
                     comicTurnIntent(me.x - downX, releaseVelocity, width.toFloat(), resources.displayMetrics.density) else 0
-                val commit = intent == if (dragFromLeft) 1 else -1
-                setReleaseCommit(commit)
+                val nativeCommit = intent == if (dragFromLeft) 1 else -1
+                // Keep the application's existing slow settlement, not a replacement engine default.
+                setReleaseCommit(if (touchZones == null) nativeCommit else
+                    com.example.ui.reader.fastPageCommit(releaseZone?.distanceDp,
+                        Offset(me.x - downX, me.y - downY), Offset(releaseVelocity, releaseVelocityY),
+                        resources.displayMetrics.density, nativeCommit))
                 val releaseX = curlStartX + (me.x - downX)
-                dispatchSynthetic(MotionEvent.ACTION_UP, releaseX, downY + (me.y - downY), downTime)
+                dispatchSynthetic(me.actionMasked, releaseX, downY + (me.y - downY), downTime)
                 dragForwarded = false
                 return true
             }

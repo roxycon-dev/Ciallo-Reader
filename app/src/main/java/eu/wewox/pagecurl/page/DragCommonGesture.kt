@@ -30,6 +30,7 @@ internal data class DragConfig(
     val isEnabled: () -> Boolean,
     val isDragSucceed: (Offset, Offset) -> Boolean,
     val onChange: () -> Unit,
+    val release: ((Offset, Offset, Offset, Boolean) -> Boolean)? = null,
 )
 
 internal suspend fun PointerInputScope.detectCurlGestures(
@@ -44,12 +45,16 @@ internal suspend fun PointerInputScope.detectCurlGestures(
     var startOffset: Offset = Offset.Zero
 
     detectCustomDragGestures(
-        onDragStart = { start, end ->
+        onDragStart = { start, end, downTime, moveTime ->
+            velocityTracker.resetTracking()
+            velocityTracker.addPosition(downTime, start)
+            velocityTracker.addPosition(moveTime, end)
             startOffset = start
             config = getConfig(start, end)
             config != null
         },
-        onDragEnd = { endOffset, complete ->
+        onDragEnd = { endOffset, endTime, complete ->
+            velocityTracker.addPosition(endTime, endOffset)
             config?.apply {
                 val velocity = velocityTracker.calculateVelocity()
                 val decay = splineBasedDecay<Offset>(this@detectCurlGestures)
@@ -64,8 +69,10 @@ internal suspend fun PointerInputScope.detectCurlGestures(
                     )
                 }
 
+                val nativeCommit = isDragSucceed(startOffset, flingEndOffset)
+                val commit = release?.invoke(startOffset, endOffset, Offset(velocity.x, velocity.y), nativeCommit) ?: nativeCommit
                 scope.launch {
-                    if (complete && isDragSucceed(startOffset, flingEndOffset)) {
+                    if (complete && commit) {
                         try {
                             edge.animateTo(end)
                         } finally {
@@ -85,10 +92,13 @@ internal suspend fun PointerInputScope.detectCurlGestures(
         onDrag = { change, _ ->
             config?.apply {
                 if (!isEnabled()) {
-                    throw CancellationException()
+                    val interrupted = this
+                    config = null
+                    scope.launch { interrupted.edge.animateTo(interrupted.start) }
+                    return@apply
                 }
 
-                velocityTracker.addPosition(System.currentTimeMillis(), change.position)
+                velocityTracker.addPosition(change.uptimeMillis, change.position)
 
                 scope.launch {
                     val target = newEdgeCreator.createNew(size, startOffset, change.position)
@@ -100,8 +110,8 @@ internal suspend fun PointerInputScope.detectCurlGestures(
 }
 
 internal suspend fun PointerInputScope.detectCustomDragGestures(
-    onDragStart: (Offset, Offset) -> Boolean,
-    onDragEnd: (Offset, Boolean) -> Unit,
+    onDragStart: (Offset, Offset, Long, Long) -> Boolean,
+    onDragEnd: (Offset, Long, Boolean) -> Unit,
     onDrag: (change: PointerInputChange, dragAmount: Offset) -> Unit
 ) {
     awaitEachGesture {
@@ -115,16 +125,22 @@ internal suspend fun PointerInputScope.detectCustomDragGestures(
             }
         } while (drag != null && !drag.isConsumed)
         if (drag != null) {
-            if (!onDragStart.invoke(down.position, drag.position)) {
+            if (!onDragStart.invoke(down.position, drag.position, down.uptimeMillis, drag.uptimeMillis)) {
                 return@awaitEachGesture
             }
             onDrag(drag, overSlop)
-            val completed = drag(drag.id) {
-                drag = it
-                onDrag(it, it.positionChange())
-                it.consume()
+            var last = drag
+            var completed = false
+            while (true) {
+                val event = awaitPointerEvent()
+                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                last = change
+                if (event.changes.count { it.pressed } > 1 || change.isConsumed) break
+                if (!change.pressed) { completed = true; change.consume(); break }
+                onDrag(change, change.positionChange())
+                change.consume()
             }
-            onDragEnd(drag?.position ?: down.position, completed)
+            onDragEnd(last?.position ?: down.position, last?.uptimeMillis ?: down.uptimeMillis, completed)
         }
     }
 }

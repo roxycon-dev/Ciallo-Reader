@@ -53,6 +53,7 @@ fun TouchZoneEditor(
     resetZones: List<TouchZone> = defaults, onRestoreDefault: () -> Unit = {},
     viewportInWindow: Rect? = null,
     onPreview: (List<TouchZone>?, Boolean) -> Unit = { _, _ -> },
+    reverse: Boolean = false,
 ) {
     var draft by remember { mutableStateOf(zones) }
     var resetRequested by remember { mutableStateOf(false) }
@@ -179,7 +180,7 @@ fun TouchZoneEditor(
                                         if (old != null) {
                                             val dx = dragTotal.x / size.width; val dy = dragTotal.y / size.height
                                             if (measuring) {
-                                                sample = abs(if (vertical) dragTotal.y else dragTotal.x) / pixelDensity
+                                                sample = dragTotal.getDistance() / pixelDensity
                                             } else if (handle == 4) {
                                                 val amount = if (vertical) dy * viewportHeight else dx * viewportWidth
                                                 currentEdit(old.copy(distanceDp = ((old.distanceDp ?: defaultDistanceDp) + amount * 2f).coerceIn(12f, 360f)))
@@ -200,8 +201,7 @@ fun TouchZoneEditor(
                                     },
                                     onDragEnd = {
                                         val old = grab
-                                        if (measuring && !multiPointer && old != null && sample >= 12f &&
-                                            (if (vertical) abs(dragTotal.y) > abs(dragTotal.x) * 1.1f else abs(dragTotal.x) > abs(dragTotal.y) * 1.1f)) {
+                                        if (measuring && !multiPointer && old != null && sample >= 12f) {
                                             currentEdit(old.copy(distanceDp = sample.coerceIn(12f, 360f)))
                                             calibrating = false; completed = true
                                             if (hapticsEnabled) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
@@ -213,7 +213,7 @@ fun TouchZoneEditor(
                             })
 
                 if (selected?.swipe == SwipeAction.PAGE) {
-                    SwipeCalibrationArt(selected, range, vertical, viewportWidth, viewportHeight, calibrating, completed, sample)
+                    SwipeCalibrationArt(selected, range, vertical, viewportWidth, viewportHeight, calibrating, completed, sample, reverse)
                 }
             }
         }
@@ -261,8 +261,9 @@ fun TouchZoneEditor(
                             edit(selected.copy(swipe = it)); if (it == SwipeAction.PAGE) startCalibration() else calibrating = false
                         }
                         if (selected.swipe == SwipeAction.PAGE) {
-                            Text(if (selected.distanceDp == null) "沿用原有阅读器判定 · 校准后使用精确距离" else "触发距离 ${range.roundToInt()} dp", color = colors.primary, fontSize = DesignTokens.TypeCaption)
+                            Text(if (selected.distanceDp == null) "沿用原有阅读器判定 · 校准快速完成距离" else "触发距离 ${range.roundToInt()} dp", color = colors.primary, fontSize = DesignTokens.TypeCaption)
                             LiquidSlider(range.coerceIn(12f, 360f), { edit(selected.copy(distanceDp = it)); completed = false }, valueRange = 12f..360f, formatLabel = { "${it.roundToInt()} dp" })
+                            Text("仅调整快速翻页的完成距离；慢速拖角、卷起与回退保持原样，滑动不限方向。", fontSize = DesignTokens.TypeCaption, color = colors.onSurfaceVariant)
                             PullOutTextButton(onClick = { startCalibration() }) { Icon(Icons.Default.Gesture, null); Text("重新校准") }
                         }
                     }
@@ -290,17 +291,23 @@ private fun <T> ActionChoices(items: List<T>, selected: T, label: (T) -> String,
 /** Decoration only: never intercepts the calibration pointer stream. */
 @Composable
 private fun SwipeCalibrationArt(zone: TouchZone, distance: Float, vertical: Boolean, viewportW: Float, viewportH: Float,
-                                guiding: Boolean, complete: Boolean, sample: Float) {
+                                guiding: Boolean, complete: Boolean, sample: Float, reverse: Boolean) {
     val accent = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
     val surface = MaterialTheme.colorScheme.surface
     val reduce = com.example.ui.feedback.LocalReduceMotion.current
     val phase = remember { Animatable(0f) }
+    val bidirectional = zone.tap != TouchAction.PREVIOUS && zone.tap != TouchAction.NEXT
+    var demoAction by remember(zone.id, zone.tap) { mutableStateOf(if (zone.tap == TouchAction.PREVIOUS) TouchAction.PREVIOUS else TouchAction.NEXT) }
+    val labelPaint = remember { android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { textAlign = android.graphics.Paint.Align.CENTER } }
     val flash = remember { Animatable(0f) }
     LaunchedEffect(complete) { if (complete) { flash.snapTo(1f); flash.animateTo(0f, spring(.85f, 180f)) } }
     val animatedDistance by animateFloatAsState(distance, spring(.86f, 580f), label = "swipeRangeLength")
-    LaunchedEffect(guiding, reduce) {
-        if (guiding && !reduce) while (true) { phase.snapTo(0f); phase.animateTo(1f, tween(2200, easing = LinearEasing)); kotlinx.coroutines.delay(450) }
+    LaunchedEffect(guiding, reduce, zone.id, zone.tap, reverse) {
+        if (guiding && !reduce) while (true) {
+            phase.snapTo(0f); phase.animateTo(1f, tween(2200, easing = LinearEasing)); kotlinx.coroutines.delay(450)
+            if (bidirectional) demoAction = if (demoAction == TouchAction.NEXT) TouchAction.PREVIOUS else TouchAction.NEXT
+        }
     }
     val success by animateFloatAsState(if (complete) 1f else 0f, spring(.55f, 280f), label = "calibrationSuccess")
     Canvas(Modifier.fillMaxSize()) {
@@ -320,25 +327,47 @@ private fun SwipeCalibrationArt(zone: TouchZone, distance: Float, vertical: Bool
                 drawCircle(accent.copy(alpha = flash.value * .65f), 1.5.dp.toPx(), end + Offset(cos(angle), sin(angle)) * radius) }
         }
         if (success > .01f) drawCircle(secondary.copy(alpha = .16f * (1 - (success - 1).coerceAtLeast(0f))), (18 * success).dp.toPx(), end, style = Stroke(DesignTokens.CardElevation.toPx()))
+        // Opposite physical directions, including RTL. These are examples, never a gesture constraint.
+        val normal = if (vertical) Offset(1f, 0f) else Offset(0f, -1f)
+        val actions = if (bidirectional) listOf(TouchAction.PREVIOUS, TouchAction.NEXT) else listOf(zone.tap)
+        actions.forEachIndexed { index, action ->
+            val sign = swipeGuideSign(action, reverse)
+            val lane = center + normal * ((if (index == 0) 22f else -22f).dp.toPx())
+            val head = lane + axis * (sign * length / 2f)
+            val tail = lane - axis * (sign * length / 2f)
+            val guide = Path().apply {
+                moveTo(tail.x, tail.y); quadraticTo(center.x + normal.x * 9.dp.toPx(), center.y + normal.y * 9.dp.toPx(), head.x, head.y)
+            }
+            drawPath(guide, accent.copy(alpha = .5f), style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round,
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 5.dp.toPx()))))
+            drawLine(accent, head, head - axis * (sign * 7.dp.toPx()) + normal * 4.dp.toPx(), 1.5.dp.toPx(), StrokeCap.Round)
+            drawLine(accent, head, head - axis * (sign * 7.dp.toPx()) - normal * 4.dp.toPx(), 1.5.dp.toPx(), StrokeCap.Round)
+            labelPaint.color = accent.toArgb(); labelPaint.textSize = 11.sp.toPx()
+            drawContext.canvas.nativeCanvas.drawText(action.label, lane.x + normal.x * 12.dp.toPx(),
+                lane.y + normal.y * 12.dp.toPx(), labelPaint)
+        }
         if (guiding) {
+            val direction = swipeGuideSign(demoAction, reverse)
+            val demoAxis = axis * direction
+            val demoStart = center - demoAxis * (length / 2)
             val p = phase.value
             val travel = ((p - .12f) / .65f).coerceIn(0f, 1f).let { it * it * (3 - 2 * it) }
-            val tip = start + axis * (length * travel)
+            val tip = demoStart + demoAxis * (length * travel)
             val normal = if (vertical) Offset(1f, 0f) else Offset(0f, -1f)
             val path = Path().apply {
-                moveTo(start.x, start.y)
-                val c1 = start + axis * length * .32f + normal * 7.dp.toPx()
-                val c2 = tip - axis * length * .15f + normal * 5.dp.toPx()
+                moveTo(demoStart.x, demoStart.y)
+                val c1 = demoStart + demoAxis * length * .32f + normal * 7.dp.toPx()
+                val c2 = tip - demoAxis * length * .15f + normal * 5.dp.toPx()
                 cubicTo(c1.x, c1.y, c2.x, c2.y, tip.x, tip.y)
             }
-            drawPath(path, Brush.linearGradient(listOf(secondary.copy(alpha = .25f), accent), start, tip + Offset(1f, 1f)),
+            drawPath(path, Brush.linearGradient(listOf(secondary.copy(alpha = .25f), accent), demoStart, tip + Offset(1f, 1f)),
                 style = Stroke(DesignTokens.CardElevation.toPx(), cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(DesignTokens.SpaceXs.toPx(), 5.dp.toPx()), -p * 60.dp.toPx())))
             val alpha = (sin(PI * p).toFloat() * 1.6f).coerceIn(0f, 1f)
             drawCircle(accent.copy(alpha = .10f * alpha), DesignTokens.SpaceLoose.toPx(), tip)
             drawRoundRect(surface.copy(alpha = .9f * alpha), tip - Offset(5.dp.toPx(), DesignTokens.CardElevation.toPx()), Size(DesignTokens.SpaceMd.toPx(), 26.dp.toPx()), CornerRadius(7.dp.toPx()))
             drawCircle(Color.White.copy(alpha = alpha * .8f), DesignTokens.SpaceXs.toPx(), tip + Offset(DesignTokens.Hairline.toPx(), DesignTokens.SpaceXs.toPx()))
             drawCircle(accent.copy(alpha = .7f * alpha), DesignTokens.SpaceCompact.toPx(), tip, style = Stroke(DesignTokens.Hairline.toPx()))
-            if (sample > 0) drawLine(secondary, start, start + axis * (sample * axisScale), DesignTokens.CardElevation.toPx(), StrokeCap.Round)
+            if (sample > 0) drawLine(secondary, demoStart, demoStart + demoAxis * (sample * axisScale), DesignTokens.CardElevation.toPx(), StrokeCap.Round)
         }
     }
 }

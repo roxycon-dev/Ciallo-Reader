@@ -1,0 +1,42 @@
+{
+  "finalTouchPolicy": [
+    {
+      "name": "com.example.ui.TouchZoneSystemTest",
+      "tests": "18",
+      "skipped": "0",
+      "failures": "0",
+      "errors": "0",
+      "timestamp": "2026-10-20T18:15:36.086Z",
+      "hostname": "DESKTOP-PIFGGNS",
+      "time": "3.526"
+    }
+  ],
+  "modalLifecycle": {
+    "name": "com.example.ui.OverlayPolishTest",
+    "tests": "3",
+    "skipped": "0",
+    "failures": "0",
+    "errors": "0",
+    "timestamp": "2026-10-20T17:06:34.423Z",
+    "hostname": "DESKTOP-PIFGGNS",
+    "time": "8.402"
+  },
+  "earlierFocusedPaperAndSlider": {
+    "tests": 17,
+    "failures": 0,
+    "phase": "earlier focused build; mesh and source math unchanged"
+  },
+  "device": {
+    "status": "not_completed",
+    "reason": "Owned emulator failed Android startup twice; window/settings/package services unavailable. No new device performance or FPS claim.",
+    "newNativeCornerTest": "compiled, not executed"
+  },
+  "fullSuiteRepeated": false,
+  "uiGate": "passed without baseline changes",
+  "sourceGuideCoverage": {
+    "sources": 721,
+    "missing": 0,
+    "stale": 3,
+    "staleExplicitlyMarkedDeleted": true
+  }
+}

@@ -1,0 +1,10 @@
+gradle.projectsEvaluated {
+    def app = gradle.rootProject.project(':app')
+    app.tasks.named('compileReleaseUnitTestKotlin').configure {
+        // Unit-test compilation only. These hosts are never added to production or the APK.
+        source(app.files(
+            'src/debug/java/com/example/ui/comic/ComicReaderTestActivity.kt',
+            'src/debug/java/com/example/ui/comic/ReaderPolishProbeActivity.kt'
+        ))
+    }
+}

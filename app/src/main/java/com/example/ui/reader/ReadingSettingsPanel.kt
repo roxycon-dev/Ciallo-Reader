@@ -49,7 +49,7 @@ internal fun ReadingSettingsPanel(
     val reduceMotion = LocalReduceMotion.current
     val close = com.example.ui.components.rememberPaperClose(visibility, onDismiss)
     PullOutDialog(
-        animateContent = false,
+        animateContent = false, lifecycleState = visibility,
         onDismissRequest = { close {} },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
@@ -58,9 +58,9 @@ internal fun ReadingSettingsPanel(
         BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
             val wide = maxWidth >= 600.dp || maxWidth > maxHeight
             val shape = RoundedCornerShape(DesignTokens.RadiusOverlay)
-            val scrim by androidx.compose.animation.core.animateFloatAsState(
-                if (visibility.targetState) com.example.ui.components.PullOutConfig.SCRIM else 0f, com.example.ui.components.PullOutConfig.spring(visibility.targetState), label = "readingSettingsScrim")
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = scrim.coerceIn(0f, .35f))).pullOutClickable { close {} })
+            com.example.ui.components.ScrimEntrance(visibility = visibility) {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = com.example.ui.components.PullOutConfig.SCRIM)).pullOutClickable { close {} })
+            }
             PullOutVisibility(
                 visibleState = visibility,
                 modifier = Modifier.align(if (wide) Alignment.CenterEnd else Alignment.BottomCenter)

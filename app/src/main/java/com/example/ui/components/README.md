@@ -26,3 +26,7 @@
 ## 1.4.11 公共交互
 
 所有滑动条使用 `LiquidSlider.kt`；弹层通过 `PullOutMotion.kt`、`PullOutHosts.kt` 和 `PullOutButtons.kt` 自动捕获触发来源并共享网格动效。参数集中于 `PullOutConfig` / `LiquidSliderConfig`，业务界面不单独定义动效或滑条样式。
+
+## 1.4.12 纸面性能与时序
+
+`PullOutMotion.kt` 负责来源与唯一物理生命周期，`PullOutRender.kt` 负责硬件网格和限幅的后台纹理准备；所有宿主继续共用封装。不得重新引入每帧软件位图、逐帧整棵面板重组或独立的关闭计时器。普通按钮仅登记坐标；关闭后先移除旧宿主再运行后续动作。

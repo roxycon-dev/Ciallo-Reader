@@ -104,6 +104,7 @@ fun PageTurnContainer(
     paperColor: Color = Color(0xFFF5F0E6),
     modifier: Modifier = Modifier
 ) {
+    val touchDensity = androidx.compose.ui.platform.LocalDensity.current.density
     val minimalMode = com.example.ui.components.LocalRenderQuality.current.minimal
     val minimalDistance = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() }
     var touchOrigin by remember { mutableStateOf(Offset.Zero) }
@@ -175,7 +176,7 @@ fun PageTurnContainer(
                     } finally { withContext(NonCancellable) { dragOffset.snapTo(0f); dragOffsetY.snapTo(0f) } }
                 }
             } else touchBinding.onAction(action)
-        }, enabled = pageTurnMode != PageTurnType.SCROLL.id, menuVisible = menuVisible, imageTap = { onImageTapAt?.invoke(it + touchOrigin) == true }, onLongPress = onLongPressCenter)
+        }, enabled = pageTurnMode != PageTurnType.SCROLL.id, menuVisible = menuVisible, imageTap = { onImageTapAt?.invoke(it + touchOrigin) == true }, onLongPress = onLongPressCenter, nativePageDrag = true)
 
     // Reset offsets when pageKey changes (page turned)
     LaunchedEffect(pageKey) {
@@ -193,7 +194,6 @@ fun PageTurnContainer(
             .clipToBounds()
             .onGloballyPositioned { containerOffsetInWindow = it.positionInWindow() }
             .pointerInput(pageTurnMode, touchBinding.zones) {
-                if (touchBinding.zones != null) return@pointerInput
                 // 滚动阅读模式：手势完全交给阅读器自身的滚动容器处理，
                 // 这里不再拦截点击/拖拽，避免“下滑误触菜单/误切章节”。
                 if (mode == PageTurnType.SCROLL) {
@@ -206,6 +206,12 @@ fun PageTurnContainer(
                 var turnJob: kotlinx.coroutines.Job? = null
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
+                    val customZones = touchBinding.zones
+                    val zone = customZones?.let { com.example.ui.reader.TouchZone.hit(it, down.position.x / size.width, down.position.y / size.height) }
+                    if (customZones != null && (zone?.swipe != com.example.ui.reader.SwipeAction.PAGE || latestMenuVisible)) return@awaitEachGesture
+                    val velocity = androidx.compose.ui.input.pointer.util.VelocityTracker().apply { addPosition(down.uptimeMillis, down.position) }
+                    var releasePosition = down.position
+                    var cancelled = false
                     touchDownY = down.position.y
                     var totalX = 0f
                     var totalY = 0f
@@ -217,7 +223,7 @@ fun PageTurnContainer(
                     val touchSlop = viewConfiguration.touchSlop
                     val screenWidth = size.width.toFloat()
                     // 长按触发区扩展到整个页面：任意位置静置 1s 均可唤出串珠快速翻页
-                    var longPressArmed = true
+                    var longPressArmed = customZones == null
                     var lastUptime = down.uptimeMillis
                     val longPressDeadline = down.uptimeMillis + 1000L
 
@@ -249,6 +255,9 @@ fun PageTurnContainer(
 
                         lastUptime = maxOf(lastUptime, event.changes.maxOf { it.uptimeMillis })
                         val currentChange = event.changes.firstOrNull { it.id == down.id } ?: break
+                        releasePosition = currentChange.position
+                        velocity.addPosition(currentChange.uptimeMillis, currentChange.position)
+                        if (event.changes.count { it.pressed } > 1 || currentChange.isConsumed) { cancelled = true; break }
                         if (!currentChange.pressed) {
                             // up 已被子层（正文内嵌图片的 clickable 等）消费：
                             // 该次触摸属于内容交互（如打开图片全屏），不再分派翻页/菜单
@@ -263,7 +272,9 @@ fun PageTurnContainer(
                         if (!isDrag) {
                             if (abs(totalX) > touchSlop || abs(totalY) > touchSlop) {
                                 isDrag = true
-                                if (totalY > touchSlop && totalY > abs(totalX) * 1.1f) {
+                                if (customZones != null) {
+                                    activeMode = 1 // Free 2D motion; keep the native surface following the finger.
+                                } else if (totalY > touchSlop && totalY > abs(totalX) * 1.1f) {
                                     activeMode = 2 // Pull-Down Bookmark
                                 } else if (abs(totalX) > touchSlop) {
                                     if (mode != PageTurnType.SCROLL) {
@@ -310,7 +321,10 @@ fun PageTurnContainer(
                                 dragOffsetY.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
                             }
 
-                            if (abs(currentVal) > threshold) {
+                            val releaseVelocity = velocity.calculateVelocity()
+                            val commit = !cancelled && com.example.ui.reader.fastPageCommit(zone?.distanceDp,
+                                releasePosition - down.position, Offset(releaseVelocity.x, releaseVelocity.y), touchDensity, abs(currentVal) > threshold)
+                            if (commit) {
                                 turnJob = coroutineScope.launch {
                                     try {
                                         val target = if (currentVal < 0) -screenWidth else screenWidth
@@ -333,7 +347,7 @@ fun PageTurnContainer(
                                 }
                             }
                         }
-                    } else if (!latestMenuVisible && !longPressFired) {
+                    } else if (customZones == null && !latestMenuVisible && !longPressFired && !cancelled) {
                         // 插图命中优先（按屏幕矩形注册表，不依赖事件消费——
                         // 与事件 pass 顺序无关，翻页引擎无关）：命中即打开全屏
                         val imageHandled = latestOnImageTapAt

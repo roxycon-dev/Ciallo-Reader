@@ -34,6 +34,7 @@ fun Modifier.touchZoneGestures(
     imageTap: ((Offset) -> Boolean)? = null,
     onLongPress: (() -> Unit)? = null,
     legacyPageCurl: Boolean = false,
+    nativePageDrag: Boolean = legacyPageCurl,
 ): Modifier = composed {
     var windowOrigin by remember { mutableStateOf(Offset.Zero) }
     val currentAction by rememberUpdatedState(onAction)
@@ -50,10 +51,11 @@ fun Modifier.touchZoneGestures(
             val threshold = zone?.distanceDp?.dp?.toPx() ?: if (legacyPageCurl)
                 kotlin.math.abs(down.position.x - size.width / 2f).coerceAtLeast(viewConfiguration.touchSlop)
                 else defaultDistance(if (vertical) size.height.toFloat() else size.width.toFloat())
+            val handToNative = nativePageDrag && zone?.swipe == SwipeAction.PAGE && !currentMenu
             val decision = TouchGestureDecision(viewConfiguration.touchSlop, threshold)
             var up = down
             var owned = false
-            var lastPosition = down.position
+            val velocityTracker = androidx.compose.ui.input.pointer.util.VelocityTracker().apply { addPosition(down.uptimeMillis, down.position) }
             var holdFired = false
             val holdJob = if (taps && currentHold != null) scope.launch {
                 delay(1000)
@@ -65,11 +67,11 @@ fun Modifier.touchZoneGestures(
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                lastPosition = change.position
+                velocityTracker.addPosition(change.uptimeMillis, change.position)
                 val delta = change.position - down.position
                 decision.update(delta.x, delta.y, event.changes.count { it.pressed }.coerceAtLeast(1), change.isConsumed && !owned)
                 if (decision.cancelled || currentZoom()) break
-                if (decision.moved) {
+                if (decision.moved && !handToNative) {
                     // Consume even short/disabled swipes: underlying pager must not bypass the configured threshold.
                     if (taps || if (vertical) kotlin.math.abs(delta.y) > kotlin.math.abs(delta.x) else kotlin.math.abs(delta.x) > kotlin.math.abs(delta.y)) {
                         change.consume(); owned = true
@@ -86,12 +88,17 @@ fun Modifier.touchZoneGestures(
                 else if (up.uptimeMillis - down.uptimeMillis >= 1000 && currentHold != null) currentHold?.invoke()
                 else if (currentMenu) currentAction(TouchAction.CONTROLS)
                 else if (currentImage?.invoke(down.position) != true) currentAction(zone?.tap ?: TouchAction.NONE)
-            } else if (decision.isSwipe(vertical) && !currentMenu && (!legacyPageCurl || zone?.distanceDp != null ||
-                down.position.x < size.width / 2f && lastPosition.x > size.width / 2f ||
-                down.position.x > size.width / 2f && lastPosition.x < size.width / 2f)) {
+            } else if (decision.moved && !currentMenu && when (zone?.swipe) {
+                SwipeAction.PAGE -> {
+                    val velocity = velocityTracker.calculateVelocity()
+                    fastPageCommit(zone.distanceDp, Offset(decision.dx, decision.dy), Offset(velocity.x, velocity.y), density,
+                        Offset(decision.dx, decision.dy).getDistance() >= defaultDistance(if (vertical) size.height.toFloat() else size.width.toFloat()))
+                }
+                else -> decision.isSwipe(vertical)
+            }) {
                 com.example.ui.components.recordPaperTouch(down.position + windowOrigin, density)
                 when (zone?.swipe) {
-                    SwipeAction.PAGE -> {
+                    SwipeAction.PAGE -> if (!handToNative) {
                         val negative = (if (vertical) decision.dy else decision.dx) < 0
                         currentAction(if (negative.xor(reverse)) TouchAction.NEXT else TouchAction.PREVIOUS)
                     }

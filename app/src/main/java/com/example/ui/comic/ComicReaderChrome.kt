@@ -277,12 +277,10 @@ fun ComicReaderChrome(
 
     var displayedPanel by remember { mutableStateOf(panel) }
     if (panel != ComicPanel.NONE) displayedPanel = panel
-    // 面板遮罩（与面板同节奏淡入淡出）
-    com.example.ui.components.PullOutScrim(
-        visible = panel != ComicPanel.NONE,
-        enter = fadeIn(tween(if (reduceMotion) 0 else ENTER_MS)),
-        exit = fadeOut(tween(if (reduceMotion) 0 else EXIT_MS)),
-    ) {
+    val panelVisibility = remember { androidx.compose.animation.core.MutableTransitionState(false) }
+    panelVisibility.targetState = panel != ComicPanel.NONE
+    // Scrim and paper use exactly one retained lifecycle and physical progress.
+    com.example.ui.components.ScrimEntrance(visibility = panelVisibility) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -292,7 +290,7 @@ fun ComicReaderChrome(
     }
 
     PullOutVisibility(
-        visible = panel != ComicPanel.NONE,
+        visibleState = panelVisibility,
         modifier = Modifier.fillMaxSize(),
     ) {
         CompositionLocalProvider(LocalReadingGlass provides ReadingGlassStyle(panelGlassBackdrop, Color(0xFF232329), TextPrimary)) {

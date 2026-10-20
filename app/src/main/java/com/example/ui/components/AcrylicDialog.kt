@@ -120,7 +120,7 @@ fun AcrylicDialog(
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val close = overlayDismiss(visibility, onDismissRequest)
     PullOutDialog(
-        animateContent = false,
+        animateContent = false, lifecycleState = visibility,
         onDismissRequest = { close {} },
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
     ) {
@@ -187,7 +187,7 @@ fun AcrylicBottomOverlay(
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val close = overlayDismiss(visibility, onDismissRequest)
     PullOutDialog(
-        animateContent = false,
+        animateContent = false, lifecycleState = visibility,
         onDismissRequest = { close {} },
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false, decorFitsSystemWindows = !fitAvailableHeight)
     ) {

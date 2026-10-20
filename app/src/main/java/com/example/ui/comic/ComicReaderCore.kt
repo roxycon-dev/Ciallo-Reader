@@ -932,7 +932,7 @@ fun ComicReaderCore(
         }
         val original = ComicReaderConfig()
         val axis = (if (verticalMode) touchViewport?.height else touchViewport?.width)?.div(context.resources.displayMetrics.density) ?: 400f
-        com.example.ui.reader.TouchZoneEditor(config.touchZones, defaults(config), comicTurnTravel(axis, 1f), comic = true, vertical = verticalMode,
+        com.example.ui.reader.TouchZoneEditor(config.touchZones, defaults(config), comicTurnTravel(axis, 1f), comic = true, vertical = verticalMode, reverse = !verticalMode && config.direction == ComicDirection.RTL,
             viewportInWindow = touchViewport, resetZones = defaults(original),
             onPreview = { draft, active -> previewTouchZones = draft; previewTouchActive = active; controlsVisible = false; panel = ComicPanel.NONE },
             onSave = { zones -> persistConfig(config.copy(touchZones = zones), immediate = true) },

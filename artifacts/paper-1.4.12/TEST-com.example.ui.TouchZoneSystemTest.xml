@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ui.TouchZoneSystemTest" tests="18" skipped="0" failures="0" errors="0" timestamp="2026-10-20T18:15:36.086Z" hostname="DESKTOP-PIFGGNS" time="3.526">
+  <properties/>
+  <testcase name="novelSettingsSurviveAStoreRecreationAndRestoreRemovesTheOverride" classname="com.example.ui.TouchZoneSystemTest" time="3.062"/>
+  <testcase name="tapAndSwipeAreSeparate" classname="com.example.ui.TouchZoneSystemTest" time="0.027"/>
+  <testcase name="topmostRectangleBlocksBothBehaviorsWithoutFallThrough" classname="com.example.ui.TouchZoneSystemTest" time="0.042"/>
+  <testcase name="importedRectanglesAndThresholdsAreBounded" classname="com.example.ui.TouchZoneSystemTest" time="0.026"/>
+  <testcase name="legacyComicJsonDoesNotGainANewDefaultLayout" classname="com.example.ui.TouchZoneSystemTest" time="0.037"/>
+  <testcase name="forwardAndBackwardGuidesPointInOppositeDirectionsIncludingRtl" classname="com.example.ui.TouchZoneSystemTest" time="0.025"/>
+  <testcase name="pinchCancelsTheWholeGestureEvenAfterOneFingerLifts" classname="com.example.ui.TouchZoneSystemTest" time="0.024"/>
+  <testcase name="malformedPreferencesFallBackToLegacyAndEmptyIsIntentional" classname="com.example.ui.TouchZoneSystemTest" time="0.023"/>
+  <testcase name="noMovementCanOnlyBeAClick" classname="com.example.ui.TouchZoneSystemTest" time="0.02"/>
+  <testcase name="diagonalAndCornerMotionUsesTheFullTwoDimensionalDistance" classname="com.example.ui.TouchZoneSystemTest" time="0.021"/>
+  <testcase name="comicZonesRoundTripThroughPresetsAndPerBookConfig" classname="com.example.ui.TouchZoneSystemTest" time="0.043"/>
+  <testcase name="aConsumedChildGestureCannotAlsoTurnAPage" classname="com.example.ui.TouchZoneSystemTest" time="0.026"/>
+  <testcase name="shortSwipeNeverFallsBackToAClick" classname="com.example.ui.TouchZoneSystemTest" time="0.022"/>
+  <testcase name="restoreUsesTheOriginalRtlAndVerticalResolvers" classname="com.example.ui.TouchZoneSystemTest" time="0.035"/>
+  <testcase name="configuredThresholdHasAnInclusiveBoundary" classname="com.example.ui.TouchZoneSystemTest" time="0.022"/>
+  <testcase name="calibratedDistanceOnlyOverridesFastReleaseAndNeverSlowNativeCornerSettlement" classname="com.example.ui.TouchZoneSystemTest" time="0.021"/>
+  <testcase name="webtoonSwipeTurnsAViewportWithoutSkippingTheRestOfATallImage" classname="com.example.ui.TouchZoneSystemTest" time="0.024"/>
+  <testcase name="customTapCoordinatesArePhysicalAndDoNotFlipWithReadingDirection" classname="com.example.ui.TouchZoneSystemTest" time="0.023"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

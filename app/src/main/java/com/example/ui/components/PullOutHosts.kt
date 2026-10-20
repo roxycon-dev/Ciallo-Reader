@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.pointer.pointerInput
@@ -36,18 +37,49 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun rememberPaperClose(state: MutableTransitionState<Boolean>, dismiss: () -> Unit): ((() -> Unit) -> Unit) {
     val latest by rememberUpdatedState(dismiss)
+    val life = rememberPaperLifecycle(state)
     var pending by remember { mutableStateOf<(() -> Unit)?>(null) }
     var executing by remember { mutableStateOf(false) }
-    LaunchedEffect(state.isIdle, state.currentState, state.targetState) {
+    var wasOpen by remember { mutableStateOf(state.targetState) }
+    SideEffect { if (state.targetState) wasOpen = true }
+    LaunchedEffect(state.isIdle, state.currentState, state.targetState, life.closed, life.registered) {
         if (state.targetState) pending = null
-        if (state.isIdle && !state.currentState && !state.targetState) {
+        val complete = if (life.registered) life.closed else state.isIdle && !state.currentState
+        if (wasOpen && !state.targetState && complete) {
+            wasOpen = false
             val action = pending; pending = null
+            // Run follow-up only after the old window has actually left composition. Otherwise
+            // Compose batches null -> next into one update and reuses the old closed remember state.
+            var followedUp = false
+            val followUp: () -> Unit = {
+                if (!followedUp) {
+                    followedUp = true; executing = true
+                    try { action?.invoke() } finally { executing = false }
+                }
+            }
+            val awaitWindowDisposal = life.hostAttached
+            if (awaitWindowDisposal) life.afterDismiss = followUp
             executing = true
-            try { action?.invoke() } finally { executing = false }
-            latest()
+            try { latest() } finally { executing = false }
+            if (!awaitWindowDisposal) followUp()
         }
     }
     return { action -> if (executing) action() else if (state.targetState) { pending = action; state.targetState = false } }
+
+}
+
+@Composable
+private fun WindowPaperFinalizer(state: MutableTransitionState<Boolean>?) {
+    if (state == null) return
+    val life = rememberPaperLifecycle(state)
+    DisposableEffect(life) {
+        life.hostAttached = true
+        onDispose {
+            life.hostAttached = false
+            val action = life.afterDismiss; life.afterDismiss = null
+            action?.invoke()
+        }
+    }
 }
 
 /** Native window host, used by every app dialog. Existing composed surfaces may own their visibility. */
@@ -56,11 +88,15 @@ fun PullOutDialog(
     onDismissRequest: () -> Unit,
     properties: DialogProperties = DialogProperties(),
     animateContent: Boolean = true,
+    lifecycleState: MutableTransitionState<Boolean>? = null,
     content: @Composable () -> Unit,
 ) {
+    val inheritedOrigin = LocalPaperOrigin.current
+    val origin = remember { PullOutSources.claim() ?: inheritedOrigin?.returnSource() }
     if (!animateContent) {
         androidx.compose.ui.window.Dialog(onDismissRequest = onDismissRequest, properties = properties) {
-            DisablePlatformWindowMotion(); content()
+            DisablePlatformWindowMotion(); WindowPaperFinalizer(lifecycleState)
+            CompositionLocalProvider(LocalPaperOrigin provides origin, LocalPaperOwner provides null) { content() }
         }
         return
     }
@@ -70,12 +106,12 @@ fun PullOutDialog(
         dismissOnBackPress = properties.dismissOnBackPress, dismissOnClickOutside = false,
         securePolicy = properties.securePolicy, usePlatformDefaultWidth = false,
         decorFitsSystemWindows = properties.decorFitsSystemWindows)) {
-        DisablePlatformWindowMotion()
-        CompositionLocalProvider(LocalOverlayClose provides close) {
+        DisablePlatformWindowMotion(); WindowPaperFinalizer(state)
+        CompositionLocalProvider(LocalOverlayClose provides close, LocalPaperOrigin provides origin, LocalPaperOwner provides null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                val p by androidx.compose.animation.core.animateFloatAsState(if (state.targetState) 1f else 0f,
-                    PullOutConfig.spring(state.targetState), label = "paperDialogScrim")
-                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = PullOutConfig.SCRIM * p.coerceIn(0f, 1f)))
+                val life = rememberPaperLifecycle(state)
+                Box(Modifier.fillMaxSize().graphicsLayer { alpha = life.progress.coerceIn(0f, 1f) }
+                    .background(Color.Black.copy(alpha = PullOutConfig.SCRIM))
                     .clickable { if (properties.dismissOnClickOutside) close {} })
                 PullOutVisibility(state, if (properties.usePlatformDefaultWidth) Modifier.widthIn(max = 560.dp).fillMaxWidth(.9f) else Modifier) {
                     Box { content() }
@@ -113,13 +149,12 @@ fun PullOutBottomSheet(
     val close = rememberPaperClose(state, onDismissRequest)
     var dragTarget by remember { mutableFloatStateOf(1f) }
     var dragged by remember { mutableFloatStateOf(0f) }
-    PullOutDialog(onDismissRequest = { close {} }, animateContent = false,
+    PullOutDialog(onDismissRequest = { close {} }, animateContent = false, lifecycleState = state,
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false, decorFitsSystemWindows = false)) {
         CompositionLocalProvider(LocalOverlayClose provides close) {
             BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
-                val p by androidx.compose.animation.core.animateFloatAsState(if (state.targetState) 1f else 0f,
-                    PullOutConfig.spring(state.targetState), label = "paperScrim")
-                Box(Modifier.fillMaxSize().background(scrimColor.copy(alpha = scrimColor.alpha * p.coerceIn(0f, 1f)))
+                val life = rememberPaperLifecycle(state)
+                Box(Modifier.fillMaxSize().graphicsLayer { alpha = life.progress.coerceIn(0f, 1f) }.background(scrimColor)
                     .clickable { close {} })
                 CompositionLocalProvider(LocalPaperVisibleTarget provides dragTarget) {
                 PullOutVisibility(state, Modifier.align(Alignment.BottomCenter)) {
@@ -180,17 +215,19 @@ fun PullOutDropdownMenu(
     var dismissed by remember { mutableStateOf(false) }
     LaunchedEffect(expanded) { if (expanded) { source = PullOutSources.latest; dismissed = false; state.targetState = true } else state.targetState = false }
     val close = rememberPaperClose(state) { if (expanded && !dismissed) { dismissed = true; onDismissRequest() } }
-    if (expanded || state.currentState || state.targetState) {
-        PullOutDialog(onDismissRequest = { close {} }, animateContent = false,
+    val retainedLife = rememberPaperLifecycle(state)
+    if (expanded || retainedLife.retained || state.currentState || state.targetState) {
+        PullOutDialog(onDismissRequest = { close {} }, animateContent = false, lifecycleState = state,
             properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
+            val menuView = LocalView.current
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val margin = with(density) { DesignTokens.SpaceMd.roundToPx() }
                 val screenWidth = constraints.maxWidth
                 val screenHeight = constraints.maxHeight
-                val bounds = source?.bounds
-                val scrimProgress by androidx.compose.animation.core.animateFloatAsState(if (state.targetState) 1f else 0f,
-                    PullOutConfig.spring(state.targetState), label = "paperMenuScrim")
-                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = PullOutConfig.SCRIM * scrimProgress.coerceIn(0f, 1f))).clickable { close {} })
+                val bounds = source?.bounds?.translate(-menuView.paperWindowOffset())
+                val life = rememberPaperLifecycle(state)
+                Box(Modifier.fillMaxSize().graphicsLayer { alpha = life.progress.coerceIn(0f, 1f) }
+                    .background(Color.Black.copy(alpha = PullOutConfig.SCRIM)).clickable { close {} })
                 PullOutVisibility(state, Modifier.offset {
                     val x = ((bounds?.right?.toInt() ?: screenWidth / 2) - menuSize.width + with(density) { offset.x.roundToPx() })
                         .coerceIn(margin, (screenWidth - menuSize.width - margin).coerceAtLeast(margin))
@@ -219,7 +256,7 @@ internal val LocalPaperVisibleTarget = compositionLocalOf { 1f }
 fun PullOutInlineOverlay(onDismiss: () -> Unit, content: @Composable (dismiss: () -> Unit) -> Unit) {
     val state = remember { MutableTransitionState(false).apply { targetState = true } }
     val close = rememberPaperClose(state, onDismiss)
-    PullOutDialog(onDismissRequest = { close {} }, animateContent = false,
+    PullOutDialog(onDismissRequest = { close {} }, animateContent = false, lifecycleState = state,
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false, decorFitsSystemWindows = false)) {
         CompositionLocalProvider(LocalOverlayClose provides close, LocalPaperVisibility provides state) {
             content { close {} }
@@ -228,15 +265,17 @@ fun PullOutInlineOverlay(onDismiss: () -> Unit, content: @Composable (dismiss: (
 }
 
 @Composable
-fun paperClick(action: () -> Unit): () -> Unit {
+fun paperClick(action: () -> Unit): () -> Unit = paperClick(action, null)
+
+@Composable
+internal fun paperClick(action: () -> Unit, source: PullOutSource?): () -> Unit {
     val intercept = LocalPaperButtonAction.current
-    val scope = rememberCoroutineScope()
     return {
+        source?.let { PullOutSources.activate(it) }
         if (intercept != null) {
-            // Retain the menu item before its closing lifecycle can dispose it and open the next panel.
-            val source = PullOutSources.latest
-            scope.launch { source?.capture?.invoke() }
-            intercept(action)
+            val trigger = source ?: PullOutSources.latest
+            val returnOrigin = trigger?.parent?.returnSource() ?: trigger?.returnSource()
+            intercept { returnOrigin?.let { PullOutSources.activate(it) }; action() }
         } else action()
     }
 }

@@ -98,7 +98,7 @@ fun PageCurlReaderContainer(
     /**
      * 卷页背面的纸色：传阅读区当页背景色（ReaderScreen 的 `bgColor`）。
      *
-     * 此前这里写死 `Color(0xFFE8E4DC)` 且 `backPageContentAlpha = 0f`——
+     * 此前这里写死米黄色 `0xFFE8E4DC` 且 `backPageContentAlpha = 0f`——
      * pagecurl 引擎内部会用 `backPageColor.copy(alpha = 1 - backPageContentAlpha)`
      * 盖一层，alpha 取 0 就是 **100% 不透明纯色**：背面的镜像内容被完全糊掉，
      * 用户看到的"仿真翻页背面不真实，渲染成不透明纯色"正是这一行造成的。
@@ -142,8 +142,8 @@ fun PageCurlReaderContainer(
         shadowAlpha = 0.25f,
         shadowRadius = 18.dp,
         shadowOffset = androidx.compose.ui.unit.DpOffset((-6).dp, 2.dp),
-        dragForwardEnabled = !menuVisible && touchBinding.zones == null,
-        dragBackwardEnabled = !menuVisible && touchBinding.zones == null,
+        dragForwardEnabled = !menuVisible,
+        dragBackwardEnabled = !menuVisible,
         // 左右点按翻页改由本容器手势仲裁器（Initial pass）处理：
         // 1) 连点时可"即时翻页"（不与在飞的卷页动画互抢同一 Animatable）；
         // 2) 库内 tapGesture → next()/prev() 的 animateJob 僵尸 finally 会与
@@ -151,6 +151,13 @@ fun PageCurlReaderContainer(
         tapForwardEnabled = false,
         tapBackwardEnabled = false,
         tapCustomEnabled = touchBinding.zones == null,
+        dragStartAllowed = { point, size ->
+            touchBinding.zones?.let { TouchZone.hit(it, point.x / size.width, point.y / size.height)?.swipe == SwipeAction.PAGE } ?: true
+        },
+        dragRelease = { start, end, velocity, size, native ->
+            val zone = touchBinding.zones?.let { TouchZone.hit(it, start.x / size.width, start.y / size.height) }
+            com.example.ui.reader.fastPageCommit(zone?.distanceDp, end - start, velocity, touchDensity, native)
+        },
         dragInteraction = PageCurlConfig.StartEndDragInteraction(),
         tapInteraction = PageCurlConfig.TargetTapInteraction(),
         onCustomTap = { sz, pos ->

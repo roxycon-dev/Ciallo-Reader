@@ -52,6 +52,8 @@ public fun PageCurl(
                         enabledForward = updatedConfig.dragForwardEnabled && updatedCurrent < state.max - 1,
                         enabledBackward = updatedConfig.dragBackwardEnabled && updatedCurrent > 0,
                         scope = scope,
+                        startAllowed = updatedConfig.dragStartAllowed,
+                        release = updatedConfig.dragRelease,
                         onChange = { state.current = updatedCurrent + it }
                     )
 
@@ -63,6 +65,8 @@ public fun PageCurl(
                         enabledForward = updatedConfig.dragForwardEnabled && updatedCurrent < state.max - 1,
                         enabledBackward = updatedConfig.dragBackwardEnabled && updatedCurrent > 0,
                         scope = scope,
+                        startAllowed = updatedConfig.dragStartAllowed,
+                        release = updatedConfig.dragRelease,
                         onChange = { state.current = updatedCurrent + it }
                     )
         }

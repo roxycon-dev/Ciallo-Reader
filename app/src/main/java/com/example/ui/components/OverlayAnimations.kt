@@ -4,6 +4,8 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.graphicsLayer
 
 @Composable
 fun DialogEntrance(modifier: Modifier = Modifier, durationMillis: Int = 240,
@@ -21,9 +23,17 @@ fun BottomSheetEntrance(modifier: Modifier = Modifier, durationMillis: Int = 260
 @Composable
 fun ScrimEntrance(modifier: Modifier = Modifier, durationMillis: Int = 220,
     visibility: MutableTransitionState<Boolean>? = null, content: @Composable () -> Unit) {
-    val state = visibility ?: LocalPaperVisibility.current ?: remember { MutableTransitionState(false).apply { targetState = true } }
-    AnimatedVisibility(visibleState = state, modifier = modifier,
-        enter = fadeIn(PullOutConfig.spring(true)), exit = fadeOut(PullOutConfig.spring(false))) { content() }
+    val shared = visibility ?: LocalPaperVisibility.current
+    if (shared != null) {
+        val life = rememberPaperLifecycle(shared)
+        if (shared.targetState || life.retained || !life.closed) {
+            Box(modifier.graphicsLayer { alpha = life.progress.coerceIn(0f, 1f) }) { content() }
+        }
+    } else {
+        val state = remember { MutableTransitionState(false).apply { targetState = true } }
+        AnimatedVisibility(state, modifier, enter = fadeIn(PullOutConfig.spring(true)), exit = fadeOut(PullOutConfig.spring(false))) { content() }
+    }
+
 }
 
 @Composable

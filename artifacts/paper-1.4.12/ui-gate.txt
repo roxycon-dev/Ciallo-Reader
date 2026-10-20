@@ -1,0 +1,8 @@
+OK   fontLiteral    baseline=522    now=521    delta=-1
+OK   radiusLiteral  baseline=302    now=300    delta=-2
+OK   colorLiteral   baseline=298    now=298    delta=0
+OK   descNull       baseline=111    now=111    delta=0
+OK   dpLiteral      baseline=2572   now=2567   delta=-5
+OK   spLiteral      baseline=619    now=619    delta=0
+OK   contentType    baseline=31     now=47     delta=16
+ui-gate: pass.

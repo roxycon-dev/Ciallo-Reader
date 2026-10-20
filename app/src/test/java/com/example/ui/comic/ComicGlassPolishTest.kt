@@ -51,12 +51,12 @@ class ComicGlassPolishTest {
         } else emptyList()
         try {
             compose.setContent { MyApplicationTheme(darkTheme = true) {
-                val backdrop = rememberLayerBackdrop()
+                val screenBackdrop = rememberLayerBackdrop()
+                val backdrop = if (frozen) rememberComicGlassBackdrop(slots, config, loader, ComicBookState(), null, null) else screenBackdrop
                 Box(Modifier.fillMaxSize()) {
-                    Column(Modifier.fillMaxSize().layerBackdrop(backdrop).background(Brush.linearGradient(listOf(Color(0xFF4B586F),Color(0xFFAE9780))))) {
+                    Column(Modifier.fillMaxSize().layerBackdrop(screenBackdrop).background(Brush.linearGradient(listOf(Color(0xFF4B586F),Color(0xFFAE9780))))) {
                         repeat(12) { Text("光影与旅途   星海图书", fontSize = 28.sp, color = Color.White.copy(alpha = .7f), modifier = Modifier.padding(12.dp)) }
                     }
-                    if (frozen) ComicFrozenGlassBackdrop(backdrop, slots, config, loader, ComicBookState(), null)
                     CompositionLocalProvider(LocalReadingGlass provides ReadingGlassStyle(backdrop)) {
                         ComicSettingsSheet(config, ComicSettingsStore(compose.activity), false, {}, { config = it }, {}, {},
                             slots.map { it.ref }, loader, 0, ComicBookState(), {}, {}, glassBackdrop = backdrop)

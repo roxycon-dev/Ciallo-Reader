@@ -18,10 +18,14 @@ internal fun Modifier.dragStartEnd(
     enabledForward: Boolean,
     enabledBackward: Boolean,
     scope: CoroutineScope,
+    startAllowed: ((androidx.compose.ui.geometry.Offset, androidx.compose.ui.unit.IntSize) -> Boolean)? = null,
+    release: ((androidx.compose.ui.geometry.Offset, androidx.compose.ui.geometry.Offset, androidx.compose.ui.geometry.Offset, androidx.compose.ui.unit.IntSize, Boolean) -> Boolean)? = null,
     onChange: (Int) -> Unit,
 ): Modifier = this.composed {
     val isEnabledForward = rememberUpdatedState(enabledForward)
     val isEnabledBackward = rememberUpdatedState(enabledBackward)
+    val allowed = rememberUpdatedState(startAllowed)
+    val releasePolicy = rememberUpdatedState(release)
 
     pointerInput(state) {
         val forwardStartRect by lazy { dragInteraction.forward.start.multiply(size) }
@@ -35,7 +39,8 @@ internal fun Modifier.dragStartEnd(
             end = state.leftEdge,
             isEnabled = { isEnabledForward.value },
             isDragSucceed = { _, end -> forwardEndRect.contains(end) },
-            onChange = { onChange(+1) }
+            onChange = { onChange(+1) },
+            release = { start, end, velocity, native -> releasePolicy.value?.invoke(start, end, velocity, size, native) ?: native }
         )
         val backwardConfig = DragConfig(
             edge = state.backward,
@@ -43,7 +48,8 @@ internal fun Modifier.dragStartEnd(
             end = state.rightEdge,
             isEnabled = { isEnabledBackward.value },
             isDragSucceed = { _, end -> backwardEndRect.contains(end) },
-            onChange = { onChange(-1) }
+            onChange = { onChange(-1) },
+            release = { start, end, velocity, native -> releasePolicy.value?.invoke(start, end, velocity, size, native) ?: native }
         )
 
         detectCurlGestures(
@@ -52,7 +58,8 @@ internal fun Modifier.dragStartEnd(
                 PointerBehavior.Default -> NewEdgeCreator.Default()
                 PointerBehavior.PageEdge -> NewEdgeCreator.PageEdge()
             },
-            getConfig = { start, _ ->
+            getConfig = getConfig@ { start, _ ->
+                if (allowed.value?.invoke(start, size) == false) return@getConfig null
                 val config = if (forwardStartRect.contains(start)) {
                     forwardConfig
                 } else if (backwardStartRect.contains(start)) {
@@ -61,6 +68,7 @@ internal fun Modifier.dragStartEnd(
                     null
                 }
 
+                if (config != null && !config.isEnabled()) return@getConfig null
                 if (config != null) {
                     scope.launch {
                         state.animateJob?.cancel()

@@ -15,7 +15,8 @@ fun PullOutButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: B
     elevation: ButtonElevation? = ButtonDefaults.buttonElevation(), border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding, interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit) {
-    Button(paperClick(onClick), modifier.pullOutAnchor(), enabled, shape, colors, elevation, border, contentPadding, interactionSource, content)
+    val source = rememberPaperTrigger()
+    Button(paperClick(onClick, source), modifier.pullOutAnchor(source), enabled, shape, colors, elevation, border, contentPadding, interactionSource, content)
 }
 @Composable
 fun PullOutTextButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
@@ -23,7 +24,8 @@ fun PullOutTextButton(onClick: () -> Unit, modifier: Modifier = Modifier, enable
     elevation: ButtonElevation? = null, border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.TextButtonContentPadding, interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit) {
-    TextButton(paperClick(onClick), modifier.pullOutAnchor(), enabled, shape, colors, elevation, border, contentPadding, interactionSource, content)
+    val source = rememberPaperTrigger()
+    TextButton(paperClick(onClick, source), modifier.pullOutAnchor(source), enabled, shape, colors, elevation, border, contentPadding, interactionSource, content)
 }
 @Composable
 fun PullOutOutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
@@ -31,7 +33,8 @@ fun PullOutOutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, en
     elevation: ButtonElevation? = null, border: BorderStroke? = ButtonDefaults.outlinedButtonBorder(enabled),
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding, interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit) {
-    OutlinedButton(paperClick(onClick), modifier.pullOutAnchor(), enabled, shape, colors, elevation, border, contentPadding, interactionSource, content)
+    val source = rememberPaperTrigger()
+    OutlinedButton(paperClick(onClick, source), modifier.pullOutAnchor(source), enabled, shape, colors, elevation, border, contentPadding, interactionSource, content)
 }
 @Composable
 fun PullOutFilledTonalButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
@@ -39,13 +42,15 @@ fun PullOutFilledTonalButton(onClick: () -> Unit, modifier: Modifier = Modifier,
     elevation: ButtonElevation? = ButtonDefaults.filledTonalButtonElevation(), border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding, interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit) {
-    FilledTonalButton(paperClick(onClick), modifier.pullOutAnchor(), enabled, shape, colors, elevation, border, contentPadding, interactionSource, content)
+    val source = rememberPaperTrigger()
+    FilledTonalButton(paperClick(onClick, source), modifier.pullOutAnchor(source), enabled, shape, colors, elevation, border, contentPadding, interactionSource, content)
 }
 @Composable
 fun PullOutIconButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
     colors: IconButtonColors = IconButtonDefaults.iconButtonColors(), interactionSource: MutableInteractionSource? = null,
     content: @Composable () -> Unit) {
-    IconButton(paperClick(onClick), modifier.pullOutAnchor(), enabled, colors, interactionSource, content = content)
+    val source = rememberPaperTrigger()
+    IconButton(paperClick(onClick, source), modifier.pullOutAnchor(source), enabled, colors, interactionSource, content = content)
 }
 @Composable
 fun PullOutDropdownMenuItem(text: @Composable () -> Unit, onClick: () -> Unit, modifier: Modifier = Modifier,
@@ -53,5 +58,6 @@ fun PullOutDropdownMenuItem(text: @Composable () -> Unit, onClick: () -> Unit, m
     enabled: Boolean = true, colors: MenuItemColors = MenuDefaults.itemColors(),
     contentPadding: PaddingValues = MenuDefaults.DropdownMenuItemContentPadding,
     interactionSource: MutableInteractionSource? = null) {
-    DropdownMenuItem(text, paperClick(onClick), modifier.pullOutAnchor(), leadingIcon, trailingIcon, enabled, colors, contentPadding, interactionSource)
+    val source = rememberPaperTrigger()
+    DropdownMenuItem(text, paperClick(onClick, source), modifier.pullOutAnchor(source), leadingIcon, trailingIcon, enabled, colors, contentPadding, interactionSource)
 }

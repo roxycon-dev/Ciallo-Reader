@@ -68,4 +68,25 @@ class OverlayPolishTest {
         compose.onNodeWithText("下载面板").assertDoesNotExist()
         assertEquals(1, dismissals)
     }
+    @Test fun dismissalCannotEraseThePanelOpenedByTheSelectedAction() {
+        var panel by mutableStateOf("first")
+        var actions = 0
+        compose.setContent { MyApplicationTheme {
+            if (panel.isNotEmpty()) AcrylicDialog(onDismissRequest = { panel = "" },
+                title = { Text(if (panel == "first") "旧弹层" else "新弹层") }, confirmButton = {
+                    if (panel == "first") {
+                        val close = LocalOverlayClose.current
+                        TextButton(onClick = { close { actions++; panel = "second" } }) { Text("打开下一层") }
+                    }
+                })
+        } }
+        compose.waitForIdle()
+        compose.onNodeWithText("打开下一层").performClick()
+        compose.mainClock.advanceTimeBy(1800)
+        compose.waitForIdle()
+        compose.onNodeWithText("旧弹层").assertDoesNotExist()
+        compose.onNodeWithText("新弹层").assertExists()
+        assertEquals(1, actions)
+    }
+
 }
