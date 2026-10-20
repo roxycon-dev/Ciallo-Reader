@@ -1,5 +1,7 @@
 package com.example.discover
 
+import com.example.ui.components.pullOutAnchor
+import com.example.ui.components.pullOutClickable
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -56,7 +58,7 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
             .then(if (rank == 1 && medal != null) Modifier.shadow(8.dp, shape, ambientColor = medal.copy(alpha = .16f), spotColor = medal.copy(alpha = .24f)) else Modifier)
             .then(if (medal != null) Modifier.border(if (rank == 1) 1.5.dp else 1.dp, Brush.linearGradient(listOf(medal.copy(alpha = .40f), medal, medal.copy(alpha = .56f))), shape) else Modifier)
             .clip(shape).background(MaterialTheme.colorScheme.surface.copy(alpha = .88f))
-            .combinedClickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClick = onClick, onLongClick = { onMenu(bounds); haptics.perform(HapticKind.MEDIUM) })
+            .pullOutAnchor().combinedClickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClick = onClick, onLongClick = { onMenu(bounds); haptics.perform(HapticKind.MEDIUM) })
             // Consume a horizontal drag after touch slop so releasing it cannot open a work.
             .pointerInput(Unit) { detectHorizontalDragGestures { change, _ -> change.consume() } }
         Column(cardModifier) {
@@ -166,7 +168,7 @@ private fun SourceBadge(label: String, modifier: Modifier) {
 @Composable
 private fun FollowButton(followed: Boolean, compact: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     // Foundation expands the small visual icon's touch target without stretching the title row.
-    Box(modifier.size(if (compact) 48.dp else 28.dp).clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick), contentAlignment = Alignment.Center) {
+    Box(modifier.size(if (compact) 48.dp else 28.dp).pullOutClickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick), contentAlignment = Alignment.Center) {
         Icon(if (followed) Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder,
             if (followed) "取消喜欢" else "加入我喜欢的", Modifier.size(20.dp),
             tint = if (followed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)

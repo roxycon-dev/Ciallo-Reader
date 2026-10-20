@@ -1,5 +1,9 @@
 package com.example.discover
 
+import com.example.ui.components.pullOutClickable
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutIconButton
+import com.example.ui.components.PullOutBottomSheet
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -183,7 +187,7 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
             CollapsingTabScreenHeader(fractionSource = headerFraction, modifier = Modifier.statusBarsPadding(), title = "发现", subtitle = "DISCOVER",
                 onTitleClick = { scope.launch { if (reduce) grid.scrollToItem(0) else grid.animateScrollToItem(0) } },
                 titleColor = glassTitleColor(), trailing = {
-                    IconButton(onClick = { showSettings = true }) { Icon(Icons.Outlined.Tune, "发现设置") }
+                    PullOutIconButton(onClick = { showSettings = true }) { Icon(Icons.Outlined.Tune, "发现设置") }
                 })
             PullToRefreshBox(isRefreshing = state.loading && state.entries.isNotEmpty(), onRefresh = { light(); model.refresh() }, modifier = Modifier.weight(1f),
                 ) {
@@ -212,13 +216,8 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
                     if (sourceId == "aggregate") item(span = { GridItemSpan(maxLineSpan) }) {
                         Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
                             val participants = rows.flatMap { it.variants }.map { it.book.sourceId }.distinct()
-                            TextButton(onClick = { noticesExpanded = !noticesExpanded }) {
+                            PullOutTextButton(onClick = { noticesExpanded = true }) {
                                 Text("当前结果 ${participants.size} 个源 · 已请求 ${activeSources.size} 个源" + if (state.loading) " · 加载中" else " · 查看来源", style = MaterialTheme.typography.labelMedium)
-                            }
-                            if (noticesExpanded) activeSources.forEach { source ->
-                                val count = rows.count { w -> w.variants.any { it.book.sourceId == source.id } }
-                                Text(source.name + " · " + if (count > 0) "${count} 本" else state.errors[source.id] ?: state.notices[source.id] ?: if (state.loading) "加载中" else if (statusFilter != "全部" && state.entries.any { it.book.sourceId == source.id && serialLabel(it.book.comicInfo?.status) == "状态未知" }) "作品状态尚未提供或待补全" else "当前筛选无结果",
-                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -226,10 +225,9 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
                         GlassCard(contentPadding = PaddingValues(12.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(if (rows.isEmpty()) "暂时连接不上，已保留上次内容" else "${state.errors.size} 个书源暂时连接不上", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                                TextButton(onClick = model::retry) { Text("重试") }
+                                PullOutTextButton(onClick = model::retry) { Text("重试") }
                             }
-                            if (noticesExpanded) state.errors.forEach { (id, error) -> Text("${sources.firstOrNull { it.id == id }?.name ?: id}：$error", style = MaterialTheme.typography.bodySmall) }
-                            TextButton(onClick = { noticesExpanded = !noticesExpanded }) { Text(if (noticesExpanded) "收起" else "查看详情") }
+                            PullOutTextButton(onClick = { noticesExpanded = true }) { Text("查看详情") }
                         }
                     }
                     if (rows.isEmpty() && !state.loading) item(span = { GridItemSpan(maxLineSpan) }) {
@@ -262,12 +260,12 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
             }
         }
         choice?.let { work ->
-            ModalBottomSheet(onDismissRequest = { choice = null }) {
+            PullOutBottomSheet(onDismissRequest = { choice = null }) {
                 Column(Modifier.padding(16.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(work.book.title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     Text("${work.variants.size} 个源可读 · 选择阅读书源", fontSize = 13.sp)
                     work.variants.forEach { entry ->
-                        DiscoverGlass(Modifier.fillMaxWidth().clickable { choice = null; onOpen(entry.book) }) {
+                        DiscoverGlass(Modifier.fillMaxWidth().pullOutClickable { choice = null; onOpen(entry.book) }) {
                             Text(sources.firstOrNull { it.id == entry.book.sourceId }?.name ?: entry.book.sourceId, fontWeight = FontWeight.SemiBold)
                             Text(metric(DiscoverWork(work.key, listOf(entry), 0.0), dimension), fontSize = 12.sp)
                             entry.book.comicInfo?.status?.let { Text(serialLabel(it), fontSize = 11.sp) }
@@ -277,29 +275,20 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
             }
         }
         menuWork?.let { work ->
-            androidx.activity.compose.BackHandler { menuWork = null }
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .32f)).clickable { menuWork = null })
-            val density = LocalDensity.current
-            val left = with(density) { (menuBounds.left - screenOffset.x).toDp() }
-            val top = with(density) { (menuBounds.top - screenOffset.y).toDp() }
-            val menuHeight = 148.dp
-            val maxMenuY = (maxHeight - LocalAppBottomInset.current - menuHeight - 16.dp).coerceAtLeast(16.dp)
-            val x = left.coerceIn(16.dp, (maxWidth - 216.dp).coerceAtLeast(16.dp))
-            val y = (if (top + menuHeight > maxHeight - LocalAppBottomInset.current - 16.dp) top - menuHeight - 8.dp else top + 16.dp).coerceIn(16.dp, maxMenuY)
-            DiscoverGlass(Modifier.offset(x = x, y = y).width(200.dp).semantics { paneTitle = "作品快捷菜单" }, RoundedCornerShape(20.dp), PaddingValues(0.dp)) {
+            com.example.ui.components.PullOutDropdownMenu(expanded = true, onDismissRequest = { menuWork = null }) {
                 val followed = work.variants.any { favoriteKey(it.book.sourceId, it.book.id) in favoriteKeys }
-                val actions = listOf(Triple(Icons.Outlined.FavoriteBorder, if (followed) "取消喜欢" else "加入我喜欢的", { follow(work, !followed) }), Triple(Icons.Outlined.VisibilityOff, "不感兴趣", { block(work) }),
-                    Triple(Icons.Outlined.Share, "分享", { share(work) }))
+                val actions = listOf(Triple(Icons.Outlined.FavoriteBorder, if (followed) "取消喜欢" else "加入我喜欢的", { follow(work, !followed) }),
+                    Triple(Icons.Outlined.VisibilityOff, "不感兴趣", { block(work) }), Triple(Icons.Outlined.Share, "分享", { share(work) }))
                 actions.forEachIndexed { index, action ->
-                    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable { menuWork = null; action.third() }.padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Icon(action.first, null, Modifier.size(20.dp), tint = if (index == 1) DiscoverRise else discoverInk())
-                        Text(action.second, fontSize = 15.sp, color = if (index == 1) DiscoverRise else discoverInk())
-                    }
-                    if (index < actions.lastIndex) HorizontalDivider(thickness = .5.dp, color = discoverInk().copy(alpha = .12f))
+                    com.example.ui.components.PullOutDropdownMenuItem(
+                        text = { Text(action.second, color = if (index == 1) DiscoverRise else discoverInk()) },
+                        leadingIcon = { Icon(action.first, null, tint = if (index == 1) DiscoverRise else discoverInk()) },
+                        onClick = { menuWork = null; action.third() })
                 }
             }
         }
+        if (noticesExpanded) DiscoverSourceStatusSheet(activeSources, rows, state, effectiveStatus,
+            onRetry = model::retry, onDismiss = { noticesExpanded = false })
         if (showSettings) DiscoverSettings { showSettings = false }
         if (showSources) DiscoverSourcePicker(sources, enabled, sourceId, { id ->
             sourceId = id; nativeFeed = store.string("feed_$id", "native").ifBlank { null }

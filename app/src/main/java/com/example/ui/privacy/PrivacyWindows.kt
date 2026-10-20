@@ -1,5 +1,7 @@
 package com.example.ui.privacy
 
+
+import com.example.ui.components.pullOutClickable
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
@@ -131,7 +133,7 @@ private fun GlassPinKey(
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surface.copy(alpha = if (enabled) 0.55f else 0.25f))
-            .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick),
+            .pullOutClickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -165,7 +167,7 @@ private fun GlassPinIconKey(
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f))
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+            .pullOutClickable(interactionSource = interaction, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -267,7 +269,7 @@ fun PrivacyPinOverlay(
                 Modifier
                     .fillMaxSize()
                     .background(Color(0x59000000))
-                    .clickable(
+                    .pullOutClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) { onDismiss() }
@@ -285,7 +287,7 @@ fun PrivacyPinOverlay(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 36.dp)
-                    .clickable(
+                    .pullOutClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) { /* 拦截穿透点击 */ },
@@ -414,7 +416,7 @@ fun PrivacyManageOverlay(
                 Modifier
                     .fillMaxSize()
                     .background(Color(0x59000000))
-                    .clickable(
+                    .pullOutClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) { onDismiss() }
@@ -426,7 +428,7 @@ fun PrivacyManageOverlay(
                 .fillMaxWidth()
                 .fillMaxHeight(0.72f)
                 .padding(horizontal = 28.dp)
-                .clickable(
+                .pullOutClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) { /* 拦截穿透点击 */ },
@@ -454,7 +456,7 @@ fun PrivacyManageOverlay(
                         color = MintPrimary,
                         modifier = Modifier
                             .clip(RoundedCornerShape(14.dp))
-                            .clickable { onDismiss() }
+                            .pullOutClickable { onDismiss() }
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     )
                 }

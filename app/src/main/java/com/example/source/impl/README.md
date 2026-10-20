@@ -8,12 +8,13 @@
 
 ## 内容
 - `AutoNovelSource.kt`
-- `GuestNovelTransport.kt`：公开请求的一次可取消网络重试
+- `GuestNovelTransport.kt`：公开 GET 的有限重试（最多两次），保持取消、权限错误不重试
+- `FanqieGateway.kt`：番茄公开搜索与目录、书荒殿索引补充、张老师API正文；有限样本验证，不承诺全部作品或章节覆盖
 - `IxdzsSource.kt`
 - `JsonBookSource.kt`
 - `MangaDexSource.kt`
 - `MockBookSource.kt`
-- `PublicNovelSource.kt`：全本小说网、话本小说、SF轻小说的免登录公开正文；未通过整本审计的适配不注册
+- `PublicNovelSource.kt`：全本小说网、话本小说、SF轻小说和番茄公开聚合；逐章下载遇到失败时拒绝生成残缺电子书，验证范围见对应审计报告
 - `README.md`
 - `Wenku8LibrarySource.kt`
 

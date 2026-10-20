@@ -1,5 +1,6 @@
 package com.example.ui
 
+import com.example.ui.components.PullOutTextButton
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -74,7 +75,7 @@ internal fun ComicMetadataBlock(book: SearchBook, onSearch: (String) -> Unit = {
                         }
                     }
                 }
-                if (aliases.size > 3 || tags.size > 6) TextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(0.dp)) {
+                if (aliases.size > 3 || tags.size > 6) PullOutTextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(0.dp)) {
                     Text(if (expanded) "收起资料" else "展开全部资料")
                 }
             }

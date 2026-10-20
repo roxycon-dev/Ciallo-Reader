@@ -2,6 +2,15 @@
 
 package com.example.ui.comic
 
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutFilledTonalButton
+import com.example.ui.components.PullOutIconButton
+import com.example.ui.components.PullOutAlertDialog
+import com.example.ui.reader.TouchZone
+import com.example.ui.reader.TouchAction
+import com.example.ui.reader.SwipeAction
+import com.example.ui.reader.ReaderTouchBinding
+import com.example.ui.reader.touchZoneGestures
 import com.example.ui.reader.readingGlass
 import com.example.ui.feedback.LocalReduceMotion
 import com.example.ui.design.DesignTokens
@@ -24,7 +33,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.IconButton
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.paneTitle
@@ -120,11 +128,9 @@ import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material.icons.outlined.PushPin
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
@@ -153,7 +159,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.MintPrimary
-import com.kashif_e.backdrop.backdrops.LayerBackdrop
+import com.kashif_e.backdrop.Backdrop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.mutableFloatStateOf
@@ -195,10 +201,11 @@ internal fun ComicSettingsSheet(
     bookState: ComicBookState,
     onBookStateChange: (ComicBookState) -> Unit,
     onDismiss: () -> Unit,
-    glassBackdrop: LayerBackdrop? = null,
+    glassBackdrop: Backdrop? = null,
     onDownloadTranslationModels: () -> Unit = {},
     onTranslationRefresh: (Boolean) -> Unit = {},
     initialTab: Int = 0,
+    onEditTouchZones: () -> Unit = {},
 ) {
     var tab by remember { mutableIntStateOf(initialTab.coerceIn(SettingsTabs.indices)) }
     val update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit = { onConfigChange(it(config)) }
@@ -232,7 +239,7 @@ internal fun ComicSettingsSheet(
                     Text("阅读设置", color = TextPrimary, fontSize = DesignTokens.TypeTitle, fontWeight = FontWeight.SemiBold)
                     Text("${config.mode.label} · ${config.direction.label}", color = TextSecondary, fontSize = DesignTokens.TypeCaption)
                 }
-                IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, "关闭阅读设置", tint = TextSecondary) }
+                PullOutIconButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Icon(Icons.Filled.Close, "关闭阅读设置", tint = TextSecondary) }
             }
             Row(Modifier.fillMaxWidth().weight(1f)) {
                 if (rail) PanelTabRail(SettingsTabs, tab, { tab = it }, Modifier.padding(start = DesignTokens.SpaceMd, top = DesignTokens.SpaceSm))
@@ -253,7 +260,7 @@ internal fun ComicSettingsSheet(
                             3 -> TranslationTab(config, update, onDownloadTranslationModels, onTranslationRefresh)
                                 4 -> EffectTab(config, update)
                                 5 -> AutoTab(config, update)
-                                6 -> GestureTab(config, update)
+                                6 -> GestureTab(config, update, onEditTouchZones)
                             }
                             Spacer(Modifier.height(DesignTokens.SpaceMd))
                         }
@@ -413,9 +420,9 @@ private fun TranslationTab(
             Spacer(Modifier.height(DesignTokens.SpaceCompact))
             PanelHint("仅发送识别文字；额度由服务商决定")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceCompact)) {
-                TextButton(onClick = { useProvider("https://api.siliconflow.cn/v1", "Qwen/Qwen2.5-7B-Instruct") }) { Text("硅基流动", color = MintPrimary) }
-                TextButton(onClick = { useProvider("https://api.deepseek.com/v1", "deepseek-chat") }) { Text("DeepSeek", color = MintPrimary) }
-                TextButton(onClick = { useProvider("https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus") }) { Text("阿里百炼", color = MintPrimary) }
+                PullOutTextButton(onClick = { useProvider("https://api.siliconflow.cn/v1", "Qwen/Qwen2.5-7B-Instruct") }) { Text("硅基流动", color = MintPrimary) }
+                PullOutTextButton(onClick = { useProvider("https://api.deepseek.com/v1", "deepseek-chat") }) { Text("DeepSeek", color = MintPrimary) }
+                PullOutTextButton(onClick = { useProvider("https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus") }) { Text("阿里百炼", color = MintPrimary) }
             }
             PanelTextField("API 地址（支持完整 chat/completions 地址）", llmUrl) {
                 saveLlm(it, llmKey, llmModel, llmGemini)
@@ -423,7 +430,7 @@ private fun TranslationTab(
             PanelTextField("API Key", llmKey, obscured = !showKey) {
                 saveLlm(llmUrl, it, llmModel, llmGemini)
             }
-            TextButton(onClick = { showKey = !showKey }) { Text(if (showKey) "隐藏密钥" else "显示密钥", color = TextSecondary) }
+            PullOutTextButton(onClick = { showKey = !showKey }) { Text(if (showKey) "隐藏密钥" else "显示密钥", color = TextSecondary) }
             PanelTextField("模型名（如 deepseek-chat）", llmModel) {
                 saveLlm(llmUrl, llmKey, it, llmGemini)
             }
@@ -432,7 +439,7 @@ private fun TranslationTab(
                 subtitle = if (llmGemini) "Gemini 接口" else "OpenAI 兼容接口",
                 checked = llmGemini,
             ) { v -> saveLlm(llmUrl, llmKey, llmModel, v) }
-            TextButton(enabled = !aiTesting && LlmBubbleTranslator.LlmConfig(llmUrl, llmKey, llmModel, llmGemini).isValid(), onClick = {
+            PullOutTextButton(enabled = !aiTesting && LlmBubbleTranslator.LlmConfig(llmUrl, llmKey, llmModel, llmGemini).isValid(), onClick = {
                 aiTesting = true
                 scope.launch {
                     try {
@@ -464,7 +471,7 @@ private fun TranslationTab(
             }
             Spacer(Modifier.height(DesignTokens.SpaceSm))
             Text("手机 OCR · 腾讯机翻 · 免 Key", color = TextSecondary, fontSize = DesignTokens.TypeCaption, lineHeight = DesignTokens.TypeCaptionLineHeight)
-            TextButton(enabled = !onlineTesting, onClick = {
+            PullOutTextButton(enabled = !onlineTesting, onClick = {
                 onlineTesting = true
                 onlineTestResult = null
                 scope.launch {
@@ -820,7 +827,7 @@ private fun PageTab(
                                 .heightIn(min = 48.dp).padding(horizontal = DesignTokens.SpaceTight, vertical = DesignTokens.SpaceMd),
                             maxLines = 2, overflow = TextOverflow.Ellipsis,
                         )
-                        TextButton(onClick = {
+                        PullOutTextButton(onClick = {
                             store.deleteCustomFitPreset(p.id)
                             presets = store.loadCustomFitPresets()
                         }) { Text("删除", color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall) }
@@ -880,7 +887,7 @@ private fun PageTab(
             format = { "${it.toInt()} dp" },
             onChange = { v -> update { it.copy(doubleShiftYDp = v) } }
         )
-        TextButton(onClick = { update { it.copy(doubleGapDp = 8f, doubleAlign = ComicDoubleAlign.CENTER,
+        PullOutTextButton(onClick = { update { it.copy(doubleGapDp = 8f, doubleAlign = ComicDoubleAlign.CENTER,
             doubleShiftXDp = 0f, doubleShiftYDp = 0f, doubleFirstAlone = false) } }) {
             Text("恢复双页排版默认值", color = TextSecondary)
         }
@@ -945,7 +952,7 @@ private fun ImageTab(
             )
         }
         if (config.manualCrop != null) {
-            TextButton(onClick = { update { it.copy(manualCrop = null) } }) {
+            PullOutTextButton(onClick = { update { it.copy(manualCrop = null) } }) {
                 Text("清除手动裁边", color = TextSecondary)
             }
         }
@@ -965,7 +972,7 @@ private fun ImageTab(
             format = { "%.0f%%".format(it * 100) },
             onChange = { v -> update { it.copy(splitPosition = v) } }
         )
-        TextButton(onClick = { update { it.copy(splitPosition = 0.5f, splitReverse = false) } }) {
+        PullOutTextButton(onClick = { update { it.copy(splitPosition = 0.5f, splitReverse = false) } }) {
             Text("重置", color = TextSecondary)
         }
     }
@@ -979,7 +986,7 @@ private fun ImageTab(
         val pageRef = pages.getOrNull(currentRawPage)
         pageRef?.let { ref ->
             if ((bookState.pageRotations[ref.id] ?: 0) != 0) {
-                TextButton(onClick = { onBookStateChange(bookState.copy(pageRotations = bookState.pageRotations - ref.id)) }) {
+                PullOutTextButton(onClick = { onBookStateChange(bookState.copy(pageRotations = bookState.pageRotations - ref.id)) }) {
                     Text("还原本页旋转", color = TextSecondary)
                 }
             }
@@ -1046,7 +1053,7 @@ private fun ImageTab(
             update { it.copy(filterShadow = v.toInt()) }
         }
         SwitchRow("黑白模式", null, config.filterBW) { v -> update { it.copy(filterBW = v) } }
-        TextButton(onClick = {
+        PullOutTextButton(onClick = {
             update {
                 it.copy(
                     filterBrightness = 0, filterContrast = 0, filterSaturation = 0,
@@ -1129,7 +1136,7 @@ internal fun FilterPreview(page: ComicPageRef?, loader: ComicPageLoader, config:
             when (preview) {
                 is PageBitmapState.Ready -> Image(preview.bitmap.asImageBitmap(), label,
                     Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                is PageBitmapState.Failed -> TextButton(onClick = { retry++ }) {
+                is PageBitmapState.Failed -> PullOutTextButton(onClick = { retry++ }) {
                     Text("预览失败 · 重试", color = TextSecondary)
                 }
                 PageBitmapState.Loading -> com.example.ui.components.ChasingDots(size = DesignTokens.SpaceLoose, color = MintPrimary)
@@ -1420,30 +1427,11 @@ private fun AutoTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> C
 /* ── Tab 5：手势 ── */
 
 @Composable
-private fun GestureTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit) {
-    PanelSectionCard("点按区域动作", Icons.Filled.PanTool) {
-        PanelHint(if (config.direction == ComicDirection.RTL && config.mode != ComicMode.WEBTOON && config.mode != ComicMode.CONTINUOUS)
-            "右至左阅读：左侧对应下一页区域，右侧对应上一页区域。"
-            else "按阅读轴分为三个区域；控制栏显示时，翻页点按先收起控制栏。")
-        val actions = ComicGestureAction.entries.map { it.ordinal to it.label }
-        val vertical = config.mode == ComicMode.WEBTOON || config.mode == ComicMode.CONTINUOUS ||
-            config.direction == ComicDirection.TTB && config.mode != ComicMode.DOUBLE
-        val reverse = config.direction == ComicDirection.RTL && !vertical
-        SegmentRow(if (vertical) "顶部区域" else if (reverse) "右侧区域" else "左侧区域", actions, config.gestureTapLeft.ordinal) { i ->
-            update { it.copy(gestureTapLeft = ComicGestureAction.entries[i]) }
-        }
-        SegmentRow("中间区域", actions, config.gestureTapCenter.ordinal) { i ->
-            update { it.copy(gestureTapCenter = ComicGestureAction.entries[i]) }
-        }
-        SegmentRow(if (vertical) "底部区域" else if (reverse) "左侧区域" else "右侧区域", actions, config.gestureTapRight.ordinal) { i ->
-            update { it.copy(gestureTapRight = ComicGestureAction.entries[i]) }
-        }
-        TextButton(onClick = { update { it.copy(gestureTapLeft = ComicGestureAction.PREV,
-            gestureTapCenter = ComicGestureAction.TOGGLE_CONTROLS, gestureTapRight = ComicGestureAction.NEXT) } }) {
-            Text("恢复默认点按动作", color = TextSecondary)
-        }
+private fun GestureTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit, onEditTouchZones: () -> Unit) {
+    PanelSectionCard("触控功能分区", Icons.Filled.PanTool) {
+        PanelHint("在当前漫画上直接调整分区，画面保持原尺寸。点击与滑动独立配置，双指缩放与放大后拖图优先。")
+        PullOutFilledTonalButton(onClick = com.example.ui.components.paperDismiss(onEditTouchZones), modifier = Modifier.fillMaxWidth()) { Text("可视化编辑功能分区") }
     }
-
     PanelSectionCard("手势开关", Icons.Filled.TouchApp) {
         SwitchRow("单指滑动翻页", null, config.gestureSwipe) { v -> update { it.copy(gestureSwipe = v) } }
         SwitchRow("双指合拢退出", null, config.gesturePinchClose) { v ->
@@ -1474,7 +1462,7 @@ internal fun ComicTocSheet(
     currentPage: Int,
     onJumpToRawPage: (Int) -> Unit,
     onDismiss: () -> Unit,
-    glassBackdrop: LayerBackdrop? = null,
+    glassBackdrop: Backdrop? = null,
 ) {
     ComicSheetContainer(
         title = "目录", onDismiss = onDismiss, heightFraction = 0.7f, scrollable = false,
@@ -1586,7 +1574,7 @@ internal fun ComicPresetSheet(
     currentConfig: ComicReaderConfig,
     onApply: (ComicReaderConfig) -> Unit,
     onDismiss: () -> Unit,
-    glassBackdrop: LayerBackdrop? = null,
+    glassBackdrop: Backdrop? = null,
 ) {
     var presets by remember { mutableStateOf(store.loadPresets()) }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -1725,7 +1713,7 @@ internal fun ComicPresetSheet(
                             Icon(Icons.Filled.ContentCopy, "复制", tint = TextSecondary, modifier = Modifier.size(15.dp))
                         }
                         if (!preset.builtIn) {
-                            IconButton(onClick = {
+                            PullOutIconButton(onClick = {
                                 store.updatePreset(preset.id, config = currentConfig)
                                 refresh()
                                 android.widget.Toast.makeText(context,
@@ -1802,13 +1790,13 @@ internal fun ComicPresetSheet(
         )
     }
     deleteTarget?.let { target ->
-        AlertDialog(onDismissRequest = { deleteTarget = null },
+        PullOutAlertDialog(onDismissRequest = { deleteTarget = null },
             title = { Text("删除预设", color = TextPrimary) },
             text = { Text("删除「${target.name}」？当前阅读配置仍会保留。", color = TextSecondary) },
-            confirmButton = { TextButton(onClick = { store.deletePreset(target.id); refresh(); deleteTarget = null }) {
+            confirmButton = { PullOutTextButton(onClick = { store.deletePreset(target.id); refresh(); deleteTarget = null }) {
                 Text("删除", color = TextPrimary)
             } },
-            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("取消", color = TextSecondary) } },
+            dismissButton = { PullOutTextButton(onClick = { deleteTarget = null }) { Text("取消", color = TextSecondary) } },
             containerColor = PanelBg)
     }
 }
@@ -1822,7 +1810,7 @@ private fun PresetNameDialog(
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf(initial) }
-    AlertDialog(
+    PullOutAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title, color = TextPrimary) },
         text = {
@@ -1840,8 +1828,8 @@ private fun PresetNameDialog(
                 )
             )
         },
-        confirmButton = { TextButton(onClick = { onConfirm(name) }) { Text("确定", color = MintPrimary) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextSecondary) } },
+        confirmButton = { PullOutTextButton(onClick = { onConfirm(name) }) { Text("确定", color = MintPrimary) } },
+        dismissButton = { PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Text("取消", color = TextSecondary) } },
         containerColor = ReadingPalette.DialogSurface
     )
 }
@@ -1905,11 +1893,11 @@ internal fun ComicCropSheet(
                 Text("手动裁边", color = TextPrimary, fontSize = DesignTokens.TypeBody, fontWeight = FontWeight.SemiBold)
             }
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = {
+                PullOutTextButton(onClick = {
                     crop = floatArrayOf(0f, 0f, 1f, 1f)
                 }) { Text("重置", color = TextSecondary) }
-                TextButton(onClick = onDismiss) { Text("取消", color = TextSecondary) }
-                TextButton(onClick = { onApply(crop[0], crop[1], crop[2], crop[3]) }) {
+                PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Text("取消", color = TextSecondary) }
+                PullOutTextButton(onClick = { onApply(crop[0], crop[1], crop[2], crop[3]) }) {
                     Text("保存", color = MintPrimary, fontWeight = FontWeight.SemiBold)
                 }
             }

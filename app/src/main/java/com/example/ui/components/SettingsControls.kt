@@ -38,7 +38,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -141,7 +140,7 @@ fun PageTurnSelectorRow(
                     Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), shape)
                 }
             )
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .pullOutClickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
         Row(
@@ -294,7 +293,7 @@ fun CustomMinutesDialog(
         },
         dismissButton = {
             val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-            TextButton(onClick = { closeOverlay {  } }) {
+            PullOutTextButton(onClick = { closeOverlay {  } }) {
                 Text("取消")
             }
         }
@@ -317,166 +316,7 @@ fun JunoSlider(
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val primary = MaterialTheme.colorScheme.primary
-    val secondary = MaterialTheme.colorScheme.secondary
-    val density = LocalDensity.current
-    var dragging by remember { mutableStateOf(false) }
-    var sliderWidth by remember { mutableStateOf(0) }
-    val currentWidth by rememberUpdatedState(sliderWidth)
-
-    val trackHeight by animateDpAsState(
-        targetValue = if (dragging) 22.dp else 10.dp,
-        animationSpec = tween(250, easing = FastOutSlowInEasing),
-        label = "junoHeight"
-    )
-    val shape = RoundedCornerShape(percent = 50)
-    val fraction = value.coerceIn(0f, 1f)
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            // 可访问性：触控目标 48dp
-            .height(48.dp)
-            .onSizeChanged { sliderWidth = it.width }
-            .pointerInput(Unit) {
-                // 仓库 DragGesture(minimumDistance: 0)：按下即开始，位移更新，无位移=点按跳转
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    val startX = down.position.x
-                    dragging = true
-                    // ⚠️ 健壮性：无论手势以何种方式结束（正常抬手 / 指针被父级消费掉 /
-                    //    拖出流外 / 节点被移出组合导致协程取消），都必须把 dragging
-                    //    归位。旧写法只在 while 循环正常 break 后复位，一旦协程在
-                    //    awaitPointerEvent 挂起时被取消，「拖动中」的 thumb 会永远
-                    //    显示、滑块永远停在拖动态。
-                    try {
-                        // 按下即把进度同步到手指位置，保证 1:1
-                        if (currentWidth > 0) {
-                            onValueChange((startX / currentWidth).coerceIn(0f, 1f))
-                        }
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            if (!change.pressed) {
-                                break
-                            }
-                            change.consume()
-                            if (currentWidth > 0) {
-                                onValueChange((change.position.x / currentWidth).coerceIn(0f, 1f))
-                            }
-                        }
-                    } finally {
-                        // 协程已取消时 suspend 的写状态也会抛 CancellationException，
-                        // 这里用非挂起的状态写保证复位语义不被吞掉
-                        dragging = false
-                    }
-                }
-            }
-            // 可访问性：向读屏暴露当前进度与百分比
-            .semantics {
-                progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f)
-                stateDescription = "${(fraction * 100).roundToInt()}%"
-            }
-    ) {
-        // 轨道：深色半透明 + 内阴影 + 外阴影（严格按仓库）
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth()
-                .height(trackHeight)
-                .clip(shape)
-                .shadow(
-                    elevation = 1.dp,
-                    shape = shape,
-                    ambientColor = primary.copy(alpha = 0.20f),
-                    spotColor = primary.copy(alpha = 0.20f)
-                )
-                .background(Color(0xFF1A1A1E).copy(alpha = 0.50f))
-                .drawBehind {
-                    // 内阴影：仓库 .shadow(.inner(color: black 0.3, radius: 3, y: 2)) → 上沿暗带
-                    drawRoundRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                primary.copy(alpha = 0.30f),
-                                primary.copy(alpha = 0.10f),
-                                Color.Transparent,
-                                Color.Transparent
-                            )
-                        ),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f)
-                    )
-                    // 外阴影亮线：仓库 .shadow(color: white 0.2, radius: 1, y: 1)
-                    drawRoundRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.20f),
-                                Color.Transparent
-                            )
-                        ),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f)
-                    )
-                }
-        ) {
-            // 进度条：最小宽度 = 当前轨道高度，宽度 = value * trackWidth
-            val minWidthPx = with(density) { (if (dragging) 22.dp else 10.dp).toPx() }
-            val progressPx = if (dragging) {
-                fraction * sliderWidth
-            } else if (sliderWidth > 0) {
-                max(minWidthPx, fraction * sliderWidth)
-            } else {
-                minWidthPx
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(with(density) { progressPx.toDp() })
-                    .clip(shape)
-                    .background(Brush.horizontalGradient(listOf(primary, secondary)))
-            ) {
-                // thumb：仅拖动时出现（仓库 opacity 0/1）
-                AnimatedVisibility(
-                    visible = dragging,
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                    enter = fadeIn() + scaleIn(initialScale = 0.6f),
-                    exit = fadeOut() + scaleOut(targetScale = 0.6f)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .padding(22.dp * 0.15f)
-                            .size(16.dp)
-                            .shadow(
-                                elevation = 1.dp,
-                                shape = CircleShape,
-                                ambientColor = primary.copy(alpha = 0.30f),
-                                spotColor = primary.copy(alpha = 0.30f)
-                            )
-                            .clip(CircleShape)
-                            .background(primary)
-                            .border(2.dp, Color.White, CircleShape)
-                    )
-                }
-            }
-        }
-
-        // 拖动中显示百分比气泡，松手淡出
-        AnimatedVisibility(
-            visible = dragging,
-            modifier = Modifier.align(Alignment.TopCenter),
-            enter = fadeIn() + scaleIn(initialScale = 0.6f),
-            exit = fadeOut() + scaleOut(targetScale = 0.6f)
-        ) {
-            Text(
-                text = "${(value * 100).toInt()}%",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Brush.horizontalGradient(listOf(primary, secondary)))
-                    .padding(horizontal = 12.dp, vertical = 5.dp)
-            )
-        }
-    }
+    LiquidSlider(value, onValueChange, modifier, formatLabel = { "${(it * 100).roundToInt()}%" })
 }
 
 /**

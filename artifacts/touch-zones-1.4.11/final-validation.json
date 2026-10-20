@@ -1,0 +1,30 @@
+{
+  "version": "1.4.11",
+  "versionCode": 234,
+  "validatedAt": "2026-10-20T16:08:51.133Z",
+  "productionManifestSha256": "65382cd835a6afdb3ceb3819e427d9424764c74345abad8c2035a9e0a941909f",
+  "selectedJvm": {
+    "passed": 130,
+    "failures": 0,
+    "scope": "Executed before final rendering fix; not repeated at user request"
+  },
+  "finalDevice": {
+    "passed": 1,
+    "case": "Actual pointer opens manga settings, gesture tab, original viewport editor; cancel",
+    "meshEnabled": true,
+    "glassEnabled": true
+  },
+  "release": {
+    "versionName": "1.4.11",
+    "versionCode": 234,
+    "package": "com.aistudio.novelreader.kxmpzq",
+    "bytes": 29149452,
+    "sha256": "8e9da6791f274119ec4762e30a753d0fc0066a2b91060ed901acbac377b7d401",
+    "abis": [
+      "arm64-v8a"
+    ],
+    "zipEntries": 207,
+    "verified": true,
+    "certificateSha256": "d2115e3cc5880b210a120558aaab03eb30ee5de2952a80f3376dda7e45501146"
+  }
+}

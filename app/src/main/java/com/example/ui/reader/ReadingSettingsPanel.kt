@@ -1,8 +1,9 @@
 package com.example.ui.reader
 
+import com.example.ui.components.PullOutDialog
+import com.example.ui.components.PullOutVisibility
 import com.example.ui.design.DesignTokens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -27,12 +28,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import com.kashif_e.backdrop.backdrops.LayerBackdrop
 import com.kashif_e.backdrop.drawPlainBackdrop
 import com.kashif_e.backdrop.effects.blur
+import com.example.ui.components.pullOutClickable
 import com.example.ui.components.overlayTouchShield
 
 /** A theme-tinted overlay; the app theme (and its switches) stays untouched. */
@@ -45,13 +46,11 @@ internal fun ReadingSettingsPanel(
     content: @Composable (close: () -> Unit) -> Unit,
 ) {
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
-    val latestDismiss by rememberUpdatedState(onDismiss)
     val reduceMotion = LocalReduceMotion.current
-    LaunchedEffect(visibility.isIdle, visibility.currentState) {
-        if (visibility.isIdle && !visibility.currentState && !visibility.targetState) latestDismiss()
-    }
-    Dialog(
-        onDismissRequest = { visibility.targetState = false },
+    val close = com.example.ui.components.rememberPaperClose(visibility, onDismiss)
+    PullOutDialog(
+        animateContent = false,
+        onDismissRequest = { close {} },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         val view = LocalView.current
@@ -60,14 +59,10 @@ internal fun ReadingSettingsPanel(
             val wide = maxWidth >= 600.dp || maxWidth > maxHeight
             val shape = RoundedCornerShape(DesignTokens.RadiusOverlay)
             val scrim by androidx.compose.animation.core.animateFloatAsState(
-                if (visibility.targetState) .16f else 0f, tween(if (reduceMotion) 0 else AppMotion.CONTENT_MS), label = "readingSettingsScrim")
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = scrim)))
-            AnimatedVisibility(
+                if (visibility.targetState) com.example.ui.components.PullOutConfig.SCRIM else 0f, com.example.ui.components.PullOutConfig.spring(visibility.targetState), label = "readingSettingsScrim")
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = scrim.coerceIn(0f, .35f))).pullOutClickable { close {} })
+            PullOutVisibility(
                 visibleState = visibility,
-                enter = if (reduceMotion) fadeIn(tween(0)) else fadeIn(tween(AppMotion.CONTENT_MS)) +
-                    if (wide) slideInHorizontally(AppMotion.reorder()) { it / 5 } else slideInVertically(AppMotion.reorder()) { it / 5 },
-                exit = if (reduceMotion) fadeOut(tween(0)) else fadeOut(tween(AppMotion.EXIT_MS)) +
-                    if (wide) slideOutHorizontally(tween(AppMotion.EXIT_MS)) { it / 5 } else slideOutVertically(tween(AppMotion.EXIT_MS)) { it / 5 },
                 modifier = Modifier.align(if (wide) Alignment.CenterEnd else Alignment.BottomCenter)
                     .padding(horizontal = if (wide) DesignTokens.SpaceXl else DesignTokens.SpaceTight, vertical = DesignTokens.SpaceTight),
             ) {
@@ -86,9 +81,10 @@ internal fun ReadingSettingsPanel(
                         .overlayTouchShield(),
                 ) {
                     CompositionLocalProvider(
+                        com.example.ui.components.LocalOverlayClose provides close,
                         LocalContentColor provides contentColor,
                         LocalReadingGlass provides ReadingGlassStyle(backdrop, themeColor, contentColor),
-                    ) { content { visibility.targetState = false } }
+                    ) { content { close {} } }
                 }
             }
         }

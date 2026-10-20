@@ -116,7 +116,7 @@ fun ReadingCalendarCard(
                 if (viewYear != today.get(Calendar.YEAR) ||
                     (!showYear && viewMonth != today.get(Calendar.MONTH))
                 ) {
-                    TextButton(onClick = {
+                    PullOutTextButton(onClick = {
                         viewYear = today.get(Calendar.YEAR)
                         viewMonth = today.get(Calendar.MONTH)
                     }) {

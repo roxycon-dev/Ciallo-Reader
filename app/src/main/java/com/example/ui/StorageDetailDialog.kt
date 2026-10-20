@@ -1,5 +1,10 @@
 package com.example.ui
 
+
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutAlertDialog
+import com.example.ui.components.PullOutDialog
+import com.example.ui.components.pullOutClickable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -24,12 +29,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,7 +50,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -303,7 +305,7 @@ fun StorageDetailDialog(
     val selectedFiles = entries.filter { checked[it.file] == true }.map { it.file }
     val totalSize = entries.sumOf { it.size }
 
-    Dialog(onDismissRequest = onDismiss) {
+    PullOutDialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = MaterialTheme.colorScheme.surface,
@@ -327,7 +329,7 @@ fun StorageDetailDialog(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .size(20.dp)
-                            .clickable(onClick = onDismiss),
+                            .pullOutClickable(onClick = com.example.ui.components.paperDismiss(onDismiss)),
                     )
                 }
                 Text(
@@ -352,7 +354,7 @@ fun StorageDetailDialog(
                             Row(
                                 Modifier.fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .clickable {
+                                    .pullOutClickable {
                                         val allOn = entries.isNotEmpty() && entries.all { checked[it.file] == true }
                                         entries.forEach { if (it.deletable) checked[it.file] = !allOn }
                                     }
@@ -379,7 +381,7 @@ fun StorageDetailDialog(
                                 Modifier.fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
                                     .then(
-                                        if (entry.deletable) Modifier.clickable {
+                                        if (entry.deletable) Modifier.pullOutClickable {
                                             checked[entry.file] = !(checked[entry.file] ?: false)
                                         } else Modifier
                                     )
@@ -427,7 +429,7 @@ fun StorageDetailDialog(
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                         modifier = Modifier
                                             .size(18.dp)
-                                            .clickable {
+                                            .pullOutClickable {
                                                 requestDeletion(listOf(entry.file))
                                             },
                                     )
@@ -441,33 +443,33 @@ fun StorageDetailDialog(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 Spacer(Modifier.height(8.dp))
                 if (allowDelete) Row {
-                    TextButton(
+                    PullOutTextButton(
                         onClick = {
                             requestDeletion(entries.filter { it.deletable }.map { it.file })
                         },
                         enabled = entries.any { it.deletable } && !scanning,
                     ) { Text("全部清理", color = MaterialTheme.colorScheme.error) }
                     Spacer(Modifier.weight(1f))
-                    TextButton(onClick = onDismiss) { Text("关闭") }
-                    TextButton(
+                    PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Text("关闭") }
+                    PullOutTextButton(
                         onClick = {
                             requestDeletion(selectedFiles)
                         },
                         enabled = selectedFiles.isNotEmpty(),
                     ) { Text("删除所选（${selectedFiles.size}）") }
                 }
-                else TextButton(onClick = onDismiss) { Text("关闭") }
+                else PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Text("关闭") }
             }
         }
     }
     pendingDeletion?.let { files ->
         val selectedBytes = entries.filter { it.file in files }.sumOf { it.size }
-        AlertDialog(
+        PullOutAlertDialog(
             onDismissRequest = { pendingDeletion = null },
             title = { Text("确认清理 ${files.size} 项") },
             text = { Text("预计清理 ${formatCacheSize(selectedBytes)}。\n\n${confirmTip.orEmpty()}") },
             confirmButton = {
-                TextButton(onClick = {
+                PullOutTextButton(onClick = {
                     pendingDeletion = null
                     scope.launch {
                         StorageDetailIndex.delete(files, rowKey)
@@ -477,7 +479,7 @@ fun StorageDetailDialog(
                 }) { Text("清理") }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDeletion = null }) { Text("取消") }
+                PullOutTextButton(onClick = { pendingDeletion = null }) { Text("取消") }
             }
         )
     }

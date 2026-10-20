@@ -219,136 +219,14 @@ internal fun PanelTabRail(tabs: List<PanelTabData>, selected: Int, onSelect: (In
  */
 @Composable
 internal fun PanelSlider(
-    value: Float,
-    onValueChange: (Float) -> Unit,
-    valueRange: ClosedFloatingPointRange<Float>,
-    onValueChangeFinished: () -> Unit = {},
-    steps: Int = 0,
-    enabled: Boolean = true,
-    modifier: Modifier = Modifier,
-    reverse: Boolean = false,
+    value: Float, onValueChange: (Float) -> Unit, valueRange: ClosedFloatingPointRange<Float>,
+    onValueChangeFinished: () -> Unit = {}, steps: Int = 0, enabled: Boolean = true,
+    modifier: Modifier = Modifier, reverse: Boolean = false,
+    formatLabel: (Float) -> String = { if (valueRange == 0f..1f) "${(it * 100).roundToInt()}%" else "${it.roundToInt()}" },
 ) {
-    val fraction = if (valueRange.endInclusive > valueRange.start) {
-        ((value - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
-    } else 0f
-    val density = LocalDensity.current
-    val latestOnValueChange by rememberUpdatedState(onValueChange)
-    val latestOnValueChangeFinished by rememberUpdatedState(onValueChangeFinished)
-    var pressed by remember { mutableStateOf(false) }
-    val pressScale by animateFloatAsState(if (pressed) 1.25f else 1f, spring(stiffness = 600f), label = "sliderPress")
-
-    fun snap(f: Float): Float = if (steps > 0) {
-        val st = 1f / (steps + 1)
-        (kotlin.math.round(f / st) * st).coerceIn(0f, 1f)
-    } else f
-
-    BoxWithConstraints(
-        modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .semantics {
-                progressBarRangeInfo = ProgressBarRangeInfo(value, valueRange, steps)
-                setProgress { target ->
-                    if (!enabled) false else {
-                        val fraction = ((target.coerceIn(valueRange) - valueRange.start) /
-                            (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
-                        latestOnValueChange(valueRange.start + snap(fraction) * (valueRange.endInclusive - valueRange.start))
-                        latestOnValueChangeFinished(); true
-                    }
-                }
-            }
-            .pointerInput(valueRange, steps, enabled, reverse) {
-                if (!enabled) return@pointerInput
-                val slop = viewConfiguration.touchSlop
-                val inset = DesignTokens.SpaceTight.toPx()
-                fun posToValue(x: Float): Float {
-                    val physical = ((x - inset) / (size.width - 2f * inset).coerceAtLeast(1f)).coerceIn(0f, 1f)
-                    val f = snap(if (reverse) 1f - physical else physical)
-                    return valueRange.start + f * (valueRange.endInclusive - valueRange.start)
-                }
-                awaitEachGesture {
-                    try {
-                    val down = awaitFirstDown()
-                    var totalX = 0f
-                    var totalY = 0f
-                    var dragging = false
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (change.isConsumed || event.changes.count { it.pressed } > 1 ||
-                            !dragging && abs(totalY) > slop && abs(totalY) >= abs(totalX)) {
-                            pressed = false
-                            break
-                        }
-                        if (!change.pressed) {
-                            pressed = false
-                            if (!dragging && abs(totalX) < slop && abs(totalY) < slop) {
-                                latestOnValueChange(posToValue(down.position.x))
-                                latestOnValueChangeFinished()
-                            } else if (dragging) {
-                                latestOnValueChangeFinished()
-                            }
-                            break
-                        }
-                        val dx = change.positionChange().x
-                        val dy = change.positionChange().y
-                        totalX += dx
-                        totalY += dy
-                        if (!dragging && abs(totalX) > slop && abs(totalX) > abs(totalY)) {
-                            dragging = true
-                            pressed = true
-                        }
-                        if (dragging) {
-                            latestOnValueChange(posToValue(change.position.x))
-                            change.consume()
-                        }
-                    }
-                    } finally { pressed = false }
-                }
-            }
-    ) {
-        val inset = with(density) { DesignTokens.SpaceTight.toPx() }
-        val trackWidth = (constraints.maxWidth.toFloat() - inset * 2).coerceAtLeast(1f)
-        val thumbR = with(density) { DesignTokens.SpaceSm.toPx() }
-        val pressRingR = with(density) { (if (enabled) DesignTokens.SpaceMd else DesignTokens.SpaceTight).toPx() }
-        val trackH = with(density) { 5.dp.toPx() }
-        // DrawScope 不是组合作用域：@Composable 的 MintPrimary 需在组合期取值
-        val fillEnabled = MintPrimary.copy(alpha = 0.9f)
-        val fillDisabled = MintPrimary.copy(alpha = 0.35f)
-        val ringColor = MintPrimary.copy(alpha = 0.18f)
-        Canvas(Modifier.fillMaxSize()) {
-            val cy = size.height / 2f
-            val cx = inset + trackWidth * (if (reverse) 1f - fraction else fraction)
-            // 轨道
-            drawRoundRect(
-                color = ReadingPalette.ControlTrack,
-                cornerRadius = CornerRadius(trackH / 2),
-                topLeft = Offset(inset, cy - trackH / 2),
-                size = Size(trackWidth, trackH),
-            )
-            // 填充
-            drawRoundRect(
-                color = if (enabled) fillEnabled else fillDisabled,
-                cornerRadius = CornerRadius(trackH / 2),
-                topLeft = Offset(if (reverse) cx else inset, cy - trackH / 2),
-                size = Size(trackWidth * fraction, trackH),
-            )
-            // 光环（克制：低透明度描边圈，不做发光；禁用时收起）
-            if (enabled) {
-                drawCircle(
-                    color = ringColor,
-                    radius = pressRingR * pressScale,
-                    center = Offset(cx, cy),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()),
-                )
-            }
-            // 圆钮
-            drawCircle(
-                if (enabled) Color(0xFFFFFFFF) else ReadingPalette.OnGlassMuted,
-                radius = thumbR * pressScale,
-                center = Offset(cx, cy),
-            )
-        }
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides TextPrimary) {
+    com.example.ui.components.LiquidSlider(value, onValueChange, modifier, valueRange, steps, enabled, reverse,
+        onValueChangeFinished = onValueChangeFinished, formatLabel = formatLabel)
     }
 }
 

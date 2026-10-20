@@ -25,7 +25,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.ui.adaptive.adaptiveDialogWidth
 import com.example.ui.adaptive.adaptiveSheetWidth
@@ -36,16 +35,7 @@ val LocalOverlayClose = compositionLocalOf<((() -> Unit) -> Unit)> { { action ->
 
 @Composable
 private fun overlayDismiss(visibility: MutableTransitionState<Boolean>, onDismiss: () -> Unit): ((() -> Unit) -> Unit) {
-    val latestDismiss by rememberUpdatedState(onDismiss)
-    var pending by remember { mutableStateOf<(() -> Unit)?>(null) }
-    LaunchedEffect(visibility.isIdle, visibility.currentState, visibility.targetState) {
-        if (visibility.isIdle && !visibility.currentState && !visibility.targetState) {
-            pending?.invoke()
-            pending = null
-            latestDismiss()
-        }
-    }
-    return { action -> if (visibility.targetState) { pending = action; visibility.targetState = false } }
+    return rememberPaperClose(visibility, onDismiss)
 }
 
 /** 亚克力立牌面板：品牌色 tint + 镜面光束 + 顶棱聚光 + 颗粒噪点 + 水晶棱镜描边 + 倒角高光 + 双层阴影。 */
@@ -129,7 +119,8 @@ fun AcrylicDialog(
     val blurPx = with(LocalDensity.current) { 18.dp.toPx() }
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val close = overlayDismiss(visibility, onDismissRequest)
-    Dialog(
+    PullOutDialog(
+        animateContent = false,
         onDismissRequest = { close {} },
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
     ) {
@@ -140,8 +131,8 @@ fun AcrylicDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .then(if (LocalRenderQuality.current.minimal) Modifier.background(Color.Black.copy(alpha = .45f)) else Modifier.radialGlassScrim())
-                            .clickable(
+                            .then(if (LocalRenderQuality.current.minimal) Modifier.background(Color.Black.copy(alpha = PullOutConfig.SCRIM)) else Modifier.radialGlassScrim())
+                            .pullOutClickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                                 onClick = { close {} }
@@ -168,11 +159,11 @@ fun AcrylicDialog(
                             horizontalArrangement = Arrangement.End,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            dismissButton?.invoke()
+                            CompositionLocalProvider(LocalPaperButtonAction provides close) { dismissButton?.invoke() }
                             if (dismissButton != null) {
                                 Spacer(modifier = Modifier.width(8.dp))
                             }
-                            confirmButton?.invoke()
+                            CompositionLocalProvider(LocalPaperButtonAction provides close) { confirmButton?.invoke() }
                         }
                     }
                 }
@@ -195,7 +186,8 @@ fun AcrylicBottomOverlay(
     val blurPx = with(LocalDensity.current) { 18.dp.toPx() }
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val close = overlayDismiss(visibility, onDismissRequest)
-    Dialog(
+    PullOutDialog(
+        animateContent = false,
         onDismissRequest = { close {} },
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false, decorFitsSystemWindows = !fitAvailableHeight)
     ) {
@@ -206,8 +198,8 @@ fun AcrylicBottomOverlay(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .then(if (LocalRenderQuality.current.minimal) Modifier.background(Color.Black.copy(alpha = .45f)) else Modifier.radialGlassScrim())
-                            .clickable(
+                            .then(if (LocalRenderQuality.current.minimal) Modifier.background(Color.Black.copy(alpha = PullOutConfig.SCRIM)) else Modifier.radialGlassScrim())
+                            .pullOutClickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                                 onClick = { if (dismissOnBackgroundClick) close {} }

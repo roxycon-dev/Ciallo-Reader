@@ -1,5 +1,10 @@
 package com.example.ui
 
+import com.example.ui.components.pullOutAnchor
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutAlertDialog
+import com.example.ui.components.PullOutVisibility
+import com.example.ui.components.pullOutClickable
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -375,7 +380,7 @@ fun HomeScreen(
         val cat = categoryToDelete!!
         val ctx = androidx.compose.ui.platform.LocalContext.current
         val isDefaultCategory = cat.name == com.example.data.DEFAULT_CATEGORY
-        AlertDialog(
+        PullOutAlertDialog(
             onDismissRequest = { categoryToDelete = null },
             title = { Text(if (isDefaultCategory) "无法删除" else "删除分类", fontWeight = FontWeight.Bold) },
             text = {
@@ -386,7 +391,7 @@ fun HomeScreen(
             },
             confirmButton = {
                 if (!isDefaultCategory) {
-                    TextButton(onClick = {
+                    PullOutTextButton(onClick = {
                         onDeleteCategory?.invoke(cat) { deleted ->
                             if (!deleted) {
                                 AppToast.makeText(
@@ -400,12 +405,12 @@ fun HomeScreen(
                         categoryToDelete = null
                     }) { Text("删除", color = MaterialTheme.colorScheme.error) }
                 } else {
-                    TextButton(onClick = { categoryToDelete = null }) { Text("知道了") }
+                    PullOutTextButton(onClick = { categoryToDelete = null }) { Text("知道了") }
                 }
             },
             dismissButton = {
                 if (!isDefaultCategory) {
-                    TextButton(onClick = { categoryToDelete = null }) { Text("取消") }
+                    PullOutTextButton(onClick = { categoryToDelete = null }) { Text("取消") }
                 }
             }
         )
@@ -493,7 +498,7 @@ fun HomeScreen(
                         )
                     } else {
                         availableCategories.forEach { cat ->
-                            TextButton(
+                            PullOutTextButton(
                                 onClick = { close {
                                     bookToMove?.let { onMoveBook(it, cat.name) }
                                     bookToMove = null
@@ -509,7 +514,7 @@ fun HomeScreen(
             confirmButton = {},
             dismissButton = {
                 val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                TextButton(onClick = { closeOverlay { bookToMove = null } }) {
+                PullOutTextButton(onClick = { closeOverlay { bookToMove = null } }) {
                     Text("取消")
                 }
             }
@@ -529,7 +534,7 @@ fun HomeScreen(
             },
             confirmButton = {
                 val close = com.example.ui.components.LocalOverlayClose.current
-                TextButton(
+                PullOutTextButton(
                     onClick = { close {
                         bookToDelete?.let { book ->
                             shelfMotion.remove(listOf(book.id.toString()), refreshScope, reduceMotion) { onDeleteBook(book) }
@@ -542,7 +547,7 @@ fun HomeScreen(
             },
             dismissButton = {
                 val close = com.example.ui.components.LocalOverlayClose.current
-                TextButton(onClick = { close {} }) {
+                PullOutTextButton(onClick = { close {} }) {
                     Text("取消")
                 }
             }
@@ -628,7 +633,7 @@ fun HomeScreen(
             },
             confirmButton = {
                 val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                TextButton(
+                PullOutTextButton(
                     onClick = { closeOverlay {
                         val old = favCategoryRenameFor
                         if (old != null && text.isNotBlank()) {
@@ -643,7 +648,7 @@ fun HomeScreen(
             },
             dismissButton = {
                 val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                TextButton(onClick = { closeOverlay { favCategoryRenameFor = null } }) { Text("取消") }
+                PullOutTextButton(onClick = { closeOverlay { favCategoryRenameFor = null } }) { Text("取消") }
             }
         )
     }
@@ -662,7 +667,7 @@ fun HomeScreen(
             },
             confirmButton = {
                 val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                TextButton(
+                PullOutTextButton(
                     onClick = { closeOverlay {
                         onDeleteFavoriteCategory(name)
                         if (favoriteCategory == name) {
@@ -676,7 +681,7 @@ fun HomeScreen(
             },
             dismissButton = {
                 val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                TextButton(onClick = { closeOverlay { favCategoryDeleteFor = null } }) { Text("取消") }
+                PullOutTextButton(onClick = { closeOverlay { favCategoryDeleteFor = null } }) { Text("取消") }
             }
         )
     }
@@ -925,11 +930,8 @@ fun HomeScreen(
                             titleColor = glassTitleColor(),
                             titleVisible = !isSearchExpanded,
                             trailing = {
-                                AnimatedVisibility(
-                                    visible = isSearchExpanded,
-                                    enter = expandHorizontally(expandFrom = Alignment.End) + fadeIn(),
-                                    exit = shrinkHorizontally(shrinkTowards = Alignment.End) + fadeOut()
-                                ) {
+                                PullOutVisibility(
+                                    visible = isSearchExpanded) {
                                     OutlinedTextField(
                                         value = searchQuery,
                                         onValueChange = { searchQuery = it },
@@ -1007,7 +1009,7 @@ fun HomeScreen(
                     
                                 Spacer(modifier = Modifier.height(8.dp))
                     
-                                TextButton(
+                                PullOutTextButton(
                                     onClick = { onImportClick(com.example.data.DEFAULT_CATEGORY) },
                                     modifier = Modifier.testTag("empty_bookshelf_import_button")
                                 ) {
@@ -2119,20 +2121,8 @@ fun HomeScreen(
                            下方网格一像素都不会动 —— 长按进入多选时不会再"跳一下"，
                            书卡的 itemRect 也不会瞬间失效导致误命中。 */
                         val reduceMotion = com.example.ui.feedback.LocalReduceMotion.current
-                        androidx.compose.animation.AnimatedVisibility(
+                        PullOutVisibility(
                             visible = shelfSelection.phase != com.example.ui.shelf.ShelfPhase.BROWSE,
-                            enter = if (reduceMotion) androidx.compose.animation.EnterTransition.None
-                            else androidx.compose.animation.fadeIn(animationSpec = tween(150)) +
-                                androidx.compose.animation.slideInVertically(
-                                    initialOffsetY = { -it },
-                                    animationSpec = tween(220, easing = FastOutSlowInEasing),
-                                ),
-                            exit = if (reduceMotion) androidx.compose.animation.ExitTransition.None
-                            else androidx.compose.animation.fadeOut(animationSpec = tween(110)) +
-                                androidx.compose.animation.slideOutVertically(
-                                    targetOffsetY = { -it },
-                                    animationSpec = tween(170, easing = FastOutSlowInEasing),
-                                ),
                             modifier = Modifier.align(Alignment.TopCenter),
                             label = "multiselect_topbar",
                         ) {
@@ -2354,13 +2344,13 @@ private fun NewCategoryDialog(
         },
         confirmButton = {
             val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-            TextButton(onClick = { closeOverlay { onCreate(name.trim()) } }, enabled = name.isNotBlank()) {
+            PullOutTextButton(onClick = { closeOverlay { onCreate(name.trim()) } }, enabled = name.isNotBlank()) {
                 Text("新建", color = MintPrimary, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-            TextButton(onClick = { closeOverlay {} }) { Text("取消") }
+            PullOutTextButton(onClick = { closeOverlay {} }) { Text("取消") }
         },
     )
 }
@@ -2402,7 +2392,7 @@ private fun HomeActionChip(
                 else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f),
                 RoundedCornerShape(18.dp)
             )
-            .combinedClickable(
+            .pullOutAnchor().combinedClickable(
                 interactionSource = interaction,
                 indication = null,
                 onClick = onClick
@@ -2455,7 +2445,7 @@ private fun HomeCategoryChip(
             .clip(RoundedCornerShape(17.dp))
             .background(baseColor.copy(alpha = bgAlpha))
             .border(0.5.dp, baseColor.copy(alpha = borderAlpha), RoundedCornerShape(17.dp))
-            .combinedClickable(
+            .pullOutAnchor().combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
@@ -2496,6 +2486,8 @@ private fun CategoryActionSheet(
     onGoToSettings: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    com.example.ui.components.PullOutInlineOverlay(onDismiss) { dismissPaper ->
+
     val isDefault = category.name == com.example.data.DEFAULT_CATEGORY
     Box(
         Modifier
@@ -2509,10 +2501,10 @@ private fun CategoryActionSheet(
                 Modifier
                     .fillMaxSize()
                     .background(Color(0x59000000))
-                    .clickable(
+                    .pullOutClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
-                    ) { onDismiss() }
+                    ) { dismissPaper() }
             )
         }
         com.example.ui.components.BottomSheetEntrance {
@@ -2525,7 +2517,7 @@ private fun CategoryActionSheet(
                 // 三键导航下不足；改用 LocalAppBottomInset（导航栏 + Tab 栏实测高度）。
                 .padding(horizontal = 20.dp)
                 .padding(top = 28.dp, bottom = LocalAppBottomInset.current)
-                .clickable(
+                .pullOutClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) { },
@@ -2579,8 +2571,8 @@ private fun CategoryActionSheet(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(14.dp))
                             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
-                            .clickable {
-                                onDismiss()
+                            .pullOutClickable {
+                                dismissPaper()
                                 onGoToSettings()
                             }
                             .padding(horizontal = 12.dp, vertical = 12.dp),
@@ -2616,7 +2608,7 @@ private fun CategoryActionSheet(
                             if (isDefault) MaterialTheme.colorScheme.surface.copy(alpha = 0.35f)
                             else MaterialTheme.colorScheme.error.copy(alpha = 0.08f)
                         )
-                        .clickable(enabled = !isDefault) { onDeleteRequest() }
+                        .pullOutClickable(enabled = !isDefault) { onDeleteRequest() }
                         .padding(horizontal = 12.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -2639,6 +2631,8 @@ private fun CategoryActionSheet(
         }
         } // BottomSheetEntrance 结束
     }
+
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2650,6 +2644,8 @@ private fun BookActionSheet(
     onMove: () -> Unit,
     onDelete: () -> Unit
 ) {
+    com.example.ui.components.PullOutInlineOverlay(onDismiss) { dismissPaper ->
+
     val context = LocalContext.current
     // 分享用 Activity 级作用域：弹窗关闭也不中断正在准备的分享
     val hostActivity = LocalContext.current as? androidx.activity.ComponentActivity
@@ -2691,7 +2687,7 @@ private fun BookActionSheet(
     val maxPanelH = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp * 0.5f
 
     /* 下载管理中心同款容器：亚克力底部悬浮面板 */
-    AcrylicBottomOverlay(onDismissRequest = onDismiss) {
+    AcrylicBottomOverlay(onDismissRequest = dismissPaper) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2707,7 +2703,7 @@ private fun BookActionSheet(
                         .pointerInput(Unit) {
                             detectVerticalDragGestures(
                                 onDragEnd = {
-                                    if (dragOffsetY > dismissThreshold) onDismiss()
+                                    if (dragOffsetY > dismissThreshold) dismissPaper()
                                     else dragOffsetY = 0f
                                 },
                                 onDragCancel = { dragOffsetY = 0f },
@@ -2821,7 +2817,7 @@ private fun BookActionSheet(
                                     .fillMaxWidth()
                                     .heightIn(min = 48.dp)
                                     .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
-                                    .clickable(
+                                    .pullOutClickable(
                                         interactionSource = interaction,
                                         indication = null,
                                         enabled = !(label == "分享图书" && sharing)
@@ -2830,7 +2826,7 @@ private fun BookActionSheet(
                                             "打开详情" -> onOpenDetail()
                                             "移动到其他书架" -> onMove()
                                             "分享图书" -> {
-                                                if (sharing) return@clickable
+                                                if (sharing) return@pullOutClickable
                                                 sharing = true
                                                 shareScope.launch {
                                                     val err = com.example.library.BookShareHelper.shareBook(context, book)
@@ -2860,6 +2856,8 @@ private fun BookActionSheet(
             }
         }
 
+
+    }
 
     }
 }

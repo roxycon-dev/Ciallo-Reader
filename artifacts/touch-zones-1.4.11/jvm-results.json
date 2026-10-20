@@ -1,0 +1,155 @@
+[
+  {
+    "name": "com.example.data.PageTurnTapTest",
+    "tests": "8",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "9.773",
+    "timestamp": "2026-10-20T12:22:46.376Z"
+  },
+  {
+    "name": "com.example.discover.DiscoverUiTest",
+    "tests": "23",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "17.653",
+    "timestamp": "2026-10-20T12:22:56.221Z"
+  },
+  {
+    "name": "com.example.source.impl.FanqieGatewayTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "2.857",
+    "timestamp": "2026-10-20T12:23:13.889Z"
+  },
+  {
+    "name": "com.example.source.impl.GuestNovelTransportTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "2.315",
+    "timestamp": "2026-10-20T12:23:16.750Z"
+  },
+  {
+    "name": "com.example.source.js.JsAccessErrorTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "0.001",
+    "timestamp": "2026-10-20T12:23:19.066Z"
+  },
+  {
+    "name": "com.example.source.js.JsHtmlStoreTest",
+    "tests": "8",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "0.205",
+    "timestamp": "2026-10-20T12:23:19.069Z"
+  },
+  {
+    "name": "com.example.ui.comic.ComicCurlGestureArbitrationTest",
+    "tests": "10",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "1.111",
+    "timestamp": "2026-10-20T12:23:23.013Z"
+  },
+  {
+    "name": "com.example.ui.comic.ComicCurlTrackingTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "0.139",
+    "timestamp": "2026-10-20T12:23:24.130Z"
+  },
+  {
+    "name": "com.example.ui.comic.ComicGestureLogicTest",
+    "tests": "6",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "0.021",
+    "timestamp": "2026-10-20T12:23:24.271Z"
+  },
+  {
+    "name": "com.example.ui.comic.ComicHarismCurlTest",
+    "tests": "13",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "0.542",
+    "timestamp": "2026-10-20T12:23:24.339Z"
+  },
+  {
+    "name": "com.example.ui.comic.ComicReaderConfigTest",
+    "tests": "6",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "0.19",
+    "timestamp": "2026-10-20T12:23:24.886Z"
+  },
+  {
+    "name": "com.example.ui.comic.ComicScrollMetricsTest",
+    "tests": "5",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "0.001",
+    "timestamp": "2026-10-20T12:23:25.078Z"
+  },
+  {
+    "name": "com.example.ui.comic.ComicSettingsStoreTest",
+    "tests": "6",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "0.686",
+    "timestamp": "2026-10-20T12:23:25.107Z"
+  },
+  {
+    "name": "com.example.ui.comic.Reader125GestureTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "0.001",
+    "timestamp": "2026-10-20T12:23:25.796Z"
+  },
+  {
+    "name": "com.example.ui.components.PaperAndSliderTest",
+    "tests": "14",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "5.503",
+    "timestamp": "2026-10-20T12:23:25.855Z"
+  },
+  {
+    "name": "com.example.ui.OverlayPolishTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "0.812",
+    "timestamp": "2026-10-20T12:23:19.298Z"
+  },
+  {
+    "name": "com.example.ui.TouchZoneSystemTest",
+    "tests": "16",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "2.817",
+    "timestamp": "2026-10-20T12:23:20.148Z"
+  }
+]

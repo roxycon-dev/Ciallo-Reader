@@ -2,12 +2,13 @@
 
 package com.example.ui.source
 
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutVisibility
 import android.net.Uri
 import android.webkit.CookieManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
@@ -68,7 +69,6 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberTopAppBarState
@@ -362,22 +362,9 @@ fun SourceManagementScreen(
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-    AnimatedVisibility(
+    PullOutVisibility(
         visible = contentVisible,
-        modifier = Modifier.fillMaxSize(),
-        enter = fadeIn(tween(260)) +
-            scaleIn(
-                initialScale = 0.94f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
-                )
-            ) +
-            slideInVertically(
-                initialOffsetY = { it / 12 },
-                animationSpec = tween(280)
-            )
-    ) {
+        modifier = Modifier.fillMaxSize()) {
         // ── 可读性由 GlassKitHost 一次提供 ──────────────────────────────
         // ① 壁纸采样模糊 + 全屏遮罩、② 顶部渐变，都画在**被录制的层**里；
         //    因此玻璃卡采样到的是「已压暗、已保护标题」的背景，而不是原始壁纸；
@@ -545,13 +532,13 @@ fun SourceManagementScreen(
             dismissButton = {
                 val closeOverlay = com.example.ui.components.LocalOverlayClose.current
                 Row {
-                    TextButton(onClick = {
+                    PullOutTextButton(onClick = {
                         com.example.source.SourceLog.clear()
                         debugLogText = "（已清空）"
                     }) {
                         Text("清空")
                     }
-                    TextButton(onClick = { closeOverlay { showDebugLog = false } }) {
+                    PullOutTextButton(onClick = { closeOverlay { showDebugLog = false } }) {
                         Text("关闭")
                     }
                 }
@@ -574,21 +561,21 @@ fun SourceManagementScreen(
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    TextButton(
+                    PullOutTextButton(
                         onClick = { closePicker {
                             showImportPicker = false
                             fileLauncher.launch("*/*")
                         } },
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("从本地文件导入") }
-                    TextButton(
+                    PullOutTextButton(
                         onClick = { closePicker {
                             showImportPicker = false
                             showPasteDialog = true
                         } },
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("粘贴 JSON 配置") }
-                    TextButton(
+                    PullOutTextButton(
                         onClick = { closePicker {
                             showImportPicker = false
                             showNetworkDialog = true
@@ -599,7 +586,7 @@ fun SourceManagementScreen(
             },
             dismissButton = {
                 val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                TextButton(onClick = { closeOverlay { showImportPicker = false } }) {
+                PullOutTextButton(onClick = { closeOverlay { showImportPicker = false } }) {
                     Text("取消")
                 }
             }
@@ -636,7 +623,7 @@ fun SourceManagementScreen(
             },
             dismissButton = {
                 val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                TextButton(onClick = { closeOverlay { showPasteDialog = false } }) {
+                PullOutTextButton(onClick = { closeOverlay { showPasteDialog = false } }) {
                     Text("取消")
                 }
             }
@@ -664,7 +651,7 @@ fun SourceManagementScreen(
                     )
                     Text("快速选择社区源：", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     SourceImporter.PRESET_SOURCE_URLS.forEach { (url, label) ->
-                        TextButton(
+                        PullOutTextButton(
                             onClick = { networkUrl = url },
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -694,7 +681,7 @@ fun SourceManagementScreen(
             },
             dismissButton = {
                 val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                TextButton(onClick = { closeOverlay { showNetworkDialog = false } }) {
+                PullOutTextButton(onClick = { closeOverlay { showNetworkDialog = false } }) {
                     Text("取消")
                 }
             }
@@ -1143,12 +1130,8 @@ private fun SourceGroupCard(
         // 头部与列表之间：0.5px 分割线，左右**不缩进**
         SourceLine()
 
-        AnimatedVisibility(
+        PullOutVisibility(
             visible = expanded,
-            enter = fadeIn(tween(AppMotion.TRANSITION_MS)) +
-                expandVertically(animationSpec = tween(AppMotion.TRANSITION_MS)),
-            exit = fadeOut(tween(AppMotion.TRANSITION_MS)) +
-                shrinkVertically(animationSpec = tween(AppMotion.TRANSITION_MS)),
             modifier = Modifier.fillMaxWidth()
         ) {
             // AnimatedSize：展开/收起「其余 N 个」时高度与内容同步过渡，不跳变
@@ -1393,7 +1376,7 @@ private fun SourceRow(
                 overflow = TextOverflow.Ellipsis
             )
             if (source.isComicSource) {
-                TextButton(onClick = { showSourceInfo = true }, contentPadding = PaddingValues(0.dp),
+                PullOutTextButton(onClick = { showSourceInfo = true }, contentPadding = PaddingValues(0.dp),
                     modifier = Modifier.heightIn(min = 28.dp)) {
                     Text("漫画源 · 查看资料", style = SourceIdStyle.copy(color = MaterialTheme.colorScheme.primary))
                 }

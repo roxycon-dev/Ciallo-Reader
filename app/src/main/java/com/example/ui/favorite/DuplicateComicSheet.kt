@@ -1,5 +1,9 @@
 package com.example.ui.favorite
 
+import com.example.ui.components.PullOutButton
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutBottomSheet
+import com.example.ui.components.pullOutClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -38,7 +42,7 @@ fun DuplicateComicSheet(
         normalizedQuery.isBlank() || TitleNormalizer.compact(it.title).contains(normalizedQuery) ||
             TitleNormalizer.compact(it.author).contains(normalizedQuery)
     } else request.candidates.map { it.favorite }
-    ModalBottomSheet(
+    PullOutBottomSheet(
         onDismissRequest = { if (!request.busy) onDismiss() },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
@@ -51,7 +55,7 @@ fun DuplicateComicSheet(
             Spacer(Modifier.height(8.dp))
             Text("喜欢里有名称相似的作品。选一本替换并迁移阅读标记，或让两个来源并存。",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextButton(enabled = !request.busy, onClick = { manual = !manual; selected = null }) {
+            PullOutTextButton(enabled = !request.busy, onClick = { manual = !manual; selected = null }) {
                 Text(if (manual) "返回相似作品" else "另一种译名？手动选旧收藏")
             }
             if (manual) {
@@ -66,7 +70,7 @@ fun DuplicateComicSheet(
                         val chosen = selected == favorite
                         Surface(shape = RoundedCornerShape(16.dp),
                             color = if (chosen) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                            modifier = Modifier.fillMaxWidth().clickable(enabled = !request.busy) {
+                            modifier = Modifier.fillMaxWidth().pullOutClickable(enabled = !request.busy) {
                                 selected = if (chosen) null else favorite
                             }) {
                             Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -107,14 +111,14 @@ fun DuplicateComicSheet(
                 }
             } else {
                 selected?.let { favorite ->
-                    Button(onClick = { onConfirm(favorite) }, modifier = Modifier.fillMaxWidth()) { Text("替换这一本并迁移阅读记录") }
+                    PullOutButton(onClick = { onConfirm(favorite) }, modifier = Modifier.fillMaxWidth()) { Text("替换这一本并迁移阅读记录") }
                 }
                 if (selected == null) {
-                    Button(onClick = { onConfirm(null) }, modifier = Modifier.fillMaxWidth()) { Text("依然添加 · 两本并存") }
+                    PullOutButton(onClick = { onConfirm(null) }, modifier = Modifier.fillMaxWidth()) { Text("依然添加 · 两本并存") }
                 } else {
-                    TextButton(onClick = { onConfirm(null) }, modifier = Modifier.fillMaxWidth()) { Text("依然添加 · 两本并存") }
+                    PullOutTextButton(onClick = { onConfirm(null) }, modifier = Modifier.fillMaxWidth()) { Text("依然添加 · 两本并存") }
                 }
-                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("取消") }
+                PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss), modifier = Modifier.fillMaxWidth()) { Text("取消") }
             }
             Spacer(Modifier.height(12.dp))
         }

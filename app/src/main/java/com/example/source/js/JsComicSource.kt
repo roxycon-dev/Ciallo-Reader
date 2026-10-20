@@ -36,6 +36,8 @@ internal fun friendlyJsSourceError(raw: String): String {
         text.contains("Not logged in", ignoreCase = true) ||
             text.contains("请先登录") -> "该源需要登录：请在书源管理中登录"
         text.contains("Invalid status code: 401") -> "登录已过期：请在书源管理中重新登录"
+        Regex("(?:status code[:：]?\\s*|HTTP\\s*)451", RegexOption.IGNORE_CASE).containsMatchIn(text) ->
+            "源站限制了当前地区的访问（HTTP 451），请使用其他可用书源"
         text.contains("Cloudflare", ignoreCase = true) ->
             "源站暂时拦截请求，请稍后重试"
             text.contains("Invalid status code: 403", ignoreCase = true) ||
@@ -58,7 +60,7 @@ internal fun jsSourceFailure(raw: String): SourceException {
     if (raw.contains("Not logged in", true) || raw.contains("Login expired", true) || raw.contains("请先登录") ||
         raw.contains("该源需要登录") || raw.contains("Invalid status code: 401", true)) return SourceException.LoginRequired
     return if (message.startsWith("源站返回网页") || message.startsWith("源站返回验证") || message.startsWith("源站返回空响应") ||
-        message.startsWith("网络连接失败") || message.contains("HTTP 403") || raw.contains("Cloudflare", true))
+        message.startsWith("网络连接失败") || message.contains("HTTP 403") || message.contains("HTTP 451") || raw.contains("Cloudflare", true))
         SourceException.NetworkError(message) else SourceException.ParseError(message)
 }
 

@@ -11,7 +11,7 @@ Read local ebooks, novels, and comics in one Android app.
 
 [🌐 Product site](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ Download the latest APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.4.10 release notes](docs/release-1.4.10-2026-10-19.md) ·
+[1.4.11 release notes](docs/release-1.4.11-2026-10-20.md) ·
 [See screenshots](#screenshots) ·
 [Features](#features) ·
 [Report an issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -24,6 +24,8 @@ Read local ebooks, novels, and comics in one Android app.
 </div>
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
+
+**1.4.11 / 234** adds an in-place touch-zone editor over the unchanged novel or manga page, with a light dim layer, collapsible tools and real-page try mode, independent tap/swipe actions, adjustable swipe distance and animated personal calibration. Existing reader gestures remain the default. Popovers share a bitmap-mesh paper transition; sliders share a theme-aware liquid glass lens with continuous, discrete and range modes. This release also includes scrollable source diagnostics, source retry fixes and the public Fanqie aggregator. [Release and validation](docs/release-1.4.11-2026-10-20.md).
 
 **1.4.10 / 233** adds **书阁 (Shuge, `xbookcn`)**, an account-free Chinese novel source with search, details, a full table of contents, online text and whole-book EPUB download. The site ships no whole-book file, so the app fetches chapters and packages the EPUB locally, comparing the table of contents before and after and discarding the whole book if any chapter differs. It also fixes normal pages being misread as verification pages because of injected Cloudflare scripts, and retries once when the site drops a TLS handshake. Other sources and existing download paths are unchanged. See the [release notes and download](docs/release-1.4.10-2026-10-19.md).
 
@@ -38,6 +40,8 @@ The three new sources were checked through search, whole-book download, import a
 Enable **嬉皮漫画 (Xipi)** for Money-First Hero and choose the original chapter title **鹰身女妖&天使** for episode 180.5. Use **19漫画 (19 Manga)** for the other three titles. Native category labels and routes are read from the sites, then mapped to the app's shared taxonomy. Verification reflects availability on 2026-10-18; see the [source audit](docs/latest-comic-source-verification-2026-10-18.md) for episode identity, page counts and scope.
 
 Also repairs legacy Android API compatibility, glass effect cleanup, EPUB path handling and Compose state subscriptions found during release checks.
+
+
 
 ## Screenshots
 
@@ -133,7 +137,7 @@ Version 1.3.8 adds Discover and restores Aiman and MYCOMIC reading. Its APK reta
 
 - **Android:** 7.0 (API 24) or newer.
 - **Architecture:** Current release APKs target arm64-v8a, supported by most Android phones and tablets. The release APK does not include an x86_64 emulator build.
-- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.4.10 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.10/Ciallo-Reader-v1.4.10.apk).
+- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.4.11 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.11/Ciallo-Reader-v1.4.11.apk).
 - Open the downloaded APK and follow Android's prompt to allow installation from that source.
 
 ## Get started

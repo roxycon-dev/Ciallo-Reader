@@ -1,5 +1,9 @@
 package com.example.library
 
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutIconButton
+import com.example.ui.components.PullOutDialog
+import com.example.ui.components.pullOutClickable
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.core.Spring
@@ -30,7 +34,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.chrisbanes.haze.HazeState
 import com.example.ui.components.liquidGlass
@@ -41,7 +44,8 @@ import com.example.ui.components.rememberIridescentColors
 import com.example.ui.components.rememberThemedGlassBackdrop
 import com.example.ui.components.AppLiquidButton
 import com.example.ui.components.DialogLiquidGlass
-import com.example.ui.adaptive.AdaptiveSpec
+import com.example.ui.adaptive.AdaptiveSpec
+
 import com.example.ui.components.AppToast
 
 /**
@@ -63,7 +67,7 @@ fun LibraryLoginDialog(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    Dialog(
+    PullOutDialog(
         onDismissRequest = { if (!loading) onDismiss() },
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
@@ -92,7 +96,7 @@ fun LibraryLoginDialog(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clickable(
+                    .pullOutClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         onClick = { if (!loading) onDismiss() }
@@ -105,16 +109,11 @@ fun LibraryLoginDialog(
                 val baseModifier = Modifier
                     .fillMaxWidth(0.92f)
                     .widthIn(max = AdaptiveSpec.dialogMaxWidth)
-                    .clickable(
+                    .pullOutClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         onClick = {}
                     )
-                    .graphicsLayer {
-                        scaleX = panelScale
-                        scaleY = panelScale
-                        alpha = panelAlpha
-                    }
                     .liquidGlass(
                         backdrop = dialogBackdrop,
                         shape = cardShape,
@@ -161,7 +160,7 @@ fun LibraryLoginDialog(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.weight(1f))
-                        IconButton(onClick = { if (!loading) onDismiss() }) {
+                        PullOutIconButton(onClick = { if (!loading) onDismiss() }) {
                             Icon(
                                 Icons.Default.Close,
                                 contentDescription = "关闭",
@@ -238,7 +237,7 @@ fun LibraryLoginDialog(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    TextButton(
+                    PullOutTextButton(
                         onClick = {
                             val url = "https://${ZLibraryNodeConfig.domain}/registration"
                             runCatching {

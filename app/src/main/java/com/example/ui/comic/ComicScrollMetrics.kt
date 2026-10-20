@@ -33,6 +33,13 @@ internal data class ComicScrollMetrics(
             firstVisibleItemScrollOffset.coerceAtLeast(0)).toDouble() / scrollRange).toFloat().coerceIn(0f, 1f)
     }
 
+    /** Custom swipe paging advances one viewport, including within a single very tall image. */
+    fun pageFraction(next: Boolean): Float {
+        if (scrollRange <= 0L) return fraction
+        val step = viewportSize.coerceAtLeast(1) * .90 / scrollRange
+        return (fraction + if (next) step else -step).toFloat().coerceIn(0f, 1f)
+    }
+
     /** 滑条落点反算到项内像素偏移，长图和末图都能精确定位。 */
     fun target(fraction: Float): ComicScrollTarget {
         if (itemSizes.isEmpty()) return ComicScrollTarget(0, 0)

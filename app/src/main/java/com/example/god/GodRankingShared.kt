@@ -1,5 +1,6 @@
 package com.example.god
 
+import com.example.ui.components.pullOutClickable
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -201,7 +202,7 @@ fun GodItemMenu(
         Column(modifier = Modifier.padding(vertical = 4.dp)) {
             GodMenuItem(text = "编辑", onClick = onEdit)
             GodMenuItem(text = "删除", danger = true, onClick = onDelete)
-            GodMenuItem(text = "取消", onClick = onDismiss)
+            GodMenuItem(text = "取消", onClick = com.example.ui.components.paperDismiss(onDismiss))
         }
     }
 }
@@ -225,7 +226,7 @@ private fun GodMenuItem(text: String, onClick: () -> Unit, danger: Boolean = fal
 }
 
 private fun Modifier.clickableItem(onClick: () -> Unit): Modifier =
-    this.clickable(onClick = onClick)
+    this.pullOutClickable(onClick = onClick)
 
 /* ══════════════ 空状态 ══════════════ */
 

@@ -1,5 +1,6 @@
 package com.example.library
 
+import com.example.ui.components.PullOutIconButton
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
@@ -27,7 +28,6 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -175,7 +175,7 @@ fun DownloadGlassCard(
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     if (onDismiss != null) {
-                        IconButton(onClick = onDismiss) {
+                        PullOutIconButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) {
                             Icon(
                                 Icons.Default.Close,
                                 contentDescription = "关闭",
@@ -240,7 +240,7 @@ fun DownloadGlassCard(
                         )
                     }
                     if (onDismiss != null) {
-                        IconButton(onClick = onDismiss) {
+                        PullOutIconButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) {
                             Icon(
                                 Icons.Default.Close,
                                 contentDescription = "关闭",

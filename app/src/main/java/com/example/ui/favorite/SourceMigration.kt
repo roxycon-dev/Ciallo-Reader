@@ -1,5 +1,8 @@
 package com.example.ui.favorite
 
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutBottomSheet
+import com.example.ui.components.pullOutClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,10 +24,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -126,7 +127,7 @@ fun SourceMigrateSheet(
     onPick: (SourceCandidate) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    PullOutBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -183,7 +184,7 @@ fun SourceMigrateSheet(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-            TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+            PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss), modifier = Modifier.align(Alignment.End)) {
                 Text("取消")
             }
         }
@@ -201,7 +202,7 @@ private fun SourceCandidateRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick),
+            .pullOutClickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),

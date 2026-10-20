@@ -1,5 +1,6 @@
 package com.example.god
 
+import com.example.ui.components.pullOutAnchor
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -107,7 +108,7 @@ fun GodChapterCard(
             .fillMaxWidth()
             .height(96.dp)
             .clip(shape)
-            .combinedClickable(
+            .pullOutAnchor().combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
                 onClickLabel = "阅读",

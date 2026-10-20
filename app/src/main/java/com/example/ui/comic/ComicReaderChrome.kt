@@ -1,5 +1,10 @@
 package com.example.ui.comic
 
+import com.example.ui.components.PullOutIconButton
+import com.example.ui.components.PullOutDropdownMenuItem
+import com.example.ui.components.PullOutDropdownMenu
+import com.example.ui.components.PullOutVisibility
+import com.example.ui.components.pullOutClickable
 import com.example.ui.design.DesignTokens
 import com.example.ui.design.ReadingPalette
 
@@ -12,7 +17,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -66,8 +70,6 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -101,7 +103,6 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.MintPrimary
 import com.example.god.GodGold
 import com.kashif_e.backdrop.Backdrop
-import com.kashif_e.backdrop.backdrops.LayerBackdrop
 import com.kashif_e.backdrop.drawPlainBackdrop
 import com.kashif_e.backdrop.effects.blur
 import com.kashif_e.backdrop.effects.colorControls
@@ -157,7 +158,7 @@ fun ComicReaderChrome(
     visible: Boolean,
     panel: ComicPanel,
     onPanelChange: (ComicPanel) -> Unit,
-    panelGlassBackdrop: LayerBackdrop? = null,
+    panelGlassBackdrop: Backdrop? = null,
     settingsInitialTab: Int = 0,
     title: String,
     chapterTitle: String?,
@@ -196,6 +197,7 @@ fun ComicReaderChrome(
     onDownloadTranslationModels: () -> Unit = {},
     onTranslationRefresh: (Boolean) -> Unit = {},
     onBottomBarHeightChanged: (Int) -> Unit = {},
+    onEditTouchZones: () -> Unit = {},
 ) {
     val reduceMotion = LocalReduceMotion.current
     val configuration = LocalConfiguration.current
@@ -210,10 +212,8 @@ fun ComicReaderChrome(
     BackHandler(enabled = panel != ComicPanel.NONE) { onDismissPanel() }
 
     // 顶部控制栏
-    AnimatedVisibility(
+    PullOutVisibility(
         visible = visible && panel == ComicPanel.NONE,
-        enter = fadeIn(tween(ENTER_MS)) + slideInVertically(tween(ENTER_MS)) { -it },
-        exit = fadeOut(tween(EXIT_MS)) + slideOutVertically(tween(EXIT_MS)) { -it },
     ) {
         ComicTopBar(
             title = title, chapterTitle = chapterTitle,
@@ -233,11 +233,9 @@ fun ComicReaderChrome(
 
     // 底部控制栏 + 悬浮缩略图气泡（气泡由 Chrome 层渲染，不占底栏布局）
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-        AnimatedVisibility(
+        PullOutVisibility(
             modifier = Modifier.onSizeChanged { onBottomBarHeightChanged(it.height) },
             visible = visible && panel == ComicPanel.NONE,
-            enter = fadeIn(tween(ENTER_MS)) + slideInVertically(tween(ENTER_MS)) { it },
-            exit = fadeOut(tween(EXIT_MS)) + slideOutVertically(tween(EXIT_MS)) { it },
         ) {
             ComicBottomBar(
                 currentPage = currentPage, totalPages = totalPages,
@@ -280,7 +278,7 @@ fun ComicReaderChrome(
     var displayedPanel by remember { mutableStateOf(panel) }
     if (panel != ComicPanel.NONE) displayedPanel = panel
     // 面板遮罩（与面板同节奏淡入淡出）
-    AnimatedVisibility(
+    com.example.ui.components.PullOutScrim(
         visible = panel != ComicPanel.NONE,
         enter = fadeIn(tween(if (reduceMotion) 0 else ENTER_MS)),
         exit = fadeOut(tween(if (reduceMotion) 0 else EXIT_MS)),
@@ -288,17 +286,13 @@ fun ComicReaderChrome(
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color(0x66000000))
-                .clickableNoRipple { if (panel != ComicPanel.SETTINGS) onDismissPanel() }
+                .background(Color.Black.copy(alpha = com.example.ui.components.PullOutConfig.SCRIM))
+                .clickableNoRipple { onDismissPanel() }
         )
     }
 
-    AnimatedVisibility(
+    PullOutVisibility(
         visible = panel != ComicPanel.NONE,
-        enter = if (reduceMotion) fadeIn(tween(0)) else fadeIn(tween(AppMotion.CONTENT_MS)) +
-            if (wide) slideInHorizontally(AppMotion.reorder()) { it / 6 } else slideInVertically(AppMotion.reorder()) { it / 6 },
-        exit = if (reduceMotion) fadeOut(tween(0)) else fadeOut(tween(AppMotion.EXIT_MS)) +
-            if (wide) slideOutHorizontally(tween(AppMotion.EXIT_MS)) { it / 6 } else slideOutVertically(tween(AppMotion.EXIT_MS)) { it / 6 },
         modifier = Modifier.fillMaxSize(),
     ) {
         CompositionLocalProvider(LocalReadingGlass provides ReadingGlassStyle(panelGlassBackdrop, Color(0xFF232329), TextPrimary)) {
@@ -325,6 +319,7 @@ fun ComicReaderChrome(
                     onDownloadTranslationModels = onDownloadTranslationModels,
                     onTranslationRefresh = onTranslationRefresh,
                     initialTab = settingsInitialTab,
+                    onEditTouchZones = onEditTouchZones,
                 )
                 ComicPanel.TOC -> ComicTocSheet(
                     toc = toc, currentChapterIndex = currentChapterIndex,
@@ -425,7 +420,7 @@ private fun ComicTopBar(
                         tint = TextPrimary.copy(alpha = 0.92f), modifier = Modifier.size(22.dp)
                     )
                 }
-                DropdownMenu(
+                PullOutDropdownMenu(
                     expanded = favMenuOpen,
                     onDismissRequest = { favMenuOpen = false },
                     containerColor = ReadingPalette.DialogSurface,
@@ -436,7 +431,7 @@ private fun ComicTopBar(
                         modifier = Modifier.padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceXs),
                     )
                     favorites.forEach { p ->
-                        DropdownMenuItem(
+                        PullOutDropdownMenuItem(
                             text = { Text(p.name, color = TextPrimary) },
                             leadingIcon = { Text(p.emoji, color = MintPrimary, fontSize = DesignTokens.TypeCaption) },
                             onClick = {
@@ -449,23 +444,23 @@ private fun ComicTopBar(
             }
             Box {
                 ChromeIconButton(Icons.Filled.MoreHoriz, "更多") { menuOpen = true }
-                DropdownMenu(
+                PullOutDropdownMenu(
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
                     containerColor = ReadingPalette.DialogSurface,
                 ) {
-                    DropdownMenuItem(
+                    PullOutDropdownMenuItem(
                         text = { Text("临时合页 / 取消", color = TextPrimary) },
                         leadingIcon = { Icon(Icons.Filled.AutoStories, null, tint = TextSecondary) },
                         enabled = canToggleMerge,
                         onClick = { menuOpen = false; onToggleMerge() }
                     )
-                    DropdownMenuItem(
+                    PullOutDropdownMenuItem(
                         text = { Text("手动裁边", color = TextPrimary) },
                         leadingIcon = { Icon(Icons.Filled.Settings, null, tint = TextSecondary) },
                         onClick = { menuOpen = false; onOpenPanel(ComicPanel.CROP) },
                     )
-                    DropdownMenuItem(
+                    PullOutDropdownMenuItem(
                         text = { Text("阅读预设", color = TextPrimary) },
                         leadingIcon = { Icon(Icons.Filled.ChevronLeft, null, tint = TextSecondary) },
                         onClick = { menuOpen = false; onOpenPanel(ComicPanel.PRESET) },
@@ -563,6 +558,7 @@ private fun ComicBottomBar(
                 dragging = false
                 onThumbPreview(-1, -1f)
             },
+            formatLabel = { if (scrolling) "${(it * 100).toInt()}%" else "第 ${spreadFirstRaw(it.toInt().coerceIn(0, (spreadCount - 1).coerceAtLeast(0))) + 1} 页" },
             enabled = sliderEnabled,
             reverse = reverse,
             valueRange = sliderRange,
@@ -663,7 +659,7 @@ internal fun ChromeIconButton(
 }
 
 internal fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier =
-    this.clickable(interactionSource = MutableInteractionSource(), indication = null, onClick = onClick)
+    this.pullOutClickable(interactionSource = MutableInteractionSource(), indication = null, onClick = onClick)
 
 /** 分段选择器（id 由调用方定义）。
  *  FlowRow 流式布局：每项按文字实际宽度占位，一行放不下自动换行——
@@ -745,6 +741,7 @@ internal fun SliderRow(
             onValueChange = onChange,
             onValueChangeFinished = onFinished,
             valueRange = range,
+            formatLabel = format,
             steps = steps,
             modifier = Modifier.semantics { contentDescription = title; stateDescription = format(value) },
         )
@@ -774,7 +771,7 @@ internal fun ComicSheetContainer(
     onDismiss: () -> Unit,
     heightFraction: Float = 0.66f,
     scrollable: Boolean = true,
-    glassBackdrop: LayerBackdrop? = null,
+    glassBackdrop: Backdrop? = null,
     content: @Composable () -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
@@ -805,7 +802,7 @@ internal fun ComicSheetContainer(
         }
         Row(Modifier.fillMaxWidth().padding(start = DesignTokens.SpaceXl, end = DesignTokens.SpaceSm), verticalAlignment = Alignment.CenterVertically) {
             Text(title, color = TextPrimary, fontSize = DesignTokens.TypeSectionLineHeight, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            androidx.compose.material3.IconButton(onClick = onDismiss) {
+            PullOutIconButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) {
                 Icon(androidx.compose.material.icons.Icons.Filled.Close, "关闭$title", tint = TextSecondary)
             }
         }

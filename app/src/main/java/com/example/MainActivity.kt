@@ -1,5 +1,6 @@
 package com.example
 
+import com.example.ui.components.PullOutVisibility
 import android.net.Uri
 import android.os.Bundle
 import kotlinx.coroutines.flow.first
@@ -1053,12 +1054,8 @@ class MainActivity : ComponentActivity() {
                             }
                             // 底部 Tab 栏：多选态下被悬浮操作栏"替换"（弹簧滑出）
                             val tabBarVisible by com.example.ui.shelf.ShelfChrome.tabBarVisible.collectAsStateWithLifecycle()
-                            androidx.compose.animation.AnimatedVisibility(
+                            PullOutVisibility(
                                 visible = tabBarVisible,
-                                enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }) +
-                                    fadeIn(tween(220)),
-                                exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) +
-                                    fadeOut(tween(180)),
                                 modifier = Modifier.align(Alignment.BottomCenter),
                             ) {
                                 AppBottomTabBar(

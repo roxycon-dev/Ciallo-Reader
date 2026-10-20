@@ -292,6 +292,29 @@ class DiscoverUiTest {
         compose.waitForIdle()
         capture("discover-scrolled.png")
     }
+    @Test @Config(qualifiers = "zh-rCN-w360dp-h640dp-420dpi")
+    fun sourceDiagnosticsScrollInsideTheirOwnPanelWithLargeText() {
+        val sources = (1..22).map { FixtureSource(it.toString()) }
+        compose.setContent {
+            MyApplicationTheme {
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, 1.3f),
+                    LocalReduceMotion provides true, LocalRenderQuality provides RenderQuality.MID) {
+                    Surface(Modifier.fillMaxSize()) {
+                        DiscoverSourceStatusSheet(sources, emptyList(),
+                            DiscoverState(errors = mapOf("22" to "源站限制了当前地区的访问（HTTP 451）")),
+                            "全部", {}, {})
+                    }
+                }
+            }
+        }
+        compose.onNodeWithText("书源加载详情").assertIsDisplayed()
+        compose.onNodeWithTag("discover_source_status_list").performScrollToNode(hasText("示例书源 22"))
+        compose.onNodeWithText("示例书源 22").assertIsDisplayed()
+        compose.onNodeWithContentDescription("关闭来源详情").assertIsDisplayed()
+        compose.onNodeWithText("重试失败书源").assertIsDisplayed()
+        capture("discover-source-status130.png", overlay = true)
+    }
     private fun capture(name: String, overlay: Boolean = false) {
         val root = generateSequence(java.io.File(requireNotNull(System.getProperty("user.dir")))) { it.parentFile }
             .first { java.io.File(it, "gradlew.bat").exists() }

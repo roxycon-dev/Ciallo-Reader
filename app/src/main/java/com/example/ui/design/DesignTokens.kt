@@ -39,6 +39,9 @@ import androidx.compose.ui.graphics.Color
  *  - 页面内顶部栏复用书架页顶部栏（Surface + 24dp 圆角 + 8dp 阴影）。
  */
 object DesignTokens {
+    val Zero = 0.dp
+    val Hairline = 1.dp
+    val StrokeStrong = 3.dp
     val RadiusXs = 8.dp
     val RadiusSm = 12.dp
     val RadiusMd = 16.dp

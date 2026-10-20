@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -216,7 +217,7 @@ fun WeeklyReadingChart(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
                             .weight(1f)
-                            .clickable(
+                            .pullOutClickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
                             ) {
@@ -460,7 +461,7 @@ private fun DayCoverCard(
     Column(
         modifier = Modifier
             .width(84.dp)
-            .combinedClickable(
+            .pullOutAnchor().combinedClickable(
                 onClick = {
                     when {
                         book != null -> onOpenBook(book)
@@ -598,7 +599,7 @@ private fun DayCoverCard(
             confirmButton = {},
             dismissButton = {
                 val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                TextButton(onClick = { closeOverlay { showMenu = false } }) { Text("取消") }
+                PullOutTextButton(onClick = { closeOverlay { showMenu = false } }) { Text("取消") }
             }
         )
     }
@@ -631,7 +632,7 @@ private fun DayCoverCard(
             },
             confirmButton = {
                 val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                TextButton(onClick = { closeOverlay { showDetail = false } }) { Text("关闭") }
+                PullOutTextButton(onClick = { closeOverlay { showDetail = false } }) { Text("关闭") }
             }
         )
     }
@@ -652,7 +653,7 @@ private fun MenuActionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
+            .pullOutClickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 4.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

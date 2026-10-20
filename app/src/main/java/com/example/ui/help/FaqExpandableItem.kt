@@ -1,6 +1,6 @@
 package com.example.ui.help
 
-import androidx.compose.animation.AnimatedVisibility
+import com.example.ui.components.PullOutVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -70,11 +70,8 @@ fun FaqExpandableItem(
                     modifier = Modifier.rotate(rotationState)
                 )
             }
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
+            PullOutVisibility(
+                visible = expanded) {
                 Column {
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(

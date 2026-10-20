@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -20,6 +19,9 @@ import androidx.compose.ui.unit.dp
 
 internal data class ReleaseSummary(val version: String, val date: String, val summary: String)
 internal val releaseHistory = listOf(
+    ReleaseSummary("1.4.11", "10-20", "原尺寸触控分区与滑动校准 · 统一纸面动效与液体玻璃滑条 · 书源修复"),
+    ReleaseSummary("1.4.10", "10-19", "新增书阁小说源 · 完整目录、在线文字与 EPUB 下载"),
+    ReleaseSummary("1.4.9", "10-19", "小说插图引用与下载修复 · 失效节点恢复"),
     ReleaseSummary("1.4.7", "10-18", "新增免登录漫画源 · 源站动态分类与筛选"),
     ReleaseSummary("1.4.6", "10-18", "互传合并书籍去重 · 原文件缺失与漫画路径识别"),
     ReleaseSummary("1.4.5", "10-18", "附近连接建组与角色修复 · 独立直连握手"),
@@ -80,6 +82,6 @@ internal fun ReleaseHistoryDialog(onDismiss: () -> Unit) {
             }
         }, confirmButton = {
             val close = LocalOverlayClose.current
-            TextButton(onClick = { close {} }) { Text("关闭") }
+            PullOutTextButton(onClick = { close {} }) { Text("关闭") }
         })
 }

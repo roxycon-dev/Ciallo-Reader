@@ -12,6 +12,9 @@ import org.jsoup.nodes.TextNode
  * JS 侧持有一个整数 key，所有查询与属性读取都回到这里用 Jsoup 完成。
  */
 class JsHtmlStore {
+    // Recent-update pages can contain a week's catalogue (~7,500 elements).
+    // Keep the input bound and handle eviction, but allow one such ordinary page.
+    private val maxRetainedBytes = 8L * 1024 * 1024
     // JS 侧 HtmlDocument._key 从 0 开始，这里必须一致，否则第一个文档永远查不到
     private var nextId = 0
     private val docs = LinkedHashMap<Int, Document>(16, 0.75f, true)
@@ -34,13 +37,13 @@ class JsHtmlStore {
         dispose(jsKey)
         val doc = Jsoup.parse(html)
         val size = html.length * 2L + doc.getAllElements().size * 512L
-        require(size <= 4L * 1024 * 1024) { "书源 HTML 解析内存预算不足" }
+        require(size <= maxRetainedBytes) { "书源 HTML 解析内存预算不足" }
         docs[jsKey] = doc
         documentIds[doc] = jsKey
         sizes[jsKey] = size
         // Every selected element keeps its entire Jsoup document alive. Bound the
         // retained documents AND release their handles, rather than clearing docs alone.
-        while (docs.size > 8 || (docs.size > 1 && sizes.values.sum() > 4L * 1024 * 1024)) {
+        while (docs.size > 8 || (docs.size > 1 && sizes.values.sum() > maxRetainedBytes)) {
             dispose(docs.keys.first())
         }
         return jsKey

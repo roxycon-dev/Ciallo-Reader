@@ -30,7 +30,7 @@ fun AppIconButton(
             .clickableWithFeedback(
                 enabled = enabled,
                 bounded = false, // Unbounded borderless ripple
-                onClick = onClick
+                onClick = paperClick(onClick)
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -58,7 +58,7 @@ fun AppButton(
             .clickableWithFeedback(
                 enabled = enabled,
                 bounded = true,
-                onClick = onClick
+                onClick = paperClick(onClick)
             ),
         shape = shape,
         color = if (enabled) containerColor else containerColor.copy(alpha = 0.5f),

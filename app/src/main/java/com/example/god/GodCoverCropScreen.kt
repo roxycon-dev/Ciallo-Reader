@@ -1,5 +1,7 @@
 package com.example.god
 
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutIconButton
 import android.graphics.Bitmap
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
@@ -19,9 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -207,7 +207,7 @@ fun GodCoverCropScreen(
                 .padding(horizontal = 4.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onCancel) {
+            PullOutIconButton(onClick = onCancel) {
                 Icon(Icons.Filled.Close, contentDescription = "取消", tint = Color.White)
             }
             Text(
@@ -217,7 +217,7 @@ fun GodCoverCropScreen(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
-            IconButton(onClick = {
+            PullOutIconButton(onClick = {
                 rotation = (rotation + 90f) % 360f
                 scope.launch {
                     scale.animateTo(1f, GodMotion.springMain())
@@ -243,10 +243,10 @@ fun GodCoverCropScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
+            PullOutTextButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
                 Text("取消", color = Color.White.copy(alpha = 0.75f))
             }
-            TextButton(
+            PullOutTextButton(
                 onClick = {
                     val f = fit
                     val r = rect
@@ -257,7 +257,7 @@ fun GodCoverCropScreen(
                                 0f, 0f, 1f, 1f,
                             ),
                         )
-                        return@TextButton
+                        return@PullOutTextButton
                     }
                     val cx = stageW / 2f
                     val cy = stageH / 2f

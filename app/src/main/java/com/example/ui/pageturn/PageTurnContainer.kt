@@ -1,5 +1,10 @@
 package com.example.ui.pageturn
 
+import com.example.ui.reader.TouchZone
+import com.example.ui.reader.TouchAction
+import com.example.ui.reader.SwipeAction
+import com.example.ui.reader.ReaderTouchBinding
+import com.example.ui.reader.touchZoneGestures
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -71,6 +76,7 @@ enum class PageTurnType(val id: Int, val title: String, val description: String)
 @Composable
 fun PageTurnContainer(
     pageTurnMode: Int,
+    touchBinding: ReaderTouchBinding = ReaderTouchBinding(),
     currentContent: @Composable () -> Unit,
     nextContent: @Composable () -> Unit,
     prevContent: @Composable () -> Unit,
@@ -98,6 +104,12 @@ fun PageTurnContainer(
     paperColor: Color = Color(0xFFF5F0E6),
     modifier: Modifier = Modifier
 ) {
+    val minimalMode = com.example.ui.components.LocalRenderQuality.current.minimal
+    val minimalDistance = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() }
+    var touchOrigin by remember { mutableStateOf(Offset.Zero) }
+    val zoneModifier = Modifier.onGloballyPositioned { touchOrigin = it.positionInWindow(); touchBinding.onViewport(androidx.compose.ui.geometry.Rect(touchOrigin, androidx.compose.ui.geometry.Size(it.size.width.toFloat(), it.size.height.toFloat()))) }.touchZoneGestures(touchBinding.zones, { if (minimalMode) minimalDistance else it * .15f }, touchBinding.onAction,
+        enabled = pageTurnMode != PageTurnType.SCROLL.id,
+        menuVisible = menuVisible, imageTap = { onImageTapAt?.invoke(it + touchOrigin) == true }, onLongPress = onLongPressCenter)
     if (com.example.ui.components.LocalRenderQuality.current.minimal) {
         var origin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
         val next by rememberUpdatedState(onNextPage)
@@ -107,15 +119,18 @@ fun PageTurnContainer(
         val right by rememberUpdatedState(onClickRight)
         val imageTap by rememberUpdatedState(onImageTapAt)
         val menu by rememberUpdatedState(menuVisible)
-        Box(modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInWindow() }
-            .pointerInput(pageKey) {
+        Box(modifier.then(zoneModifier).fillMaxSize().onGloballyPositioned { origin = it.positionInWindow() }
+            .pointerInput(pageKey, touchBinding.zones) {
+                if (touchBinding.zones != null) return@pointerInput
                 detectTapGestures { point ->
+                    com.example.ui.components.recordPaperTouch(point + origin, density)
                     if (menu) center()
                     else if (imageTap?.invoke(point + origin) != true) {
                         when { point.x < size.width / 3f -> left(); point.x > size.width * 2f / 3f -> right(); else -> center() }
                     }
                 }
-            }.pointerInput(pageKey) {
+            }.pointerInput(pageKey, touchBinding.zones) {
+                if (touchBinding.zones != null) return@pointerInput
                 var distance = 0f
                 detectHorizontalDragGestures(
                     onDragStart = { distance = 0f }, onDragCancel = { distance = 0f },
@@ -147,6 +162,21 @@ fun PageTurnContainer(
     val latestOnImageTapAt by rememberUpdatedState(onImageTapAt)
     var containerOffsetInWindow by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
 
+    var zoneTurnJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    var zoneWidth by remember { mutableFloatStateOf(1f) }
+    val animatedZoneModifier = Modifier.onGloballyPositioned { zoneWidth = it.size.width.toFloat(); touchOrigin = it.positionInWindow(); touchBinding.onViewport(androidx.compose.ui.geometry.Rect(touchOrigin, androidx.compose.ui.geometry.Size(it.size.width.toFloat(), it.size.height.toFloat()))) }
+        .touchZoneGestures(touchBinding.zones, { it * .15f }, { action ->
+            if (action == TouchAction.NEXT || action == TouchAction.PREVIOUS) {
+                zoneTurnJob?.cancel()
+                zoneTurnJob = coroutineScope.launch {
+                    try {
+                        dragOffset.animateTo(if (action == TouchAction.NEXT) -zoneWidth else zoneWidth, tween(180))
+                        if (action == TouchAction.NEXT) latestOnNextPage() else latestOnPrevPage()
+                    } finally { withContext(NonCancellable) { dragOffset.snapTo(0f); dragOffsetY.snapTo(0f) } }
+                }
+            } else touchBinding.onAction(action)
+        }, enabled = pageTurnMode != PageTurnType.SCROLL.id, menuVisible = menuVisible, imageTap = { onImageTapAt?.invoke(it + touchOrigin) == true }, onLongPress = onLongPressCenter)
+
     // Reset offsets when pageKey changes (page turned)
     LaunchedEffect(pageKey) {
         dragOffset.snapTo(0f)
@@ -158,10 +188,12 @@ fun PageTurnContainer(
 
     BoxWithConstraints(
         modifier = modifier
+            .then(animatedZoneModifier)
             .fillMaxSize()
             .clipToBounds()
             .onGloballyPositioned { containerOffsetInWindow = it.positionInWindow() }
-            .pointerInput(pageTurnMode) {
+            .pointerInput(pageTurnMode, touchBinding.zones) {
+                if (touchBinding.zones != null) return@pointerInput
                 // 滚动阅读模式：手势完全交给阅读器自身的滚动容器处理，
                 // 这里不再拦截点击/拖拽，避免“下滑误触菜单/误切章节”。
                 if (mode == PageTurnType.SCROLL) {
@@ -309,6 +341,7 @@ fun PageTurnContainer(
                         if (imageHandled || tapConsumedByChild) {
                             // 命中插图 / 子层已消费：不分派翻页
                         } else {
+                        com.example.ui.components.recordPaperTouch(down.position + containerOffsetInWindow, density)
                         val tapX = down.position.x
                         val leftZone = screenWidth * 0.35f
                         val rightZone = screenWidth * 0.65f

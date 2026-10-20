@@ -22,3 +22,7 @@
 ## 维护提示
 
 随 APK 打包的生产代码和资源应通过 `:app:assembleRelease` 验证；测试 fixtures 放在对应测试源集。
+
+## 1.4.11 公共交互
+
+所有滑动条使用 `LiquidSlider.kt`；弹层通过 `PullOutMotion.kt`、`PullOutHosts.kt` 和 `PullOutButtons.kt` 自动捕获触发来源并共享网格动效。参数集中于 `PullOutConfig` / `LiquidSliderConfig`，业务界面不单独定义动效或滑条样式。

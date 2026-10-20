@@ -6,6 +6,14 @@
 
 package com.example.library
 
+import com.example.ui.components.pullOutAnchor
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutIconButton
+import com.example.ui.components.PullOutAlertDialog
+import com.example.ui.components.PullOutDialog
+import com.example.ui.components.PullOutBottomSheet
+import com.example.ui.components.PullOutVisibility
+import com.example.ui.components.pullOutClickable
 import com.example.ui.components.catalogCoverMotion
 
 import androidx.activity.compose.BackHandler
@@ -68,7 +76,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -128,7 +135,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import kotlin.math.max
@@ -596,14 +602,14 @@ fun LibraryScreen(
         titleColor = glassTitleColor(),
         leading = {
             onBack?.let { back ->
-                IconButton(onClick = back) {
+                PullOutIconButton(onClick = back) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回上一层")
                 }
             }
         },
                 trailing = {
                     val activeCount = downloadStates.values.count { it is DownloadState.Pending || it is DownloadState.Downloading } + comicDownloading.size
-                    TextButton(onClick = { showDownloadPanel = true }, modifier = Modifier.testTag("download_tasks_entry")) {
+                    PullOutTextButton(onClick = { showDownloadPanel = true }, modifier = Modifier.testTag("download_tasks_entry")) {
                         Icon(Icons.Default.Download, contentDescription = "下载任务", modifier = Modifier.size(DesignTokens.SpaceXl))
                         Spacer(Modifier.width(DesignTokens.SpaceXs))
                         Text(if (activeCount > 0) "下载中 $activeCount" else "下载任务")
@@ -673,7 +679,7 @@ fun LibraryScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                                 if (currentSource?.capabilities?.downloadRequiresLogin == true && !isCurrentSourceLoggedIn) {
-                                    TextButton(onClick = onOpenSourceManagement) {
+                                    PullOutTextButton(onClick = onOpenSourceManagement) {
                                         Text("去管理/登录")
                                     }
                                 }
@@ -699,19 +705,8 @@ fun LibraryScreen(
                 }
 
                 // 搜索历史：点击搜索框获得焦点、输入为空且历史非空时，以“窗帘”动画展开/收起
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = historyPanelVisible,
-                    enter = expandVertically(
-                        animationSpec = tween(200, easing = com.example.ui.feedback.AppMotion.easeOutCubic)
-                    ) + fadeIn(
-                        animationSpec = tween(200, easing = com.example.ui.feedback.AppMotion.easeOutCubic)
-                    ),
-                    exit = shrinkVertically(
-                        animationSpec = tween(170, easing = com.example.ui.feedback.AppMotion.easeOutCubic)
-                    ) + fadeOut(
-                        animationSpec = tween(170, easing = com.example.ui.feedback.AppMotion.easeOutCubic)
-                    )
-                ) {
+                PullOutVisibility(
+                    visible = historyPanelVisible) {
                     SearchHistoryPanel(
                         history = searchHistory,
                         lightweight = !historyPanelSettled,
@@ -870,17 +865,11 @@ fun LibraryScreen(
                     val showTopFab by remember {
                         derivedStateOf { staggeredGridState.firstVisibleItemIndex > 8 }
                     }
-                    androidx.compose.animation.AnimatedVisibility(
+                    PullOutVisibility(
                         visible = showTopFab,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(end = 20.dp, bottom = extraBottomPadding + 16.dp),
-                        enter = scaleIn(
-                            initialScale = 0.6f,
-                            animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium)
-                        ) + fadeIn(),
-                        exit = scaleOut(targetScale = 0.6f) + fadeOut()
-                    ) {
+                            .padding(end = 20.dp, bottom = extraBottomPadding + 16.dp)) {
                         SmallFloatingActionButton(
                             onClick = { scope.launch { staggeredGridState.animateScrollToItem(0) } },
                             modifier = Modifier.consistentShadow(3.dp, CircleShape),
@@ -1262,7 +1251,7 @@ private fun UnifiedSearchField(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
-                    .clickable(onClick = onSourceClick)
+                    .pullOutClickable(onClick = onSourceClick)
                     .padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 12.dp)
             ) {
                 Text(
@@ -1327,7 +1316,7 @@ private fun UnifiedSearchField(
                 }
             )
             if (query.isNotBlank()) {
-                IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(36.dp)) {
+                PullOutIconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(36.dp)) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "清空",
@@ -1345,7 +1334,7 @@ private fun UnifiedSearchField(
                     .size(40.dp)
                     .clip(CircleShape)
                     .background(primary)
-                    .clickable(onClick = onSearch),
+                    .pullOutClickable(onClick = onSearch),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -1436,7 +1425,7 @@ private fun SearchHistoryPanel(
         Column(
             modifier = Modifier
                 // 点空白退出编辑态（子胶囊会先消费点击，不会误触）
-                .clickable(
+                .pullOutClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) { editing = false }
@@ -1458,7 +1447,7 @@ private fun SearchHistoryPanel(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
-                        .clickable { confirmClear = true }
+                        .pullOutClickable { confirmClear = true }
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Icon(
@@ -1493,7 +1482,7 @@ private fun SearchHistoryPanel(
     }
 
     if (confirmClear) {
-        AlertDialog(
+        PullOutAlertDialog(
             onDismissRequest = { confirmClear = false },
             title = {
                 Text(
@@ -1509,7 +1498,7 @@ private fun SearchHistoryPanel(
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
+                PullOutTextButton(onClick = {
                     confirmClear = false
                     editing = false
                     onClearAll()
@@ -1518,7 +1507,7 @@ private fun SearchHistoryPanel(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) {
+                PullOutTextButton(onClick = { confirmClear = false }) {
                     Text(text = "取消")
                 }
             }
@@ -1663,7 +1652,7 @@ private fun HistoryChip(
             // 规范：胶囊高 32、水平内边距 14、字号 13、**平涂**无描边无渐变
             .height(32.dp)
             .background(primary.copy(alpha = if (muted) 0.06f else 0.10f))
-            .combinedClickable(
+            .pullOutAnchor().combinedClickable(
                 interactionSource = interaction,
                 indication = null,
                 onClick = { if (!editing) onPick() },
@@ -1686,7 +1675,7 @@ private fun HistoryChip(
                     .size(16.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f))
-                    .clickable { onDelete() },
+                    .pullOutClickable { onDelete() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -1761,19 +1750,14 @@ private fun SourcePickerSheet(
         reduceTransparency || animationsOff
     }
 
-    Dialog(
+    PullOutDialog(
         onDismissRequest = dismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
     ) {
         // 透明窗口 + 实时模糊宿主窗口（decorView RenderEffect）
         GlassDialogWindowEffect(activity = activity, blurRadiusPx = blurPx)
-        AnimatedVisibility(
-            visible = visible,
-            enter = fadeIn(tween(160)) +
-                slideInVertically(tween(340), initialOffsetY = { it }),
-            exit = fadeOut(tween(150)) +
-                slideOutVertically(tween(260), targetOffsetY = { it })
-        ) {
+        PullOutVisibility(
+            visible = visible) {
             Box(modifier = Modifier.fillMaxSize()) {
                 // 径向渐变遮罩：中心亮、四周暗，聚光灯打在立牌上
                 Box(
@@ -1785,7 +1769,7 @@ private fun SourcePickerSheet(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clickable(
+                        .pullOutClickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                             onClick = dismiss
@@ -1890,7 +1874,7 @@ private fun SourcePickerSheet(
                                 .clip(RoundedCornerShape(50))
                                 .height(28.dp)
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
-                                .clickable(
+                                .pullOutClickable(
                                     interactionSource = manageInteraction,
                                     indication = null,
                                     onClick = onManageSources
@@ -2076,7 +2060,7 @@ private fun AggregateOptionItem(
                 scaleX = pressScale
                 scaleY = pressScale
             }
-            .clickable(
+            .pullOutClickable(
                 interactionSource = interaction,
                 indication = null,
                 onClick = onClick
@@ -2164,7 +2148,7 @@ private fun SourceOptionItem(
                 scaleX = pressScale
                 scaleY = pressScale
             }
-            .clickable(
+            .pullOutClickable(
                 interactionSource = interaction,
                 indication = null,
                 onClick = onClick
@@ -2199,7 +2183,7 @@ private fun ComicDownloadGlassCard(
                     fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                PullOutIconButton(onClick = com.example.ui.components.paperDismiss(onDismiss), modifier = Modifier.size(28.dp)) {
                     Icon(
                         Icons.Default.Close,
                         contentDescription = "关闭",
@@ -2393,7 +2377,7 @@ fun LibraryWelcomeScreen(
         GlassCard(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onImportLocal() }
+                .pullOutClickable { onImportLocal() }
                 .testTag("welcome_import_local_card"),
             shape = RoundedCornerShape(16.dp)
         ) {
@@ -2427,7 +2411,7 @@ fun LibraryWelcomeScreen(
         GlassCard(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onOnlineSearch() }
+                .pullOutClickable { onOnlineSearch() }
                 .testTag("welcome_online_search_card"),
             shape = RoundedCornerShape(16.dp)
         ) {
@@ -2465,7 +2449,7 @@ fun LibraryWelcomeScreen(
         GlassCard(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onSourceManage() }
+                .pullOutClickable { onSourceManage() }
                 .testTag("welcome_source_manage_card"),
             shape = RoundedCornerShape(16.dp)
         ) {
@@ -2542,7 +2526,7 @@ fun SearchResultFavoriteButton(
             }
             .clip(CircleShape)
             .background(Color.Black.copy(alpha = 0.38f))
-            .clickable(
+            .pullOutClickable(
                 interactionSource = interaction,
                 indication = null,
                 onClick = { onToggle(!favorite) },
@@ -2945,7 +2929,7 @@ private fun StaggeredComicCard(
                 spotColor = Color.Black.copy(alpha = shadowAlpha)
             )
             .clip(cardShape)
-            .clickable(
+            .pullOutClickable(
                 interactionSource = interaction,
                 indication = null,
                 onClick = onClick
@@ -3079,7 +3063,7 @@ private fun AggregateSourceHeader(
                 shape = RoundedCornerShape(20.dp)
             )
             .background(MaterialTheme.colorScheme.surface)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            .then(if (onClick != null) Modifier.pullOutClickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -3164,7 +3148,7 @@ private fun AggregateExpandButton(
                 shape = RoundedCornerShape(20.dp)
             )
             .background(MintPrimary.copy(alpha = 0.08f))
-            .clickable(
+            .pullOutClickable(
                 interactionSource = interaction,
                 indication = null,
                 onClick = onExpand
@@ -3232,7 +3216,7 @@ private fun AggregateJumpSheet(
     onDismiss: () -> Unit,
     onJump: (Int) -> Unit
 ) {
-    ModalBottomSheet(
+    PullOutBottomSheet(
         onDismissRequest = onDismiss,
         dragHandle = null,
         containerColor = MaterialTheme.colorScheme.surface,
@@ -3263,7 +3247,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(Modifier.weight(1f))
-                    IconButton(onClick = onDismiss) {
+                    PullOutIconButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) {
                         Icon(Icons.Default.Close, "关闭", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -3272,7 +3256,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 6.dp)) {
                 item(key = "jump_top") {
                     Surface(
-                        modifier = Modifier.fillMaxWidth().clickable { onJump(-1) },
+                        modifier = Modifier.fillMaxWidth().pullOutClickable { onJump(-1) },
                         color = Color.Transparent
                     ) {
                         Row(
@@ -3292,7 +3276,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize
                 }
                 itemsIndexed(groups, key = { _, g -> "jump_${g.sourceId}" }) { idx, group ->
                     Surface(
-                        modifier = Modifier.fillMaxWidth().clickable { onJump(idx) },
+                        modifier = Modifier.fillMaxWidth().pullOutClickable { onJump(idx) },
                         color = Color.Transparent
                     ) {
                         Row(

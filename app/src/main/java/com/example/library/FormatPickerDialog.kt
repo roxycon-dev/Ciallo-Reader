@@ -1,5 +1,8 @@
 package com.example.library
 
+import com.example.ui.components.PullOutIconButton
+import com.example.ui.components.PullOutDialog
+import com.example.ui.components.pullOutClickable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -23,7 +26,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.source.BookFormat
 import com.example.ui.components.AppActionButton
@@ -54,7 +56,7 @@ fun FormatPickerDialog(
     val activity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
     val blurPx = with(androidx.compose.ui.platform.LocalDensity.current) { 18.dp.toPx() }
 
-    Dialog(
+    PullOutDialog(
         onDismissRequest = { if (!loading) onDismiss() },
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
@@ -63,23 +65,6 @@ fun FormatPickerDialog(
     ) {
         DialogLiquidGlass {
             GlassDialogWindowEffect(activity = activity, blurRadiusPx = blurPx)
-            var appear by remember { mutableStateOf(false) }
-            LaunchedEffect(Unit) { appear = true }
-
-            val panelScale by animateFloatAsState(
-                targetValue = if (appear) 1f else 0.82f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
-                ),
-                label = "formatPanelScale"
-            )
-            val panelAlpha by animateFloatAsState(
-                targetValue = if (appear) 1f else 0f,
-                animationSpec = tween(220),
-                label = "formatPanelAlpha"
-            )
-
             // 平板/横屏钳宽居中（手机全宽观感不变）
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             Box(
@@ -87,11 +72,6 @@ fun FormatPickerDialog(
                     .fillMaxWidth()
                     .padding(horizontal = 28.dp)
                     .widthIn(max = AdaptiveSpec.dialogMaxWidth)
-                    .graphicsLayer {
-                        scaleX = panelScale
-                        scaleY = panelScale
-                        alpha = panelAlpha
-                    }
                     // 原：.shadow(28.dp, RoundedCornerShape(24.dp), clip = false)
                     // consistentShadow 内部 .clip(shape) 与紧接着的 .clip(RoundedCornerShape(24.dp)) 同形，
                     // 净效果等价（该面板内容本就全在 24dp 圆角内）。
@@ -134,7 +114,7 @@ fun FormatPickerDialog(
                             )
                         }
                         if (!loading) {
-                            IconButton(onClick = onDismiss) {
+                            PullOutIconButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) {
                                 Icon(
                                     Icons.Default.Close,
                                     contentDescription = "关闭",
@@ -188,7 +168,7 @@ private fun FormatRow(format: BookFormat, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .clickable(
+            .pullOutClickable(
                 interactionSource = interaction,
                 indication = null,
                 onClick = onClick

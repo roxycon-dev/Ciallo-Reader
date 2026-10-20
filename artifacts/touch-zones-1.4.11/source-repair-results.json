@@ -1,0 +1,13 @@
+{
+  "bytes": 29143032,
+  "sha256": "1af34451a5c9bdd1ad423533f3e38f38630ebf962c9fb8cc9c211b6e47eff9b9",
+  "versionName": "1.4.11",
+  "versionCode": 234,
+  "jvm_tests": 14,
+  "live_sources": 7,
+  "release_build": "successful",
+  "signature_v2": true,
+  "upgrade_from": 217,
+  "upgrade_to": 234,
+  "startup": "ok"
+}

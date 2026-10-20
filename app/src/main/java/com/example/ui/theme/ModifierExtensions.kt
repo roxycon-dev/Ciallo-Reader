@@ -1,5 +1,6 @@
 package com.example.ui.theme
 
+import com.example.ui.components.pullOutClickable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -71,7 +72,7 @@ fun Modifier.clickableWithFeedback(
             scaleY = scaleState.value
             alpha = dimState.value
         }
-        .clickable(
+        .pullOutClickable(
             interactionSource = interactionSource,
             indication = null,
             enabled = enabled,
@@ -121,7 +122,7 @@ fun Modifier.clickableRowFeedback(
                 )
             }
         }
-        .clickable(
+        .pullOutClickable(
             interactionSource = interactionSource,
             indication = null,
             enabled = enabled,

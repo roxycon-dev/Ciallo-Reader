@@ -5,12 +5,17 @@
 
 package com.example.ui
 
+import com.example.ui.components.pullOutClickable
+import com.example.ui.components.PullOutButton
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutAlertDialog
+import com.example.ui.components.PullOutBottomSheet
+import com.example.ui.components.PullOutVisibility
 import android.os.StatFs
 import android.os.Build
 import android.os.Process
 import android.os.storage.StorageManager
 import android.app.usage.StorageStatsManager
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -66,7 +71,8 @@ import java.io.File
 import java.util.Locale
 import androidx.compose.foundation.layout.widthIn
 import com.example.ui.adaptive.AdaptiveSpec
-import com.example.ui.design.DesignTokens
+import com.example.ui.design.DesignTokens
+
 
 import com.example.ui.components.AppToast
 
@@ -462,7 +468,7 @@ fun CacheManagementScreen(
 
     // 与「书库使用手册」一致的 ModalBottomSheet 结构与观感
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
+    PullOutBottomSheet(
         onDismissRequest = onBack,
         sheetState = sheetState,
         dragHandle = null,
@@ -591,7 +597,7 @@ fun CacheManagementScreen(
                 }
 
                 item(key = "clear_all") {
-                    Button(
+                    PullOutButton(
                         onClick = { clearAllCache() },
                         enabled = !isScanning && !isClearing && cacheTotal > 0,
                         modifier = Modifier.fillMaxWidth().height(48.dp),
@@ -635,7 +641,7 @@ fun CacheManagementScreen(
                                         )
                                     )
                                     .then(
-                                        if (targetsFor(row.key).isNotEmpty()) Modifier.clickable { detailRow = row }
+                                        if (targetsFor(row.key).isNotEmpty()) Modifier.pullOutClickable { detailRow = row }
                                         else Modifier
                                     )
                             ) {
@@ -687,17 +693,8 @@ fun CacheManagementScreen(
                 // 单独包一层居中 Box：不依赖外层 Box 的 align 重载，
                 // 也不影响 LazyColumn 自身的 TopCenter 排布。
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = successFreed != null,
-                        enter = fadeIn(androidx.compose.animation.core.tween(180)) + scaleIn(
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            ),
-                            initialScale = 0.6f
-                        ),
-                        exit = fadeOut(androidx.compose.animation.core.tween(260))
-                    ) {
+                    PullOutVisibility(
+                        visible = successFreed != null) {
                         CleanSuccessBadge(freedText = formatSize(successFreed ?: 0L))
                     }
                 }
@@ -708,7 +705,7 @@ fun CacheManagementScreen(
 
     // 用户数据删除确认：一句话说清删什么、多少、多大、后果
     confirmRow?.let { row ->
-        AlertDialog(
+        PullOutAlertDialog(
             onDismissRequest = { confirmRow = null },
             title = { Text("删除「${row.name}」") },
             text = {
@@ -719,7 +716,7 @@ fun CacheManagementScreen(
                 // 有下载进行中时不允许删除对应离线内容，避免与写入中的文件竞态（执行前还有二次复核兜底）
                 val deleteEnabled = !((row.key == "downloads" && hasActiveDownload) ||
                     (row.key == "comics" && hasActiveComicDownload))
-                TextButton(
+                PullOutTextButton(
                     onClick = { confirmRow = null; clearRow(row.key) },
                     enabled = deleteEnabled
                 ) {
@@ -727,7 +724,7 @@ fun CacheManagementScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmRow = null }) { Text("取消") }
+                PullOutTextButton(onClick = { confirmRow = null }) { Text("取消") }
             }
         )
     }

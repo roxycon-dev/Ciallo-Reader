@@ -277,7 +277,7 @@ fun GlassCard(
     if (LocalRenderQuality.current.minimal) {
         val flatShape = shape ?: RoundedCornerShape(16.dp)
         Column(modifier.clip(flatShape).background(MaterialTheme.colorScheme.surface)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.pullOutClickable(onClick = onClick) else Modifier)
             .padding(contentPadding), content = content)
         return
     }
@@ -960,7 +960,7 @@ fun GlassCard(
             )
             .then(
                 if (onClick != null) {
-                    Modifier.clickable(
+                    Modifier.pullOutClickable(
                         interactionSource = interactionSource,
                         indication = null,
                         onClick = onClick

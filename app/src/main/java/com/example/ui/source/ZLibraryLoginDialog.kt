@@ -1,5 +1,8 @@
 package com.example.ui.source
 
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutDialog
+import com.example.ui.components.pullOutClickable
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -28,7 +31,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.source.BookSource
 import com.example.source.LoginCredential
@@ -80,7 +82,7 @@ fun ZLibraryLoginDialog(
     var cookieString by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
 
-    Dialog(
+    PullOutDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
@@ -109,10 +111,10 @@ fun ZLibraryLoginDialog(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clickable(
+                    .pullOutClickable(
                         interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                         indication = null,
-                        onClick = onDismiss
+                        onClick = com.example.ui.components.paperDismiss(onDismiss)
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -122,16 +124,11 @@ fun ZLibraryLoginDialog(
                 val baseModifier = Modifier
                     .fillMaxWidth(0.9f)
                     .widthIn(max = AdaptiveSpec.dialogMaxWidth)
-                    .clickable(
+                    .pullOutClickable(
                         interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                         indication = null,
                         onClick = {}
                     )
-                    .graphicsLayer {
-                        scaleX = panelScale
-                        scaleY = panelScale
-                        alpha = panelAlpha
-                    }
                     .liquidGlass(
                         backdrop = dialogBackdrop,
                         shape = cardShape,
@@ -174,7 +171,7 @@ fun ZLibraryLoginDialog(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.weight(1f))
-                        AppIconButton(onClick = onDismiss) {
+                        AppIconButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) {
                             Icon(Icons.Default.Close, contentDescription = "关闭", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -286,7 +283,7 @@ fun ZLibraryLoginDialog(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     if (onRegister != null) {
-                        TextButton(
+                        PullOutTextButton(
                             onClick = {
                                 scope.launch {
                                     isLoading = true
@@ -314,7 +311,7 @@ fun ZLibraryLoginDialog(
                     }
 
                     registrationUrl?.let { url ->
-                        TextButton(
+                        PullOutTextButton(
                             onClick = {
                                 runCatching {
                                     context.startActivity(

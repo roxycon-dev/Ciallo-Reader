@@ -1,7 +1,9 @@
 package com.example.ui.source
 
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutAlertDialog
+import com.example.ui.components.PullOutVisibility
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -46,7 +48,8 @@ import com.example.ui.theme.MintPrimary
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.net.URLEncoder
+import java.net.URLEncoder
+
 import com.example.ui.components.AppToast
 
 /**
@@ -193,22 +196,9 @@ fun ZLibraryNodeManagementScreen(
     val builtinNodes = (listOf(defaultNode) + scrapedNodes).distinct()
     val customNodeList = customNodes.filterNot { it in builtinNodes }
 
-    AnimatedVisibility(
+    PullOutVisibility(
         visible = contentVisible,
-        modifier = Modifier.fillMaxSize(),
-        enter = fadeIn(tween(260)) +
-            scaleIn(
-                initialScale = 0.94f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
-                )
-            ) +
-            slideInVertically(
-                initialOffsetY = { it / 12 },
-                animationSpec = tween(280)
-            )
-    ) {
+        modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -381,7 +371,7 @@ fun ZLibraryNodeManagementScreen(
     }
 
     if (showReplaceDialog) {
-        AlertDialog(
+        PullOutAlertDialog(
             onDismissRequest = { showReplaceDialog = false },
             title = { Text("找到 ${foundNodes.size} 个节点") },
             text = {
@@ -408,7 +398,7 @@ fun ZLibraryNodeManagementScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showReplaceDialog = false }) {
+                PullOutTextButton(onClick = { showReplaceDialog = false }) {
                     Text("取消")
                 }
             }

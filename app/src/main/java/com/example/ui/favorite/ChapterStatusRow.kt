@@ -1,5 +1,6 @@
 package com.example.ui.favorite
 
+import com.example.ui.components.pullOutAnchor
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -186,7 +187,7 @@ fun ChapterStatusRow(
                     if (bookmarked) append("，已加书签")
                 }
             }
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .pullOutAnchor().combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .pointerInput(Unit) {
                 if (currentOnToggle == null) return@pointerInput
                 // 方向仲裁：必须**横向明显占主导**才接管为书签滑动。
@@ -325,7 +326,7 @@ fun ChapterStatusRow(
                         .size(32.dp)
                         .clip(CircleShape)
                         .background(MintPrimary.copy(alpha = 0.12f))
-                        .combinedClickable(onClick = onDownload),
+                        .pullOutAnchor().combinedClickable(onClick = onDownload),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(

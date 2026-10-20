@@ -1,5 +1,6 @@
 package com.example.library
 
+import com.example.ui.components.PullOutTextButton
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -45,7 +46,7 @@ internal fun NovelDownloadPanel(
         .padding(DesignTokens.SpaceLg).testTag("download_task_panel"), verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceMd)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("下载任务", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            TextButton(onClick = onDismiss) { Text("收起") }
+            PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Text("收起") }
         }
         Text("完成后自动存入书架；收起面板后可继续下载。", style = MaterialTheme.typography.bodySmall)
         if (tasks.isEmpty() && preparations.isEmpty() && comicContent == null) Text("暂无下载任务")
@@ -91,12 +92,12 @@ private fun DownloadTaskRow(book: SearchBook, state: DownloadState, task: Downlo
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
                 when (state) {
-                    is DownloadState.Downloading -> TextButton(onClick = onPause) { Text("暂停") }
-                    is DownloadState.Paused -> TextButton(onClick = onResume) { Text("继续") }
-                    is DownloadState.Error -> TextButton(onClick = onRetry) { Text("重新获取并重试") }
+                    is DownloadState.Downloading -> PullOutTextButton(onClick = onPause) { Text("暂停") }
+                    is DownloadState.Paused -> PullOutTextButton(onClick = onResume) { Text("继续") }
+                    is DownloadState.Error -> PullOutTextButton(onClick = onRetry) { Text("重新获取并重试") }
                     else -> Unit
                 }
-                if (state !is DownloadState.Success) TextButton(onClick = onCancel) { Text("取消任务") }
+                if (state !is DownloadState.Success) PullOutTextButton(onClick = onCancel) { Text("取消任务") }
             }
         }
     }

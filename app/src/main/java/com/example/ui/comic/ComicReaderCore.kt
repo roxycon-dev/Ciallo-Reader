@@ -1,5 +1,11 @@
 package com.example.ui.comic
 
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.reader.TouchZone
+import com.example.ui.reader.TouchAction
+import com.example.ui.reader.SwipeAction
+import com.example.ui.reader.ReaderTouchBinding
+import com.example.ui.reader.touchZoneGestures
 import androidx.compose.runtime.derivedStateOf
 
 import com.example.ui.design.DesignTokens
@@ -40,7 +46,6 @@ import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -60,6 +65,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -206,6 +213,11 @@ fun ComicReaderCore(
     onGodMoment: (() -> Unit)? = null,
     onExit: () -> Unit,
 ) {
+    var touchWindowOrigin by remember { mutableStateOf(Offset.Zero) }
+    var touchViewport by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    var showTouchEditor by remember { mutableStateOf(false) }
+    var previewTouchZones by remember { mutableStateOf<List<com.example.ui.reader.TouchZone>?>(null) }
+    var previewTouchActive by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val store = remember { ComicSettingsStore(context) }
@@ -264,12 +276,12 @@ fun ComicReaderCore(
     // 重算（2800px×数十次）。displayConfig 落后 config 250ms——滑条拖动期间只有
     // 设置面板里的小图预览（loadPreview 540px）实时，松手静止后阅读页才重算一次
     var requestedDisplayConfig by remember(bookKey) { mutableStateOf(config) }
-    val displayConfig = if (minimal) requestedDisplayConfig.copy(
+    val displayConfig = (if (minimal) requestedDisplayConfig.copy(
         pageAnim = ComicPageAnim.NONE, enhanceMode = ComicEnhanceMode.OFF, filterSharpen = 0,
         filterBrightness = 0, filterContrast = 0, filterSaturation = 0, filterHue = 0,
         filterGamma = 1f, filterShadow = 0, filterBW = false, translationEnabled = false,
         sceneEffect = false, bgType = if (requestedDisplayConfig.bgType == ComicBgType.PAPER || requestedDisplayConfig.bgType == ComicBgType.DYNAMIC) ComicBgType.BLACK else requestedDisplayConfig.bgType,
-    ) else requestedDisplayConfig
+    ) else requestedDisplayConfig).copy(touchZones = if (previewTouchActive) previewTouchZones else config.touchZones)
     LaunchedEffect(bookKey) {
         snapshotFlow { config }
             .debounce(250)
@@ -435,10 +447,11 @@ fun ComicReaderCore(
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val lifecycleState by lifecycle.currentStateFlow.collectAsStateWithLifecycle()
     val readerResumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
-    val autoReadingActive = autoRead && panel == ComicPanel.NONE && readerResumed
+    val autoReadingActive = autoRead && panel == ComicPanel.NONE && readerResumed && !showTouchEditor
     // 条漫与无缝模式共用滚动位置；页码仍跟随最可见项。
     var scrollMetrics by remember(pages, config.mode) { mutableStateOf<ComicScrollMetrics?>(null) }
     var scrollJump by remember(pages, config.mode) { mutableStateOf<Pair<Int, Float>?>(null) }
+    var scrollJumpAnimated by remember(pages, config.mode) { mutableStateOf(false) }
     val latestExit by rememberUpdatedState(onExit)
 
     var chapterNavigationPending by remember(pages) { mutableStateOf(false) }
@@ -517,8 +530,30 @@ fun ComicReaderCore(
         }
     }
     val gestureCallbacks = ComicGestureCallbacks(
+        onZoneAction = { action ->
+            fun swipePage(next: Boolean) {
+                if (controlsVisible || !config.gestureSwipe) return
+                if (verticalMode) {
+                    val metrics = scrollMetrics ?: return
+                    if (if (next) metrics.canScrollForward else metrics.canScrollBackward) {
+                        scrollJumpAnimated = true
+                        scrollJump = ((scrollJump?.first ?: 0) + 1) to metrics.pageFraction(next)
+                    } else navigateChapter(next)
+                } else if (next) goNext() else goPrev()
+            }
+            when (action) {
+                TouchAction.PREVIOUS -> swipePage(false)
+                TouchAction.NEXT -> swipePage(true)
+                TouchAction.CONTROLS -> { controlsVisible = !controlsVisible; if (!controlsVisible) panel = ComicPanel.NONE }
+                TouchAction.SETTINGS -> { controlsVisible = true; panel = ComicPanel.SETTINGS }
+                TouchAction.CONTENTS -> { controlsVisible = true; panel = ComicPanel.TOC }
+                TouchAction.EXIT -> latestExit()
+                else -> Unit
+            }
+        },
         onTapZone = { pos, size ->
-            when (resolveTapAction(pos, size, config)) {
+            com.example.ui.components.recordPaperTouch(pos + touchWindowOrigin, context.resources.displayMetrics.density)
+            when (resolveTapAction(pos, size, config.copy(touchZones = if (previewTouchActive) previewTouchZones else config.touchZones))) {
                 ComicGestureAction.PREV -> {
                     // 第 23 条：栏可见时点击优先隐藏栏，不直接翻页；
                     // 栏隐藏后点击才正常翻页（TOC/设置/退出等 UI 意图不受影响）
@@ -611,24 +646,23 @@ fun ComicReaderCore(
     }
 
     /* ── 模式渲染 ── */
-    // 第 11 条毛玻璃采样源：面板打开期间才把模式渲染层挂上 layerBackdrop，
+    // 面板玻璃使用独立的当前页位图采样层，避免纸面快照反向引用活动 RenderNode，
     // 供设置/目录/预设面板 drawBackdrop 高斯模糊采样（与底部 Tab 栏同机制）。
     // remember 无条件调用（Compose 规范），仅按需挂 modifier——阅读期零每帧重录开销
-    val readerLayerBackdrop = rememberLayerBackdrop()
     var retainPanelGlass by remember { mutableStateOf(false) }
     LaunchedEffect(panel) {
         if (panel != ComicPanel.NONE) retainPanelGlass = true
         else { delay(240); retainPanelGlass = false }
     }
     val glassOpen = !minimal && (panel != ComicPanel.NONE || retainPanelGlass)
-    val nativeGlass = panelGlassSamplingActive(displayConfig.pageAnim, config.direction, config.mode, glassOpen)
-    val frozenGlass = glassOpen && curlEngineActive(displayConfig.pageAnim, config.direction, config.mode)
-    val panelGlassBackdrop: LayerBackdrop? = if (glassOpen) readerLayerBackdrop else null
+    val panelGlassBackdrop = if (glassOpen) rememberComicGlassBackdrop(
+        layout.spreads.getOrNull(currentSpread)?.slots.orEmpty(), displayConfig, loader, bookState, dynamicBg, touchViewport
+    ) else null
+    Box(Modifier.fillMaxSize()) {
     CompositionLocalProvider(LocalComicTranslationEpoch provides translationEpoch) {
     BoxWithConstraints(
         modifier
             .fillMaxSize()
-            .then(if (nativeGlass) Modifier.layerBackdrop(readerLayerBackdrop) else Modifier)
     ) {
         val containerW = constraints.maxWidth.toFloat()
         val containerH = constraints.maxHeight.toFloat()
@@ -669,7 +703,7 @@ fun ComicReaderCore(
         }
         // GL 引擎完全不挂 graphicsLayer（连 alpha=1 的合成层也不给，规避 Surface 异常）
         Box(
-            Modifier.fillMaxSize().then(
+            Modifier.fillMaxSize().onGloballyPositioned { touchWindowOrigin = it.positionInWindow(); touchViewport = androidx.compose.ui.geometry.Rect(touchWindowOrigin, androidx.compose.ui.geometry.Size(it.size.width.toFloat(), it.size.height.toFloat())) }.then(
                 if (engineIsGl || minimal) Modifier
                 else Modifier.graphicsLayer { alpha = engineFade }
             )
@@ -695,6 +729,7 @@ fun ComicReaderCore(
                 onReachEnd = { goNext() },
                 onScrollMetrics = { scrollMetrics = it },
                 scrollJump = scrollJump,
+                animateScrollJump = scrollJumpAnimated,
                 onPreviousChapter = { navigateChapter(next = false) },
                 onNextChapter = { navigateChapter(next = true) },
                 gestureCallbacks = gestureCallbacks,
@@ -803,10 +838,6 @@ fun ComicReaderCore(
     DisposableEffect(Unit) { onDispose { audio.stop() } }
 
     /* ── 控制层与面板 ── */
-    if (frozenGlass) {
-        ComicFrozenGlassBackdrop(readerLayerBackdrop, layout.spreads.getOrNull(currentSpread)?.slots.orEmpty(),
-            displayConfig, loader, bookState, dynamicBg)
-    }
     ComicReaderChrome(
         visible = controlsVisible,
         panel = panel,
@@ -848,6 +879,7 @@ fun ComicReaderCore(
             }
         },
         onConfigChange = { persistConfig(it, immediate = false) },
+        onEditTouchZones = { panel = ComicPanel.NONE; controlsVisible = false; autoRead = false; showTouchEditor = true },
         onJumpToSpread = { target ->
             currentSpread = target.coerceIn(0, (spreadCount - 1).coerceAtLeast(0))
         },
@@ -863,6 +895,7 @@ fun ComicReaderCore(
         onAutoReadToggle = { autoRead = !autoRead },
         continuousFraction = if (verticalMode) scrollMetrics?.fraction ?: 0f else -1f,
         onJumpToScrollFraction = if (verticalMode) ({ fraction ->
+            scrollJumpAnimated = false
             scrollJump = ((scrollJump?.first ?: 0) + 1) to fraction
         }) else null,
         spreadAtScrollFraction = { fraction -> scrollMetrics?.target(fraction)?.index ?: currentSpread },
@@ -880,6 +913,34 @@ fun ComicReaderCore(
         onToggleControls = { controlsVisible = !controlsVisible },
         onExit = { latestExit() },
     )
+    if (showTouchEditor) {
+        val reverse = config.direction == ComicDirection.RTL && !verticalMode
+        fun action(old: ComicGestureAction) = when (old) {
+            ComicGestureAction.PREV -> TouchAction.PREVIOUS
+            ComicGestureAction.NEXT -> TouchAction.NEXT
+            ComicGestureAction.TOGGLE_CONTROLS -> TouchAction.CONTROLS
+            ComicGestureAction.TOC -> TouchAction.CONTENTS
+            ComicGestureAction.SETTINGS -> TouchAction.SETTINGS
+            ComicGestureAction.EXIT -> TouchAction.EXIT
+            else -> TouchAction.NONE
+        }
+        fun defaults(settings: ComicReaderConfig) = (0..2).map { index ->
+            val tap = action(listOf(settings.gestureTapLeft, settings.gestureTapCenter, settings.gestureTapRight)[if (reverse) 2 - index else index])
+            val swipe = if (settings.gestureSwipe) com.example.ui.reader.SwipeAction.PAGE else com.example.ui.reader.SwipeAction.NONE
+            if (verticalMode) com.example.ui.reader.TouchZone(id = "default$index", left = 0f, top = index / 3f, right = 1f, bottom = (index + 1) / 3f, tap = tap, swipe = swipe)
+            else com.example.ui.reader.TouchZone(id = "default$index", left = index / 3f, top = 0f, right = (index + 1) / 3f, bottom = 1f, tap = tap, swipe = swipe)
+        }
+        val original = ComicReaderConfig()
+        val axis = (if (verticalMode) touchViewport?.height else touchViewport?.width)?.div(context.resources.displayMetrics.density) ?: 400f
+        com.example.ui.reader.TouchZoneEditor(config.touchZones, defaults(config), comicTurnTravel(axis, 1f), comic = true, vertical = verticalMode,
+            viewportInWindow = touchViewport, resetZones = defaults(original),
+            onPreview = { draft, active -> previewTouchZones = draft; previewTouchActive = active; controlsVisible = false; panel = ComicPanel.NONE },
+            onSave = { zones -> persistConfig(config.copy(touchZones = zones), immediate = true) },
+            onDismiss = { previewTouchActive = false; showTouchEditor = false; controlsVisible = false; panel = ComicPanel.NONE },
+            onRestoreDefault = { config = config.copy(gestureTapLeft = original.gestureTapLeft, gestureTapCenter = original.gestureTapCenter,
+                gestureTapRight = original.gestureTapRight, gestureSwipe = original.gestureSwipe) })
+    }
+    } // reading scene and in-place touch editor
 }
 
 /** 配置 → 管线调色参数 */
@@ -920,6 +981,18 @@ private fun <T> kotlinx.coroutines.flow.Flow<T>.produceState0(initial: T): State
  * 垂直模式上下三分。双页+TTB 组合仍按水平解析（双页为横向排版）。
  */
 fun resolveTapAction(pos: Offset, size: Size, config: ComicReaderConfig): ComicGestureAction {
+    config.touchZones?.let { zones ->
+        val action = TouchZone.hit(zones, pos.x / size.width.coerceAtLeast(1f), pos.y / size.height.coerceAtLeast(1f))?.tap
+        return when (action) {
+            TouchAction.PREVIOUS -> ComicGestureAction.PREV
+            TouchAction.NEXT -> ComicGestureAction.NEXT
+            TouchAction.CONTROLS -> ComicGestureAction.TOGGLE_CONTROLS
+            TouchAction.SETTINGS -> ComicGestureAction.SETTINGS
+            TouchAction.CONTENTS -> ComicGestureAction.TOC
+            TouchAction.EXIT -> ComicGestureAction.EXIT
+            else -> ComicGestureAction.NONE
+        }
+    }
     val vertical = config.mode == ComicMode.WEBTOON || config.mode == ComicMode.CONTINUOUS ||
         (config.direction == ComicDirection.TTB && config.mode != ComicMode.DOUBLE)
     return if (vertical) {
@@ -1182,7 +1255,7 @@ private fun ComicPagedReader(
     }
 
     val chapterEdgeModifier = Modifier.comicChapterEdgeSwipe(
-        enabled = config.gestureSwipe,
+        enabled = config.gestureSwipe && config.touchZones == null,
         direction = config.direction,
         atStart = { pagerState.settledPage == 0 && !pagerState.isScrollInProgress },
         atEnd = { pagerState.settledPage == layout.spreadCount - 1 && !pagerState.isScrollInProgress },
@@ -1197,7 +1270,7 @@ private fun ComicPagedReader(
             state = pagerState,
             flingBehavior = PagerDefaults.flingBehavior(pagerState,
                 snapPositionalThreshold = comicPagerThreshold(true)),
-            userScrollEnabled = config.gestureSwipe,
+            userScrollEnabled = config.gestureSwipe && config.touchZones == null,
             modifier = Modifier.fillMaxSize().then(chapterEdgeModifier),
         ) { idx -> cell(idx) }
     } else {
@@ -1206,7 +1279,7 @@ private fun ComicPagedReader(
             flingBehavior = PagerDefaults.flingBehavior(pagerState,
                 snapPositionalThreshold = comicPagerThreshold(false)),
             reverseLayout = rtl,
-            userScrollEnabled = config.gestureSwipe,
+            userScrollEnabled = config.gestureSwipe && config.touchZones == null,
             modifier = Modifier.fillMaxSize().then(chapterEdgeModifier),
             beyondViewportPageCount = 1,
         ) { idx -> cell(idx) }
@@ -1311,7 +1384,7 @@ private fun ComicMagneticPager(
         Modifier
             .fillMaxSize()
             .comicChapterEdgeSwipe(
-                enabled = config.gestureSwipe,
+                enabled = config.gestureSwipe && config.touchZones == null,
                 direction = config.direction,
                 atStart = { latestCurrentSpread == 0 && !magDragActive.value },
                 atEnd = { latestCurrentSpread == layout.spreadCount - 1 && !magDragActive.value },
@@ -1341,7 +1414,7 @@ private fun ComicMagneticPager(
                         tracker.addPosition(change.uptimeMillis, change.position)
                         val delta = if (ttb) change.positionChange().y else change.positionChange().x
                         total += delta
-                        if (!dragging && abs(total) > slop && latestConfig.gestureSwipe &&
+                        if (!dragging && abs(total) > slop && latestConfig.gestureSwipe && latestConfig.touchZones == null &&
                             !childZoomed.value && !event.changes.any { it.isConsumed }
                         ) {
                             dragging = true
@@ -1458,6 +1531,7 @@ private fun ComicVerticalList(
     onPreviousChapter: () -> Unit,
     onNextChapter: () -> Unit,
     gestureCallbacks: ComicGestureCallbacks,
+    animateScrollJump: Boolean = false,
 ) {
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = currentSpread, initialFirstVisibleItemScrollOffset = 0)
     var restoring by remember { mutableStateOf(initialScrollOffset > 0) }
@@ -1615,7 +1689,8 @@ private fun ComicVerticalList(
     LaunchedEffect(scrollJump) {
         val request = scrollJump ?: return@LaunchedEffect
         val target = latestMetrics?.target(request.second) ?: return@LaunchedEffect
-        listState.scrollToItem(target.index, target.offset)
+        if (animateScrollJump) listState.animateScrollToItem(target.index, target.offset)
+        else listState.scrollToItem(target.index, target.offset)
     }
 
     // 条漫磁吸（第 6/7 条）：SnapFlingBehavior 官方 item-snap——松手连续衰减滚动
@@ -1627,7 +1702,7 @@ private fun ComicVerticalList(
     } else androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior()
 
     val chapterEdge = Modifier.fillMaxSize().comicChapterEdgeSwipe(
-        enabled = config.gestureSwipe,
+        enabled = config.gestureSwipe && config.touchZones == null,
         direction = ComicDirection.TTB,
         atStart = { !listState.canScrollBackward && !listState.isScrollInProgress },
         atEnd = { !listState.canScrollForward && !listState.isScrollInProgress },
@@ -1636,13 +1711,16 @@ private fun ComicVerticalList(
         onNext = onNextChapter,
     )
 
-    Box(modifier = chapterEdge.comicEdgeSwipe(config.gestureEdgeSwipe,
+    Box(modifier = chapterEdge.comicEdgeSwipe(config.gestureEdgeSwipe && config.touchZones == null,
         zoomed = { zoomState.scale > 1.01f }, onTrigger = gestureCallbacks.onEdgeBack)) {
         LazyColumn(
+            userScrollEnabled = config.touchZones == null,
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .onSizeChanged { onAreaSizeChanged(Size(it.width.toFloat(), it.height.toFloat())) }
+                .touchZoneGestures(config.touchZones, { comicTurnTravel(it, density.density) }, gestureCallbacks.onZoneAction,
+                    vertical = true, taps = false, zoomed = { zoomState.scale > 1.01f })
                 .comicVerticalGestures(zoomState, config, gestureCallbacks) { verticalTouchActive = it }
                 .zoomableWithScroll(zoomState = zoomState, onTap = onTap,
                     enableOneFingerZoom = config.doubleTapZoom,
@@ -1724,7 +1802,7 @@ private fun ComicVerticalItem(
                 verticalArrangement = Arrangement.Center
             ) {
                 Text("图片加载失败", color = ReadingPalette.Error)
-                TextButton(onClick = { retry++ }) { Text("点击重试", color = Color.White.copy(alpha = 0.8f)) }
+                PullOutTextButton(onClick = { retry++ }) { Text("点击重试", color = Color.White.copy(alpha = 0.8f)) }
             }
             is PageBitmapState.Ready -> {
                 imageBitmap?.let {
@@ -1785,6 +1863,7 @@ fun ComicSpreadCell(
         val origin = gestureCallbacks
         ComicGestureCallbacks(
             onTapZone = { pos, size -> origin.onTapZone(Offset(size.width - pos.x, pos.y), size) },
+            onZoneAction = origin.onZoneAction,
             onLongPress = origin.onLongPress,
             onPinchClose = origin.onPinchClose,
             onEdgeBack = origin.onEdgeBack,
@@ -1810,7 +1889,7 @@ fun ComicSpreadCell(
             .graphicsLayer { alpha = fadeAlpha.value }
             .comicZoomable(state = zoomState, config = config, callbacks = physicalCallbacks)
             .comicEdgeSwipe(
-                enabled = config.gestureEdgeSwipe,
+                enabled = config.gestureEdgeSwipe && config.touchZones == null,
                 zoomed = { zoomState.isZoomed },
                 onTrigger = gestureCallbacks.onEdgeBack,
             ),
@@ -2179,7 +2258,7 @@ internal fun DoubleSpreadContent(
                             .background(ReadingPalette.SubtleFill),
                         contentAlignment = Alignment.Center
                     ) {
-                        TextButton(onClick = { retry++ }) { Text("加载失败·重试", color = ReadingPalette.Error, fontSize = DesignTokens.TypeCaption) }
+                        PullOutTextButton(onClick = { retry++ }) { Text("加载失败·重试", color = ReadingPalette.Error, fontSize = DesignTokens.TypeCaption) }
                     }
                 } else {
                     Box(
@@ -2212,7 +2291,7 @@ internal fun ComicRefinementFeedback(refining: Boolean, error: Throwable?, modif
             val modelStatus = when (mode) { ComicEnhanceMode.MANGAJANAI -> MangaJaNai.status.collectAsStateWithLifecycle().value; ComicEnhanceMode.MANGAJANAI_FULL -> MangaJaNaiFull.status.collectAsStateWithLifecycle().value; else -> "" }
             Text(modelStatus.ifBlank { "高清图加载中…" }, color = Color.White, fontSize = DesignTokens.TypeCaption)
         }
-        else TextButton(onClick = onRetry) { Text("高清图加载失败 · 重试", color = Color.White) }
+        else PullOutTextButton(onClick = onRetry) { Text("高清图加载失败 · 重试", color = Color.White) }
     }
 }
 
@@ -2281,7 +2360,7 @@ private fun PagePlaceholder(state: PageBitmapState, onRetry: () -> Unit, enhance
             verticalArrangement = Arrangement.Center
         ) {
             Text("图片加载失败", color = ReadingPalette.Error)
-            TextButton(onClick = onRetry) { Text("点击重试", color = Color.White.copy(alpha = 0.8f)) }
+            PullOutTextButton(onClick = onRetry) { Text("点击重试", color = Color.White.copy(alpha = 0.8f)) }
         }
         is PageBitmapState.Ready -> Unit
     }
@@ -2309,7 +2388,7 @@ internal fun ComicLoadingFeedback(ref: ComicPageRef?, onRetry: (() -> Unit)? = n
             else -> "正在加载页面…"
         }
         Text(label, color = Color(0xBBFFFFFF), fontSize = DesignTokens.TypeCaption)
-        if (elapsed >= 8 && onRetry != null) TextButton(onClick = onRetry) {
+        if (elapsed >= 8 && onRetry != null) PullOutTextButton(onClick = onRetry) {
             Text("重新加载", color = Color.White)
         }
     }

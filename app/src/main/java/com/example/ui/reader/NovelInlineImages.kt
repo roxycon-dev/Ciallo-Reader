@@ -1,5 +1,6 @@
 package com.example.ui.reader
 
+import com.example.ui.components.pullOutClickable
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -329,7 +330,7 @@ fun NovelInlineImage(path: String, onTap: () -> Unit, enabled: Boolean = true) {
             .background(Color.Black.copy(alpha = 0.04f))
             // prev/next 层同屏叠放且在命中链上；非当前页彻底不安装 clickable，
             // 让点击穿透到阅读器的菜单/翻页手势宿主。
-            .then(if (enabled) Modifier.clickable { onTap() } else Modifier),
+            .then(if (enabled) Modifier.pullOutClickable { onTap() } else Modifier),
         contentAlignment = Alignment.Center
     ) {
         val bmp = bitmap

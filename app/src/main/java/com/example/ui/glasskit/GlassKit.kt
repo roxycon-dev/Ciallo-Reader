@@ -1,5 +1,6 @@
 package com.example.ui.glasskit
 
+import com.example.ui.components.pullOutClickable
 import android.provider.Settings
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -329,7 +330,7 @@ fun GlassKitCard(
 ) {
     if (LocalRenderQuality.current.minimal) {
         Column(modifier.clip(shape).background(androidx.compose.material3.MaterialTheme.colorScheme.surface)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier), content = content)
+            .then(if (onClick != null) Modifier.pullOutClickable(onClick = onClick) else Modifier), content = content)
         return
     }
     val kitBackdrop = LocalGlassKitBackdrop.current
@@ -435,7 +436,7 @@ fun GlassKitCard(
             .then(glassModifier)
             .then(
                 if (onClick != null) {
-                    Modifier.clickable(
+                    Modifier.pullOutClickable(
                         interactionSource = source,
                         indication = null,
                         onClick = onClick

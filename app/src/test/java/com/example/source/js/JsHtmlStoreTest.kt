@@ -38,11 +38,24 @@ class JsHtmlStoreTest {
 
     @Test fun sizeBudgetBoundsRetainedPagesBeforeTheCountLimit() {
         val store = JsHtmlStore()
-        repeat(6) { store.parse(it, "<p>" + "x".repeat(600_000) + "</p>") }
+        repeat(6) { store.parse(it, "<p>" + "x".repeat(1_200_000) + "</p>") }
         assertNull(store.querySelector(0, "p"))
         assertNotNull(store.querySelector(5, "p"))
         val retained = (0..5).count { store.querySelector(it, "p") != null }
         assertTrue("Retained $retained oversized documents", retained <= 3)
+    }
+
+    @Test fun weeklyUpdateCatalogueFitsWhileOversizedDocumentsAreStillRejected() {
+        val store = JsHtmlStore()
+        val card = "<div class='common-comic-item'><a><img></a><h3><a>作品</a></h3><p><a>最新话</a></p></div>"
+        store.parse(0, card.repeat(1041))
+        assertEquals(1041, store.querySelectorAll(0, ".common-comic-item").size)
+        try {
+            store.parse(1, "<i></i>".repeat(20_000))
+            fail("Pathological DOM must retain a bounded budget")
+        } catch (_: IllegalArgumentException) { }
+        assertNull(store.querySelector(1, "i"))
+        assertNotNull(store.querySelector(0, ".common-comic-item"))
     }
 
 

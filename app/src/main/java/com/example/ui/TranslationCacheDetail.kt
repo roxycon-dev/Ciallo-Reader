@@ -1,5 +1,8 @@
 package com.example.ui
 
+import com.example.ui.components.pullOutClickable
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,7 +29,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -140,7 +142,7 @@ fun TranslationCacheDetailDialog(
     val selectedFiles = entries.filter { checked[it.file] == true }.map { it.file }
     val totalSize = entries.sumOf { it.size }
 
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+    PullOutDialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = MaterialTheme.colorScheme.surface,
@@ -176,7 +178,7 @@ fun TranslationCacheDetailDialog(
                             Row(
                                 Modifier.fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .clickable {
+                                    .pullOutClickable {
                                         val allOn = entries.isNotEmpty() && entries.all { checked[it.file] == true }
                                         entries.forEach { checked[it.file] = !allOn }
                                     }
@@ -201,7 +203,7 @@ fun TranslationCacheDetailDialog(
                             Row(
                                 Modifier.fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .clickable { checked[entry.file] = !(checked[entry.file] ?: false) }
+                                    .pullOutClickable { checked[entry.file] = !(checked[entry.file] ?: false) }
                                     .padding(horizontal = 8.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -240,7 +242,7 @@ fun TranslationCacheDetailDialog(
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                     modifier = Modifier
                                         .size(18.dp)
-                                        .clickable {
+                                        .pullOutClickable {
                                             scope.launch {
                                                 TranslationCacheIndex.delete(listOf(entry.file))
                                                 refresh()
@@ -256,7 +258,7 @@ fun TranslationCacheDetailDialog(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 Spacer(Modifier.height(8.dp))
                 Row {
-                    TextButton(
+                    PullOutTextButton(
                         onClick = {
                             scope.launch {
                                 TranslationCache.clear(context)
@@ -266,10 +268,10 @@ fun TranslationCacheDetailDialog(
                         enabled = entries.isNotEmpty() && !scanning,
                     ) { Text("全部清理", color = MaterialTheme.colorScheme.error) }
                     Spacer(Modifier.weight(1f))
-                    TextButton(
-                        onClick = onDismiss,
+                    PullOutTextButton(
+                        onClick = com.example.ui.components.paperDismiss(onDismiss),
                     ) { Text("关闭") }
-                    TextButton(
+                    PullOutTextButton(
                         onClick = {
                             scope.launch {
                                 TranslationCacheIndex.delete(selectedFiles)

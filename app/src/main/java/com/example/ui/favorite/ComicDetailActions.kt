@@ -1,5 +1,6 @@
 package com.example.ui.favorite
 
+import com.example.ui.components.PullOutTextButton
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,7 +11,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,7 +68,7 @@ fun ComicBottomActionBar(
                 buttonSize = AppButtonSize.Medium,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = onContinue) {
+            PullOutTextButton(onClick = onContinue) {
                 Text("从头重读", fontSize = 12.sp, color = MintPrimary, fontWeight = FontWeight.SemiBold)
             }
         } else {
@@ -109,8 +109,8 @@ fun SourceUnavailableBanner(
             color = MaterialTheme.colorScheme.error,
             modifier = Modifier.weight(1f),
         )
-        TextButton(onClick = onRetry) { Text("重试", fontSize = 12.sp) }
-        TextButton(onClick = onChangeSource) { Text("换源", fontSize = 12.sp) }
+        PullOutTextButton(onClick = onRetry) { Text("重试", fontSize = 12.sp) }
+        PullOutTextButton(onClick = onChangeSource) { Text("换源", fontSize = 12.sp) }
     }
 }
 

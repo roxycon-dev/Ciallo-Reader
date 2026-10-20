@@ -1,11 +1,14 @@
 package com.example.ui
 
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutAlertDialog
+import com.example.ui.components.PullOutVisibility
+import com.example.ui.components.Slider
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -349,7 +352,7 @@ LazyColumn(
 
                                 Row {
                                     if (!splashPosterUri.isNullOrEmpty()) {
-                                        TextButton(
+                                        PullOutTextButton(
                                             onClick = {
                                                 splashPosterUri = null
                                                 prefs.customSplashPosterUri = null
@@ -829,11 +832,8 @@ LazyColumn(
                                 )
                             }
 
-                            AnimatedVisibility(
-                                visible = showCardPanel,
-                                enter = expandVertically() + fadeIn(),
-                                exit = shrinkVertically() + fadeOut()
-                            ) {
+                            PullOutVisibility(
+                                visible = showCardPanel) {
                                 Column(
                                     modifier = Modifier.padding(top = 8.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -846,7 +846,7 @@ LazyColumn(
                                         horizontalArrangement = Arrangement.End,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        TextButton(onClick = {
+                                        PullOutTextButton(onClick = {
                                             updateCardTweaks { com.example.ui.components.CardTweaks() }
                                             AppToast.makeText(context, "已恢复默认卡片参数", Toast.LENGTH_SHORT).show()
                                         }) {
@@ -1336,14 +1336,14 @@ LazyColumn(
                             }
                             val updateUriHandler = androidx.compose.ui.platform.LocalUriHandler.current
                             if (updateMessage != null && appUpdateState.release == null && !updateMessage!!.contains("最新版本")) {
-                                TextButton(onClick = {
+                                PullOutTextButton(onClick = {
                                     runCatching { updateUriHandler.openUri(com.example.data.UPDATE_REPOSITORY + "/releases/latest") }.onFailure {
                                         AppToast.makeText(context, "无法打开发布页，请检查浏览器。", Toast.LENGTH_SHORT).show()
                                     }
                                 }) { Text("GitHub 发布页") }
                             }
                             if (appUpdateState.release != null) {
-                                TextButton(onClick = appUpdate::show) {
+                                PullOutTextButton(onClick = appUpdate::show) {
                                     Text(if (appUpdateState.transferring) "查看下载进度" else if (appUpdateState.hasPackage) "继续安装更新" else "查看更新")
                                 }
                             }
@@ -1394,7 +1394,7 @@ LazyColumn(
     }
 
     if (showAddCategoryDialog) {
-        AlertDialog(
+        PullOutAlertDialog(
             onDismissRequest = { showAddCategoryDialog = false },
             title = { Text("新建分类", fontWeight = FontWeight.Bold) },
             text = {
@@ -1424,7 +1424,7 @@ LazyColumn(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddCategoryDialog = false }) {
+                PullOutTextButton(onClick = { showAddCategoryDialog = false }) {
                     Text("取消")
                 }
             },
@@ -1567,7 +1567,7 @@ private fun CardTweakSlider(
     if (com.example.ui.components.LocalRenderQuality.current.minimal) {
         Column(Modifier.fillMaxWidth()) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label); Text(valueText) }
-            Slider(value = position.coerceIn(0f, 1f), onValueChange = onChange)
+            Slider(value = position.coerceIn(0f, 1f), onValueChange = onChange, formatLabel = { valueText })
         }
         return
     }

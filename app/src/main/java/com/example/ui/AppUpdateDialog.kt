@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutAlertDialog
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -8,11 +10,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -131,7 +131,7 @@ internal fun AppUpdateDialog(
     onReleasePage: () -> Unit,
 ) {
     val release = state.release ?: return
-    AlertDialog(
+    PullOutAlertDialog(
         onDismissRequest = onDismiss,
         shape = DesignTokens.shape(DesignTokens.RadiusXl),
         title = { Text(when (state.stage) {
@@ -163,25 +163,25 @@ internal fun AppUpdateDialog(
                     }
                     if (state.hasPackage) {
                         Text("系统仍需你确认安装。升级成功后自动清理应用内安装包；导出的副本由你保留。", style = MaterialTheme.typography.bodySmall)
-                        TextButton(enabled = !exporting, onClick = onExport) { Text(if (exporting) "导出中…" else "导出安装包") }
+                        PullOutTextButton(enabled = !exporting, onClick = onExport) { Text(if (exporting) "导出中…" else "导出安装包") }
                     }
-                    TextButton(onClick = onBrowser) { Text("浏览器下载") }
-                    TextButton(onClick = onReleasePage) { Text("查看完整更新说明") }
+                    PullOutTextButton(onClick = onBrowser) { Text("浏览器下载") }
+                    PullOutTextButton(onClick = onReleasePage) { Text("查看完整更新说明") }
                 }
             }
         },
         confirmButton = {
             when (state.stage) {
-                AppUpdateStage.DOWNLOADING, AppUpdateStage.VERIFYING -> TextButton(onClick = onDismiss) { Text("收起") }
-                AppUpdateStage.NEED_PERMISSION -> TextButton(enabled = !exporting, onClick = onPermission) { Text("允许安装") }
-                AppUpdateStage.READY, AppUpdateStage.INSTALLING -> TextButton(enabled = !exporting, onClick = onInstall) { Text("安装") }
+                AppUpdateStage.DOWNLOADING, AppUpdateStage.VERIFYING -> PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Text("收起") }
+                AppUpdateStage.NEED_PERMISSION -> PullOutTextButton(enabled = !exporting, onClick = onPermission) { Text("允许安装") }
+                AppUpdateStage.READY, AppUpdateStage.INSTALLING -> PullOutTextButton(enabled = !exporting, onClick = onInstall) { Text("安装") }
                 AppUpdateStage.AVAILABLE, AppUpdateStage.FAILED -> if (release.apk != null)
-                    TextButton(onClick = onDownload) { Text(if (state.stage == AppUpdateStage.FAILED) "重新下载" else "下载并安装") }
-                else TextButton(onClick = onReleasePage) { Text("打开发布页") }
+                    PullOutTextButton(onClick = onDownload) { Text(if (state.stage == AppUpdateStage.FAILED) "重新下载" else "下载并安装") }
+                else PullOutTextButton(onClick = onReleasePage) { Text("打开发布页") }
             }
         },
         dismissButton = {
-            TextButton(enabled = !exporting, onClick = if (state.transferring) onCancel else onDismiss) {
+            PullOutTextButton(enabled = !exporting, onClick = if (state.transferring) onCancel else onDismiss) {
                 Text(if (state.transferring) "取消下载" else "稍后")
             }
         },

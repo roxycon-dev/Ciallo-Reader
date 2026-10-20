@@ -1,5 +1,7 @@
 package com.example.god
 
+
+import com.example.ui.components.pullOutClickable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -116,7 +118,7 @@ fun GodSettingsSection(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
                             .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.10f))
-                            .clickable { onOpenRanking() }
+                            .pullOutClickable { onOpenRanking() }
                             .padding(vertical = 11.dp),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -201,7 +203,7 @@ private fun GodStyleCard(
                 ),
                 shape = RoundedCornerShape(14.dp),
             )
-            .clickable(onClick = onClick)
+            .pullOutClickable(onClick = onClick)
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

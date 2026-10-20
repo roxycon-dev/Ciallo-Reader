@@ -124,6 +124,7 @@ fun AppActionButton(
     loading: Boolean = false,
     fullWidth: Boolean = false
 ) {
+    val paperAction = paperClick(onClick)
     if (LocalRenderQuality.current.minimal) {
         val cs = MaterialTheme.colorScheme
         val bg = when (variant) {
@@ -140,7 +141,7 @@ fun AppActionButton(
         }
         Row(modifier.then(if (fullWidth) Modifier.fillMaxWidth() else Modifier)
             .height(buttonSize.height).clip(RoundedCornerShape(12.dp))
-            .background(bg).clickable(enabled = enabled && !loading, onClick = onClick)
+            .background(bg).pullOutClickable(enabled = enabled && !loading, onClick = paperAction)
             .padding(horizontal = buttonSize.horizontalPadding),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             icon?.let { Icon(it, null, tint = ink, modifier = Modifier.size(buttonSize.iconSize)); Spacer(Modifier.width(6.dp)) }
@@ -325,11 +326,11 @@ fun AppActionButton(
                 }
                 .border(1.dp, colors.destructive.copy(alpha = 0.35f), shape)
         }
-            .clickable(
+            .pullOutClickable(
                 interactionSource = interactionSource,
                 indication = null,
                 enabled = enabled,
-                onClick = onClick
+                onClick = paperAction
             )
             .padding(horizontal = buttonSize.horizontalPadding),
         contentAlignment = Alignment.Center

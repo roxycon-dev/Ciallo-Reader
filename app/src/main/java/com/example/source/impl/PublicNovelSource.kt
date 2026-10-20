@@ -24,12 +24,13 @@ import java.util.concurrent.TimeUnit
 /** Only individually verified, public guest sites belong in this registry. */
 object PublicNovelSources {
     // CZBooks failed its live whole-book audit (403); it is deliberately not published.
-    val ids = setOf("quanben", "ihuaben", "sfacg")
+    val ids = setOf("quanben", "ihuaben", "sfacg", "fanqie")
     fun create(context: Context, id: String): PublicNovelSource? = if (id !in ids) null else when (id) {
         "czbooks" -> PublicNovelSource(context, PublicNovelSite.CZBOOKS)
         "quanben" -> PublicNovelSource(context, PublicNovelSite.QUANBEN)
         "ihuaben" -> PublicNovelSource(context, PublicNovelSite.IHUABEN)
         "sfacg" -> PublicNovelSource(context, PublicNovelSite.SFACG)
+        "fanqie" -> PublicNovelSource(context, PublicNovelSite.FANQIE)
         "linovel" -> PublicNovelSource(context, PublicNovelSite.LINOVEL)
         else -> null
     }
@@ -41,7 +42,8 @@ enum class PublicNovelSite(val sourceId: String, val label: String, val home: St
     QUANBEN("quanben", "全本小说网", "https://www.quanben.io/"),
     IHUABEN("ihuaben", "话本小说", "https://www.ihuaben.com/"),
     SFACG("sfacg", "SF轻小说", "https://m.sfacg.com/"),
-    LINOVEL("linovel", "轻之文库", "https://www.linovel.net/")
+    LINOVEL("linovel", "轻之文库", "https://www.linovel.net/"),
+    FANQIE("fanqie", "番茄小说（公开聚合）", "https://fanqienovel.com/")
 }
 
 /** No account, credential store, or browser cookies are used by this adapter. */
@@ -55,16 +57,19 @@ class PublicNovelSource(
     override val name = site.label
     // Chapter APIs are used to assemble the EPUB. Expose offline reading, which preserves
     // illustrations, rather than advertising the plain-text preview as a complete reader.
-    override val capabilities = SourceCapabilities(supportEbook = true)
+    override val capabilities = SourceCapabilities(supportEbook = true, supportOnlineText = site == PublicNovelSite.FANQIE)
     internal val http = client ?: JsSourceProxy.failoverClient(context.applicationContext,
         SharedHttpTransport.builder().cookieJar(okhttp3.CookieJar.NO_COOKIES)
             .connectTimeout(12, TimeUnit.SECONDS).readTimeout(25, TimeUnit.SECONDS)
             .callTimeout(40, TimeUnit.SECONDS).build())
+    private val fanqie by lazy { FanqieGateway(http) }
 
     private fun validId(id: String): String = id.also {
         require(it.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { "小说标识无效" }
     }
-    internal fun bookUrl(bookId: String): HttpUrl = if (site == PublicNovelSite.SFACG)
+    internal fun bookUrl(bookId: String): HttpUrl = if (site == PublicNovelSite.FANQIE)
+        baseUrl.newBuilder().addPathSegment("page").addPathSegment(validId(bookId)).build()
+        else if (site == PublicNovelSite.SFACG)
         baseUrl.newBuilder().addPathSegment("b").addPathSegment(validId(bookId)).addPathSegment("").build()
         else if (site == PublicNovelSite.IHUABEN || site == PublicNovelSite.LINOVEL)
         baseUrl.newBuilder().addPathSegment("book").addPathSegment(validId(bookId) + ".html").build()
@@ -73,6 +78,7 @@ class PublicNovelSource(
     internal fun bookId(url: HttpUrl): String {
         require(url.host == baseUrl.host && url.scheme == baseUrl.scheme) { "小说地址不属于当前源" }
         val pattern = when (site) {
+            PublicNovelSite.FANQIE -> "^/page/([0-9]{18,20})$"
             PublicNovelSite.IHUABEN, PublicNovelSite.LINOVEL -> "^/book/([0-9]+)\\.html$"
             PublicNovelSite.SFACG -> "^/b/([0-9]+)/?$"
             else -> "^/n/([A-Za-z0-9_-]+)/?$"
@@ -123,6 +129,7 @@ class PublicNovelSource(
 
     override suspend fun search(keyword: String) = result {
         if (keyword.isBlank()) return@result emptyList<SearchBook>()
+        if (site == PublicNovelSite.FANQIE) return@result fanqie.search(keyword)
         val url = if (site == PublicNovelSite.CZBOOKS) baseUrl.newBuilder().addPathSegment("s").addPathSegment(keyword.trim()).build()
             else if (site == PublicNovelSite.IHUABEN) "https://so.ihuaben.com/search".toHttpUrl().newBuilder().addQueryParameter("keyword", keyword.trim()).build()
             else if (site == PublicNovelSite.SFACG) "https://s.sfacg.com/".toHttpUrl().newBuilder().addQueryParameter("Key", keyword.trim()).addQueryParameter("S", "1").build()
@@ -181,6 +188,7 @@ class PublicNovelSource(
     override suspend fun getDetail(bookId: String) = result { detail(bookId) }
     override suspend fun refreshNovelDetail(bookId: String) = result { detail(bookId) }
     private suspend fun detail(bookId: String): SearchBook {
+        if (site == PublicNovelSite.FANQIE) return fanqie.detail(bookId)
         val doc = page(bookUrl(bookId))
         val title: String
         val author: String
@@ -219,6 +227,7 @@ class PublicNovelSource(
     }
     override suspend fun getChapters(bookId: String) = result { chapters(bookId) }
     internal suspend fun chapters(bookId: String): List<ComicChapter> {
+        if (site == PublicNovelSite.FANQIE) return fanqie.chapters(bookId)
         if (site == PublicNovelSite.LINOVEL) {
             val doc = page(bookUrl(bookId))
             val volumes = doc.select(".catalog-list .volume-wrp")
@@ -295,6 +304,7 @@ class PublicNovelSource(
     }
 
     internal suspend fun chapterParts(chapterId: String): List<NovelPart> {
+        if (site == PublicNovelSite.FANQIE) return fanqie.parts(chapterId)
         val url = chapterId.toHttpUrl()
         val doc = page(url)
         val root = doc.selectFirst(when (site) {

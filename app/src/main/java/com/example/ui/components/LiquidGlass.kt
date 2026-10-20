@@ -438,7 +438,7 @@ fun Modifier.radialGlassScrim(): Modifier = this.drawBehind {
         brush = Brush.radialGradient(
             colors = listOf(
                 Color.Black.copy(alpha = 0.25f),
-                Color.Black.copy(alpha = 0.65f)
+                Color.Black.copy(alpha = PullOutConfig.SCRIM)
             ),
             center = Offset(size.width * 0.5f, size.height * 0.78f),
             radius = size.maxDimension * 0.95f

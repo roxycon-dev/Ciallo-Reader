@@ -121,7 +121,7 @@ fun AppErrorSnackbar(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 // Copy log button
-                TextButton(
+                PullOutTextButton(
                     onClick = {
                         clipboardManager.setText(AnnotatedString(message))
                         AppToast.makeText(context, "错误日志已复制到剪贴板", Toast.LENGTH_SHORT).show()

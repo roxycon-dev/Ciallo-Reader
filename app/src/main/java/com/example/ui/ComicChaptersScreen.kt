@@ -1,5 +1,10 @@
 package com.example.ui
 
+import com.example.ui.components.pullOutAnchor
+import com.example.ui.components.PullOutButton
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutIconButton
+import com.example.ui.components.pullOutClickable
 import android.widget.Toast
 import android.os.Build
 import androidx.compose.foundation.Canvas
@@ -277,7 +282,7 @@ fun ComicChaptersScreen(
                         .padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = ::exitSelection, modifier = Modifier.size(40.dp)) {
+                    PullOutIconButton(onClick = ::exitSelection, modifier = Modifier.size(40.dp)) {
                         Icon(
                             Icons.Filled.Close,
                             contentDescription = "退出多选",
@@ -292,7 +297,7 @@ fun ComicChaptersScreen(
                         color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = {
+                    PullOutTextButton(onClick = {
                         selectedChapterIds.clear()
                         selectedChapterIds.addAll(ordered.map { it.chapter.id })
                     }) {
@@ -339,7 +344,7 @@ fun ComicChaptersScreen(
                 // ── 多选底部：通栏「下载 N 话」 ──
                 selectionMode && !textMode -> {
                     val n = selectedChapterIds.size
-                    Button(
+                    PullOutButton(
                         onClick = {
                             if (n == 0) {
                                 AppToast.makeText(context, "先勾选要下载的章节", Toast.LENGTH_SHORT).show()
@@ -404,7 +409,7 @@ fun ComicChaptersScreen(
                             )
                         }
                         Spacer(Modifier.width(8.dp))
-                        Button(
+                        PullOutButton(
                             onClick = {
                                 val pair = cont
                                 if (pair == null) {
@@ -465,7 +470,7 @@ fun ComicChaptersScreen(
                             Spacer(modifier = Modifier.height(12.dp))
                             AppLiquidButton(text = "重试", onClick = onRetry)
                             Spacer(modifier = Modifier.height(8.dp))
-                            TextButton(onClick = onChangeSource) { Text("换源") }
+                            PullOutTextButton(onClick = onChangeSource) { Text("换源") }
                         }
                     }
                 }
@@ -524,7 +529,7 @@ fun ComicChaptersScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
-                                    .clickable { sortDesc = !sortDesc }
+                                    .pullOutClickable { sortDesc = !sortDesc }
                                     .padding(horizontal = 4.dp),
                             ) {
                                 Icon(
@@ -546,7 +551,7 @@ fun ComicChaptersScreen(
                                     .height(32.dp)
                                     .clip(RoundedCornerShape(16.dp))
                                     .background(MintPrimary.copy(alpha = 0.12f))
-                                    .clickable {
+                                    .pullOutClickable {
                                         val idx = if (sortDesc) 0 else (normalChapters.size - 1).coerceAtLeast(0)
                                         scope.launch {
                                             listState.animateScrollToItem(godList.size + idx + LIST_HEADER_ITEMS)
@@ -564,7 +569,7 @@ fun ComicChaptersScreen(
                             }
                             Spacer(Modifier.weight(1f))
                             if (textMode && onDownloadNovel != null) {
-                                TextButton(onClick = onDownloadNovel) {
+                                PullOutTextButton(onClick = onDownloadNovel) {
                                     Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(3.dp))
                                     Text("整本下载", fontSize = 13.sp)
@@ -575,7 +580,7 @@ fun ComicChaptersScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(8.dp))
-                                        .clickable { selectionMode = true }
+                                        .pullOutClickable { selectionMode = true }
                                         .padding(horizontal = 4.dp),
                                 ) {
                                     Icon(
@@ -777,7 +782,7 @@ private fun QuickPill(text: String, onClick: () -> Unit) {
             .height(30.dp)
             .clip(RoundedCornerShape(16.dp))
             .border(0.5.dp, SolidColor(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)), RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
+            .pullOutClickable(onClick = onClick)
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -880,9 +885,9 @@ private fun ChapterCardSpec(
             }
             .then(
                 if (selecting) {
-                    Modifier.clickable(onClick = onClick)
+                    Modifier.pullOutClickable(onClick = onClick)
                 } else {
-                    Modifier.combinedClickable(
+                    Modifier.pullOutAnchor().combinedClickable(
                         onClick = onClick,
                         onLongClick = {
                             if (HapticsGate.enabled) {
@@ -982,9 +987,9 @@ private fun ChapterCardSpec(
                 modifier = Modifier.size(40.dp)
                     .then(
                         when {
-                            selecting -> Modifier.clip(CircleShape).clickable(onClick = onClick)
+                            selecting -> Modifier.clip(CircleShape).pullOutClickable(onClick = onClick)
                             downloading || downloaded || external || textMode -> Modifier
-                            else -> Modifier.clickable(onClick = onDownload)
+                            else -> Modifier.pullOutClickable(onClick = onDownload)
                         }
                     ),
                 contentAlignment = Alignment.Center,
@@ -1099,7 +1104,7 @@ private fun GodCardSpec(
                 SolidColor(if (isSelected) MintPrimary else GodGoldStroke),
                 shape,
             )
-            .combinedClickable(
+            .pullOutAnchor().combinedClickable(
                 onClick = onOpen,
                 onLongClick = {
                     if (HapticsGate.enabled) {
@@ -1192,7 +1197,7 @@ private fun GodCardSpec(
                 modifier = Modifier.size(40.dp)
                     .then(
                         if (selecting) {
-                            Modifier.clip(CircleShape).clickable(onClick = onToggleCheck)
+                            Modifier.clip(CircleShape).pullOutClickable(onClick = onToggleCheck)
                         } else {
                             Modifier
                         }
@@ -1223,7 +1228,7 @@ private fun GodCardSpec(
             }
             if (!selecting) {
                 Box(
-                    modifier = Modifier.size(40.dp).clickable(onClick = onDownload),
+                    modifier = Modifier.size(40.dp).pullOutClickable(onClick = onDownload),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -1447,7 +1452,7 @@ private fun ComicHeroHeader(book: SearchBook?, textMode: Boolean, onTextClick: (
                 overflow = TextOverflow.Ellipsis,
             ) }
             if (desc.length > 60) {
-                TextButton(onClick = { descriptionExpanded = !descriptionExpanded }) {
+                PullOutTextButton(onClick = { descriptionExpanded = !descriptionExpanded }) {
                     Text(if (descriptionExpanded) "收起" else "展开")
                 }
             }

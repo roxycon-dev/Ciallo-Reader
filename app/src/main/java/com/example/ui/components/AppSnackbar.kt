@@ -18,14 +18,12 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarVisuals
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -141,7 +139,7 @@ fun AppToastSnackbar(
 
             if (actionLabel != null && onActionClick != null) {
                 Spacer(modifier = Modifier.width(8.dp))
-                TextButton(
+                PullOutTextButton(
                     onClick = onActionClick,
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                     modifier = Modifier.height(32.dp),
@@ -156,7 +154,7 @@ fun AppToastSnackbar(
             }
 
             if (onDismissClick != null) {
-                IconButton(onClick = onDismissClick, modifier = Modifier.size(28.dp)) {
+                PullOutIconButton(onClick = onDismissClick, modifier = Modifier.size(28.dp)) {
                     Icon(
                         imageVector = Icons.Filled.Close,
                         contentDescription = "关闭",

@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.pullOutClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -76,7 +78,7 @@ internal fun KeywordSearchPreview(
         Column(Modifier.padding(DesignTokens.SpaceMd), verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
             Row(Modifier.fillMaxWidth().heightIn(min = DesignTokens.SpaceXxl * 2)
                 .semantics { stateDescription = if (expanded) "已展开" else "已收起" }
-                .clickable(role = Role.Button, onClickLabel = if (expanded) "收起搜索用词" else "查看搜索用词") { expanded = !expanded },
+                .pullOutClickable(role = Role.Button, onClickLabel = if (expanded) "收起搜索用词" else "查看搜索用词") { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
                 Icon(Icons.Default.Translate, "多语言关键词", tint = MaterialTheme.colorScheme.primary,
@@ -107,7 +109,7 @@ internal fun KeywordSearchPreview(
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.widthIn(max = DesignTokens.SpaceXxl * 9)
                                 .background(MaterialTheme.colorScheme.secondaryContainer, DesignTokens.shape(DesignTokens.RadiusXs))
-                                .clickable(onClickLabel = "查看完整搜索用词") { expanded = true }
+                                .pullOutClickable(onClickLabel = "查看完整搜索用词") { expanded = true }
                                 .padding(horizontal = DesignTokens.SpaceSm, vertical = DesignTokens.SpaceXs))
                     }
                 }
@@ -144,7 +146,7 @@ internal fun KeywordSearchPreview(
             }
             if (onRetry != null && !status.startsWith("正在") &&
                 (status.contains("失败") || status.contains("超时") || status.startsWith("未找到更多"))) {
-                TextButton(onClick = onRetry, contentPadding = PaddingValues(horizontal = DesignTokens.SpaceXs)) {
+                PullOutTextButton(onClick = onRetry, contentPadding = PaddingValues(horizontal = DesignTokens.SpaceXs)) {
                     Text("重新查词", style = MaterialTheme.typography.labelMedium)
                 }
             }

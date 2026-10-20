@@ -1,5 +1,11 @@
 package com.example.god
 
+
+import com.example.ui.components.PullOutButton
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutIconButton
+import com.example.ui.components.PullOutAlertDialog
+import com.example.ui.components.pullOutClickable
 import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -55,13 +61,11 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -239,6 +243,10 @@ fun GodMomentSheet(
     onDismiss: () -> Unit,
     onSaved: (GodMomentEntity) -> Unit,
 ) {
+    com.example.ui.components.PullOutInlineOverlay(onDismiss) { dismissPaper ->
+    val finishPaper = com.example.ui.components.LocalOverlayClose.current
+    val savedAfterPaper: (GodMomentEntity) -> Unit = { entity -> finishPaper { onSaved(entity) } }
+
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -378,7 +386,7 @@ fun GodMomentSheet(
             val id = viewModel.repository.save(entity)
             burst = true
             kotlinx.coroutines.delay(620)
-            onSaved(entity.copy(id = id))
+            savedAfterPaper(entity.copy(id = id))
         }
     }
 
@@ -390,12 +398,12 @@ fun GodMomentSheet(
                 modifier = Modifier
                     .fillMaxSize()
                     .radialGlassScrim()
-                    .clickable(
+                    .pullOutClickable(
                         interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                         indication = null,
                     ) {
                         if (!saving) {
-                            if (dirty) confirmClose = true else onDismiss()
+                            if (dirty) confirmClose = true else dismissPaper()
                         }
                     },
             )
@@ -561,7 +569,7 @@ fun GodMomentSheet(
                 dark = dark,
                 title = shownTitle,
                 rating = rating,
-                onCancel = { if (dirty) confirmClose = true else onDismiss() },
+                onCancel = { if (dirty) confirmClose = true else dismissPaper() },
                 onConfirm = ::doSave,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -580,7 +588,7 @@ fun GodMomentSheet(
         if (confirmClose) {
             GodConfirmCloseDialog(
                 onKeep = { confirmClose = false },
-                onDiscard = { confirmClose = false; onDismiss() },
+                onDiscard = { confirmClose = false; dismissPaper() },
             )
         }
     }
@@ -595,6 +603,8 @@ fun GodMomentSheet(
                 showCrop = false
             },
         )
+    }
+
     }
 }
 
@@ -946,7 +956,7 @@ private fun GodPageThumb(
                     else -> "加载中"
                 }
             }
-            .clickable {
+            .pullOutClickable {
                 if (failed) retry++
                 onClick()
             },
@@ -1061,7 +1071,7 @@ private fun GodTitleField(
             ),
             trailingIcon = {
                 if (custom) {
-                    IconButton(onClick = onResetDefault) {
+                    PullOutIconButton(onClick = onResetDefault) {
                         Icon(Icons.Filled.Refresh, contentDescription = "还原默认", modifier = Modifier.size(18.dp))
                     }
                 }
@@ -1154,7 +1164,7 @@ private fun GodActionBar(
     }
     Spacer(Modifier.height(9.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
-        TextButton(onClick = onCancel, enabled = enabled) {
+        PullOutTextButton(onClick = onCancel, enabled = enabled) {
             Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.width(12.dp))
@@ -1193,7 +1203,7 @@ fun GodShineButton(
     val shape = RoundedCornerShape(GodMotion.BUTTON_CORNER.dp)
     val press = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
 
-    androidx.compose.material3.Button(
+    PullOutButton(
         onClick = { if (!loading && enabled) onClick() },
         modifier = modifier
             .height(52.dp)
@@ -1363,14 +1373,14 @@ private fun GodBurstOverlay(preview: Bitmap?, reduce: Boolean) {
 
 @Composable
 private fun GodConfirmCloseDialog(onKeep: () -> Unit, onDiscard: () -> Unit) {
-    androidx.compose.material3.AlertDialog(
+    PullOutAlertDialog(
         onDismissRequest = onKeep,
         title = { Text("放弃这次编辑？") },
         text = { Text("已经改过的内容不会保存。", fontSize = 14.sp) },
         confirmButton = {
-            TextButton(onClick = onDiscard) { Text("放弃", color = MaterialTheme.colorScheme.error) }
+            PullOutTextButton(onClick = onDiscard) { Text("放弃", color = MaterialTheme.colorScheme.error) }
         },
-        dismissButton = { TextButton(onClick = onKeep) { Text("继续编辑") } },
+        dismissButton = { PullOutTextButton(onClick = onKeep) { Text("继续编辑") } },
         shape = RoundedCornerShape(24.dp),
     )
 }

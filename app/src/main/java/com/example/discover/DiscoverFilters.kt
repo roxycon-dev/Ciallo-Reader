@@ -1,5 +1,8 @@
 package com.example.discover
 
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutIconButton
+import com.example.ui.components.PullOutVisibility
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -58,9 +61,9 @@ internal fun DiscoverFilters(tabs: List<Pair<String, Boolean>>, onTab: (Int) -> 
                 Icon(Icons.Outlined.ExpandMore, null, Modifier.size(16.dp), tint = colors.onSurfaceVariant)
             }
             ToolLabel(Icons.Outlined.FilterList, "分类${if (selected.isNotEmpty()) " ${selected.size}" else ""}", selected.isNotEmpty(), onCategory)
-            IconButton(onClick = onRefresh, enabled = !refreshing) { Icon(Icons.Outlined.Refresh, "刷新发现", Modifier.size(18.dp), tint = colors.onSurfaceVariant) }
+            PullOutIconButton(onClick = onRefresh, enabled = !refreshing) { Icon(Icons.Outlined.Refresh, "刷新发现", Modifier.size(18.dp), tint = colors.onSurfaceVariant) }
         }
-        AnimatedVisibility(selected.isNotEmpty(), enter = expandVertically(tween(duration)) + fadeIn(tween(duration)), exit = shrinkVertically(tween(duration)) + fadeOut(tween(duration))) {
+        PullOutVisibility(selected.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 LazyRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(DiscoverTaxonomy.all.filter { it.id in selected }, key = { it.id }) { category ->
@@ -73,7 +76,7 @@ internal fun DiscoverFilters(tabs: List<Pair<String, Boolean>>, onTab: (Int) -> 
                     }
                 }
                 VerticalDivider(Modifier.padding(horizontal = 8.dp).height(16.dp), thickness = .5.dp, color = colors.outline.copy(alpha = .24f))
-                TextButton(onClick = onClear) { Text("清除", fontSize = 13.sp, lineHeight = 18.sp, color = accentInk) }
+                PullOutTextButton(onClick = onClear) { Text("清除", fontSize = com.example.ui.design.DesignTokens.TypeLabel, lineHeight = com.example.ui.design.DesignTokens.TypeCaptionLineHeight, color = accentInk) }
             }
         }
         if (sorts.isNotEmpty()) {

@@ -1,5 +1,6 @@
 package com.example.discover
 
+import com.example.ui.components.PullOutTextButton
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -38,7 +39,7 @@ fun DiscoverSettings(onDismissRequest: () -> Unit) {
                         SegmentedPillSelector(listOf(6 to "6小时", 24 to "24小时", 72 to "72小时"),
                             store.string("cache_hours", "24").toIntOrNull() ?: 24, { store.put("cache_hours", it.toString()) })
                     }
-                    TextButton(onClick = { store.cache.edit().clear().apply() }) { Text("清除离线缓存") }
+                    PullOutTextButton(onClick = { store.cache.edit().clear().apply() }) { Text("清除离线缓存") }
                 }
                 AppActionButton("屏蔽管理", { blockedOpen = true }, variant = AppButtonVariant.Secondary, fullWidth = true)
             }
@@ -50,7 +51,7 @@ fun DiscoverSettings(onDismissRequest: () -> Unit) {
             Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
                 if (blocked.isEmpty()) Text("还没有屏蔽作品")
                 blocked.forEach { (key, title) ->
-                    TextButton(onClick = { store.unblock(key) }) {
+                    PullOutTextButton(onClick = { store.unblock(key) }) {
                         Text("解除 · $title")
                     }
                 }

@@ -1,5 +1,7 @@
 package com.example.ui.comic
 
+import com.example.ui.reader.TouchAction
+import com.example.ui.reader.touchZoneGestures
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationState
 import androidx.compose.animation.core.Spring
@@ -370,6 +372,7 @@ class ComicGestureCallbacks(
     val onEdgeBack: () -> Unit,
     /** 放大状态下滑到边缘继续翻页（dir>0 屏幕向右拖） */
     val onZoomedEdgeSwipe: ((Int) -> Unit)? = null,
+    val onZoneAction: (TouchAction) -> Unit = {},
 )
 
 /**
@@ -390,6 +393,7 @@ fun Modifier.comicZoomable(
     callbacks: ComicGestureCallbacks,
 ): Modifier = composed {
     val scope = rememberCoroutineScope()
+    val resourcesDensity = androidx.compose.ui.platform.LocalDensity.current.density
     val latestConfig by rememberUpdatedState(config)
     val latestCallbacks by rememberUpdatedState(callbacks)
     DisposableEffect(state) {
@@ -398,7 +402,9 @@ fun Modifier.comicZoomable(
             state.releaseJob?.cancel()
         }
     }
-    this
+    this.touchZoneGestures(config.touchZones, { span -> comicTurnTravel(span, resourcesDensity) }, callbacks.onZoneAction,
+        vertical = config.direction == ComicDirection.TTB && config.mode != ComicMode.DOUBLE,
+        reverse = config.direction == ComicDirection.RTL, taps = false, zoomed = { state.isZoomed })
         .onSizeChanged { state.containerSize = Size(it.width.toFloat(), it.height.toFloat()) }
         .pointerInput(state) {
             val slop = viewConfiguration.touchSlop

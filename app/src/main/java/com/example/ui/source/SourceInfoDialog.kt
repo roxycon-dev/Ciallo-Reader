@@ -1,5 +1,7 @@
 package com.example.ui.source
 
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutAlertDialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,7 +16,7 @@ import com.example.source.js.JsComicSource
 @Composable
 internal fun SourceInfoDialog(source: BookSource, enabled: Boolean, onDismiss: () -> Unit) {
     val caps = source.capabilities
-    AlertDialog(onDismissRequest = onDismiss,
+    PullOutAlertDialog(onDismissRequest = onDismiss,
         title = { Text(source.name) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -33,6 +35,6 @@ internal fun SourceInfoDialog(source: BookSource, enabled: Boolean, onDismiss: (
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("知道啦") } },
+        confirmButton = { PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Text("知道啦") } },
     )
 }

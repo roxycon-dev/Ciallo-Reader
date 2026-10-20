@@ -234,7 +234,7 @@ fun CollapsingTabScreenHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             leading?.invoke(this)
-            if (titleVisible) Column(Modifier.weight(1f).then(if (onTitleClick != null) Modifier.clickable(onClick = onTitleClick) else Modifier)) {
+            if (titleVisible) Column(Modifier.weight(1f).then(if (onTitleClick != null) Modifier.pullOutClickable(onClick = onTitleClick) else Modifier)) {
                 Text(
                     text = title,
                     fontSize = titleSize.sp,

@@ -2,6 +2,23 @@
 
 package com.example.ui
 
+
+import com.example.ui.components.PullOutButton
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutFilledTonalButton
+import com.example.ui.components.PullOutIconButton
+import com.example.ui.components.PullOutDropdownMenuItem
+import com.example.ui.components.PullOutAlertDialog
+import com.example.ui.components.PullOutBottomSheet
+import com.example.ui.components.PullOutDropdownMenu
+import com.example.ui.components.PullOutVisibility
+import com.example.ui.components.pullOutClickable
+import com.example.ui.reader.TouchZone
+import com.example.ui.reader.TouchAction
+import com.example.ui.reader.SwipeAction
+import com.example.ui.reader.ReaderTouchBinding
+import com.example.ui.reader.touchZoneGestures
+import com.example.ui.components.Slider
 import com.example.ui.design.DesignTokens
 import com.example.ui.design.ReadingPalette
 
@@ -186,6 +203,7 @@ import com.example.ui.reader.NovelImageFullscreenViewer
 import com.example.ui.reader.NovelInlineImage
 import com.example.ui.reader.NovelInlineImages
 import com.example.ui.reader.buildAnnotatedWithImages
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.boundsInWindow
@@ -314,6 +332,13 @@ fun ReaderScreen(
 
 
 
+    val touchStore = remember { com.example.ui.reader.NovelTouchZoneStore(context) }
+    var savedTouchZones by remember { mutableStateOf(touchStore.load()) }
+    var previewTouchZones by remember { mutableStateOf<List<TouchZone>?>(null) }
+    var previewTouchActive by remember { mutableStateOf(false) }
+    var touchViewport by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    val touchZones = if (previewTouchActive) previewTouchZones else savedTouchZones
+    var showTouchEditor by remember { mutableStateOf(false) }
     var showTocSheet by remember { mutableStateOf(false) }
 
     var showSettingsSheet by remember { mutableStateOf(false) }
@@ -1146,6 +1171,7 @@ fun ReaderScreen(
 
 
 
+    Box(Modifier.fillMaxSize()) {
     Box(
 
         modifier = Modifier
@@ -1818,6 +1844,22 @@ fun ReaderScreen(
 
 
 
+            val touchBinding = ReaderTouchBinding(touchZones, onViewport = { touchViewport = it }) { action ->
+                when (action) {
+                    TouchAction.PREVIOUS -> if (isScrollMode && scrollState.value > 0) scope.launch { scrollState.animateScrollTo((scrollState.value - (touchViewport?.height ?: (700 * context.resources.displayMetrics.density)) * .9f).toInt().coerceAtLeast(0)) } else handlePrevPage()
+                    TouchAction.NEXT -> if (isScrollMode && scrollState.value < scrollState.maxValue) scope.launch { scrollState.animateScrollTo((scrollState.value + (touchViewport?.height ?: (700 * context.resources.displayMetrics.density)) * .9f).toInt().coerceAtMost(scrollState.maxValue)) } else handleNextPage()
+                    TouchAction.CONTROLS -> showBars = !showBars
+                    TouchAction.SETTINGS -> showSettingsSheet = true
+                    TouchAction.CONTENTS -> showTocSheet = true
+                    TouchAction.LISTEN -> {
+                        showTtsBar = true; isAutoScrolling = false
+                        if (!isTtsPlaying) currentChapter?.let { ttsManager.startReading(NovelInlineImages.stripTokens(it.content), speed = prefs.ttsSpeed, pitch = prefs.ttsPitch) }
+                    }
+                    TouchAction.EXIT -> onBack()
+                    TouchAction.NONE -> Unit
+                }
+            }
+
             if (readerLoadError != null) {
                 Column(
                     modifier = Modifier.fillMaxSize().padding(DesignTokens.SpaceSection),
@@ -1826,7 +1868,7 @@ fun ReaderScreen(
                 ) {
                     Text("章节加载失败：$readerLoadError", color = textColor)
                     Spacer(Modifier.height(DesignTokens.SpaceLg))
-                    Button(onClick = onRetryLoad) { Text("重试加载") }
+                    PullOutButton(onClick = onRetryLoad) { Text("重试加载") }
                 }
             } else if (readerLoading || chapters.isEmpty() ||
                 (book?.isComic == false && currentChapterIndex !in loadedChapterIndices) ||
@@ -1965,6 +2007,8 @@ fun ReaderScreen(
 
                                                     }
 
+                                                    .onGloballyPositioned { touchBinding.onViewport(androidx.compose.ui.geometry.Rect(it.positionInWindow(), androidx.compose.ui.geometry.Size(it.size.width.toFloat(), it.size.height.toFloat()))) }
+                                                    .touchZoneGestures(touchZones, { it * .15f }, touchBinding.onAction, vertical = true, menuVisible = showBars)
                                                     // 滚动模式统一手势（与 PageTurnContainer 拉下书签手势同款 awaitEachGesture 写法）：
 
                                                     //  - 章节中部拖拽一律不消费，完全交给 verticalScroll，互不干扰；
@@ -1977,8 +2021,9 @@ fun ReaderScreen(
 
                                                     // 才能先于滚动组件接管边界拖拽，避免两套手势互相打架。
 
-                                                    .pointerInput(scrollState, currentChapterIndex, chapters.size) {
+                                                    .pointerInput(scrollState, currentChapterIndex, chapters.size, touchZones) {
 
+                                                        if (touchZones != null) return@pointerInput
                                                         awaitEachGesture {
 
                                                             val down = awaitFirstDown(requireUnconsumed = false)
@@ -2073,7 +2118,7 @@ fun ReaderScreen(
 
                                                     .pointerInput(Unit) {
 
-                                                        detectTapGestures(onTap = { showBars = !showBars })
+                                                        if (touchZones == null) detectTapGestures(onTap = { showBars = !showBars })
 
                                                     }
 
@@ -2510,6 +2555,7 @@ fun ReaderScreen(
                                         // C1 pagecurl 引擎（SIMULATE 专用）：三页窗口 + 中央点击唤出菜单
 
                                         PageCurlReaderContainer(
+                                            touchBinding = touchBinding,
 
                                             currentContent = currentSlot,
 
@@ -2559,6 +2605,7 @@ fun ReaderScreen(
                                     } else {
 
                                         PageTurnContainer(
+                                            touchBinding = touchBinding,
 
                                             pageTurnMode = pageTurnMode,
 
@@ -2650,17 +2697,9 @@ fun ReaderScreen(
 
                                 // （方向修正：章尾手指上滑→下一章；章首手指下拉→上一章）
 
-                                androidx.compose.animation.AnimatedVisibility(
+                                PullOutVisibility(
 
                                     visible = isScrollMode && overscrollDirection != 0 && !switchingChapter,
-
-                                    enter = fadeIn(tween(120)) + slideInVertically(
-
-                                        initialOffsetY = { if (overscrollDirection == 1) it / 2 else -it / 2 }
-
-                                    ),
-
-                                    exit = fadeOut(tween(100)),
 
                                     modifier = Modifier
 
@@ -2775,13 +2814,9 @@ fun ReaderScreen(
 
                                 val isCurrentBookmarked = bookmarks.any { (it.bookId == (book?.id ?: 0) || it.bookId == 0) && it.chapterIndex == currentChapterIndex }
 
-                                androidx.compose.animation.AnimatedVisibility(
+                                PullOutVisibility(
 
                                     visible = isCurrentBookmarked,
-
-                                    enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
-
-                                    exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
 
                                     modifier = Modifier
 
@@ -2845,12 +2880,9 @@ fun ReaderScreen(
 
                         // B5：TTS 播放器原先直接显隐、无任何进出场，
                         // 与其它浮层（目录/设置面板都有动画）观感不一致。
-                        AnimatedVisibility(
+                        PullOutVisibility(
                             visible = showTtsBar,
-                            modifier = Modifier.align(Alignment.BottomCenter),
-                            enter = fadeIn(tween(180)) + slideInVertically(tween(240, easing = EaseOut)) { it / 3 },
-                            exit = fadeOut(tween(150)) + slideOutVertically(tween(200)) { it / 3 }
-                        ) {
+                            modifier = Modifier.align(Alignment.BottomCenter)) {
 
                             Card(
 
@@ -2972,23 +3004,14 @@ fun ReaderScreen(
 
 
 
-                        AnimatedVisibility(
+                        PullOutVisibility(
                             visible = showReturnChip && previousPosition != null,
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
                                 // B5：原 80.dp 是拍脑袋的魔法数字，刘海/挖孔更高的机型
                                 // 会把浮层顶到状态栏里。改为真实状态栏高度 + 视觉间距。
                                 .statusBarsPadding()
-                                .padding(top = 56.dp),
-                            enter = fadeIn(tween(240)) + slideInVertically(
-                                initialOffsetY = { -it / 2 },
-                                animationSpec = tween(280, easing = EaseOut)
-                            ),
-                            exit = fadeOut(tween(420)) + slideOutVertically(
-                                targetOffsetY = { -it / 2 },
-                                animationSpec = tween(360, easing = EaseOut)
-                            )
-                        ) {
+                                .padding(top = 56.dp)) {
                             Surface(
                                 modifier = Modifier.clickableWithFeedback {
                                     previousPosition?.let { (ch, offset) ->
@@ -3023,13 +3046,9 @@ fun ReaderScreen(
 
         // 自动滚屏运行指示器（点击停止）
 
-        androidx.compose.animation.AnimatedVisibility(
+        PullOutVisibility(
 
             visible = isAutoScrolling,
-
-            enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { it / 2 },
-
-            exit = fadeOut(tween(150)),
 
             // B5：同上，三键导航机型（导航栏 ≈48dp）会把浮层压在导航栏后面
             modifier = Modifier
@@ -3077,13 +3096,9 @@ fun ReaderScreen(
 
         // 滚动模式：滚过 20% 时显示"回到顶部"按钮
 
-        androidx.compose.animation.AnimatedVisibility(
+        PullOutVisibility(
 
             visible = isScrollMode && !isAutoScrolling && scrollState.value > scrollState.maxValue * 0.2f,
-
-            enter = fadeIn(tween(200)) + scaleIn(initialScale = 0.8f),
-
-            exit = fadeOut(tween(150)) + scaleOut(targetScale = 0.8f),
 
             modifier = Modifier.align(Alignment.BottomEnd).padding(end = DesignTokens.SpaceXl, bottom = 80.dp)
 
@@ -3155,7 +3170,7 @@ fun ReaderScreen(
 
         // Reader Overlay (Background Mask)
 
-        AnimatedVisibility(
+        com.example.ui.components.PullOutScrim(
 
             visible = showBars && !showSettingsSheet,
 
@@ -3173,11 +3188,11 @@ fun ReaderScreen(
 
                     .fillMaxSize()
 
-                    .background(Color.Black.copy(alpha = 0.6f))
+                    .background(Color.Black.copy(alpha = com.example.ui.components.PullOutConfig.SCRIM))
 
                     // 菜单打开时点击空白处只关闭菜单，绝不触发翻页/切章
 
-                    .clickable(
+                    .pullOutClickable(
 
                         interactionSource = remember { MutableInteractionSource() },
 
@@ -3207,15 +3222,9 @@ fun ReaderScreen(
 
             Box(modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
 
-                AnimatedVisibility(
+                PullOutVisibility(
 
-                                    visible = showBars && !showSettingsSheet,
-
-                                    enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
-
-                                    exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
-
-                                ) {
+                                    visible = showBars && !showSettingsSheet) {
 
                                     // ── 定制阅读器顶栏：圆角浮层 + 章节进度 + 主题自适应色 ──
 
@@ -3361,21 +3370,21 @@ fun ReaderScreen(
                                                 AppIconButton(onClick = { showReaderMoreMenu = true }) {
                                                     Icon(Icons.Filled.MoreVert, "更多", tint = barContentColor, modifier = Modifier.size(DesignTokens.SpaceXl))
                                                 }
-                                                DropdownMenu(
+                                                PullOutDropdownMenu(
                                                     expanded = showReaderMoreMenu,
                                                     onDismissRequest = { showReaderMoreMenu = false }
                                                 ) {
-                                                    DropdownMenuItem(
+                                                    PullOutDropdownMenuItem(
                                                         text = { Text("全文搜索") },
                                                         leadingIcon = { Icon(Icons.Filled.Search, null, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
                                                         onClick = { showReaderMoreMenu = false; showSearchDialog = true }
                                                     )
-                                                    DropdownMenuItem(
+                                                    PullOutDropdownMenuItem(
                                                         text = { Text("书签列表") },
                                                         leadingIcon = { Icon(Icons.Filled.Bookmarks, null, tint = MintPrimary, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
                                                         onClick = { showReaderMoreMenu = false; showAnnotationsSheet = true }
                                                     )
-                                                    DropdownMenuItem(
+                                                    PullOutDropdownMenuItem(
                                                         text = { Text(if (isAutoScrolling) "停止自动滚屏" else "自动滚屏") },
                                                         leadingIcon = { Icon(Icons.Filled.UnfoldMore, null, tint = if (isAutoScrolling) MintGold else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
                                                         onClick = {
@@ -3388,7 +3397,7 @@ fun ReaderScreen(
                                                             }
                                                         }
                                                     )
-                                                    DropdownMenuItem(
+                                                    PullOutDropdownMenuItem(
                                                         text = { Text("排版设置") },
                                                         leadingIcon = { Icon(Icons.Filled.Settings, null, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
                                                         onClick = { showReaderMoreMenu = false; showSettingsSheet = true }
@@ -3406,15 +3415,9 @@ fun ReaderScreen(
 
             Box(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
 
-                AnimatedVisibility(
+                PullOutVisibility(
 
-                                    visible = showBars && !showSettingsSheet && chapters.isNotEmpty(),
-
-                                    enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-
-                                    exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-
-                                ) {
+                                    visible = showBars && !showSettingsSheet && chapters.isNotEmpty()) {
 
                                     // ── 定制阅读器底栏：与顶栏同风格 ──
 
@@ -3456,7 +3459,7 @@ fun ReaderScreen(
 
                                             Row(verticalAlignment = Alignment.CenterVertically) {
 
-                                                TextButton(
+                                                PullOutTextButton(
 
                                                     onClick = {
 
@@ -3542,7 +3545,7 @@ fun ReaderScreen(
 
                 
 
-                                                TextButton(
+                                                PullOutTextButton(
 
                                                     onClick = {
 
@@ -3601,7 +3604,7 @@ fun ReaderScreen(
 
                 
 
-                                                FilledTonalButton(
+                                                PullOutFilledTonalButton(
 
                                                     onClick = {
 
@@ -3701,7 +3704,7 @@ fun ReaderScreen(
 
 
 
-        ModalBottomSheet(
+        PullOutBottomSheet(
 
             onDismissRequest = { showTocSheet = false },
 
@@ -3714,7 +3717,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("目录 (${chapters.size}章)", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    if (onCheckNovelUpdate != null) TextButton(onClick = { showTocSheet = false; onCheckNovelUpdate() }) {
+                    if (onCheckNovelUpdate != null) PullOutTextButton(onClick = { showTocSheet = false; onCheckNovelUpdate() }) {
                         Icon(Icons.Filled.Refresh, null, Modifier.size(DesignTokens.SpaceLg))
                         Spacer(Modifier.width(5.dp)); Text("检查更新")
                     }
@@ -3757,7 +3760,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                         val index = chapter.chapterOrder
 
-                        TextButton(
+                        PullOutTextButton(
 
                             onClick = {
 
@@ -3808,6 +3811,19 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
 
 
+    if (showTouchEditor) {
+        val width = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.toFloat()
+        val split = if (pageTurnMode == PageTurnType.SIMULATE.id || com.example.ui.components.LocalRenderQuality.current.minimal) 1f / 3f else .35f
+        val defaults = if (isScrollMode) listOf(TouchZone(id = "scroll", left = 0f, top = 0f, right = 1f, bottom = 1f, swipe = SwipeAction.NONE))
+        else listOf(
+            TouchZone(id = "left", left = 0f, top = 0f, right = split, bottom = 1f, tap = TouchAction.PREVIOUS),
+            TouchZone(id = "center", left = split, top = 0f, right = 1f - split, bottom = 1f),
+            TouchZone(id = "right", left = 1f - split, top = 0f, right = 1f, bottom = 1f, tap = TouchAction.NEXT),
+        )
+        com.example.ui.reader.TouchZoneEditor(savedTouchZones, defaults, if (com.example.ui.components.LocalRenderQuality.current.minimal) 48f else (touchViewport?.width?.div(LocalDensity.current.density) ?: width) * .15f,
+            vertical = isScrollMode, onSave = { savedTouchZones = it; touchStore.save(it) }, onDismiss = { previewTouchActive = false; showTouchEditor = false },
+            viewportInWindow = touchViewport, onPreview = { draft, active -> previewTouchZones = draft; previewTouchActive = active; showBars = false })
+    }
     if (showSettingsSheet) {
         val themeColor = bgColor
         val accentColor = MintPrimary
@@ -3836,7 +3852,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                     Spacer(modifier = Modifier.width(DesignTokens.SpaceTight))
                     Text("阅读排版", fontSize = DesignTokens.TypeDisplay, fontWeight = FontWeight.SemiBold, color = textColor,
                         modifier = Modifier.weight(1f))
-                    TextButton(onClick = {
+                    PullOutTextButton(onClick = {
                         fontSize = 18f
                         lineHeight = 28f
                         marginHorizontal = 16
@@ -3849,11 +3865,14 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                     }) {
                         Text("重置", fontWeight = FontWeight.SemiBold, color = accentColor)
                     }
-                    IconButton(onClick = closePanel) {
+                    PullOutIconButton(onClick = closePanel) {
                         Icon(Icons.Filled.Close, "关闭阅读排版", tint = textColor.copy(alpha = 0.65f))
                     }
                 }
 
+                PullOutFilledTonalButton(onClick = com.example.ui.components.paperDismiss { showBars = false; isAutoScrolling = false; showTouchEditor = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.TouchApp, null); Spacer(Modifier.width(8.dp)); Text("自定义触控功能分区")
+                }
                 /* ── 分组：显示（亮度 + 首行缩进）── */
                 Text(
                     "显 示",
@@ -3887,6 +3906,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                         Slider(
                             value = ((readerBrightness - 0.2f) / 0.8f).coerceIn(0f, 1f),
                             onValueChange = { readerBrightness = 0.2f + it * 0.8f; prefs.readerBrightness = readerBrightness },
+                            formatLabel = { "${(readerBrightness * 100).toInt()}%" },
                             colors = SliderDefaults.colors(
                                 thumbColor = accentColor,
                                 activeTrackColor = accentColor,
@@ -3941,7 +3961,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                 modifier = Modifier.readingGlass(RoundedCornerShape(DesignTokens.RadiusSm))
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    TextButton(
+                                    PullOutTextButton(
                                         onClick = {
                                             val next = (Math.round(fontSize) - 1).coerceAtLeast(12).toFloat()
                                             if (next != fontSize) { fontSize = next; prefs.fontSize = fontSize }
@@ -3962,7 +3982,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                         )
                                     }
-                                    TextButton(
+                                    PullOutTextButton(
                                         onClick = {
                                             val next = (Math.round(fontSize) + 1).coerceAtMost(36).toFloat()
                                             if (next != fontSize) { fontSize = next; prefs.fontSize = fontSize }
@@ -3990,7 +4010,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = 44.dp)
-                                .clickable { fontPanelOpen = !fontPanelOpen },
+                                .pullOutClickable { fontPanelOpen = !fontPanelOpen },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text("字体", fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
@@ -4011,11 +4031,8 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                 modifier = Modifier.size(DesignTokens.SpaceXl)
                             )
                         }
-                        AnimatedVisibility(
-                            visible = fontPanelOpen,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
+                        PullOutVisibility(
+                            visible = fontPanelOpen) {
                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 // 字体档位表由 AppFonts 提供（id 与 prefs.fontFamilyIndex 一一对应，勿重排）；
                                 // 「自定义字体」档在下方单独渲染（要带「+导入」按钮）。
@@ -4043,7 +4060,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                         }
                                     },
                                     trailing = {
-                                        TextButton(
+                                        PullOutTextButton(
                                             onClick = { fontFileLauncher.launch("font/ttf") },
                                             contentPadding = PaddingValues(horizontal = DesignTokens.SpaceCompact),
                                             modifier = Modifier.height(30.dp)
@@ -4074,6 +4091,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                         Slider(
                             value = ((lineHeight - 20f) / 28f).coerceIn(0f, 1f),
                             onValueChange = { lineHeight = 20f + it * 28f; prefs.lineHeight = lineHeight },
+                            formatLabel = { "${lineHeight.toInt()} sp" },
                             colors = SliderDefaults.colors(
                                 thumbColor = accentColor,
                                 activeTrackColor = accentColor,
@@ -4089,6 +4107,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                         Slider(
                             value = ((marginHorizontal - 8f) / 40f).coerceIn(0f, 1f),
                             onValueChange = { marginHorizontal = Math.round(8f + it * 40f); prefs.marginHorizontal = marginHorizontal },
+                            formatLabel = { "$marginHorizontal dp" },
                             colors = SliderDefaults.colors(
                                 thumbColor = accentColor,
                                 activeTrackColor = accentColor,
@@ -4188,7 +4207,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
     if (showSearchDialog) {
 
-        AlertDialog(
+        PullOutAlertDialog(
 
             onDismissRequest = { showSearchDialog = false },
 
@@ -4316,7 +4335,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
             confirmButton = {
 
-                TextButton(onClick = { showSearchDialog = false }) {
+                PullOutTextButton(onClick = { showSearchDialog = false }) {
 
                     Text("关闭")
 
@@ -4332,7 +4351,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
     if (showAnnotationsSheet) {
 
-        ModalBottomSheet(
+        PullOutBottomSheet(
 
             onDismissRequest = { showAnnotationsSheet = false },
 
@@ -4422,13 +4441,9 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
 
 
-    AnimatedVisibility(
+    PullOutVisibility(
 
         visible = showRestDialog,
-
-        enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
-
-        exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
 
         modifier = Modifier
 
@@ -4556,13 +4571,9 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
     // Cute Anime Easter Egg UI Overlay
 
-    AnimatedVisibility(
+    PullOutVisibility(
 
         visible = showEasterEgg,
-
-        enter = slideInVertically(initialOffsetY = { it / 2 }) + fadeIn(animationSpec = tween(400, easing = EaseOut)),
-
-        exit = slideOutVertically(targetOffsetY = { it / 2 }) + fadeOut(animationSpec = tween(400, easing = EaseOut)),
 
         modifier = Modifier.fillMaxSize()
 
@@ -4626,6 +4637,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
     }
 
+    } // reading scene and in-place touch editor
 }
 
 
@@ -5150,7 +5162,7 @@ private fun ReaderFontOptionRow(
             .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(DesignTokens.RadiusSm))
             .background(if (selected) MintPrimary.copy(alpha = 0.10f) else Color.Transparent)
-            .clickable(onClick = onClick)
+            .pullOutClickable(onClick = onClick)
             .padding(horizontal = DesignTokens.SpaceSm, vertical = DesignTokens.SpaceCompact),
         verticalAlignment = Alignment.CenterVertically
     ) {

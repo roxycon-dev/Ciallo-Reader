@@ -25,6 +25,8 @@ import org.robolectric.annotation.GraphicsMode
 class OverlayPolishTest {
     @get:Rule val compose = createAndroidComposeRule<ComicReaderTestActivity>()
 
+    @org.junit.Before fun resetSource() { com.example.ui.components.PullOutSources.latest = null }
+
     @Test fun confirmationWaitsForExitAndRepeatedTapsCannotRepeatTheAction() {
         var open by mutableStateOf(true)
         var actions = 0

@@ -1,5 +1,6 @@
 package com.example.ui.favorite
 
+import com.example.ui.components.pullOutAnchor
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -151,7 +152,7 @@ fun FavoriteHeartButton(
                 else if (favorite) "已喜欢，点击取消喜欢"
                 else "喜欢，加入我喜欢的"
             }
-            .combinedClickable(
+            .pullOutAnchor().combinedClickable(
                 interactionSource = interaction,
                 indication = null,
                 enabled = true,

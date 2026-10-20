@@ -1,6 +1,9 @@
 package com.example.ui
 
-import androidx.compose.animation.AnimatedVisibility
+import com.example.ui.components.pullOutClickable
+import com.example.ui.components.PullOutButton
+import com.example.ui.components.PullOutOutlinedButton
+import com.example.ui.components.PullOutVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -71,7 +74,7 @@ fun NovelReaderScreen(
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(modifier = Modifier.fillMaxSize()) {
             // 顶栏
-            AnimatedVisibility(visible = showBars) {
+            PullOutVisibility(visible = showBars) {
                 TopAppBar(
                     title = {
                         Column {
@@ -148,7 +151,7 @@ fun NovelReaderScreen(
                         state = listState,
                         modifier = Modifier
                             .fillMaxSize()
-                            .clickable { showBars = !showBars },
+                            .pullOutClickable { showBars = !showBars },
                         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
@@ -181,7 +184,7 @@ fun NovelReaderScreen(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 if (hasPrevChapter) {
-                                    OutlinedButton(
+                                    PullOutOutlinedButton(
                                         onClick = onLoadPrev,
                                         modifier = Modifier.weight(1f)
                                     ) {
@@ -195,7 +198,7 @@ fun NovelReaderScreen(
                                     }
                                 }
                                 if (hasNextChapter) {
-                                    Button(
+                                    PullOutButton(
                                         onClick = onLoadNext,
                                         modifier = Modifier.weight(1f),
                                         colors = ButtonDefaults.buttonColors(containerColor = MintPrimary)

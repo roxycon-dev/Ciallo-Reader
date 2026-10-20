@@ -1,5 +1,9 @@
 package com.example.god
 
+import com.example.ui.components.pullOutAnchor
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.PullOutAlertDialog
+import com.example.ui.components.pullOutClickable
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -41,10 +45,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -143,7 +145,7 @@ fun GodRankingBody(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clickable(
+                    .pullOutClickable(
                         interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                         indication = null,
                     ) { interactions.menuFor = null },
@@ -159,18 +161,18 @@ fun GodRankingBody(
 
         // 删除确认
         interactions.deleteFor?.let { target ->
-            AlertDialog(
+            PullOutAlertDialog(
                 onDismissRequest = { interactions.deleteFor = null },
                 title = { Text("确定移除这个神回吗？") },
                 text = { Text("随笔和评分将一并删除", fontSize = 14.sp) },
                 confirmButton = {
-                    TextButton(onClick = {
+                    PullOutTextButton(onClick = {
                         interactions.deleteFor = null
                         onDelete(target)
                     }) { Text("移除", color = MaterialTheme.colorScheme.error) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { interactions.deleteFor = null }) { Text("取消") }
+                    PullOutTextButton(onClick = { interactions.deleteFor = null }) { Text("取消") }
                 },
                 shape = RoundedCornerShape(24.dp),
             )
@@ -180,7 +182,7 @@ fun GodRankingBody(
         // 按用户要求做成"什么提示都没有"的纯展示窗口 —— 没有任何按钮，
         // 点窗外或返回键关闭。长文可滚动。
         interactions.noteFor?.let { target ->
-            AlertDialog(
+            PullOutAlertDialog(
                 onDismissRequest = { interactions.noteFor = null },
                 title = {
                     Text(
@@ -263,7 +265,7 @@ fun GodItemCard(
                 scaleX = press.value
                 scaleY = press.value
             }
-            .combinedClickable(
+            .pullOutAnchor().combinedClickable(
                 onClick = { (onTap ?: { onItemClick(moment) }).invoke() },
                 onLongClick = {
                     if (HapticsGate.enabled) {

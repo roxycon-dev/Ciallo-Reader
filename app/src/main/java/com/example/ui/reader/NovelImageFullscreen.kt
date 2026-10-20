@@ -1,5 +1,8 @@
 package com.example.ui.reader
 
+import com.example.ui.components.pullOutClickable
+import com.example.ui.components.PullOutDialog
+import com.example.ui.components.PullOutVisibility
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.BitmapFactory
@@ -27,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
@@ -53,7 +55,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -96,16 +97,15 @@ fun NovelImageFullscreenViewer(
         loaded = true
     }
 
-    Dialog(
+    PullOutDialog(
+        animateContent = false,
         onDismissRequest = close,
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             decorFitsSystemWindows = false
         )
     ) {
-        AnimatedVisibility(visibleState = visibility,
-            enter = fadeIn(tween(if (reduce) 0 else 180)) + scaleIn(tween(if (reduce) 0 else 220), initialScale = .97f),
-            exit = fadeOut(tween(if (reduce) 0 else 150)) + scaleOut(tween(if (reduce) 0 else 150), targetScale = .98f)) {
+        PullOutVisibility(visibleState = visibility) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -199,7 +199,7 @@ fun NovelImageFullscreenViewer(
                     text = "保存",
                     color = Color.White,
                     modifier = Modifier
-                        .clickable {
+                        .pullOutClickable {
                             val msg = saveNovelImageToGallery(context, path)
                             AppToast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                         }
@@ -209,7 +209,7 @@ fun NovelImageFullscreenViewer(
                     text = "关闭",
                     color = Color.White,
                     modifier = Modifier
-                        .clickable { close() }
+                        .pullOutClickable { close() }
                         .padding(horizontal = 14.dp, vertical = 10.dp)
                 )
             }

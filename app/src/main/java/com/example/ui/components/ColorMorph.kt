@@ -5,6 +5,7 @@
  */
 package com.example.ui.components
 
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -100,7 +101,7 @@ fun ColorStateMorph(
           .rotate(rotation)
           .clip(RoundedCornerShape(cornerDp))
           .background(color = color, shape = RoundedCornerShape(cornerDp))
-          .clickable { morphed = !morphed },
+          .pullOutClickable { morphed = !morphed },
         contentAlignment = Alignment.Center,
       ) {
         Text(

@@ -1,0 +1,5 @@
+com.example.ui.TouchZoneInteractionDeviceTest:.
+
+Time: 12.781
+
+OK (1 test)

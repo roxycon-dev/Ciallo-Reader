@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.components.pullOutClickable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -734,7 +736,7 @@ private fun DayDetailSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 6.dp)
-                        .clickable(enabled = localBook != null || recordBook != null) {
+                        .pullOutClickable(enabled = localBook != null || recordBook != null) {
                             if (localBook != null) onOpenBook(localBook)
                             else if (recordBook != null) onOpenRecordDetail(recordBook)
                         },
@@ -777,7 +779,7 @@ private fun DayDetailSheet(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    TextButton(onClick = { onDeleteRecord(record) }) {
+                    PullOutTextButton(onClick = { onDeleteRecord(record) }) {
                         Text("删除", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
                     }
                 }

@@ -1,5 +1,6 @@
 package com.example.ui.comic
 
+import com.example.ui.reader.TouchZone
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -79,6 +80,8 @@ data class ComicReaderConfig(
     val autoPageIntervalSec: Float = 6f,    // 自动翻页间隔
     val autoScrollSpeedDp: Float = 40f,     // 条漫自动滚动速度 dp/s
 
+    /** null preserves the complete legacy gesture implementation and thresholds. */
+    val touchZones: List<TouchZone>? = null,
     /* ── 手势 ── */
     val gestureTapLeft: ComicGestureAction = ComicGestureAction.PREV,
     val gestureTapRight: ComicGestureAction = ComicGestureAction.NEXT,
@@ -115,6 +118,7 @@ data class ComicReaderConfig(
             if (r - l >= 0.05f - 0.00001f && b - t >= 0.05f - 0.00001f) listOf(l, t, r, b) else null
         }
         return copy(
+            touchZones = touchZones?.take(64)?.map { it.normalized() }?.distinctBy { it.id },
             customFitBase = customFitBase.takeUnless { it == ComicFit.CUSTOM } ?: ComicFit.FIT_PAGE,
             customFitScale = customFitScale.bounded(0.5f, 2.5f, 1f),
             pageSpacingDp = pageSpacingDp.bounded(0f, 40f, 8f),
@@ -180,6 +184,7 @@ data class ComicReaderConfig(
         put("pageAnim", pageAnim.name)
         put("autoPageIntervalSec", autoPageIntervalSec)
         put("autoScrollSpeedDp", autoScrollSpeedDp)
+        touchZones?.let { put("touchZones", JSONArray(TouchZone.encode(it))) }
         put("gestureTapLeft", gestureTapLeft.name)
         put("gestureTapRight", gestureTapRight.name)
         put("gestureTapCenter", gestureTapCenter.name)
@@ -259,6 +264,7 @@ data class ComicReaderConfig(
                 pageAnim = safe("pageAnim", ComicPageAnim.SLIDE, ComicPageAnim.entries.toTypedArray()),
                 autoPageIntervalSec = json.optDouble("autoPageIntervalSec", 6.0).toFloat().coerceIn(1f, 120f),
                 autoScrollSpeedDp = json.optDouble("autoScrollSpeedDp", 40.0).toFloat().coerceIn(5f, 400f),
+                touchZones = TouchZone.decode(json.optJSONArray("touchZones")?.toString()),
                 gestureTapLeft = safe("gestureTapLeft", ComicGestureAction.PREV, ComicGestureAction.entries.toTypedArray()),
                 gestureTapRight = safe("gestureTapRight", ComicGestureAction.NEXT, ComicGestureAction.entries.toTypedArray()),
                 gestureTapCenter = safe("gestureTapCenter", ComicGestureAction.TOGGLE_CONTROLS, ComicGestureAction.entries.toTypedArray()),

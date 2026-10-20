@@ -1,5 +1,6 @@
 package com.example.ui
 
+import com.example.ui.components.PullOutTextButton
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -91,7 +92,7 @@ fun OnboardingScreen(
                 )
         ) {
             // "Skip" button on top-right
-            TextButton(
+            PullOutTextButton(
                 onClick = onFinished,
                 modifier = Modifier
                     .align(Alignment.TopEnd)

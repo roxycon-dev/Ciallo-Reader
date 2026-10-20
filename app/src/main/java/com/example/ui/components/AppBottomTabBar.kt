@@ -1,6 +1,6 @@
 package com.example.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.Animatable
@@ -149,7 +149,7 @@ fun AppBottomTabBar(
             items.forEachIndexed { index, item ->
                 Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
                     .background(if (index == selectedIndex) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-                    .clickable { onTabSelected(index) }.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    .pullOutClickable { onTabSelected(index) }.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box {
                         Icon(if (index == selectedIndex) item.selectedIcon else item.icon, null, modifier = Modifier.size(24.dp))
                         item.badgeCount?.takeIf { it > 0 }?.let { Text(it.toString(), fontSize = 9.sp, modifier = Modifier.align(Alignment.TopEnd)) }
@@ -491,7 +491,7 @@ private fun TabIcon(
                 scaleX = pressScale
                 scaleY = pressScale
             }
-            .clickable(
+            .pullOutClickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
@@ -520,11 +520,8 @@ private fun TabIcon(
             }
         }
 
-        AnimatedVisibility(
-            visible = !collapsed,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically()
-        ) {
+        PullOutVisibility(
+            visible = !collapsed) {
             Text(
                 text = item.label,
                 fontSize = 10.sp,

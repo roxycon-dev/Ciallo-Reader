@@ -1,5 +1,10 @@
 package com.example.ui.comic
 
+import com.example.ui.components.PullOutTextButton
+import com.example.ui.reader.TouchZone
+import com.example.ui.reader.TouchAction
+import com.example.ui.reader.SwipeAction
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -19,7 +24,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -115,6 +119,9 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
     var longPressPanelEnabled = false
 
     /** 滑动翻页开关（false = 只响应点按，拖拽不产生卷页） */
+    var isRightToLeftZones = false
+    var touchZones: List<TouchZone>? = null
+    var onZoneAction: (TouchAction) -> Unit = {}
     var swipeEnabled = true
 
     /** GL 首末页外翻在 View 层仲裁，避免 Compose 抢走 AndroidView 的触摸流。 */
@@ -300,6 +307,8 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
         }
         when (me.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                val location = IntArray(2); getLocationInWindow(location)
+                com.example.ui.components.recordPaperTouch(Offset(me.x + location[0], me.y + location[1]), resources.displayMetrics.density)
                 isTouchActive = true
                 pendingQuickTap?.let { view.removeCallbacks(it) }
                 if (com.example.BuildConfig.DEBUG) {
@@ -368,6 +377,10 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                     onZoomMotion?.invoke(me)
                     return true
                 }
+                if (touchZones != null) {
+                    if (touchTravel > slopPx) view.removeCallbacks(longPressRunnable)
+                    return true
+                }
                 val edgePx = 24f * resources.displayMetrics.density
                 val inward = if (downX <= edgePx) me.x - downX else downX - me.x
                 if (edgeSwipeEnabled && !dragForwarded &&
@@ -419,6 +432,22 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                 velocityTracker?.recycle()
                 velocityTracker = null
                 view.removeCallbacks(longPressRunnable)
+                if (touchZones != null && touchTravel > slopPx && !longPressFired && !doubleTapActive) {
+                    if (me.actionMasked == MotionEvent.ACTION_UP) {
+                        val zone = TouchZone.hit(touchZones.orEmpty(), downX / width.coerceAtLeast(1), downY / height.coerceAtLeast(1))
+                        val dx = me.x - downX; val dy = me.y - downY
+                        val threshold = zone?.distanceDp?.times(resources.displayMetrics.density) ?: comicTurnTravel(width.toFloat(), resources.displayMetrics.density)
+                        if (abs(dx) >= threshold && abs(dx) > abs(dy) * 1.1f) {
+                            when (zone?.swipe) {
+                                SwipeAction.PAGE -> onZoneAction(if ((dx < 0).xor(isRightToLeftZones)) TouchAction.NEXT else TouchAction.PREVIOUS)
+                                SwipeAction.CONTROLS -> onZoneAction(TouchAction.CONTROLS)
+                                SwipeAction.SETTINGS -> onZoneAction(TouchAction.SETTINGS)
+                                else -> Unit
+                            }
+                        }
+                    }
+                    return true
+                }
                 if (edgeClosing) {
                     edgeClosing = false
                     if (me.actionMasked == MotionEvent.ACTION_UP && abs(me.x - downX) > 64f * resources.displayMetrics.density)
@@ -1623,6 +1652,9 @@ internal fun ComicHarismCurlReader(
                 }
             },
             update = { v ->
+                v.touchZones = latestConfig.touchZones
+                v.isRightToLeftZones = latestConfig.direction == ComicDirection.RTL
+                v.onZoneAction = latestCallbacks.onZoneAction
                 v.swipeEnabled = latestConfig.gestureSwipe
                 v.doubleTapZoomEnabled = latestConfig.doubleTapZoom
                 v.longPressZoomEnabled = latestConfig.longPressZoom
@@ -1661,7 +1693,7 @@ internal fun ComicHarismCurlReader(
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("本页加载失败", color = Color(0xFFFF9A9A))
-                    TextButton(onClick = { pageRetry++ }) { Text("点击重试", color = Color.White) }
+                    PullOutTextButton(onClick = { pageRetry++ }) { Text("点击重试", color = Color.White) }
                 }
             }
         }
@@ -1705,6 +1737,7 @@ internal fun ComicCurlZoomOverlay(
         ComicReaderBackground(config.bgType, config.paperIntensity, dynamicBackground)
         val callbacks = ComicGestureCallbacks(
             onTapZone = { position, size -> if (!zoomState.isZoomed) onDismiss() else readerCallbacks.onTapZone(position, size) },
+            onZoneAction = readerCallbacks.onZoneAction,
             onLongPress = readerCallbacks.onLongPress,
             onPinchClose = readerCallbacks.onPinchClose,
             onEdgeBack = readerCallbacks.onEdgeBack,

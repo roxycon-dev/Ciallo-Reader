@@ -2,6 +2,11 @@
 
 package com.example.ui.pageturn
 
+import com.example.ui.reader.TouchZone
+import com.example.ui.reader.TouchAction
+import com.example.ui.reader.SwipeAction
+import com.example.ui.reader.ReaderTouchBinding
+import com.example.ui.reader.touchZoneGestures
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -78,6 +83,7 @@ private const val BACK_PAGE_CONTENT_ALPHA = 0.58f
  */
 @Composable
 fun PageCurlReaderContainer(
+    touchBinding: ReaderTouchBinding = ReaderTouchBinding(),
     currentContent: @Composable () -> Unit,
     nextContent: @Composable () -> Unit,
     prevContent: @Composable () -> Unit,
@@ -107,6 +113,7 @@ fun PageCurlReaderContainer(
     val state = rememberPageCurlState(initialCurrent = 1)
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
+    val touchDensity = androidx.compose.ui.platform.LocalDensity.current.density
     var containerOffsetInWindow by androidx.compose.runtime.remember {
         androidx.compose.runtime.mutableStateOf(androidx.compose.ui.geometry.Offset.Zero)
     }
@@ -135,18 +142,19 @@ fun PageCurlReaderContainer(
         shadowAlpha = 0.25f,
         shadowRadius = 18.dp,
         shadowOffset = androidx.compose.ui.unit.DpOffset((-6).dp, 2.dp),
-        dragForwardEnabled = !menuVisible,
-        dragBackwardEnabled = !menuVisible,
+        dragForwardEnabled = !menuVisible && touchBinding.zones == null,
+        dragBackwardEnabled = !menuVisible && touchBinding.zones == null,
         // 左右点按翻页改由本容器手势仲裁器（Initial pass）处理：
         // 1) 连点时可"即时翻页"（不与在飞的卷页动画互抢同一 Animatable）；
         // 2) 库内 tapGesture → next()/prev() 的 animateJob 僵尸 finally 会与
         //    重置 LaunchedEffect 竞态（快速连点后卡死、无法回翻的根因）。
         tapForwardEnabled = false,
         tapBackwardEnabled = false,
-        tapCustomEnabled = true,
+        tapCustomEnabled = touchBinding.zones == null,
         dragInteraction = PageCurlConfig.StartEndDragInteraction(),
         tapInteraction = PageCurlConfig.TargetTapInteraction(),
         onCustomTap = { sz, pos ->
+            com.example.ui.components.recordPaperTouch(pos + containerOffsetInWindow, touchDensity)
             val third = sz.width / 3f
             if (pos.x >= third && pos.x <= third * 2f) {
                 onClickCenter()
@@ -198,8 +206,17 @@ fun PageCurlReaderContainer(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer { translationY = pullValue }
-                .onGloballyPositioned { containerOffsetInWindow = it.positionInWindow() }
-                .pointerInput(Unit) {
+                .onGloballyPositioned { containerOffsetInWindow = it.positionInWindow(); touchBinding.onViewport(androidx.compose.ui.geometry.Rect(containerOffsetInWindow, androidx.compose.ui.geometry.Size(it.size.width.toFloat(), it.size.height.toFloat()))) }
+                .touchZoneGestures(touchBinding.zones, { it * .15f }, { action ->
+                    when (action) {
+                        TouchAction.NEXT -> tapTurn(true)
+                        TouchAction.PREVIOUS -> tapTurn(false)
+                        else -> touchBinding.onAction(action)
+                    }
+                }, menuVisible = menuVisible, imageTap = { onImageTapAt?.invoke(it + containerOffsetInWindow) == true },
+                    onLongPress = onLongPressCenter, legacyPageCurl = true)
+                .pointerInput(touchBinding.zones) {
+                    if (touchBinding.zones != null) return@pointerInput
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         val slop = viewConfiguration.touchSlop

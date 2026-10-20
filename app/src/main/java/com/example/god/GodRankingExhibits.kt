@@ -1,5 +1,6 @@
 package com.example.god
 
+import com.example.ui.components.pullOutClickable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -99,7 +100,7 @@ internal fun GodPodiumStyle(
                                 fontSize = 10.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.clickable { interactions.noteFor = item.entity },
+                                modifier = Modifier.pullOutClickable { interactions.noteFor = item.entity },
                             )
                         }
                     }
@@ -224,7 +225,7 @@ private fun GodPodiumTopThree(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f))
-                    .clickable { interactions.noteFor = leader }
+                    .pullOutClickable { interactions.noteFor = leader }
                     .padding(horizontal = 10.dp, vertical = 7.dp),
             )
         }
@@ -341,7 +342,7 @@ internal fun GodVinylStyle(
                 fontSize = 11.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.clickable { interactions.noteFor = selected.entity },
+                modifier = Modifier.pullOutClickable { interactions.noteFor = selected.entity },
             )
         }
     }
@@ -465,7 +466,7 @@ internal fun GodPolaroidStyle(
                                     fontSize = 9.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.clickable { interactions.noteFor = item.entity },
+                                    modifier = Modifier.pullOutClickable { interactions.noteFor = item.entity },
                                 )
                             }
                             Spacer(Modifier.height(5.dp))

@@ -1,5 +1,6 @@
 package com.example.discover
 
+import com.example.ui.components.PullOutButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -62,7 +63,7 @@ fun DiscoverEmptyState(mascotResId: Int, title: String, description: String, act
         Image(painterResource(mascotResId), null, Modifier.size(120.dp))
         Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = discoverInk(), textAlign = TextAlign.Center)
         Text(description, fontSize = 13.sp, color = discoverInk().copy(alpha = .64f), textAlign = TextAlign.Center)
-        Button(onActionClick, Modifier.heightIn(min = 48.dp), shape = androidx.compose.foundation.shape.CircleShape,
+        PullOutButton(onActionClick, Modifier.heightIn(min = 48.dp), shape = androidx.compose.foundation.shape.CircleShape,
             colors = ButtonDefaults.buttonColors(contentColor = contrastInk(MaterialTheme.colorScheme.primary))) { Text(actionLabel) }
     }
 }

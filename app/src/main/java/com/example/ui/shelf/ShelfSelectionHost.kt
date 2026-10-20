@@ -1,5 +1,9 @@
 package com.example.ui.shelf
 
+
+import com.example.ui.components.PullOutBottomSheet
+import com.example.ui.components.PullOutVisibility
+import com.example.ui.components.pullOutClickable
 import androidx.activity.compose.BackHandler
 import kotlin.math.roundToInt
 import androidx.compose.animation.core.animateFloatAsState
@@ -7,7 +11,6 @@ import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -42,7 +45,6 @@ import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -383,7 +385,7 @@ fun MultiSelectTopBar(
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                     .semantics { contentDescription = "退出多选" }
-                    .clickable { onClose() },
+                    .pullOutClickable { onClose() },
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(Icons.Filled.Close, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
@@ -431,7 +433,7 @@ fun MultiSelectTopBar(
                         color = if (allSelected) primary else primary.copy(alpha = 0.38f),
                         shape = shape,
                     )
-                    .clickable { onToggleAll() }
+                    .pullOutClickable { onToggleAll() }
                     .padding(horizontal = 12.dp, vertical = 7.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -473,17 +475,15 @@ fun MultiSelectActionBar(
 ) {
     val shape = RoundedCornerShape(26.dp)
     val primary = MintPrimary
-    AnimatedVisibility(
+    PullOutVisibility(
         visible = visible,
-        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
         modifier = modifier,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 // Include padding, gaps and disabled actions in the input surface.
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+                .pullOutClickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
                 .padding(horizontal = 12.dp)
                 // 多选态下悬浮 Tab 栏已被藏起来，这里只能让开系统导航栏。
                 // 继续用 LocalAppBottomInset 会让操作栏在底部凭空悬高 92dp。
@@ -513,7 +513,7 @@ fun MultiSelectActionBar(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(16.dp))
-                            .clickable(enabled = action.enabled) { action.onClick() }
+                            .pullOutClickable(enabled = action.enabled) { action.onClick() }
                             .graphicsLayer { this.alpha = alpha }
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -547,7 +547,7 @@ fun MoreActionSheet(
     onPick: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    PullOutBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Text("更多操作", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
@@ -555,7 +555,7 @@ fun MoreActionSheet(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onPick(title) }
+                        .pullOutClickable { onPick(title) }
                         .padding(vertical = 14.dp),
                 ) {
                     Text(title, fontSize = 14.sp)
@@ -580,7 +580,7 @@ fun CategoryPickerSheet(
 ) {
     var newName by remember { mutableStateOf("") }
     var creating by remember { mutableStateOf(false) }
-    ModalBottomSheet(onDismissRequest = onDismiss, modifier = modifier) {
+    PullOutBottomSheet(onDismissRequest = onDismiss, modifier = modifier) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
@@ -588,7 +588,7 @@ fun CategoryPickerSheet(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onPick(name) }
+                        .pullOutClickable { onPick(name) }
                         .padding(vertical = 13.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -601,7 +601,7 @@ fun CategoryPickerSheet(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { creating = true }
+                        .pullOutClickable { creating = true }
                         .padding(vertical = 13.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {

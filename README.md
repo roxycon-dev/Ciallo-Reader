@@ -11,7 +11,7 @@
 
 [🌐 产品主页](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.4.10 更新说明与验证](docs/release-1.4.10-2026-10-19.md) ·
+[1.4.11 更新说明与验证](docs/release-1.4.11-2026-10-20.md) ·
 [查看截图](#界面预览) ·
 [全部功能](#功能亮点) ·
 [提交问题或建议](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -26,6 +26,8 @@
 Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电子书阅读器**。你可以导入本地书籍，也可以通过内置或自定义书源搜索内容、下载到书架，再使用可调排版、翻页和阅读进度继续阅读。
 
 **English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
+
+**1.4.11 / 234**：小说与漫画直接在原尺寸阅读画面上覆盖轻微暗色编辑层，可收起工具并真实试读；共用可视化触控分区：矩形可添加、移动、缩放与置顶，点击和滑动分别配置；滑动距离可手动调整或跟随动态手指引导校准。恢复默认回到原有阅读引擎判定，漫画双指缩放及放大后拖图优先。全应用弹层统一为柔性纸面网格动效，滑动条统一为跟随主题的液体玻璃透镜，支持连续、分档和双滑块范围。同时合入来源详情面板、小说源重试和番茄公开聚合源修复。详见 [1.4.11 发布与验证](docs/release-1.4.11-2026-10-20.md)。
 
 **1.4.10 / 233**：新增免登录小说书源 **书阁（xbookcn）**，支持搜索、详情、完整目录、在线正文与整本 EPUB 下载；该站无整本文件，改由逐章抓取后本地打包，下载前后比对目录，任一章不一致即整本作废。修复 Cloudflare 注入脚本导致正常页面被误判为验证页，源站 TLS 偶发失败增加一次重试。其余书源与下载分支未改动。详见 [更新说明与下载](docs/release-1.4.10-2026-10-19.md)。
 
@@ -160,7 +162,7 @@ Novelia、Wenku8 Library、爱下电子书继续提供中文轻小说或网文�
 
 - **系统要求：** Android 7.0（API 24）及以上。
 - **当前 Release：** 提供 arm64-v8a APK，适用于大多数 Android 手机和平板；Release 暂不包含 x86_64 模拟器版本。
-- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.4.10](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.10/Ciallo-Reader-v1.4.10.apk)。
+- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.4.11](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.11/Ciallo-Reader-v1.4.11.apk)。
 - 下载后按 Android 提示允许安装该来源的应用，再打开 APK 安装。
 
 ## 快速开始
