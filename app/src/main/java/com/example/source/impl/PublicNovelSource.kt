@@ -100,14 +100,14 @@ class PublicNovelSource(
         }
         error("源站读取失败")
     }
-    private suspend fun pageOnce(url: HttpUrl): Document = withContext(Dispatchers.IO) {
+    private suspend fun pageOnce(url: HttpUrl, userAgent: String = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/119.0.0.0 Mobile Safari/537.36"): Document = withContext(Dispatchers.IO) {
         val hosts = setOf(baseUrl.host) + when (site) {
             PublicNovelSite.IHUABEN -> setOf("so.ihuaben.com")
-            PublicNovelSite.SFACG -> setOf("s.sfacg.com")
+            PublicNovelSite.SFACG -> setOf("s.sfacg.com", "book.sfacg.com")
             else -> emptySet()
         }
         require(url.host in hosts && url.scheme == baseUrl.scheme) { "源站页面地址异常" }
-        val request = Request.Builder().url(url).header("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/119.0.0.0 Mobile Safari/537.36")
+        val request = Request.Builder().url(url).header("User-Agent", userAgent)
             .header("Referer", baseUrl.toString()).header("Accept", "text/html").build()
         http.newCall(request).executeCancellable().use { response ->
             require(response.isSuccessful) { "$name 暂时无法免登录访问（HTTP ${response.code}）" }
@@ -186,11 +186,29 @@ class PublicNovelSource(
         }.distinctBy { it.id }
     }
 
-    private val discovery by lazy { HtmlNovelDiscovery(id, baseUrl, ::page, { url ->
+    private val discovery by lazy { HtmlNovelDiscovery(id, baseUrl, { url ->
+        if (site == PublicNovelSite.SFACG && url == baseUrl) {
+            // The mobile root currently serves a soft 404. The desktop site's public
+            // recommendation page has the same numeric identities as /b/{id}/.
+            page("https://book.sfacg.com/".toHttpUrl()).also { doc ->
+                doc.select("a[href]").forEach { a ->
+                    val u = "https://book.sfacg.com/".toHttpUrl().resolve(a.attr("href"))
+                    if (u?.host == "book.sfacg.com") Regex("^/Novel/([0-9]+)/?$").matchEntire(u.encodedPath)?.let {
+                        a.attr("href", bookUrl(it.groupValues[1]).toString())
+                    }
+                }
+            }
+        } else page(url)
+    }, { url ->
         runCatching { bookId(url) }.getOrNull()
     }) }
-    override suspend fun discoverCatalog(resolveDynamic: Boolean) = result { discovery.catalog() }
-    override suspend fun discover(query: com.example.discover.DiscoverQuery) = result { discovery.discover(query) }
+    private val fanqieDiscovery by lazy { FanqieDiscovery(baseUrl, http) { url -> guestNovelIoRetry { pageOnce(url, "Mozilla/5.0") } } }
+    override suspend fun discoverCatalog(resolveDynamic: Boolean) = result {
+        if (site == PublicNovelSite.FANQIE) fanqieDiscovery.catalog() else discovery.catalog()
+    }
+    override suspend fun discover(query: com.example.discover.DiscoverQuery) = result {
+        if (site == PublicNovelSite.FANQIE) fanqieDiscovery.discover(query) else discovery.discover(query)
+    }
 
     override suspend fun getDetail(bookId: String) = result { detail(bookId) }
     override suspend fun refreshNovelDetail(bookId: String) = result { detail(bookId) }

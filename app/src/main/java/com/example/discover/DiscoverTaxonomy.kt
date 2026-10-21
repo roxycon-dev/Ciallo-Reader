@@ -65,7 +65,34 @@ object DiscoverTaxonomy {
         "palace" to listOf("古代宫廷", "欧式宫廷", "后宫·宮廷", "宅斗", "宫廷"), "japan" to listOf("日本漫画"),
         "china" to listOf("国产漫画", "中国"), "korea" to listOf("韩国漫画", "韩国", "咚漫"), "western" to listOf("欧美漫画", "美漫", "欧漫"),
         "music" to listOf("偶像", "歌舞"), "inspiring" to listOf("正能量"), "seinen" to listOf("成人向"),
-        "femalelead" to listOf("女性视角", "女性視角"), "supernatural" to listOf("奇异幻想", "奇異幻想"))
+        "femalelead" to listOf("女性视角", "女性視角"), "supernatural" to listOf("奇异幻想", "奇異幻想"),
+        // Exact native novel labels. Never infer a genre from a title substring.
+        "fantasy" to listOf("西方奇幻", "玄幻奇幻", "异世界幻想", "现代幻想", "幻想：高幻想", "幻想：低幻想"),
+        "cultivation" to listOf("东方仙侠", "都市修真", "仙侠修真", "传统玄幻", "玄幻脑洞", "修真"),
+        "scifi" to listOf("科幻末世", "科幻未来", "星际机甲", "科幻：VR游戏", "科幻：宇宙", "科幻：空想科学", "科幻：惊悚"),
+        "mecha" to listOf("星际机甲"), "apocalypse" to listOf("科幻末世", "末世生存"), "survival" to listOf("末世生存"),
+        "modern" to listOf("都市日常", "都市高武", "都市修真", "都市脑洞", "都市种田", "都市生活", "职场商战", "现实世界", "恋爱：现实世界", "现代幻想", "现代戏剧", "现言", "现言脑洞", "豪门总裁", "职场婚恋"),
+        "daily" to listOf("都市日常", "都市生活", "乡村生活", "古代世情", "古风世情"),
+        "battle" to listOf("都市高武", "文学：动作"), "war" to listOf("历史军事", "军事战争", "军事", "抗战谍战"),
+        "historical" to listOf("历史古代", "历史脑洞", "古代世情", "古风世情", "历史军事", "文学：历史", "历史·时代·传奇", "民国年代", "民国言情"),
+        "ancient" to listOf("历史古代", "古代世情", "古风世情", "古言", "古言脑洞", "古代言情", "宫廷宅斗", "宫斗宅斗"),
+        "palace" to listOf("宫廷宅斗", "宫斗宅斗"), "martial" to listOf("武侠江湖", "武侠仙侠"),
+        "suspense" to listOf("悬疑脑洞", "女频悬疑", "灵异悬疑", "悬疑惊悚", "悬疑灵异", "文学：推理", "科幻：惊悚"),
+        "supernatural" to listOf("灵异志怪", "灵异悬疑", "悬疑灵异", "灵异言情"),
+        "detective" to listOf("文学：推理", "推理"), "horror" to listOf("文学：恐怖", "恐怖"),
+        "love" to listOf("言情", "现言", "古言", "现言脑洞", "古言脑洞", "玄幻言情", "古代言情", "校园言情", "穿越言情", "灵异言情", "民国言情", "豪门总裁", "职场婚恋", "恋爱：异世界", "恋爱：现实世界", "浪漫喜剧"),
+        "fantasy" to listOf("玄幻言情"), "ceo" to listOf("豪门总裁"), "sweet" to listOf("青春甜宠"),
+        "school" to listOf("校园言情", "校园青春"), "youth" to listOf("青春甜宠", "校园青春"),
+        "comedy" to listOf("文学：喜剧", "浪漫喜剧"), "career" to listOf("职场商战", "官场", "职场婚恋"),
+        "otherworld" to listOf("恋爱：异世界", "异世界幻想", "幻想：高幻想"), "travel" to listOf("快穿", "穿越言情"),
+        "sports" to listOf("游戏体育", "游戏竞技"), "game" to listOf("游戏体育", "游戏竞技", "科幻：VR游戏"),
+        "doujin" to listOf("同人衍生", "动漫衍生", "男频衍生", "女频衍生", "男频同人", "明星同人", "动漫同人", "影视同人", "游戏同人", "小说同人"),
+        "martial" to listOf("武侠小说"), "cultivation" to listOf("修真仙侠"), "modern" to listOf("都市青春"),
+        "youth" to listOf("都市青春"), "war" to listOf("军事历史"), "historical" to listOf("军事历史"),
+        "game" to listOf("网游竞技"), "sports" to listOf("网游竞技"), "scifi" to listOf("科幻灵异"),
+        "supernatural" to listOf("科幻灵异"), "love" to listOf("言情穿越", "台言古言"), "travel" to listOf("言情穿越"),
+        "bl" to listOf("耽美同人"), "doujin" to listOf("耽美同人"),
+        "lightnovel" to listOf("轻小说"), "drama" to listOf("文学：人性剧", "现代戏剧"))
         .groupBy({ it.first }, { it.second }).mapValues { it.value.flatten() }
     private val aliasIndex by lazy { all.flatMap { c -> (c.aliases + extraAliases[c.id].orEmpty()).map { tagKey(it) to c.id } }.groupBy({ it.first }, { it.second }) }
     private val ancestors by lazy { all.associate { c -> c.id to all.filter { c.id in it.leaves }.map { it.id }.toSet() } }
@@ -76,7 +103,7 @@ object DiscoverTaxonomy {
     fun classify(tags: List<String>): Set<String> {
         val matched = tags.flatMap { raw ->
             if (!isStoryTag(raw)) emptyList()
-            else raw.substringAfter('：').substringAfter(':').split(Regex("[,，/、;；|]"))
+            else aliasIndex[tagKey(raw)].orEmpty() + raw.substringAfter('：').substringAfter(':').split(Regex("[,，/、;；|]"))
                 .flatMap { tag ->
                     val tokens = if (tag.any { it.code in 0x3400..0x9fff }) listOf(tag) + tag.split(Regex("\\s+")) else listOf(tag)
                     tokens.flatMap { aliasIndex[tagKey(it)].orEmpty() }

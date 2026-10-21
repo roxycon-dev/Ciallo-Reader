@@ -120,27 +120,10 @@ class AutoNovelSource(
         }.distinctBy { it.id }
     }
 
-    override suspend fun discoverCatalog(resolveDynamic: Boolean) = SourceResult.Success(com.example.discover.DiscoverCatalog(
-        feeds = listOf(com.example.discover.DiscoverFeed("native", "原站最新")), declared = true, explicit = true,
-        dated = true, capabilities = mapOf("updates" to listOf("最新"))))
-    override suspend fun discover(query: com.example.discover.DiscoverQuery) = result {
-        if (query.categoryId != null || (query.feedId != "native" && query.dimension != com.example.discover.DiscoverDimension.UPDATES))
-            return@result com.example.discover.DiscoverPage(supported = false, notice = "此书源提供原站最新目录，未提供该榜单")
-        val url = baseUrl.newBuilder().addPathSegments("api/novel")
-            .addQueryParameter("page", (query.page - 1).coerceAtLeast(0).toString()).addQueryParameter("pageSize", "24")
-            .addQueryParameter("provider", providers.joinToString(",")).addQueryParameter("type", "0")
-            .addQueryParameter("level", "1").addQueryParameter("translate", "2").addQueryParameter("sort", "0").build()
-        val items = json(url).getJSONArray("items")
-        val rows = (0 until items.length()).mapNotNull { i ->
-            val item = items.optJSONObject(i) ?: return@mapNotNull null
-            val provider = item.optString("providerId"); val novel = item.optString("novelId")
-            if (provider !in providers || novel.isBlank() || title(item).isBlank()) return@mapNotNull null
-            val b = book("$provider/$novel", item)
-            com.example.discover.DiscoverEntry(b, updatedAt = item.optLong("updateAt").takeIf { it > 0 }?.times(1000),
-                nativeOrder = query.offset + i, native = true, origin = "原站最新")
-        }
-        com.example.discover.DiscoverPage(rows, hasMore = items.length() == 24, native = true)
-    }
+    private val discovery by lazy { AutoNovelDiscovery(baseUrl, ::json, ::book) }
+    override suspend fun discoverCatalog(resolveDynamic: Boolean) = SourceResult.Success(discovery.catalog)
+    override suspend fun discover(query: com.example.discover.DiscoverQuery) = result { discovery.discover(query) }
+
     override suspend fun getDetail(bookId: String) = result { book(bookId, detail(bookId)) }
     override suspend fun refreshNovelDetail(bookId: String) = result { book(bookId, detail(bookId, fresh = true)) }
     override suspend fun getChapters(bookId: String) = result {

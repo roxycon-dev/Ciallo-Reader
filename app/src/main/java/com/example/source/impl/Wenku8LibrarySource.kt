@@ -93,21 +93,11 @@ class Wenku8LibrarySource(
             book(data).also { cache.put(it.id, Cached(SystemClock.elapsedRealtime(), data)) }
         } }.distinctBy { it.id }
     }
-    override suspend fun discoverCatalog(resolveDynamic: Boolean) = SourceResult.Success(com.example.discover.DiscoverCatalog(
-        feeds = listOf(com.example.discover.DiscoverFeed("native", "文库目录")), declared = true, explicit = true))
-    override suspend fun discover(query: com.example.discover.DiscoverQuery) = result {
-        if (query.feedId != "native" || query.categoryId != null) return@result com.example.discover.DiscoverPage(
-            supported = false, notice = "文库源提供原站目录，未提供此榜单")
-        val data = json(baseUrl.newBuilder().addPathSegments("api/books").addQueryParameter("page", query.page.toString())
-            .addQueryParameter("limit", "24").build())
-        val items = data.getJSONArray("items")
-        com.example.discover.DiscoverPage((0 until items.length()).map { i ->
-            val item = items.getJSONObject(i)
-            val b = book(item).also { cache.put(it.id, Cached(SystemClock.elapsedRealtime(), item)) }
-            com.example.discover.DiscoverEntry(b, updatedAt = com.example.discover.DiscoverEngine.parseDate(b.novelInfo?.updatedAt),
-                nativeOrder = query.offset + i, native = true, origin = "文库目录")
-        }, hasMore = query.page < data.optInt("pages", query.page), native = true)
-    }
+    private val discoveryContext = context.applicationContext
+    private val discovery by lazy { Wenku8Discovery(baseUrl,
+        java.io.File(discoveryContext.cacheDir, "wenku8-discover-${baseUrl.toString().hashCode()}.json"), ::json, ::book) }
+    override suspend fun discoverCatalog(resolveDynamic: Boolean) = result { discovery.catalog() }
+    override suspend fun discover(query: com.example.discover.DiscoverQuery) = result { discovery.discover(query) }
     override suspend fun getDetail(bookId: String) = result { book(detail(bookId)) }
     override suspend fun refreshNovelDetail(bookId: String) = result { book(detail(bookId, fresh = true)) }
     override suspend fun getDownloadInfo(bookId: String) = result {

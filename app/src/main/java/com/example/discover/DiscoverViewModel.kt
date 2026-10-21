@@ -247,6 +247,7 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
                     }
                     errors.remove(id)
                     if (!data.supported) notices[id] = data.notice ?: "该站未提供当前榜单或时间范围"
+                    else if (!data.notice.isNullOrBlank()) notices[id] = data.notice
                     else if (data.entries.isEmpty() && !data.hasMore) notices[id] = "该站当前条件没有作品"
                     else notices.remove(id)
                     val repeatedCursor = data.nextCursor?.let { !cursorHistory.getOrPut(id) { mutableSetOf() }.add(it) } == true

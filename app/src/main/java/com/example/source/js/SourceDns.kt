@@ -22,6 +22,19 @@ object SourceDns {
     private const val CACHE_TTL_MS = 5 * 60_000L
     private val cache = HashMap<String, Pair<Long, List<InetAddress>>>()
 
+    /**
+     * Cloudflare-hosted sources (wenku8.ywy.moe, n.novelia.cc) publish AAAA records ahead of A.
+     * On a network without a working IPv6 route every single request burns a full connect
+     * timeout on the first address before falling back, which turned a 70-page catalogue into a
+     * 100 s load. Keep IPv6 as a fallback but try IPv4 first; order within each family is kept.
+     */
+    private fun preferIpv4(list: List<InetAddress>): List<InetAddress> {
+        if (list.size < 2) return list
+        val v4 = list.filterIsInstance<java.net.Inet4Address>()
+        if (v4.isEmpty() || v4.size == list.size) return list
+        return v4 + list.filterNot { it is java.net.Inet4Address }
+    }
+
     /** 给 OkHttp 客户端挂上带兜底候选的 DNS。 */
     fun dns(base: Dns = Dns.SYSTEM): Dns = object : Dns {
         override fun lookup(hostname: String): List<InetAddress> {
@@ -30,13 +43,13 @@ object SourceDns {
                 .firstOrNull { (zone, _) -> host == zone || host.endsWith(".$zone") }
                 ?.second
                 .orEmpty()
-            if (extra.isEmpty()) return base.lookup(hostname)
+            if (extra.isEmpty()) return preferIpv4(base.lookup(hostname))
             synchronized(cache) {
                 cache[host]?.takeIf { System.currentTimeMillis() - it.first < CACHE_TTL_MS }
                     ?.let { return it.second }
             }
             val system = runCatching { base.lookup(host) }.getOrElse { emptyList() }
-            val merged = system + extra.filter { pinned -> system.none { it.address == pinned.address } }
+            val merged = preferIpv4(system + extra.filter { pinned -> system.none { it.address == pinned.address } })
             if (merged.isEmpty()) throw UnknownHostException(host)
             synchronized(cache) { cache[host] = System.currentTimeMillis() to merged }
             return merged

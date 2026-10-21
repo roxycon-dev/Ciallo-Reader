@@ -1550,13 +1550,9 @@ private fun SettingsSectionHeader(text: String) {
     )
 }
 
-/**
- * 卡片微调滑块行（基线原版 FluidSlider 样式，零改动）：
- *  1. 标签行与滑条容器零间距、共用同一左右内边距，视觉强关联；
- *  2. 防误触由滑条内部的方向仲裁独自承担（纵向起手静默让位给页面滚动）。
- */
+/** Keep labels outside the slider's reserved bubble and deformation area. */
 @Composable
-private fun CardTweakSlider(
+internal fun CardTweakSlider(
     label: String,
     valueText: String,
     position: Float,
@@ -1564,66 +1560,18 @@ private fun CardTweakSlider(
     endText: String,
     onChange: (Float) -> Unit
 ) {
-    if (com.example.ui.components.LocalRenderQuality.current.minimal) {
-        Column(Modifier.fillMaxWidth()) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label); Text(valueText) }
-            Slider(value = position.coerceIn(0f, 1f), onValueChange = onChange, formatLabel = { valueText })
-        }
-        return
-    }
-    var dragging by remember { mutableStateOf(false) }
-    /*
-     * FluidSlider 容器 = 2.5×barH：底部 1×barH 轨道 + 顶部 1.5×barH 气泡预留空区。
-     * 标签行与气泡同处预留空区：静止时标签可见；拖动开始整行淡出、
-     * 让数值气泡独占该区域（不遮任何文字），松手后淡回 —— 两态互斥永不叠印。
-     */
-    Box(
-        modifier = Modifier.fillMaxWidth(),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        val labelAlpha by animateFloatAsState(
-            targetValue = if (dragging) 0f else 1f,
-            animationSpec = tween(140),
-            label = "tweakLabelAlpha"
-        )
-        // 标签行先组合 → 绘制在滑条下层；拖动时 alpha→0 交还区域给数值气泡
+    Column(Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(horizontal = 4.dp)
-                .offset(y = (-30).dp)   // 抬到轨道上沿之上
-                .graphicsLayer { alpha = labelAlpha },
-            verticalAlignment = Alignment.CenterVertically
+            Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top
         ) {
-            Text(
-                label,
-                fontSize = 12.sp,
-                lineHeight = 15.sp,
-                maxLines = 1,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            Text(
-                valueText,
-                fontSize = 12.sp,
-                lineHeight = 15.sp,
-                maxLines = 1,
-                color = MintPrimary,
-                fontWeight = FontWeight.Bold
-            )
+            Text(label, modifier = Modifier.weight(1f), fontSize = 12.sp,
+                lineHeight = 18.sp, fontWeight = FontWeight.SemiBold)
+            Text(valueText, fontSize = 12.sp, lineHeight = 18.sp,
+                color = MintPrimary, fontWeight = FontWeight.Bold)
         }
-        FluidSlider(
-            position = position.coerceIn(0f, 1f),
-            onPositionChange = onChange,
-            bubbleText = valueText,
-            startText = startText,
-            endText = endText,
-            colorBar = MintPrimary,
-            colorBubble = Color.White,
-            colorBubbleText = MintPrimary,
-            colorBarText = glassTitleColor(),
-            barHeightDp = 28,
-            onDraggingChange = { dragging = it }
-        )
+        FluidSlider(position = position.coerceIn(0f, 1f), onPositionChange = onChange,
+            bubbleText = valueText, startText = startText, endText = endText)
     }
 }
