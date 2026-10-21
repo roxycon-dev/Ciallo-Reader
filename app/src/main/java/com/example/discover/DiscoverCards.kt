@@ -39,7 +39,7 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
     followed: Boolean, unread: Boolean, reverseColors: Boolean, onClick: () -> Unit,
     onFollow: (Boolean) -> Unit, onBlock: () -> Unit, onMenu: (Rect) -> Unit, menuActive: Boolean,
     sourceLabel: (String) -> String, entryIndex: Int,
-    coverSource: (String) -> com.example.source.ComicSource? = { null }) {
+    coverSource: (String) -> com.example.source.BookSource? = { null }) {
     val reduce = LocalReduceMotion.current
     val haptics = rememberAppHaptics()
     var bounds by remember { mutableStateOf(Rect.Zero) }
@@ -123,7 +123,7 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
                     Column(Modifier.padding(10.dp)) {
                         TagRow(work.tags)
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text(listOfNotNull(work.book.author.takeIf { it.isNotBlank() }, work.book.comicInfo?.status?.let(::serialLabel)).joinToString(" · "), Modifier.weight(1f), fontSize = 13.sp, color = discoverInk())
+                            Text(listOfNotNull(work.book.author.takeIf { it.isNotBlank() }, work.book.discoverStatus?.let(::serialLabel)).joinToString(" · "), Modifier.weight(1f), fontSize = 13.sp, color = discoverInk())
                             FollowButton(followed, false) { onFollow(!followed); haptics.perform(HapticKind.SUCCESS) }
                         }
                     }
@@ -134,7 +134,7 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
 }
 
 @Composable
-private fun Cover(book: SearchBook, modifier: Modifier, updatedAt: Long?, unread: Boolean, rank: Int?, medal: Color?, source: (String) -> com.example.source.ComicSource?) {
+private fun Cover(book: SearchBook, modifier: Modifier, updatedAt: Long?, unread: Boolean, rank: Int?, medal: Color?, source: (String) -> com.example.source.BookSource?) {
     val context = LocalContext.current
     var headers by remember(book.sourceId, book.cover) { mutableStateOf<Map<String, String>>(emptyMap()) }
     var headersReady by remember(book.sourceId, book.cover) { mutableStateOf(book.cover.isNullOrBlank()) }

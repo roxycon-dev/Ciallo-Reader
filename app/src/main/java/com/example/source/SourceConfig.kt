@@ -66,6 +66,9 @@ data class HtmlContentRule(
     val imageSelector: String           // 图片选择器，如 "img.page@src" 或 "img@data-src"
 )
 
+/** A source-declared list: the search keyword is never used to fake a discovery feed. */
+data class HtmlExploreRule(val label: String, val rule: HtmlSearchRule, val kind: String? = null)
+
 data class SourceConfig(
     val id: String,
     val name: String,
@@ -81,5 +84,6 @@ data class SourceConfig(
     val isCustom: Boolean = true,
     val insecureTls: Boolean = false,
     /** 可选：显式声明内容类型 "comic"/"novel"/"text"，不声明时按规则自动判断。 */
+    val explore: List<HtmlExploreRule> = emptyList(),
     val type: String? = null
 )

@@ -1,0 +1,2880 @@
+{
+  "version": "1.4.17",
+  "versionCode": 240,
+  "baseline": "05683f0d533e28b6f2be1aab427e16fd37eb5bd2",
+  "isolated": true,
+  "inputs": {
+    "app/build.gradle.kts": {
+      "bytes": 12848,
+      "sha256": "73f8c79ed6932c82ae257811a99e6bce7f40d748c01e8e18fea8511be0d446f2"
+    },
+    "app/proguard-rules.pro": {
+      "bytes": 2389,
+      "sha256": "8faa3aefa0abfc98941d2877057470a8b833ca1e816af7dadc68cfd283fa9804"
+    },
+    "app/src/main/AndroidManifest.xml": {
+      "bytes": 5990,
+      "sha256": "e2fcfec8b824bf6b41fd5a4d5537f3dd3220bb1ab13a436ae4a70980d2f926e2"
+    },
+    "app/src/main/README.md": {
+      "bytes": 1544,
+      "sha256": "58f33cb1534caa406172f4cb0d965740c97308c8b302679a29fa39f41d34c019"
+    },
+    "app/src/main/assets/FidelityFX-FSR-MIT.txt": {
+      "bytes": 1107,
+      "sha256": "e0b0a625733fc5a8afd6e548d04e6e4112d9f045c5d8acd1968379f0edc49e09"
+    },
+    "app/src/main/assets/ambient/CREDITS.md": {
+      "bytes": 10330,
+      "sha256": "d65cd3f93b30dc9b5b0d0c9db9951a4e8859113805e9e466455f5e3f052e1098"
+    },
+    "app/src/main/assets/ambient/scene_campfire.ogg": {
+      "bytes": 210624,
+      "sha256": "a7d3673a08e7c943ed05b45e6ed6c0ff0e301b834a9db23ba3789eeb8c45bd8e"
+    },
+    "app/src/main/assets/ambient/scene_firefly.ogg": {
+      "bytes": 202316,
+      "sha256": "0309f5d0dfec0aae147e8b010470f9d8cae510cfd7e954b5f5376a85fac3cb5c"
+    },
+    "app/src/main/assets/ambient/scene_night.ogg": {
+      "bytes": 200483,
+      "sha256": "c0fc7c4196b7f3dbb4a563066b10ea220e829b00955d1f90716f13475d891dec"
+    },
+    "app/src/main/assets/ambient/scene_ocean.ogg": {
+      "bytes": 311035,
+      "sha256": "b6a8523c61a232488dd33578a1269c185d3c3af5eda947e0cc96aca2bcab051f"
+    },
+    "app/src/main/assets/ambient/scene_rain.ogg": {
+      "bytes": 161914,
+      "sha256": "63658acb544134237b24be25e1cce088f32085b6102e1ac565401db3e24f17af"
+    },
+    "app/src/main/assets/ambient/scene_sakura.ogg": {
+      "bytes": 182767,
+      "sha256": "708a154bd17f6aed038987dc556f2267d20354fa6db83306b4aca8bc9e470de6"
+    },
+    "app/src/main/assets/ambient/scene_snow.ogg": {
+      "bytes": 194514,
+      "sha256": "14411c8b58d3d28334f24c2851634e9c732d1f25faf439ef2e6a0f810a2c2fa3"
+    },
+    "app/src/main/assets/anilist_titles.tsv.gzip": {
+      "bytes": 1644547,
+      "sha256": "18b43822a98fab31f88c5ddb99f092db5891bafbfbc81129aeb01a63312f3316"
+    },
+    "app/src/main/assets/certificates/isrg-root-x2.pem": {
+      "bytes": 804,
+      "sha256": "669fce0c7d292a008fd26854c1aa1dd3a7af9c255f0091af809c6eb21f6f70d6"
+    },
+    "app/src/main/assets/comic_enhancement/Anime4K-MIT.txt": {
+      "bytes": 1084,
+      "sha256": "36191332f59280d16f096e382521661f83bd7b477db76071b0639a3f213b3ade"
+    },
+    "app/src/main/assets/comic_enhancement/MangaJaNai-CC-BY-NC-4.0.txt": {
+      "bytes": 19755,
+      "sha256": "8946c49d9a63a62f5621f114027b2842ee914bd237590f2a5496d4b044c95af9"
+    },
+    "app/src/main/assets/comic_enhancement/MangaJaNai-Full-NOTICE.txt": {
+      "bytes": 1416,
+      "sha256": "3f480f75d565c8b52d21540cbb9399ac5ba38e1b64b7e0bf97777009ba521228"
+    },
+    "app/src/main/assets/comic_enhancement/MangaJaNai-NOTICE.txt": {
+      "bytes": 1221,
+      "sha256": "e09887e50f9e1cb1f50efbac8b473afb0117faa35c755fc958e55f6514c5c022"
+    },
+    "app/src/main/assets/comic_enhancement/janai-span-mobile.onnx": {
+      "bytes": 1673288,
+      "sha256": "718b8670ab396a5174e5b4b38f9d3947beaac3afbe9647d494d65925180a2a7b"
+    },
+    "app/src/main/assets/comic_enhancement/ncnn-LICENSE.txt": {
+      "bytes": 6513,
+      "sha256": "3a066e39806976fe274a042929523c68821c54bcf73369ed61aae2717edd54e8"
+    },
+    "app/src/main/assets/comic_enhancement/restore-s.onnx": {
+      "bytes": 5560,
+      "sha256": "695d708d09e6952fe1bbb731282cd274da18877957687d6d6281ed1bd44653d9"
+    },
+    "app/src/main/assets/comic_enhancement/upscale-s.onnx": {
+      "bytes": 5550,
+      "sha256": "6027198710bcf8f42526298203821664bdae957d2db16f9b002655f953e66327"
+    },
+    "app/src/main/assets/js_extra/aimanhua.js": {
+      "bytes": 13155,
+      "sha256": "822b72e7b8d9524b42f65a385fcf1d2d5f9b3ea1e98ee45a9f3b0b1a9c0658c4"
+    },
+    "app/src/main/assets/js_extra/bilimanga.js": {
+      "bytes": 17915,
+      "sha256": "3d8057936bae4174e442896970a4ae71fee862fa959d29217b0907623f5a64d6"
+    },
+    "app/src/main/assets/js_extra/nineteen.js": {
+      "bytes": 11669,
+      "sha256": "6f24dc21a80aced4d71d71e4a285c2069c272c67b070db2c8001bca75bd00ac6"
+    },
+    "app/src/main/assets/js_extra/pufei.js": {
+      "bytes": 34031,
+      "sha256": "d64bd9a22c14331bfd83cd751f85f7abc0b3871d4d6362941f084ff1362a1093"
+    },
+    "app/src/main/assets/js_extra/vomic.js": {
+      "bytes": 17397,
+      "sha256": "628ca95a45578b34162546cb696e18df467865e6f1beb3a47caba850a79db36f"
+    },
+    "app/src/main/assets/js_extra/xipi.js": {
+      "bytes": 15436,
+      "sha256": "646b250f966b22c6fd38706c4392b6c6b5eb4a5d3e26f9011cce15c020a6e459"
+    },
+    "app/src/main/assets/js_safety/ACORN_LICENSE.txt": {
+      "bytes": 1120,
+      "sha256": "9a0b4cee959ae002e571b0cc8a1f0702f08d9cd057b8570651aae8022ef0a75a"
+    },
+    "app/src/main/assets/js_safety/acorn.js": {
+      "bytes": 251574,
+      "sha256": "8d2da0e1fe4258b4b990ef3f4691c2ab67fc19a92c37f933e1600e97d8ec20e1"
+    },
+    "app/src/main/assets/js_safety/instrument.js": {
+      "bytes": 5475,
+      "sha256": "707ddac03e6fcbd2ab38c5bd1954a8d8ee189ad98fe154a02933a5f7758172e7"
+    },
+    "app/src/main/assets/keyword_dictionary_notice.txt": {
+      "bytes": 967,
+      "sha256": "a74de7c5525686c55dbb3c83f0e504499e0c5243dae1b9cdabab25b57b28964e"
+    },
+    "app/src/main/assets/keyword_dictionary_version.txt": {
+      "bytes": 42,
+      "sha256": "296687b77ebb8c5e83982a9f8adfb446fe936396f44ee646f5e65f90221e79e2"
+    },
+    "app/src/main/assets/keyword_ehtag.tsv.gzip": {
+      "bytes": 647255,
+      "sha256": "6ecf412053d570f1b4f644c56961c73509431385010d3079008a08e540490d09"
+    },
+    "app/src/main/assets/keyword_seed.tsv": {
+      "bytes": 6399,
+      "sha256": "23dfd17ca42f751158dcad7ebb6e9bc37c83f2e36495d806f46222d4026f132a"
+    },
+    "app/src/main/assets/licenses/keiyoushi-xipi-LICENSE.txt": {
+      "bytes": 11558,
+      "sha256": "e03ba41d7fab20700769fe4118bab50d800cb74f990353a05d2f5fff1c228363"
+    },
+    "app/src/main/assets/licenses/keiyoushi-xipi-NOTICE.txt": {
+      "bytes": 578,
+      "sha256": "e1e04168199240e4e5a24aa87af677f8d59f5cb7a6606f8fbfd6fed2eda31cbd"
+    },
+    "app/src/main/assets/mt/llm_prompt.txt": {
+      "bytes": 1093,
+      "sha256": "e055052d5707b205fbeb5f10d514ea3d1bcec5898a3a827dc86d5f32e8161099"
+    },
+    "app/src/main/assets/mt/ppocr_keys_v6_small.txt": {
+      "bytes": 93655,
+      "sha256": "769e7fa79bb297b5f18d8dbd149e364a45bc61f2b3f574e5ea836f0b261c23a6"
+    },
+    "app/src/main/assets/venera/README.txt": {
+      "bytes": 380,
+      "sha256": "99f27e6ba1f7309f1ff3cf28a879d11c33e6f31ceb4deeb4ec9fb58e306384a7"
+    },
+    "app/src/main/assets/venera/_venera_.js": {
+      "bytes": 37828,
+      "sha256": "47100aaa4e5bf77fd7d6ba4f6270dcb41fcfc3179d285f71c09f5b81fcb25297"
+    },
+    "app/src/main/assets/venera/comic_metadata.js": {
+      "bytes": 784,
+      "sha256": "abcc0b14685405a1da22ef9d11457d3c644bae8e5a1d939ef00e50c08a91c6a6"
+    },
+    "app/src/main/assets/venera/discover_bridge.js": {
+      "bytes": 22214,
+      "sha256": "0f0246b11dfc055fb8d0712481f69480594712a962ef3680eb525a05c0848459"
+    },
+    "app/src/main/assets/venera/jm_response.js": {
+      "bytes": 4236,
+      "sha256": "8a040dfe5a17a3aeef6f5533a1480265da95abb133f5f4db0934dbda4be9b8c6"
+    },
+    "app/src/main/assets/venera/source_responses.js": {
+      "bytes": 4928,
+      "sha256": "f0acfd0cd8be67b84d055444694371ab7bc49547607f674f7e0c4d8f530d4ca2"
+    },
+    "app/src/main/assets/venera/wnacg_info.js": {
+      "bytes": 5090,
+      "sha256": "69a6ce81ce2c6554953a94761251737778635df7cc8d49848d8e6d648d347df3"
+    },
+    "app/src/main/cpp/CMakeLists.txt": {
+      "bytes": 609,
+      "sha256": "dfdf8c9e93dd80cd686cdbe64ab2d6f5eebbe8d1a49f1e5b41a686fa3a7bc226"
+    },
+    "app/src/main/cpp/mangajanai.cpp": {
+      "bytes": 6249,
+      "sha256": "9a7012a01b0fc1aa444ca5b34f02760ceb3369c0742961130137bb0ac89109e7"
+    },
+    "app/src/main/cpp/vendor/ncnn/LICENSE.txt": {
+      "bytes": 6513,
+      "sha256": "3a066e39806976fe274a042929523c68821c54bcf73369ed61aae2717edd54e8"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/allocator.h": {
+      "bytes": 13049,
+      "sha256": "e25d20bacebc77ac65def4296bcf96e59f000c04900af73f146da6110dc24438"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/benchmark.h": {
+      "bytes": 664,
+      "sha256": "fa5e32fd6a61499801485667fdba8bb0aa0bbbe8d34e6315ab69f5c198231cd9"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/blob.h": {
+      "bytes": 562,
+      "sha256": "d367b89c96f19a2e14ae2e021ad511f89603cdc6524bb9a25599bb5effba3ab9"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/c_api.h": {
+      "bytes": 23401,
+      "sha256": "5edce12b5e8edc2bfb2ec3700302b0be4eb3347d3ed4af0995a77cf80f300a64"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/command.h": {
+      "bytes": 3737,
+      "sha256": "d859bf0759e75bf8b031bcc834eff84baa17f37e2a0f073dc8c5d17062db2f26"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/cpu.h": {
+      "bytes": 5356,
+      "sha256": "1f617e3c35e7fee03612f8d1c2807e5e4747678b12532f25d2b95092ab9787ff"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/datareader.h": {
+      "bytes": 2848,
+      "sha256": "66fe80a04fa090101b0ced1f9cb3c336495530c0d473318a89ad0f06083eb5b8"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/expression.h": {
+      "bytes": 579,
+      "sha256": "477ea99380443f2232541bedf5bb75b1504be40d3a0cac295a7cb8635550de71"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/gpu.h": {
+      "bytes": 26888,
+      "sha256": "e6b19cf94eea8ba5d20652ed14aab562a96a6fdfafb6eed0c3080db5bd12f6a5"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/layer.h": {
+      "bytes": 6025,
+      "sha256": "270fe866980130df8067c2a0b20b2e5297fb8fdba9107718454806758ff11382"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/layer_shader_type.h": {
+      "bytes": 349,
+      "sha256": "42242a46ce7daba28767b3ce293e22d4e79553f5b45ce079ac7a26080e42780e"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/layer_shader_type_enum.h": {
+      "bytes": 7335,
+      "sha256": "a42f622bbf365703fb14163b9f71c46a41a5625ad13bd2888569ab46918c6a71"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/layer_type.h": {
+      "bytes": 330,
+      "sha256": "75cb00100bbfe2a502ff780711600a2abc6c4d5043eb4eabbb86f07b13efbd98"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/layer_type_enum.h": {
+      "bytes": 1911,
+      "sha256": "05d55b13c816f3289ee8e804181f484d652987751f8b85819bcc32064053ef85"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/mat.h": {
+      "bytes": 70177,
+      "sha256": "c66263c5400b303d337c6029ca48a708b884420298e604993008bfa233fde235"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/modelbin.h": {
+      "bytes": 1662,
+      "sha256": "44d2b35c6e586b80f64eb4c63323d9ea06ca4b30887f37307e1aba58f4646460"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/ncnn_export.h": {
+      "bytes": 1072,
+      "sha256": "d8a586ebd175d2ff4adca7ca7bc9a1a409e2230d48c1426f163b6ee1b36228b0"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/net.h": {
+      "bytes": 7276,
+      "sha256": "405575afd810beaf52ddb30a15802384df5710b9dc17773d7a28043596fbf542"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/option.h": {
+      "bytes": 4230,
+      "sha256": "f2109fc100307530bd5ff5b71f61726caab8bfb96e6bd6ab91a524e4f0a996b6"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/paramdict.h": {
+      "bytes": 1266,
+      "sha256": "d160a6d793bd4c18fef30e9705b12cf51a333a4c44d83448d3e8ce0604d99d24"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/pipeline.h": {
+      "bytes": 2988,
+      "sha256": "a0e2f2a417c5f283ade6907d1cef4370938271695de974988044950aaf488dd1"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/pipelinecache.h": {
+      "bytes": 3222,
+      "sha256": "1013f4c6692dc9bfdea1063e28494efd5feffddbc76911be580948a0536abebf"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/platform.h": {
+      "bytes": 12826,
+      "sha256": "74a1de1b0c28c676a72febb693e428525667f8c3ab9b56aefaf3e51ed18b964c"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/simplemath.h": {
+      "bytes": 2862,
+      "sha256": "e45b5676fd49dc87b76a979a3efddd7d31ded15ec7a30d65fe32ed4d9e1e43ba"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/simpleocv.h": {
+      "bytes": 9868,
+      "sha256": "51f6838eb1e6823f2a6b6cb2f5f4f2536011dbd7c9c6fcfa7e9a5f3a940a6199"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/simpleomp.h": {
+      "bytes": 838,
+      "sha256": "61756b512872a3ab10b35ba978dd5ec82cd30c6ba7e0e7327d4f6ef87e5fa3bf"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/simplestl.h": {
+      "bytes": 12139,
+      "sha256": "1ae30ad95dcf3c3a7fa3a3bffa2e54ca2f7cca9e1ee381cd51d6806e71d2508d"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/simplevk.h": {
+      "bytes": 90967,
+      "sha256": "5a996b816bb753d970f146e5516b76d8f7c10d080cec9f9042c32352dedd709a"
+    },
+    "app/src/main/cpp/vendor/ncnn/include/vulkan_header_fix.h": {
+      "bytes": 92533,
+      "sha256": "d26fce44d0e4cd800672df320ffa3a0ecf62ffa9588fbf301d3f913082c6bebb"
+    },
+    "app/src/main/cpp/vendor/ncnn/lib/arm64-v8a/libncnn.so": {
+      "bytes": 9968704,
+      "sha256": "17f3c033ef4837262919e179f26c4ef439dbb4a452d595a12086cbdf953310fb"
+    },
+    "app/src/main/cpp/vendor/ncnn/lib/x86_64/libncnn.so": {
+      "bytes": 19568968,
+      "sha256": "773c73211ba9bc9e105ec226688b64a04c985820e66e9546e81edd14bdadda33"
+    },
+    "app/src/main/java/README.md": {
+      "bytes": 401,
+      "sha256": "4b90fe6d285edbdb55ed872a3d9c9e72be8b11e8a3b7a77a7360735617e7d67c"
+    },
+    "app/src/main/java/com/README.md": {
+      "bytes": 391,
+      "sha256": "9a2f3746c33273f0f29ca3e420ab3ee5825db5947863ce7e16b81fe4ba10a281"
+    },
+    "app/src/main/java/com/example/MainActivity.kt": {
+      "bytes": 133790,
+      "sha256": "c26cb4db465197c981f8c48f14151429979f02be7d34d552c99ffe054bcd595c"
+    },
+    "app/src/main/java/com/example/MainViewModel.kt": {
+      "bytes": 53583,
+      "sha256": "9bf445943b40f1f453c101dbf63838b977db034526fd1dd5d37f01279f5812f5"
+    },
+    "app/src/main/java/com/example/README.md": {
+      "bytes": 483,
+      "sha256": "32f1352ef7cc5c73142f31aed2dd18ee7b8b970308c748dc5f775685eeb89142"
+    },
+    "app/src/main/java/com/example/data/AppDatabase.kt": {
+      "bytes": 32210,
+      "sha256": "62d1812249a675c4eead620af6194555e8a64790315b3ab25d20645e3abedee0"
+    },
+    "app/src/main/java/com/example/data/AppUpdateCleanupReceiver.kt": {
+      "bytes": 638,
+      "sha256": "d094c0840cfd8de4f0868b467558c6c2e9179ecf6a7b99fdbd9ece45a2c79c78"
+    },
+    "app/src/main/java/com/example/data/AppUpdateDownload.kt": {
+      "bytes": 9314,
+      "sha256": "c732373779bb41a0187c025978338dff4a3c35566963ac21e9f94dabd637add6"
+    },
+    "app/src/main/java/com/example/data/AppUpdateInstaller.kt": {
+      "bytes": 1456,
+      "sha256": "9a904758ede8d79634a8282b2c5a7ba0ae9783de261fee91cc3fd41c4d0d9a73"
+    },
+    "app/src/main/java/com/example/data/AppUpdateManager.kt": {
+      "bytes": 7786,
+      "sha256": "5cb70a99c9b1fc2e0c6cdda7c154bc25bee589ca8f3bdeae3ad28d9708dd35c3"
+    },
+    "app/src/main/java/com/example/data/AppUpdateStore.kt": {
+      "bytes": 4001,
+      "sha256": "3bd6b28d1b6d513674179a52ff227bc952a10d1abdc1bc8ad76ca1347b5bc6a4"
+    },
+    "app/src/main/java/com/example/data/BackupArchive.kt": {
+      "bytes": 14851,
+      "sha256": "4960bc89adfeacddb617dc66a5485aba9f45b18b8a168ffa4d5e91e7f0ab93ed"
+    },
+    "app/src/main/java/com/example/data/BackupManager.kt": {
+      "bytes": 8994,
+      "sha256": "258d95902768c3d65536fbb4891051145909e3b390d580a64802a24f0b61279b"
+    },
+    "app/src/main/java/com/example/data/Book.kt": {
+      "bytes": 3790,
+      "sha256": "7b490d728da8b59c07678edc4f9136c53efdb3b0c9dcf8bd1707f8d65fcb8f29"
+    },
+    "app/src/main/java/com/example/data/BookRepository.kt": {
+      "bytes": 57130,
+      "sha256": "025f2029257b9329e459d3b1898437df1c31a1b2ddbb9531f870d662b7942b82"
+    },
+    "app/src/main/java/com/example/data/ChapterMerger.kt": {
+      "bytes": 3495,
+      "sha256": "c8f357f5ff7f9e9a8ecdcff8a1de95ee7cde04c01c6bcec6bc634dda29a8c3de"
+    },
+    "app/src/main/java/com/example/data/CharsetSniffer.kt": {
+      "bytes": 4122,
+      "sha256": "4f7205993e224a8c88212228ec1b6e9fed990736315b1c128b585ff72febfbd2"
+    },
+    "app/src/main/java/com/example/data/ComicParser.kt": {
+      "bytes": 9147,
+      "sha256": "fea1b1e76cd1f5569ea7ab4c209eb7348f0026fefc100e07f7e86ccfe39a685f"
+    },
+    "app/src/main/java/com/example/data/ContentMutationGate.kt": {
+      "bytes": 331,
+      "sha256": "8ad8a05961a916772e7d249346ecd71e407b0c81b355bcfa0e9c642524e0f1c7"
+    },
+    "app/src/main/java/com/example/data/DocxParser.kt": {
+      "bytes": 11933,
+      "sha256": "de36867b0dccae0b8f619eed5e9076d512331ffb490928a5352c3283eef557fe"
+    },
+    "app/src/main/java/com/example/data/EncryptedSecretStore.kt": {
+      "bytes": 1878,
+      "sha256": "f9eca5edf695eaff0633b4b454bc1b2975bf2dddd683ed423653b7db986f2f45"
+    },
+    "app/src/main/java/com/example/data/EpubParser.kt": {
+      "bytes": 49676,
+      "sha256": "21da68298901e689df281ff3d3db5078c76fffb4ce9cb49a3de433e9df7fb127"
+    },
+    "app/src/main/java/com/example/data/Fb2Parser.kt": {
+      "bytes": 12085,
+      "sha256": "1dfb2587b90c4c488eb9fa7cfc0712415e87d2d3c4001a12af564334e79d1e09"
+    },
+    "app/src/main/java/com/example/data/GithubUpdateChecker.kt": {
+      "bytes": 9806,
+      "sha256": "090404053691114c1100d64a39a51f7b2bd128367949d5f4641bfbaa2aa1612a"
+    },
+    "app/src/main/java/com/example/data/ImportSafety.kt": {
+      "bytes": 2807,
+      "sha256": "1b6c53c35370e0e5a663631db90de6c4e07a92797db9716b7b9fc44204268e0e"
+    },
+    "app/src/main/java/com/example/data/LegacyDatabaseMigration.kt": {
+      "bytes": 8657,
+      "sha256": "b03d910c2fe03a07204a7cb2530702c9ab64a0108b9eef1e3b2a2b2e57e492ef"
+    },
+    "app/src/main/java/com/example/data/MobiParser.kt": {
+      "bytes": 41580,
+      "sha256": "5b4d6e66ae354a79943ed51e9b7f968f28ceb591d9b9a182b7a6290accb81f0b"
+    },
+    "app/src/main/java/com/example/data/PreferencesManager.kt": {
+      "bytes": 15772,
+      "sha256": "1607e0bafaf8bc498d1acf4fafe8f475cea465e05e52d4b73bcb750a97e9a11a"
+    },
+    "app/src/main/java/com/example/data/PrivacyManager.kt": {
+      "bytes": 5292,
+      "sha256": "f5e6cd53ed5b363d918b4eaa04a2e2be678d7d7d1acb9996a6e49c3c4fccd1cc"
+    },
+    "app/src/main/java/com/example/data/README.md": {
+      "bytes": 883,
+      "sha256": "fb050c4c68d8ea20fe32d5e8fcd29016019720375d7a0da0934714df728f878b"
+    },
+    "app/src/main/java/com/example/data/ReadingSession.kt": {
+      "bytes": 1366,
+      "sha256": "07bc164ccbbe4399ef3ddb081f41ff9f403014fa3c3fefd58a02d020b7421383"
+    },
+    "app/src/main/java/com/example/data/ReadingTimeSlices.kt": {
+      "bytes": 1413,
+      "sha256": "3fbc42b2478b4667397f7277cbe6edbc67ca126e13e6f5f6f4392456d1acfc99"
+    },
+    "app/src/main/java/com/example/data/SearchLocator.kt": {
+      "bytes": 4831,
+      "sha256": "a353dad84f107a9b7f979d18043b27144c575b11077e9fa634bda9a9e962d4c7"
+    },
+    "app/src/main/java/com/example/data/TtsManager.kt": {
+      "bytes": 5421,
+      "sha256": "89abd1901d7dec15d03bc2788c1079560bffaa6fc179f0d38a8dd09e45e383c9"
+    },
+    "app/src/main/java/com/example/data/TtsPlaybackService.kt": {
+      "bytes": 2225,
+      "sha256": "388394eebcfbb8d727f785d81d906194fc2712a5c5bfdfbe3691d00e91cd86c0"
+    },
+    "app/src/main/java/com/example/data/favorite/ChapterCatalog.kt": {
+      "bytes": 2541,
+      "sha256": "e5c869959c8ac5aa23da4265d6fc1e5c5d6e690271d8c4a8bc46cec0ed8aee93"
+    },
+    "app/src/main/java/com/example/data/favorite/ComicChapterMatching.kt": {
+      "bytes": 2977,
+      "sha256": "91d4e9c32619a7b48c812d39de87e22fa973122d88af352603bbb4248850bceb"
+    },
+    "app/src/main/java/com/example/data/favorite/ComicFavoriteMatching.kt": {
+      "bytes": 2471,
+      "sha256": "ecdb2b256e2500bd2fabb837bf0b792ecc26618832cc60b2ec122adaeeba2de8"
+    },
+    "app/src/main/java/com/example/data/favorite/ComicReadingLogic.kt": {
+      "bytes": 9851,
+      "sha256": "cdbf2bd207123a8aaa3f3acb71f1fcb5196c996e4276f0609c31e69bc762a130"
+    },
+    "app/src/main/java/com/example/data/favorite/FavoriteDao.kt": {
+      "bytes": 12256,
+      "sha256": "ee979094c14b7da362d070fed128714b3219c55a4645a50f291b1f03de6cc4bb"
+    },
+    "app/src/main/java/com/example/data/favorite/FavoriteModels.kt": {
+      "bytes": 6261,
+      "sha256": "13532517693fba44d24fb9e439fc4298e76db7e71911943845672d395958fcad"
+    },
+    "app/src/main/java/com/example/data/favorite/FavoriteRepository.kt": {
+      "bytes": 26207,
+      "sha256": "eeb4091835fa94a57481aeee105d15124ef71c9b835223d8851f7146721e81c4"
+    },
+    "app/src/main/java/com/example/data/favorite/README.md": {
+      "bytes": 500,
+      "sha256": "2a4a00dd212ad8ed58e0fa9609b906594e1417532e20b4c7c44fc501b2ec8794"
+    },
+    "app/src/main/java/com/example/data/remote/AppErrorInterceptor.kt": {
+      "bytes": 7396,
+      "sha256": "e4b55e91ed99a96189001359b4f054eb9bbd0b64832e7cb4d97347331d544667"
+    },
+    "app/src/main/java/com/example/data/remote/README.md": {
+      "bytes": 337,
+      "sha256": "8ea629c17501c5b2f0eeaca5882c8bb387d25532b547827d7d9a61e183875033"
+    },
+    "app/src/main/java/com/example/discover/DiscoverCards.kt": {
+      "bytes": 21084,
+      "sha256": "3b71b4c609691acdc0bc0e08f0c8aed90da754fae4012504bf63cfcd177a08b8"
+    },
+    "app/src/main/java/com/example/discover/DiscoverDesign.kt": {
+      "bytes": 3566,
+      "sha256": "9b7973895bdf27279338012d2f4b80709c4f61882a0827b646383a98de04adde"
+    },
+    "app/src/main/java/com/example/discover/DiscoverFilters.kt": {
+      "bytes": 9861,
+      "sha256": "118018b0822b466293516d28234255244f39247703ccc6623762d6b51036fe49"
+    },
+    "app/src/main/java/com/example/discover/DiscoverModels.kt": {
+      "bytes": 11356,
+      "sha256": "15d74474bfa87199fdfe7c62aeb1f188c9d7641dadc75766f1556537c81b2fb2"
+    },
+    "app/src/main/java/com/example/discover/DiscoverNovelDetails.kt": {
+      "bytes": 2370,
+      "sha256": "53c0e686f6426a965afe74a4ae7db391baaf6b4eeee0502ce393baf1c4ef8af0"
+    },
+    "app/src/main/java/com/example/discover/DiscoverPanels.kt": {
+      "bytes": 13547,
+      "sha256": "a58bcbc6198e886238ccd560631d4db8330269db3745a4353a41b5d0d7f6a929"
+    },
+    "app/src/main/java/com/example/discover/DiscoverPartition.kt": {
+      "bytes": 888,
+      "sha256": "f81faaf8ec745f914e4b84d6eb704eca87a79e9809e842b615e4d674874575d7"
+    },
+    "app/src/main/java/com/example/discover/DiscoverScreen.kt": {
+      "bytes": 28727,
+      "sha256": "5b201fe10368306ba21dde60b29cc5e09fd2d2fa984cb8e198814327f633b7dd"
+    },
+    "app/src/main/java/com/example/discover/DiscoverSettings.kt": {
+      "bytes": 4651,
+      "sha256": "5998b66fd7d264d8b233e6e0068ac1625aa3df4be0df269b3abe6749e42f8849"
+    },
+    "app/src/main/java/com/example/discover/DiscoverStatusScope.kt": {
+      "bytes": 1918,
+      "sha256": "c65a9c0b1c9acebe91331c975b100a4b777030d1a95804d1013499f780052ebd"
+    },
+    "app/src/main/java/com/example/discover/DiscoverStore.kt": {
+      "bytes": 9670,
+      "sha256": "04e9f5d3201d4fa6ccb16ea122333926718b96492c745a239e3604a5a68efb6e"
+    },
+    "app/src/main/java/com/example/discover/DiscoverTaxonomy.kt": {
+      "bytes": 14326,
+      "sha256": "154afd290926b61200686ad9456ff564d9303a38e4a873552cb0c0aa9d8ab16f"
+    },
+    "app/src/main/java/com/example/discover/DiscoverViewModel.kt": {
+      "bytes": 22015,
+      "sha256": "e2227a224aadc5a539f3958702c1165a24d95fba990b431dc937efcb9fbf37f5"
+    },
+    "app/src/main/java/com/example/download/DownloadFileValidator.kt": {
+      "bytes": 12122,
+      "sha256": "12c7e04d73b2b77759259e9bc59573fd89a09fc83ca52336507b1a48b9f94a60"
+    },
+    "app/src/main/java/com/example/download/DownloadManager.kt": {
+      "bytes": 15869,
+      "sha256": "feb3773dac1b5ad5f09e0ccc153e396d29646d0dec9f8035b625a0a445e24f07"
+    },
+    "app/src/main/java/com/example/download/DownloadProgressBroadcaster.kt": {
+      "bytes": 741,
+      "sha256": "b69550c35a50c8c34e5d01dc5d6ee881cac6b4a39c5ce4c5676be4168f9d33e7"
+    },
+    "app/src/main/java/com/example/download/DownloadRequest.kt": {
+      "bytes": 365,
+      "sha256": "13c8d775483e82e1f1c0d3d7e1a93e4c2e312aa1dc1d84295ba3d9cd20a11b3c"
+    },
+    "app/src/main/java/com/example/download/DownloadState.kt": {
+      "bytes": 581,
+      "sha256": "d16bf25e9004f629b929b4306810fe2a4e3a716a452498c0a001e12682f8f85b"
+    },
+    "app/src/main/java/com/example/download/DownloadTaskDao.kt": {
+      "bytes": 1620,
+      "sha256": "977d9dc230d75cf4cbff332d5ef2a88c0c9cdfb4e56e201a2dd13d56fbe1c675"
+    },
+    "app/src/main/java/com/example/download/DownloadTaskEntity.kt": {
+      "bytes": 722,
+      "sha256": "d601a7c94cc184035322d92d1292bf0587a2bc5b24d6ee9d6cf42bab40d9be76"
+    },
+    "app/src/main/java/com/example/download/DownloadTransferPolicy.kt": {
+      "bytes": 1341,
+      "sha256": "2c09d5c98da9bef9ba31e5943bf4e94605fe2a2ca1210ede8f6720783d9cc1c7"
+    },
+    "app/src/main/java/com/example/download/DownloadWorker.kt": {
+      "bytes": 30264,
+      "sha256": "761c15acf4fb6b694ca0f536ce1dc0c9af0303dce33b9a1984d64f831fb2f293"
+    },
+    "app/src/main/java/com/example/download/GuestNovelEpub.kt": {
+      "bytes": 8473,
+      "sha256": "d16f8c84f328eb78306d5eb30ef23892cdf56892f141e3d5f6e6cd6ed7350a0a"
+    },
+    "app/src/main/java/com/example/download/GuestNovelIntegrity.kt": {
+      "bytes": 7351,
+      "sha256": "f73743b0beec7ce3b94a9e6b42893ba7a37c6b9cb490493d855c4a6afd260f5d"
+    },
+    "app/src/main/java/com/example/download/NovelDownloadStore.kt": {
+      "bytes": 3786,
+      "sha256": "821edfdeb1d65570f211a2520cdc90c6602726ef3ea8518ee8f142363e9b1693"
+    },
+    "app/src/main/java/com/example/download/NovelTextArchive.kt": {
+      "bytes": 7950,
+      "sha256": "6e4f375e85bc9448a97ef92886be0f06d6b518d34dbffcd21ac69d257cb3de97"
+    },
+    "app/src/main/java/com/example/download/README.md": {
+      "bytes": 806,
+      "sha256": "252429dae6d8ce747dc26b2efda936cdc05491b92cf0c8d73f5bf911fc2716ed"
+    },
+    "app/src/main/java/com/example/download/XbookcnEpub.kt": {
+      "bytes": 7233,
+      "sha256": "283c02025ca3f481991d29f53169e92998ea2ebd1cc0fb05a93fed449cb85905"
+    },
+    "app/src/main/java/com/example/god/GodChapterCard.kt": {
+      "bytes": 10249,
+      "sha256": "406984fac300199ffc611728d29ded5ecf9fba35ebdb3f5cfb1c9c22bd207bc7"
+    },
+    "app/src/main/java/com/example/god/GodCoverCropScreen.kt": {
+      "bytes": 19511,
+      "sha256": "80c624e50575e474f8718c5644f843d123afb27cd8f80c1cb3c46d651e35a84c"
+    },
+    "app/src/main/java/com/example/god/GodCoverEngine.kt": {
+      "bytes": 21153,
+      "sha256": "0adbc835bfe6ab4805b78a8d186b9b60cc6dfe9ee47c111ab55827353cf3207c"
+    },
+    "app/src/main/java/com/example/god/GodMomentDao.kt": {
+      "bytes": 2626,
+      "sha256": "848287a99aafb85b2a9a4db73c4a09b7ebd2d27a3b0f61af63c5d5f5987f0f89"
+    },
+    "app/src/main/java/com/example/god/GodMomentModels.kt": {
+      "bytes": 12786,
+      "sha256": "7f3dcbdee56a9d3ced700a8dc2e068e1651991bbfbbd1158235a7bdf5ec415a4"
+    },
+    "app/src/main/java/com/example/god/GodMomentRepository.kt": {
+      "bytes": 7168,
+      "sha256": "3b282b312c3d4f21311e9baa5e32b13879b65ce63e82bf63f2248cebd6628cbf"
+    },
+    "app/src/main/java/com/example/god/GodMomentSettingsStore.kt": {
+      "bytes": 3421,
+      "sha256": "8ee0a0a28907e8e991aed281cae9285dc3bf05c4a9028f99ba930aa16ecffe70"
+    },
+    "app/src/main/java/com/example/god/GodMomentSheet.kt": {
+      "bytes": 57907,
+      "sha256": "02dfd661c98313e088216daae152ab008f7113f56bfea4264bdcf46cf26c70c2"
+    },
+    "app/src/main/java/com/example/god/GodMomentViewModel.kt": {
+      "bytes": 2150,
+      "sha256": "bb5b1fdc63d2d47c1b750be22b4f9ba00d0569aa8d12853338dc0d72507f111d"
+    },
+    "app/src/main/java/com/example/god/GodMotion.kt": {
+      "bytes": 7318,
+      "sha256": "226f8c1f871dc3a5c36ab7b1a28a3f727526097e080b1b42058d475377687b81"
+    },
+    "app/src/main/java/com/example/god/GodPull.kt": {
+      "bytes": 15915,
+      "sha256": "39d5e17956283ffc063305b3160acc51202e96d9caee7ad1ec10ade27f4e508b"
+    },
+    "app/src/main/java/com/example/god/GodRankingCard.kt": {
+      "bytes": 14642,
+      "sha256": "b0bf05bdca237db0257cd9285ff505b2684248b27df6eab19d73da617c3ee236"
+    },
+    "app/src/main/java/com/example/god/GodRankingExhibits.kt": {
+      "bytes": 21666,
+      "sha256": "895aed4378aa03cdfde995433430a093e0ad55032b08132329f3e9a90c06cb04"
+    },
+    "app/src/main/java/com/example/god/GodRankingShared.kt": {
+      "bytes": 13498,
+      "sha256": "215f84f96b6f255d530635b79d1772154603736904068a8bc62461650cf1fa7b"
+    },
+    "app/src/main/java/com/example/god/GodRankingStyles.kt": {
+      "bytes": 12389,
+      "sha256": "43f70f32319ed4a020d1b719dd4f6606f4b0183b3522a2392a248574e10fda28"
+    },
+    "app/src/main/java/com/example/god/GodReaderBinding.kt": {
+      "bytes": 7325,
+      "sha256": "678ee083617c228f8350c29f0fa4f0e92792c31ce7d43ddbdfd1a0db6b7f447b"
+    },
+    "app/src/main/java/com/example/god/GodSettingsSection.kt": {
+      "bytes": 11141,
+      "sha256": "ef4c5ac84e0409f89d95eab487cb4c62fcdeb3b9b2afb88ffadc2fbeef838522"
+    },
+    "app/src/main/java/com/example/god/GodStarRating.kt": {
+      "bytes": 12239,
+      "sha256": "f75779905670830fe2d7cda3ec19e4cd9197e117cea7b6f7f4a87c81855b998d"
+    },
+    "app/src/main/java/com/example/god/README.md": {
+      "bytes": 586,
+      "sha256": "faafe7ab60f4236a04ddd316a5b7828fbe2ae093830e6cf81efd1149a9ebea43"
+    },
+    "app/src/main/java/com/example/library/BookShareHelper.kt": {
+      "bytes": 18163,
+      "sha256": "b9a510cc97cec78fd649483809134c8ab4dc0d8e5c47f3db008d53ff581f61cd"
+    },
+    "app/src/main/java/com/example/library/ComicAggregateSearch.kt": {
+      "bytes": 6588,
+      "sha256": "df648684c8f437b4b5962d2681cf99087461a1aad2935952fbc1877bc0248463"
+    },
+    "app/src/main/java/com/example/library/ComicDownloadManager.kt": {
+      "bytes": 10471,
+      "sha256": "fec834ad881a34140b520662f52a3ea29bae1c865ba60b68d8f15f586f7ebbbf"
+    },
+    "app/src/main/java/com/example/library/ComicDownloadWorker.kt": {
+      "bytes": 4191,
+      "sha256": "4d0a37a9d8587758d36035056745ef8a88ecd9d100c12c0f03cdd69c40482fa1"
+    },
+    "app/src/main/java/com/example/library/ComicLocalImporter.kt": {
+      "bytes": 17990,
+      "sha256": "e0d2615db60539a03f050feaa0394d36357e881bfbb59c226272a8dd7f8f14ec"
+    },
+    "app/src/main/java/com/example/library/DownloadGlassCard.kt": {
+      "bytes": 17001,
+      "sha256": "6f4969c75b8688bc9a6f34630f092273691236b313b44c48dc60f4e5bf515545"
+    },
+    "app/src/main/java/com/example/library/FavoriteShareHelper.kt": {
+      "bytes": 4277,
+      "sha256": "0b5b1fe70d79de614bb5830e5167e9ede62729836ea1d816197e1e362be45e26"
+    },
+    "app/src/main/java/com/example/library/FormatPickerDialog.kt": {
+      "bytes": 9250,
+      "sha256": "cc579bc0cd20fcd8580a71e7070c0b3021a2a6ca05fbbeaf126005f1f0bfb12d"
+    },
+    "app/src/main/java/com/example/library/GenericCoverLoader.kt": {
+      "bytes": 1951,
+      "sha256": "8c3298b74b148c58dec8b94c5cf6137f8d77e6912b85f82f224fc9bfc8057c3b"
+    },
+    "app/src/main/java/com/example/library/ImageBytes.kt": {
+      "bytes": 6066,
+      "sha256": "d291187ddbedc507f2f2704e27151a86b1a6bb625844ff62c808bfd5cc023700"
+    },
+    "app/src/main/java/com/example/library/KeywordSearchPreview.kt": {
+      "bytes": 11226,
+      "sha256": "cfb323730dbdf5fe313db43b2addb5f204fb6e702891d1aa2198beac9f8ea8a8"
+    },
+    "app/src/main/java/com/example/library/LibraryError.kt": {
+      "bytes": 700,
+      "sha256": "7f407791e9aa02596f417414b67c0d06c6f928e4b15293baeee1a2b18788c517"
+    },
+    "app/src/main/java/com/example/library/LibraryLoginDialog.kt": {
+      "bytes": 12016,
+      "sha256": "148e1fd8b03dd25c65669ab5e676fed8b178f60961551f624e49c200ce950632"
+    },
+    "app/src/main/java/com/example/library/LibraryNavigation.kt": {
+      "bytes": 2467,
+      "sha256": "cd9afcb0a7b4684aafe4a1b2cf943a6b27c188f36d469e480f0d65cb81736bab"
+    },
+    "app/src/main/java/com/example/library/LibraryScreen.kt": {
+      "bytes": 159111,
+      "sha256": "0b4b6400bf55ab0ef08685b33a84fd1d7acb0f3de711ba4d94db5a066ab8ffea"
+    },
+    "app/src/main/java/com/example/library/LibraryUiState.kt": {
+      "bytes": 984,
+      "sha256": "cbdf6002666d9f63e28a0cbb7ba1854c3ec1e6aa75736fd9726800fa5b3fb6f6"
+    },
+    "app/src/main/java/com/example/library/LibraryViewModel.kt": {
+      "bytes": 70259,
+      "sha256": "3e44525f569a631436f39844651797ef574e07f7edcad1a4049035e3d7dc3ac8"
+    },
+    "app/src/main/java/com/example/library/MhttuImageDecryptor.kt": {
+      "bytes": 1838,
+      "sha256": "83a292198b5be4aba11ebf9e0651de433f885b3d0b95e1f933d3d02162fa3efd"
+    },
+    "app/src/main/java/com/example/library/NovelBookUi.kt": {
+      "bytes": 21109,
+      "sha256": "82998500bbc52c719ee28aec532977d336ed05ad561f51e343f5e5faf4cf8013"
+    },
+    "app/src/main/java/com/example/library/NovelDownloadPanel.kt": {
+      "bytes": 6823,
+      "sha256": "9873c19cc755ba61e06bf5a1196320d7fb3bb49ee09678361e252363ba5131a2"
+    },
+    "app/src/main/java/com/example/library/README.md": {
+      "bytes": 901,
+      "sha256": "0b91bf18ce664ab434ed2ce0469bf8b312369881ba828a81468a8e7d173a7ed1"
+    },
+    "app/src/main/java/com/example/library/ReadingRecordMetadata.kt": {
+      "bytes": 2309,
+      "sha256": "09c739e4f9aa77ab7e16acf292059f134fb0fce66f0979e1b6a85eb8f3b0a027"
+    },
+    "app/src/main/java/com/example/library/ReadingRecordResolver.kt": {
+      "bytes": 3645,
+      "sha256": "6bccefc7925058ae211e066d6a5082f587c8e2cf7d200561f72e02d1af3a734e"
+    },
+    "app/src/main/java/com/example/library/SharedWorkLink.kt": {
+      "bytes": 1655,
+      "sha256": "3a9c8dc62af78a609f9e49db8de773d99e51a4f78ebae3b5f24b61695d378bd1"
+    },
+    "app/src/main/java/com/example/library/SourceSearchCoordinator.kt": {
+      "bytes": 2305,
+      "sha256": "913db501ecb880e03134502eca8ab61eb021287958823eb3b9e4b29311a83a4a"
+    },
+    "app/src/main/java/com/example/library/ZLibraryCoverLoader.kt": {
+      "bytes": 2837,
+      "sha256": "d1f00469f54ee0f3e37d896af6b30763e56ea78f4766444b465285288e7cb8b7"
+    },
+    "app/src/main/java/com/example/library/ZLibraryNativeSession.kt": {
+      "bytes": 16259,
+      "sha256": "5476c2875a1141313bb4728a2b9541b2e229a79709ff9cdfa1622ae904cf9f33"
+    },
+    "app/src/main/java/com/example/library/ZLibraryNodeConfig.kt": {
+      "bytes": 924,
+      "sha256": "84a736c22ae5a022437b3fa965a4c0e1e414489449e4bbbc2f18810a326d41c1"
+    },
+    "app/src/main/java/com/example/library/ZLibraryNodeManager.kt": {
+      "bytes": 9540,
+      "sha256": "8581e65681ea9daaa73bed2ed0ff58464815bebc8687f90f63697805e1ea0b53"
+    },
+    "app/src/main/java/com/example/library/ZLibraryNovelMetadata.kt": {
+      "bytes": 1348,
+      "sha256": "352136f499b08c40a0135b041c50148fb8ef0840c6cd9b01f65e4bc5543ce101"
+    },
+    "app/src/main/java/com/example/mangatranslate/BubbleDetector.kt": {
+      "bytes": 18478,
+      "sha256": "4cacb0d55449f2789359482c979afe038958708862dddd8401aeb23e89260ec8"
+    },
+    "app/src/main/java/com/example/mangatranslate/BubblePipeline.kt": {
+      "bytes": 22494,
+      "sha256": "fe014bae48e0636d68375acde1f037f75b30521aafe97b16e52ff57a9969da0c"
+    },
+    "app/src/main/java/com/example/mangatranslate/LlmBubbleTranslator.kt": {
+      "bytes": 17057,
+      "sha256": "82f363e522e06fa3285a77347b54ac536c9a748cc1c58c1e9145b209bb841d20"
+    },
+    "app/src/main/java/com/example/mangatranslate/MangaOcr.kt": {
+      "bytes": 21925,
+      "sha256": "91dd335afeb28d913a558a1bd4b61bd6b9946ad3420f3fad3a27ddee32ec8e08"
+    },
+    "app/src/main/java/com/example/mangatranslate/MangaTranslationCore.kt": {
+      "bytes": 47942,
+      "sha256": "0c095f7f67183a0044ebb3c544308f1054ac530df28e8b872816ca478a1a5ec8"
+    },
+    "app/src/main/java/com/example/mangatranslate/PageMemoryBudget.kt": {
+      "bytes": 1246,
+      "sha256": "4bcdcb73b013a6cbf03db2763dd6d029428bce69e097078d16b97425bb95c2c6"
+    },
+    "app/src/main/java/com/example/mangatranslate/PageRegionDetector.kt": {
+      "bytes": 12685,
+      "sha256": "e4da9687d2f479e347f8a721640b92ae97ce152e56a283ef59c6c32be0efc295"
+    },
+    "app/src/main/java/com/example/mangatranslate/PageRegionTiling.kt": {
+      "bytes": 35011,
+      "sha256": "ce7b32918f6be5339fa15e884d8b10d995f38e7993828656002f5a52df91cbc3"
+    },
+    "app/src/main/java/com/example/mangatranslate/README.md": {
+      "bytes": 1525,
+      "sha256": "dd43020ca39b203f9897e7024371e101537f7680695e9d5483cb8733c3519be9"
+    },
+    "app/src/main/java/com/example/mangatranslate/TextBlockMerger.kt": {
+      "bytes": 22120,
+      "sha256": "1c10281763fdf6f23f5e2c1dd60397b0714fe15eb8c9bb0919cfa37c8db66853"
+    },
+    "app/src/main/java/com/example/mangatranslate/TextTranslator.kt": {
+      "bytes": 8584,
+      "sha256": "9d78ff352404cce604e9f423cb1799e2a520b84f15566c019849742f1b11fb1a"
+    },
+    "app/src/main/java/com/example/mangatranslate/TranslateModelManager.kt": {
+      "bytes": 15506,
+      "sha256": "849ea3b67f98ae954f8fdc382e251b4a0bea5ad749501c4f16f673fd34ef957b"
+    },
+    "app/src/main/java/com/example/mangatranslate/TranslationFailure.kt": {
+      "bytes": 2900,
+      "sha256": "be7f5bdeb95ae0378d93f392e28d7a8fc1f579c6e947692714126cbf02e120d3"
+    },
+    "app/src/main/java/com/example/mangatranslate/TranslationPrivacy.kt": {
+      "bytes": 294,
+      "sha256": "2e5b943e0e03c8a7b6036f6fcec1ae6b08b6a1090cf4d04bc968f896cd5188cd"
+    },
+    "app/src/main/java/com/example/source/AuthenticationState.kt": {
+      "bytes": 252,
+      "sha256": "42a990c9d8225a47e3913115577f5743ad3359ab3c5b4b3887d76105b5283fa5"
+    },
+    "app/src/main/java/com/example/source/BookFormat.kt": {
+      "bytes": 660,
+      "sha256": "0337beb8aef6786290ee8fac28e4ddf5418402af9500ef42d41572409e6c91dc"
+    },
+    "app/src/main/java/com/example/source/BookSource.kt": {
+      "bytes": 2655,
+      "sha256": "8b6805dbedab76b0610c7485749ccba8b9621d29ed57d26da5340ad360595461"
+    },
+    "app/src/main/java/com/example/source/ComicChapter.kt": {
+      "bytes": 296,
+      "sha256": "fbad934ea17dd1d69b53ac8d9bc4c5821b7a20572ed874bfc66cbdcd3351d263"
+    },
+    "app/src/main/java/com/example/source/ComicChapterTitle.kt": {
+      "bytes": 2488,
+      "sha256": "91bc07b809ff96ee33a570e063e0f2e3f79ec32e6e3583e2a5b0fbaa5804160f"
+    },
+    "app/src/main/java/com/example/source/ComicInfo.kt": {
+      "bytes": 1886,
+      "sha256": "06f8c276287254e3e83f13d5976677e32b57d52c2f37e69c932aa98b8b1a233b"
+    },
+    "app/src/main/java/com/example/source/ComicSource.kt": {
+      "bytes": 1352,
+      "sha256": "7e2eaa3b1306ad15bde4069a4dee35bdccdbd7b455743c249579460ed346534d"
+    },
+    "app/src/main/java/com/example/source/DetailLink.kt": {
+      "bytes": 811,
+      "sha256": "bd38b261a35e8afb680f79ed277f631cb5c512eda9948ba87a7af3b892422a14"
+    },
+    "app/src/main/java/com/example/source/DownloadInfo.kt": {
+      "bytes": 313,
+      "sha256": "4762cee872f8dfefeac2f313dba2f9cd132309a87b6498ee77f1458dca4a5b07"
+    },
+    "app/src/main/java/com/example/source/LoginCredential.kt": {
+      "bytes": 212,
+      "sha256": "2a70910909ecf110661825f84ff0be654d2c7164bc694a19777bf735fbeb76ec"
+    },
+    "app/src/main/java/com/example/source/NetworkCalls.kt": {
+      "bytes": 3785,
+      "sha256": "39ffff36acb030cc5538132c2c23e98b381d6204319e65534f2b18e6d4c1d813"
+    },
+    "app/src/main/java/com/example/source/NovelContentChecks.kt": {
+      "bytes": 510,
+      "sha256": "540392a99454d7036841ce2fbc33ca173debdfcec6252a2f6b35366472846b20"
+    },
+    "app/src/main/java/com/example/source/NovelInfo.kt": {
+      "bytes": 1343,
+      "sha256": "f9e108d5b68b1100b9ceb3b9b068ac3859e9997f23857c2ef51e88910475cc8f"
+    },
+    "app/src/main/java/com/example/source/PufeiImageCacheRetry.kt": {
+      "bytes": 1283,
+      "sha256": "b3e44d5d22a8418e690a3e370ef5da0a9484bad92fa9a3bd6bce7ed1377f30bc"
+    },
+    "app/src/main/java/com/example/source/README.md": {
+      "bytes": 594,
+      "sha256": "f276a8a616833d3727a2cf4888d4a808c7badea3cfb59d056fbef248c948e76d"
+    },
+    "app/src/main/java/com/example/source/SearchBook.kt": {
+      "bytes": 821,
+      "sha256": "fb1e23f613276a7237bce85e34ca5a40d6fed727c52dc66ee51e8a56da4c85fd"
+    },
+    "app/src/main/java/com/example/source/SourceCapabilities.kt": {
+      "bytes": 1239,
+      "sha256": "d8108ac79079950bd01fcd5006f40b81732d9796cf384fedcf41b4d4100010f0"
+    },
+    "app/src/main/java/com/example/source/SourceConfig.kt": {
+      "bytes": 3683,
+      "sha256": "4cf1652224370bfb48dee55d6bf428f6537344f9fd29e404d8deeba98b47cd37"
+    },
+    "app/src/main/java/com/example/source/SourceException.kt": {
+      "bytes": 602,
+      "sha256": "0e8f8afe6a669c4b496699bbca7edad3341031636ae87625a7fde33f2239d209"
+    },
+    "app/src/main/java/com/example/source/SourceLog.kt": {
+      "bytes": 1790,
+      "sha256": "3594115cb5ff033c8e2d000f7ad45c493152784524040c6a8fc63623a925d900"
+    },
+    "app/src/main/java/com/example/source/SourceManager.kt": {
+      "bytes": 7052,
+      "sha256": "d640c74aa9fa5778dfcc2485411aa771f584521dde04c90ae15bcdab0549fafa"
+    },
+    "app/src/main/java/com/example/source/SourceRegistration.kt": {
+      "bytes": 335,
+      "sha256": "65343f215c9252acdd8ce635bfdf176c528d44d81fbe1fce50d6c39531ce7ec3"
+    },
+    "app/src/main/java/com/example/source/SourceResponse.kt": {
+      "bytes": 4583,
+      "sha256": "dfd678f9a83d205791bac7eb4dc6bd2d19cadb30ed543719bd5ae8312af98369"
+    },
+    "app/src/main/java/com/example/source/SourceResult.kt": {
+      "bytes": 525,
+      "sha256": "a7353c15d3d121ed34c46becb91dc5d1407ae1b3b48c7403ec6c702c5985a7ce"
+    },
+    "app/src/main/java/com/example/source/SourceViewModel.kt": {
+      "bytes": 7593,
+      "sha256": "aadfb7efe43434739345e3c7c4b38d7eab9a18ef1a9dd89dcf5d52023cda6516"
+    },
+    "app/src/main/java/com/example/source/anilist/AniListClient.kt": {
+      "bytes": 6308,
+      "sha256": "5ac090bdc40d0cc9c6f23f4ba284aa99a99caf35dd69f9dfe99c921f624532ac"
+    },
+    "app/src/main/java/com/example/source/anilist/AniListModels.kt": {
+      "bytes": 4127,
+      "sha256": "4967ca8c644505ce1c8267870e692fdca1c8755ac25a58face95982cc0c84506"
+    },
+    "app/src/main/java/com/example/source/anilist/CjkFoldMap.kt": {
+      "bytes": 6208,
+      "sha256": "183a8d19e45bea56e8f0c4eee7b3fc0965d3e848ab38a5ed6fa465bcd7cde6b9"
+    },
+    "app/src/main/java/com/example/source/anilist/README.md": {
+      "bytes": 388,
+      "sha256": "8fc973189a9db207b56a32a6a1ca849210fe5077a2e556f5eed1d5db962418b3"
+    },
+    "app/src/main/java/com/example/source/anilist/TitleNormalizer.kt": {
+      "bytes": 2102,
+      "sha256": "9b467584625a5a83a63ff6680087783cc5c04467bc205ee63dd2e370546d5420"
+    },
+    "app/src/main/java/com/example/source/impl/AutoNovelSource.kt": {
+      "bytes": 13216,
+      "sha256": "81053ee4bc783cdc441465538a50082f6a8b7274111263f1905a52b3c8d2d7b2"
+    },
+    "app/src/main/java/com/example/source/impl/FanqieGateway.kt": {
+      "bytes": 10586,
+      "sha256": "44df5b4d09815a962af8dad15995efce06bac4b044f16306f6b4ffa812118e51"
+    },
+    "app/src/main/java/com/example/source/impl/GuestNovelTransport.kt": {
+      "bytes": 869,
+      "sha256": "37ac4a653aec2b78c19eb062920d947422395a47b9568c34374cee54f2e1c1bc"
+    },
+    "app/src/main/java/com/example/source/impl/HtmlNovelDiscovery.kt": {
+      "bytes": 7853,
+      "sha256": "dbe601dc47d84ddee4229bd1642fdcb7859f87db620dacf23c337cb2a1d39f6e"
+    },
+    "app/src/main/java/com/example/source/impl/IxdzsSource.kt": {
+      "bytes": 8240,
+      "sha256": "2ba9162bd2e5382caa52d5870f6bb122b736a94695c4b6f5a283b27012192087"
+    },
+    "app/src/main/java/com/example/source/impl/JsonBookSource.kt": {
+      "bytes": 34382,
+      "sha256": "9a2d2fd727c8f2892e8e7bf185eb965faad314eb80eb33c147cfb94d731b8cab"
+    },
+    "app/src/main/java/com/example/source/impl/MangaDexSource.kt": {
+      "bytes": 53424,
+      "sha256": "254506bcc3457a42756fe7e54e0fbb2de62034929d8572cfc246a152b59ec873"
+    },
+    "app/src/main/java/com/example/source/impl/MockBookSource.kt": {
+      "bytes": 3289,
+      "sha256": "230c7a4bfb7634891885618227e61b118644cd82d98a350284bd26abd3a1e2cc"
+    },
+    "app/src/main/java/com/example/source/impl/PublicNovelSource.kt": {
+      "bytes": 25342,
+      "sha256": "e8bb7b05eebeab31ecd77cf8cb1bfb8caa294558766606b1b204b84aff22dc17"
+    },
+    "app/src/main/java/com/example/source/impl/README.md": {
+      "bytes": 900,
+      "sha256": "c3ce515f175233d8c92b5e3a5761fb2ff319d26504d1816ab68bc98c94bc9e28"
+    },
+    "app/src/main/java/com/example/source/impl/Wenku8LibrarySource.kt": {
+      "bytes": 8038,
+      "sha256": "3c037f32478ea675e64203ab73717c2d21ad294468d1a04a110f645ac2c8ed21"
+    },
+    "app/src/main/java/com/example/source/impl/XbookcnSource.kt": {
+      "bytes": 18385,
+      "sha256": "19c1c36c6961e90f0b3341d0da6c89d3b1b3d5a6ffe8076e220ca2b0af9242d0"
+    },
+    "app/src/main/java/com/example/source/importer/README.md": {
+      "bytes": 326,
+      "sha256": "76b5f18b645ea7f22f971946c4714ca151b3b9ffaf16e8363aee1471a3e7658d"
+    },
+    "app/src/main/java/com/example/source/importer/SourceImporter.kt": {
+      "bytes": 33055,
+      "sha256": "4e03cda98bb37602f77911a55423954a5d396beb3ecc9ddb38985ec5a110e048"
+    },
+    "app/src/main/java/com/example/source/js/AimanhuaTls.kt": {
+      "bytes": 3210,
+      "sha256": "d43746394abab30efa928842368c9bc034fabbd65903be53009be12f5e5d3151"
+    },
+    "app/src/main/java/com/example/source/js/CfWebViewSolver.kt": {
+      "bytes": 13353,
+      "sha256": "de2d803d502b7587db5261a411e1500d96b2557c3937480a01f0c4a51a7d4a93"
+    },
+    "app/src/main/java/com/example/source/js/JsChapterOrder.kt": {
+      "bytes": 5674,
+      "sha256": "c58444b776d881428628c15c2658af1ca735d2cf9ee4a61fe97821ff3528f3c8"
+    },
+    "app/src/main/java/com/example/source/js/JsComicMetadata.kt": {
+      "bytes": 3730,
+      "sha256": "0db3ffa683b0b9d8af6d42fa0d60c2800eeb1cb544d430bb786774b2c290daca"
+    },
+    "app/src/main/java/com/example/source/js/JsComicSource.kt": {
+      "bytes": 48393,
+      "sha256": "dba2530ae44d45ad17fe0e522a0d0a5a615e91c563f8756f488b5fede0cab1a1"
+    },
+    "app/src/main/java/com/example/source/js/JsCookieJar.kt": {
+      "bytes": 5431,
+      "sha256": "adefb0a451971a04e136c300e6555d9670b03b8bc7160912efca96283956f46c"
+    },
+    "app/src/main/java/com/example/source/js/JsDiscoverAdapter.kt": {
+      "bytes": 5735,
+      "sha256": "999f2d26ef2fefaa8d9391aeb3ee4d42b7aebb562af8fa7ad05b75f7aa7e2c8e"
+    },
+    "app/src/main/java/com/example/source/js/JsHtmlStore.kt": {
+      "bytes": 6738,
+      "sha256": "f4ae157e30e9a31f86c325b177af4a85509fdfee056361267e4ae43f102d610d"
+    },
+    "app/src/main/java/com/example/source/js/JsImageProcessor.kt": {
+      "bytes": 1612,
+      "sha256": "fbcfd39675bf1ab5674ebabc734619fae8787da84ab604f4025c728eb4eb06aa"
+    },
+    "app/src/main/java/com/example/source/js/JsMessageHandler.kt": {
+      "bytes": 52344,
+      "sha256": "02a836899f2a080a87038d2b707ed690622ac292e58f9d711c74f907eaf49f32"
+    },
+    "app/src/main/java/com/example/source/js/JsSourceEngine.kt": {
+      "bytes": 32382,
+      "sha256": "907999fe036fc62426859b9389dbee2dd7a7ba70b79a85efd2eddbbac8b9a072"
+    },
+    "app/src/main/java/com/example/source/js/JsSourcePayload.kt": {
+      "bytes": 1382,
+      "sha256": "814cdf3c7890b4a964c8663e56bf3cf7c2385ac2503ec63f3ac431eb98d3cc0a"
+    },
+    "app/src/main/java/com/example/source/js/JsSourceProxy.kt": {
+      "bytes": 11202,
+      "sha256": "1eace617a00641da3acb291cd3c31690ab6d77aa668dc289e2ca849bfc05ea11"
+    },
+    "app/src/main/java/com/example/source/js/JsSourceRepo.kt": {
+      "bytes": 85438,
+      "sha256": "f19002e72d8879b81edf078f2405977b2cebd2592aea4f516d6a524695c461d2"
+    },
+    "app/src/main/java/com/example/source/js/JsUiDialogs.kt": {
+      "bytes": 7899,
+      "sha256": "fcad750297ce765fc0830422fda65475e7461772837142b20e8b537e3bd7f38c"
+    },
+    "app/src/main/java/com/example/source/js/MxsSpacerPages.kt": {
+      "bytes": 1168,
+      "sha256": "048b9c303b2faa27146068a01eeb47289c5f8ced4693e27531ef25dc156214a9"
+    },
+    "app/src/main/java/com/example/source/js/MyComicBrowserReader.kt": {
+      "bytes": 7561,
+      "sha256": "3ecf1c63d3753171592e2bf4ee1833d2b0969f90c4a8cd4d7ca5dfd263638d8d"
+    },
+    "app/src/main/java/com/example/source/js/QuickJsAsyncLifecycle.kt": {
+      "bytes": 1861,
+      "sha256": "3912ed6eb2489aab973ba0af0fec7d6b8c8e128c2a5bf3a0c3b9061b07684dbf"
+    },
+    "app/src/main/java/com/example/source/js/README.md": {
+      "bytes": 703,
+      "sha256": "efb8368dec747934787cc3f3105cd8e5615d224af2b04f170ccad636e2e8bc58"
+    },
+    "app/src/main/java/com/example/source/js/SourceDns.kt": {
+      "bytes": 2415,
+      "sha256": "57f4c99628ca18d9f254562f89ccaae28162e5e09af424ba993a76bee01d779d"
+    },
+    "app/src/main/java/com/example/source/keyword/KeywordCache.kt": {
+      "bytes": 4390,
+      "sha256": "7a3bdf3431d46c9fd0d75ee522d440014da4bcf963d3d9dd98ec11d792d7ec6c"
+    },
+    "app/src/main/java/com/example/source/keyword/KeywordDictionary.kt": {
+      "bytes": 9909,
+      "sha256": "b81be20ee7a1ec9daf0f1e9e4e840f33127becb6f3093a68784332a84c639403"
+    },
+    "app/src/main/java/com/example/source/keyword/KeywordExpansion.kt": {
+      "bytes": 7556,
+      "sha256": "bada35f21ebe8a51bc16605494ed25c5de072e18f9daecb01fb946323ece2e74"
+    },
+    "app/src/main/java/com/example/source/keyword/KeywordModels.kt": {
+      "bytes": 7771,
+      "sha256": "d9ea2e880464646b8b14464fcf117443eca7c2ba90a220f4fa6135b50d30cd54"
+    },
+    "app/src/main/java/com/example/source/keyword/KeywordRepository.kt": {
+      "bytes": 9262,
+      "sha256": "d9914debc12acd6fd0e169bd1b8660f72af3a8cf39b8df24683eac8a2e6be00c"
+    },
+    "app/src/main/java/com/example/source/keyword/LocalKeywordIndex.kt": {
+      "bytes": 1526,
+      "sha256": "b3da08a72c3d5dd1da20389874e68a8e210d131e0aa6d9bd7017d0087257dba4"
+    },
+    "app/src/main/java/com/example/source/keyword/OnlineKeywordLookup.kt": {
+      "bytes": 17410,
+      "sha256": "daf7b7b21c8de0547a78e059a5289ce60badb5b8d7eaf33e3c7e60a1e50f1214"
+    },
+    "app/src/main/java/com/example/source/keyword/README.md": {
+      "bytes": 2157,
+      "sha256": "a8a1612a865b9a86b995b11b065941953678e5ea6e48fee1d86642d2d045a972"
+    },
+    "app/src/main/java/com/example/source/parser/JsonPathResolver.kt": {
+      "bytes": 8660,
+      "sha256": "63f25c6b330e793360275f28c7f7c3c8a47dcde801468c71ed3252079109c1c8"
+    },
+    "app/src/main/java/com/example/source/parser/LegadoRule.kt": {
+      "bytes": 14502,
+      "sha256": "1654536881cd89c1e744732b264788a141ca61ef1dc05085acb83415c9919ed6"
+    },
+    "app/src/main/java/com/example/source/parser/README.md": {
+      "bytes": 379,
+      "sha256": "5ff463bb45bb864f254d7e10e2a9cf444c3e255acb423528ee61be4c2d05ae4e"
+    },
+    "app/src/main/java/com/example/source/parser/RuleBudget.kt": {
+      "bytes": 1763,
+      "sha256": "f0a6206c603999d67afa43ceb8eaf1efde59a6a92eb38b9a236e06b3c1b1312a"
+    },
+    "app/src/main/java/com/example/source/storage/README.md": {
+      "bytes": 362,
+      "sha256": "02ef52e133b290cd1ef5e31b73cf4985c9a4df03b8750caa3f2c338f2e1b9233"
+    },
+    "app/src/main/java/com/example/source/storage/SharedPreferencesSourceStorage.kt": {
+      "bytes": 4284,
+      "sha256": "043f6bc9bc4e3dfbcf58510290f835d5ab974b686ba643d19e9e649047bad756"
+    },
+    "app/src/main/java/com/example/source/storage/SourceStorage.kt": {
+      "bytes": 490,
+      "sha256": "c815dde11df0304dc83ebeb03f7a73169d2bbdeb596e9ad884ef57cfdb1fca5f"
+    },
+    "app/src/main/java/com/example/source/zlibrary/DiamWallInterceptor.kt": {
+      "bytes": 13148,
+      "sha256": "0c0cd507c6f77375d7315ce1be2cc936d8c9fc20b302826dd49ee6128eaf6e43"
+    },
+    "app/src/main/java/com/example/source/zlibrary/EncryptedCookieJar.kt": {
+      "bytes": 5222,
+      "sha256": "c22268b9543edc63632e9e41e43f0e8e8ea3ddbd30cef6ee33e160e8bcbd624d"
+    },
+    "app/src/main/java/com/example/source/zlibrary/EndpointHealthChecker.kt": {
+      "bytes": 10768,
+      "sha256": "f48c52fcecc35abd5aa421d3139f6c10e50240fae6818dc49f6cc1998e723ab8"
+    },
+    "app/src/main/java/com/example/source/zlibrary/README.md": {
+      "bytes": 1319,
+      "sha256": "ef52d72633e18a0088177c674b26179cf59f8bbd5f1e8410a7d3c309c3cf4d88"
+    },
+    "app/src/main/java/com/example/source/zlibrary/RemoteEndpointConfig.kt": {
+      "bytes": 418,
+      "sha256": "d456f6fa1af0c59e2dfd11035488d0356a1e1df333c8ed70346d7ae9d4e96ad5"
+    },
+    "app/src/main/java/com/example/source/zlibrary/RemoteEndpointProvider.kt": {
+      "bytes": 8648,
+      "sha256": "45ed3f293a162a1dc3cb06b25f24765fb6c65f69517920b90e13bf450e2ef6d7"
+    },
+    "app/src/main/java/com/example/source/zlibrary/ZLibraryAccessChecker.kt": {
+      "bytes": 1517,
+      "sha256": "1d9cd66088b8e210b9a674758756e8bc019711b7fb99d0b7ce32b0a0550799ae"
+    },
+    "app/src/main/java/com/example/source/zlibrary/ZLibraryBookReference.kt": {
+      "bytes": 2235,
+      "sha256": "30fa63783f46c7a77a48afa39fa05fb7fc7a783cfc935322fe2657bc47cdd187"
+    },
+    "app/src/main/java/com/example/source/zlibrary/ZLibraryCredentialStorage.kt": {
+      "bytes": 2873,
+      "sha256": "937bbeaa492da56f53acd3beb23bd6f2e07b8a8db288f3233b74a6451455523f"
+    },
+    "app/src/main/java/com/example/source/zlibrary/ZLibraryDomainResolver.kt": {
+      "bytes": 1555,
+      "sha256": "bce341db1e21664f8fa43c396369888786edc449ba888f9c38f54815dfc2c0e9"
+    },
+    "app/src/main/java/com/example/source/zlibrary/ZLibraryEapiClient.kt": {
+      "bytes": 11965,
+      "sha256": "ef3bc7dfc020ddbe25ea309c95775ba4e0264d9fd18b587e9467103236531eda"
+    },
+    "app/src/main/java/com/example/source/zlibrary/ZLibraryEndpointProvider.kt": {
+      "bytes": 12053,
+      "sha256": "f9fb744d876f9894d6d10844792f855b7589c3e31a3f13a852c5fa955373ba3a"
+    },
+    "app/src/main/java/com/example/source/zlibrary/ZLibraryNodeSelection.kt": {
+      "bytes": 1107,
+      "sha256": "dff7a07999d6c70d9fb541a3936ed5b985be9b2ad659b3f7085d16adf7b7e549"
+    },
+    "app/src/main/java/com/example/source/zlibrary/ZLibraryParser.kt": {
+      "bytes": 1721,
+      "sha256": "65de38001c309c9bf7e84290060e2e57a31f78b17ec1bba5d4d3e31903531ab7"
+    },
+    "app/src/main/java/com/example/source/zlibrary/ZLibrarySource.kt": {
+      "bytes": 44538,
+      "sha256": "06d1192598909040b1391c6ca98e004990a8e75daee627fafa925076dcbb8220"
+    },
+    "app/src/main/java/com/example/source/zlibrary/ZLibraryWebViewHelper.kt": {
+      "bytes": 11896,
+      "sha256": "3b5558def9c2460f4858c5d497a9d9f3d2a1981ef89b5f5977dea24e187f1579"
+    },
+    "app/src/main/java/com/example/source/zlibrary/network/README.md": {
+      "bytes": 445,
+      "sha256": "aec8fea6ddcb4c7e3744f32f7d9c4b6e0ede8adf0bd44f340517384f868d316b"
+    },
+    "app/src/main/java/com/example/source/zlibrary/network/SystemProxyResolver.kt": {
+      "bytes": 1882,
+      "sha256": "91f1e96cb481280be1ac460dfbb10317fb924a93468014b94887880e66f821eb"
+    },
+    "app/src/main/java/com/example/source/zlibrary/network/ZLibraryDns.kt": {
+      "bytes": 15870,
+      "sha256": "126866d54bc6073dc714bc44bb1fe9e1753c51d46e8a2b5a84f7992fb926ae15"
+    },
+    "app/src/main/java/com/example/source/zlibrary/network/ZLibraryHttpClient.kt": {
+      "bytes": 7897,
+      "sha256": "dc09422afb4eeb6bb17a721504f3d2f3aea5ca9653ca5ba147a870a2b92a4caf"
+    },
+    "app/src/main/java/com/example/source/zlibrary/network/ZLibraryNetworkLogger.kt": {
+      "bytes": 1046,
+      "sha256": "70929ebafe0fd8b57c02f2e274afd932d5085f8a99f5442c52a85d7187d229fc"
+    },
+    "app/src/main/java/com/example/source/zlibrary/network/ZLibrarySessionManager.kt": {
+      "bytes": 2260,
+      "sha256": "ea6aaf4673b3f624ff04cfe766d04cd7e2da5605992dcb50e1f5be38b4c7b1a7"
+    },
+    "app/src/main/java/com/example/source/zlibrary/parser/BookcardLayoutParser.kt": {
+      "bytes": 6775,
+      "sha256": "73acad56032645ed8cd160f0965b6b1ead6a950bb4d08763799e74128bb5fd6d"
+    },
+    "app/src/main/java/com/example/source/zlibrary/parser/CoverExtractor.kt": {
+      "bytes": 2741,
+      "sha256": "663093c146caa1ca7879e5379da1f305838477cf3fdb5db4de66e2962c8d5074"
+    },
+    "app/src/main/java/com/example/source/zlibrary/parser/DesktopLayoutParser.kt": {
+      "bytes": 4772,
+      "sha256": "ca88bcdd0193a5229e5c9005a35e2a8d8a0f256e9cfbb3138752c8deddfc70cb"
+    },
+    "app/src/main/java/com/example/source/zlibrary/parser/GenericFallbackParser.kt": {
+      "bytes": 6963,
+      "sha256": "52f06f628d5a6233ceb8940f5144d5169995f696b3d8fb7768e23346533ba8c5"
+    },
+    "app/src/main/java/com/example/source/zlibrary/parser/LegacyLayoutParser.kt": {
+      "bytes": 3996,
+      "sha256": "96db9bee1ff37a3e55c72127410ff09aebd70e1589da8cf0aa42bd72fa70b4fd"
+    },
+    "app/src/main/java/com/example/source/zlibrary/parser/MobileLayoutParser.kt": {
+      "bytes": 4413,
+      "sha256": "6aa8cd60ae5f70ab4f82adaa6f2475edd3f0cfadf9763d66d11e30d05a0f6acd"
+    },
+    "app/src/main/java/com/example/source/zlibrary/parser/README.md": {
+      "bytes": 548,
+      "sha256": "b232bb54e4d3a104b3f722266a27986e73c3a3b500c67306300073dbd7f83d91"
+    },
+    "app/src/main/java/com/example/source/zlibrary/parser/ZLibraryLayoutParser.kt": {
+      "bytes": 959,
+      "sha256": "4ba8f2651e9aa26e8d600420b4b3e8bf1733ae91192cac8f9b603b425e0c6907"
+    },
+    "app/src/main/java/com/example/source/zlibrary/parser/ZLibraryParserManager.kt": {
+      "bytes": 3149,
+      "sha256": "c22fc70f33bc1f6865d138e575949666321d609c1c35a8f509b023d927d8fd6b"
+    },
+    "app/src/main/java/com/example/transfer/ArchiveImporter.kt": {
+      "bytes": 20759,
+      "sha256": "4c47674cd330ccb77fe851a47de5bea821b072caed9b53e46055cb46915e8822"
+    },
+    "app/src/main/java/com/example/transfer/ArchiveRows.kt": {
+      "bytes": 4037,
+      "sha256": "7b888bd1244d6077f174b86776b584cf440a84982cab2f47984578228657b889"
+    },
+    "app/src/main/java/com/example/transfer/BookBodyFingerprint.kt": {
+      "bytes": 3493,
+      "sha256": "b2c65253bdc50ff6558781c82e0820ee7551bca04489fd04c3831fdb16f0654e"
+    },
+    "app/src/main/java/com/example/transfer/ImportJournal.kt": {
+      "bytes": 4581,
+      "sha256": "e981ec1d40513696be114950c243e43c1c242827532c46e275fc7e5414cfb986"
+    },
+    "app/src/main/java/com/example/transfer/IncomingChapterIndex.kt": {
+      "bytes": 4378,
+      "sha256": "c08128a55b535539c8624bccdef5050aa4f2c07be14f0650aa71aacef880b120"
+    },
+    "app/src/main/java/com/example/transfer/NearbyConnector.kt": {
+      "bytes": 4546,
+      "sha256": "1a2a08a62ba3655a350b32918b2dbed7175f69a08e62ab84164e87eb8cb9af21"
+    },
+    "app/src/main/java/com/example/transfer/NearbyHandshake.kt": {
+      "bytes": 1689,
+      "sha256": "1dd3671472fc24f5a883a4c5e029029f7e02fd6582e38437cd8fc34345d7a96a"
+    },
+    "app/src/main/java/com/example/transfer/PortableArchive.kt": {
+      "bytes": 25990,
+      "sha256": "c8c84d7f8211c9b8e6be86c4efc3c264b978c9136347b8b14bbaad90ae6f2939"
+    },
+    "app/src/main/java/com/example/transfer/PortableSettings.kt": {
+      "bytes": 10103,
+      "sha256": "b1fd4e45401a14bd28068a05bdae41609dece7d00890e27ebbadfdffa67a3d62"
+    },
+    "app/src/main/java/com/example/transfer/TransferConnection.kt": {
+      "bytes": 4413,
+      "sha256": "9b1d7a19d616c40a8a4277eb32e21298772477752e5eb12e80ccff295768a48d"
+    },
+    "app/src/main/java/com/example/transfer/TransferDiscovery.kt": {
+      "bytes": 16841,
+      "sha256": "5381b7c4b034aa01302e52066b70fbc91c38cf8828d4f8603d0ff0c40c86ef51"
+    },
+    "app/src/main/java/com/example/transfer/TransferManager.kt": {
+      "bytes": 41130,
+      "sha256": "0b3c282ca9656f7e9dd37c7faf92e1d691381b42eeb40791eee7afa038f4958f"
+    },
+    "app/src/main/java/com/example/transfer/TransferModels.kt": {
+      "bytes": 4677,
+      "sha256": "a1844cc29a870eefee61d6849936dddaa1d5df2dad23b0e2337b6d1de27ca14c"
+    },
+    "app/src/main/java/com/example/transfer/TransferRoutes.kt": {
+      "bytes": 975,
+      "sha256": "4d5a2536183b4710ce1a7f3f5eb6a3a58494f0c3ee8d93763598fabaa4b8ae32"
+    },
+    "app/src/main/java/com/example/transfer/TransferScreen.kt": {
+      "bytes": 33612,
+      "sha256": "1c22dfd47997d159050abd42fddce17c0d1512b875498c9809641f7d8ac6cd59"
+    },
+    "app/src/main/java/com/example/transfer/TransferService.kt": {
+      "bytes": 3109,
+      "sha256": "3a947d4333a2a0c5424e87a93615d086eeb7df7b912c3d00aeaa4334c81658c0"
+    },
+    "app/src/main/java/com/example/transfer/TransferTls.kt": {
+      "bytes": 5062,
+      "sha256": "1433a9a3977acf9600a0cdda1587437bf790743aae1100dee342a5cf389b883f"
+    },
+    "app/src/main/java/com/example/transfer/TransferWire.kt": {
+      "bytes": 1270,
+      "sha256": "b81098892b1ed5383762a1dcb1a9def78da4b9cde3ba17a9bdb3c99e34615461"
+    },
+    "app/src/main/java/com/example/ui/AppBackground.kt": {
+      "bytes": 3568,
+      "sha256": "1a70394c99c221c21f0c342603e62ddaa16996beaac2b8b21483b76d9e33292e"
+    },
+    "app/src/main/java/com/example/ui/AppUpdateDialog.kt": {
+      "bytes": 10543,
+      "sha256": "c42b13f609173e92aa5bea72c2611654d713f9e9fd02fe8223df31f25842120f"
+    },
+    "app/src/main/java/com/example/ui/CacheManagementScreen.kt": {
+      "bytes": 51073,
+      "sha256": "ff7df3ac704c20c6895268f387c6648daaaa574b7604bb212e3ea0dda4da94cd"
+    },
+    "app/src/main/java/com/example/ui/ComicChaptersScreen.kt": {
+      "bytes": 76323,
+      "sha256": "2ef5a1eec4df14802342891e38342026d4c5c168945dd1471ec535f441dce08e"
+    },
+    "app/src/main/java/com/example/ui/ComicMetadataUi.kt": {
+      "bytes": 4633,
+      "sha256": "4f339ad493f81d14e5aa94251786474b491fb1612f2103a2dc124e433716b66a"
+    },
+    "app/src/main/java/com/example/ui/ComicReaderScreen.kt": {
+      "bytes": 5767,
+      "sha256": "ca836f00cb3cf82e29e648df709f15310649a0a9e2dca5bd1bbfa61011591a5a"
+    },
+    "app/src/main/java/com/example/ui/HomeScreen.kt": {
+      "bytes": 176905,
+      "sha256": "48f996d2de19a4bfa8310e0fbb82d44542f496fbb1e067f7fa34697b842a9cda"
+    },
+    "app/src/main/java/com/example/ui/NovelReaderScreen.kt": {
+      "bytes": 10538,
+      "sha256": "9c584a5ad046bc7b50940831842dd7998e8d8079ce2d26a887a36c33137fafaf"
+    },
+    "app/src/main/java/com/example/ui/OnboardingScreen.kt": {
+      "bytes": 10922,
+      "sha256": "d02a404b8ebd684b115ac92d32ffa9149c2ecc6a6324a92c81d14c02254367c0"
+    },
+    "app/src/main/java/com/example/ui/OnlineComicReaderScreen.kt": {
+      "bytes": 22353,
+      "sha256": "2fb84df5ee510eae93f3268255d79a5d6d1fb8ee676e4c8defd46dd9cbfa83b9"
+    },
+    "app/src/main/java/com/example/ui/README.md": {
+      "bytes": 495,
+      "sha256": "9688816581e8d6754952f4e6d8a366fa1ed548ef958d9d580baac4fda0da750c"
+    },
+    "app/src/main/java/com/example/ui/ReaderPagination.kt": {
+      "bytes": 16240,
+      "sha256": "eda201aa25366320b08b07865d806a6db90ea5165377c9b02995637194d022c2"
+    },
+    "app/src/main/java/com/example/ui/ReaderScreen.kt": {
+      "bytes": 199569,
+      "sha256": "85b84d930445009ec6453e56f9b63edca94138d203a69b438ca5698ca55d59f3"
+    },
+    "app/src/main/java/com/example/ui/ReadingTimerEffect.kt": {
+      "bytes": 4779,
+      "sha256": "043d99886dcbfea24050ab92c9787b4319547a6fa487b39fd5cfe0c8d56b0893"
+    },
+    "app/src/main/java/com/example/ui/SettingsTabScreen.kt": {
+      "bytes": 89417,
+      "sha256": "0fdeb851a83b0740874b09e5f6c6106a8feaaebaa18617690a654dc22b6e110e"
+    },
+    "app/src/main/java/com/example/ui/SplashScreen.kt": {
+      "bytes": 12219,
+      "sha256": "182bde1d04711c66ec19acd54268bfb845d425a54099b11d4739d267dbfa8823"
+    },
+    "app/src/main/java/com/example/ui/StatisticsScreen.kt": {
+      "bytes": 41194,
+      "sha256": "e1dcbe545d7fd5a2242e0d2f0be9d8b041ee7a586b4b528b3425e430ebcbce3f"
+    },
+    "app/src/main/java/com/example/ui/StorageDetailDialog.kt": {
+      "bytes": 24395,
+      "sha256": "06e849ef0d141ebc0272635347819932da7367cf232ef0e6995410547308598c"
+    },
+    "app/src/main/java/com/example/ui/TranslationCacheDetail.kt": {
+      "bytes": 14582,
+      "sha256": "45400cbf7618cb05f29b310de56c3e99c001a610d4128a55555f7b755dbffde8"
+    },
+    "app/src/main/java/com/example/ui/adaptive/AdaptiveSpec.kt": {
+      "bytes": 8004,
+      "sha256": "844144155dce11105ebe72c6d4871cbb456d47a78903e82290cf9264719d1c72"
+    },
+    "app/src/main/java/com/example/ui/adaptive/README.md": {
+      "bytes": 338,
+      "sha256": "f19a1c4d1d5f0f8c140bee51e522e92cdfdc573154f14044d13e276dc4c6bede"
+    },
+    "app/src/main/java/com/example/ui/comic/Anime4KCnn.kt": {
+      "bytes": 13471,
+      "sha256": "42f8c510b46f99000e46877d93b49de8f248886db47583db1f1eb25f9d60bd23"
+    },
+    "app/src/main/java/com/example/ui/comic/Anime4KCnnWeights.kt": {
+      "bytes": 33883,
+      "sha256": "0e220002a8fc71728f2be0dfd7dba763244b0375afcdb7857d69773b9f2825b0"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicChapterEdgeGesture.kt": {
+      "bytes": 5070,
+      "sha256": "edf73ff452ca0bb42525eacfb53dac538d66c7b2892e2f4f3ce60160ea61671b"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicChapterResume.kt": {
+      "bytes": 1054,
+      "sha256": "a377fabc5bc8f494d57b52caf77dc87056b888ce482758fd285bf7aa7e05a7c0"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicEdgeUpscaler.kt": {
+      "bytes": 11851,
+      "sha256": "ca21346c8bdef274dc333d19c6e4420105a85ead675e67151ac23ce44a0df1a0"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicFrozenGlassBackdrop.kt": {
+      "bytes": 5230,
+      "sha256": "8eea8f52a67878116a161227ef2e58fbe999569e14e511d236fd5854795a993f"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicHarismCurl.kt": {
+      "bytes": 90005,
+      "sha256": "12a060adbf121fd6cb6ec7ec95c8f2ac3a88abc7b66de64ac3c9cdd45c34c498"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicImagePipeline.kt": {
+      "bytes": 56261,
+      "sha256": "5f5719a8da5151afa94c2d2063cd76f07b759ffcb8a961f23e49f5e34e79dadb"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicLoadSupport.kt": {
+      "bytes": 2516,
+      "sha256": "8456e39d1454bf9ba6173ac62df35aa39568889f30646300b92e9bd358001c47"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicNeuralBackend.kt": {
+      "bytes": 3483,
+      "sha256": "27570e52abeb6a21bead4ca27a6089a5fc0ac2fac85ff2ca2f5b61bcab30ff37"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicPageLayout.kt": {
+      "bytes": 11422,
+      "sha256": "81d7c7dab5ea9d0de0d56348c4fdf4b9142d696f177e8917e822f5021200ca58"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicPageLoader.kt": {
+      "bytes": 58237,
+      "sha256": "036838b38f6ba78b078c05db5c5e9b05e94ddb2fd07bce16a46e77f100124a4e"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicPanelDesign.kt": {
+      "bytes": 13518,
+      "sha256": "5a948ed0f877bf109c0fd32fe73e94afe69a827e363a73fbd121caf115460865"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicProcessedDiskCache.kt": {
+      "bytes": 5136,
+      "sha256": "e8c0842ed373f7c014e3b708c810708abb1ce7ba319d3995db7e79db5f513fb3"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicReaderBackground.kt": {
+      "bytes": 7905,
+      "sha256": "ee0560e70051e158dbc6934643c45ecac68b658354bcafeb0eb6f837bbaf4d52"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicReaderChrome.kt": {
+      "bytes": 39362,
+      "sha256": "7a1906d3280a896ecf141a50cd57e736af51e72d5dd48a84e8f73f60a165a38c"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicReaderConfig.kt": {
+      "bytes": 22095,
+      "sha256": "c5550c2c9be72c24ef597378815ab5b92bba4f26141323bbde820dcdf16715fe"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicReaderCore.kt": {
+      "bytes": 130752,
+      "sha256": "01bf5b69f7f451e80c5aa81cd5926dafb94894abf94f29387bcc3bd91d4edd9e"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicReaderSheets.kt": {
+      "bytes": 104923,
+      "sha256": "f9d16794509d752a1d99d46a7ed13e5f4c3b2fa982293b4f6a1add0e0ff9d0dc"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicSceneEngine.kt": {
+      "bytes": 11709,
+      "sha256": "fe263607b06614c6bc304422d68bffa7a7ebb23fe2a521a7f445e14eb3e7fab3"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicSceneFx.kt": {
+      "bytes": 28650,
+      "sha256": "4604752e70395e50f29d58e438a4a8cc4bb568622f14cd07f2fd85d457fa1053"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicScrollMetrics.kt": {
+      "bytes": 2258,
+      "sha256": "9fb7580060a5ae514c65e01988e00211a3de87682b78306f7df6021e8b5ae0a6"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicSettingsStore.kt": {
+      "bytes": 14413,
+      "sha256": "f0dcd54928842a0ef91c5e31bf40259fa6eb676e1390b6fdbdac6cda723195d3"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicStreamPreview.kt": {
+      "bytes": 5278,
+      "sha256": "1d6beca3c9b78e5ca4b6df6136b08abd8dba5825a7a7aaabaaff0deeba4bfb58"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicTurnGesture.kt": {
+      "bytes": 1324,
+      "sha256": "7ce256c511da4fec51677b5e6fb7d1ff5639af88a13b0050b65a8c137e09226d"
+    },
+    "app/src/main/java/com/example/ui/comic/ComicZoomGesture.kt": {
+      "bytes": 42728,
+      "sha256": "3feed881ee277ebf54b4ea6149f79580db481ad68939e03326ef0f3486c07cdf"
+    },
+    "app/src/main/java/com/example/ui/comic/MangaJaNai.kt": {
+      "bytes": 13786,
+      "sha256": "fc50f0ca5fb8949f0db03a2a031a9d18d5531feed8399e40905554737c62bd85"
+    },
+    "app/src/main/java/com/example/ui/comic/MangaJaNaiFull.kt": {
+      "bytes": 15325,
+      "sha256": "96b4cc2e03ebfd8a346617ed2a8cc70adfec090c6923116604e73104d7e97c79"
+    },
+    "app/src/main/java/com/example/ui/comic/MangaJaNaiFullRuntime.kt": {
+      "bytes": 8599,
+      "sha256": "6a05b1ee5f157d936b7532a412ec0293ec2c1a06022e3995078f2167d90feeac"
+    },
+    "app/src/main/java/com/example/ui/comic/MangaJaNaiGpu.kt": {
+      "bytes": 475,
+      "sha256": "98599b8a185bdc215eed571a0a37f9dd34dc657b22a794d109b9cf799526e5f2"
+    },
+    "app/src/main/java/com/example/ui/comic/MangaJaNaiMobile.kt": {
+      "bytes": 3639,
+      "sha256": "ca11e8be7f86c21047a3c0a05d69bd43d554d7f92d3042d46609a09bc1888511"
+    },
+    "app/src/main/java/com/example/ui/comic/MangaJaNaiRuntime.kt": {
+      "bytes": 9305,
+      "sha256": "2a06ee9d7314278180354ddb75b44bce76e63d05457844b9fc9a066907f2df1a"
+    },
+    "app/src/main/java/com/example/ui/comic/MangaJaNaiTiles.kt": {
+      "bytes": 2704,
+      "sha256": "6de99f9e46d9c99192e0f06279d8d3bf1ae4f7c0c4c732afa33589a1032a58ee"
+    },
+    "app/src/main/java/com/example/ui/comic/README.md": {
+      "bytes": 622,
+      "sha256": "25409462baf597c76c272cf27818f39b520ce89867c089a20cf00d78222a5c95"
+    },
+    "app/src/main/java/com/example/ui/components/AcrylicDialog.kt": {
+      "bytes": 9590,
+      "sha256": "50fe28c44562bd17ce3864e557991e42ba42300e10f12e1765d0e0693632f962"
+    },
+    "app/src/main/java/com/example/ui/components/AppBottomTabBar.kt": {
+      "bytes": 25659,
+      "sha256": "8f9fe025d356b6ed558fa86f074e1356cef8a7c1dfc564b2980b7591de5bcc1e"
+    },
+    "app/src/main/java/com/example/ui/components/AppButton.kt": {
+      "bytes": 16495,
+      "sha256": "abb0c1ea26725a77c2017f642735766b38bc059a94def8cdb5ef04096b6cb51f"
+    },
+    "app/src/main/java/com/example/ui/components/AppErrorSnackbar.kt": {
+      "bytes": 7044,
+      "sha256": "e4fff1503c6856854124de82ee24de14fa6930c495e04a2a7f2f4012adcd4a43"
+    },
+    "app/src/main/java/com/example/ui/components/AppSnackbar.kt": {
+      "bytes": 6699,
+      "sha256": "1f97750ca488f0693291fa671c4172e4a3a05d32a75eb98060080241d41dd802"
+    },
+    "app/src/main/java/com/example/ui/components/AppSwitch.kt": {
+      "bytes": 2535,
+      "sha256": "500614e6547db64335e02e2d08400774ad62543d2f5809156f20b1653703f80c"
+    },
+    "app/src/main/java/com/example/ui/components/AppToast.kt": {
+      "bytes": 4830,
+      "sha256": "818052987887f2e3674128912a621bd35b62b0f1487ba05a10b96f47859e98aa"
+    },
+    "app/src/main/java/com/example/ui/components/CardTweaks.kt": {
+      "bytes": 2516,
+      "sha256": "641b554b1512ffe5e02e8a9ed11669badc5fc11f1b36e7e26428e4143d4f472a"
+    },
+    "app/src/main/java/com/example/ui/components/CatalogCoverMotion.kt": {
+      "bytes": 1009,
+      "sha256": "37c1285cb73aa6b6afb0ec1d1929c2a5430f1b84d61979bf899cc455c7c13c50"
+    },
+    "app/src/main/java/com/example/ui/components/ChasingDots.kt": {
+      "bytes": 6716,
+      "sha256": "9c738dd61729c3a17c69e879c1a511bc6656682952dc89f746445ed9dfc9b1dd"
+    },
+    "app/src/main/java/com/example/ui/components/ChasingDotsTransition.kt": {
+      "bytes": 2131,
+      "sha256": "a95758425ff1488cc53d945837e3d625d6070fe791ca1aef0104b9d3d496b5ea"
+    },
+    "app/src/main/java/com/example/ui/components/ColorMorph.kt": {
+      "bytes": 7345,
+      "sha256": "d25f124e9b9c933fb0fe9ac0014301d915fa440c51e02971a5c0f4dc43c0210e"
+    },
+    "app/src/main/java/com/example/ui/components/CompletionGlyph.kt": {
+      "bytes": 1542,
+      "sha256": "8510f2ada432705450e2d8cf6838b758be89eb19dd7b8cf1448fd688def75ef3"
+    },
+    "app/src/main/java/com/example/ui/components/CustomButtons.kt": {
+      "bytes": 2377,
+      "sha256": "4437e60fea79be32694844f010ef2dc2186668a501cd30ebed5aa4b49f2757c4"
+    },
+    "app/src/main/java/com/example/ui/components/GlassCard.kt": {
+      "bytes": 56907,
+      "sha256": "deea00b4b33bc26a70e8b75b62a64f21dc95787b4f4afcc21cc00f5974d3a152"
+    },
+    "app/src/main/java/com/example/ui/components/GlassQuality.kt": {
+      "bytes": 1673,
+      "sha256": "e38e1af03494acf8325fb972b5950bbf4676d0ae442e08ce965756321f5250ee"
+    },
+    "app/src/main/java/com/example/ui/components/GradientActionButton.kt": {
+      "bytes": 1024,
+      "sha256": "8af304167fe5fe8d21629abb8082f669f4f6f818755a078dffd8da0f6935da81"
+    },
+    "app/src/main/java/com/example/ui/components/HazeProgress.kt": {
+      "bytes": 2704,
+      "sha256": "fdcca386900ddfb83417ab2a41f70800709e4f44001451da2d6415f146b1b3a2"
+    },
+    "app/src/main/java/com/example/ui/components/LiquidBlob.kt": {
+      "bytes": 2550,
+      "sha256": "a5db3ddfdaeb707effa0908a7803699626df64452efaf86d9b10bb318b70f484"
+    },
+    "app/src/main/java/com/example/ui/components/LiquidGlass.kt": {
+      "bytes": 19770,
+      "sha256": "c60165055c3dcb0285449a5ced591e818ffc3fc11934cc43b5bfe023c18d36cf"
+    },
+    "app/src/main/java/com/example/ui/components/LiquidGlassControls.kt": {
+      "bytes": 3975,
+      "sha256": "323659f6e24bf1c54b9c39257eb3e26b85cb47220da9054ea2ac88d15c3ef92c"
+    },
+    "app/src/main/java/com/example/ui/components/LiquidSegmentPhysics.kt": {
+      "bytes": 5881,
+      "sha256": "f116c6ba216bf3390dfd622798d6b2915e9c10436a5f3e430e2214c4b173e5e5"
+    },
+    "app/src/main/java/com/example/ui/components/LiquidSegmentShader.kt": {
+      "bytes": 5452,
+      "sha256": "4a16bb7021d4cfb02f893a518ea2fb202fbf46e3fddcaee038cf7bb6e9ee5396"
+    },
+    "app/src/main/java/com/example/ui/components/LiquidSegmentView.kt": {
+      "bytes": 16841,
+      "sha256": "85858f9e2064d762b09feec126845a1a4f5dcfeafe56c69e9a08879a5c550f7a"
+    },
+    "app/src/main/java/com/example/ui/components/LiquidSegmentedSelector.kt": {
+      "bytes": 7618,
+      "sha256": "5d0bd50d3768faaa60efb62e6a60951eda0fff8c11216dc3a4258be06dff2c6a"
+    },
+    "app/src/main/java/com/example/ui/components/LiquidSlider.kt": {
+      "bytes": 23053,
+      "sha256": "42dc49cf9edf761d8a4efdc243c5380c32c7902fb60f75195f40303d72060977"
+    },
+    "app/src/main/java/com/example/ui/components/MascotEmptyState.kt": {
+      "bytes": 7845,
+      "sha256": "080ee03c295c15b4269adf694920e9de76fb80e685e0e9541aee2f7e07b892cd"
+    },
+    "app/src/main/java/com/example/ui/components/MaxCardEffects.kt": {
+      "bytes": 5310,
+      "sha256": "678eb101ec987b6762619867d697dca0d8943edb08b6bc47566e6f20b6858139"
+    },
+    "app/src/main/java/com/example/ui/components/MaxFx.kt": {
+      "bytes": 9565,
+      "sha256": "792e0809d4e6821429ae34e4000c4e7616c03df80f43ce698ef1d80800764c13"
+    },
+    "app/src/main/java/com/example/ui/components/OverlayAnimations.kt": {
+      "bytes": 2098,
+      "sha256": "187124d879945fcf1af8f12b1c311fc56f65f5dcc28f539bd3a10558cf982d0c"
+    },
+    "app/src/main/java/com/example/ui/components/OverlayTouchShield.kt": {
+      "bytes": 709,
+      "sha256": "bf40bdebda52f8f12269e40d959122fda1c0edd2364004010b50967f6612431b"
+    },
+    "app/src/main/java/com/example/ui/components/PlayPauseMorph.kt": {
+      "bytes": 4559,
+      "sha256": "d013d5c15e776c7e00b5d670e10f79076b42b6cb45cf42f136d63355078e2101"
+    },
+    "app/src/main/java/com/example/ui/components/ProducedState.kt": {
+      "bytes": 459,
+      "sha256": "76d06373b0e5254a74f267a2ff483940f8fc952a94ae6a92e6f6103b7aac698b"
+    },
+    "app/src/main/java/com/example/ui/components/PullOutButtons.kt": {
+      "bytes": 4383,
+      "sha256": "18bd0fd81d2a9ac9ab7ef6c553a57f4521d1465fee1e075b05d40b1e2b9a9515"
+    },
+    "app/src/main/java/com/example/ui/components/PullOutHosts.kt": {
+      "bytes": 27923,
+      "sha256": "a6dd8f04e2437c57b786a456aa732f63c88d983722d3ef925e09c9190f26b97f"
+    },
+    "app/src/main/java/com/example/ui/components/PullOutMotion.kt": {
+      "bytes": 15859,
+      "sha256": "526335a868014cc2773f8c2d7e5ae070bceb98bd44e9ecc3b915ecda4069ffcf"
+    },
+    "app/src/main/java/com/example/ui/components/PullOutRender.kt": {
+      "bytes": 11645,
+      "sha256": "797e81ed43ee88bed7e39aebcbe9fd0e810e1308caa675d950e04364b30b349c"
+    },
+    "app/src/main/java/com/example/ui/components/README.md": {
+      "bytes": 2200,
+      "sha256": "5fdf42b5a057afbea07333cbd40ab300748d08f06c2a5c2f363240aa7831120f"
+    },
+    "app/src/main/java/com/example/ui/components/ReadingCalendarCard.kt": {
+      "bytes": 24578,
+      "sha256": "89675c66686bada403c881ca1f900c1156629dd63e76e414f2758edfe20154ec"
+    },
+    "app/src/main/java/com/example/ui/components/ReadingRecordCover.kt": {
+      "bytes": 1197,
+      "sha256": "8c6f03c292da5ac8bdbb81e90f7586a398c39f083d062d936cdd9162edca8549"
+    },
+    "app/src/main/java/com/example/ui/components/ReadingStats.kt": {
+      "bytes": 7073,
+      "sha256": "f29bfb88cd6c715c701075c5e2fc2bbe02d149e3fb754a384d4e0dcf6ff217bd"
+    },
+    "app/src/main/java/com/example/ui/components/ReadingTrendCard.kt": {
+      "bytes": 17064,
+      "sha256": "5a64746a4690e9c7bf29070f951622d82ccf49864b866dccb23d775a7f139545"
+    },
+    "app/src/main/java/com/example/ui/components/ReleaseHistoryDialog.kt": {
+      "bytes": 6331,
+      "sha256": "750341d1fd2834a392c3dac095151efdb21983e314ea553dbd5f2a2a5ee4d630"
+    },
+    "app/src/main/java/com/example/ui/components/ScrollTilt.kt": {
+      "bytes": 9509,
+      "sha256": "d303ecec0e34a189be06afae69e54f368a56c583e43c483bc42f46301eb53247"
+    },
+    "app/src/main/java/com/example/ui/components/SettingsControls.kt": {
+      "bytes": 19672,
+      "sha256": "d9037179bc662848a00a2a6d4f00ba02caafcfe3aed916ba900b6604c98a76d0"
+    },
+    "app/src/main/java/com/example/ui/components/ShimmerBox.kt": {
+      "bytes": 2470,
+      "sha256": "9fe43fe439f4488dfb61977f731124d9b50ed0c6eb4091bdbfdf53d657551518"
+    },
+    "app/src/main/java/com/example/ui/components/SourceAvatar.kt": {
+      "bytes": 2010,
+      "sha256": "a6638673898e0a557effffbe797a0dcf55087070ffa1490a2cdbd7f114e62689"
+    },
+    "app/src/main/java/com/example/ui/components/StarryNightBackground.kt": {
+      "bytes": 2792,
+      "sha256": "18dbb5094a851ae2105476848f25749e7e841a8509794d7b3d6d41006e802b83"
+    },
+    "app/src/main/java/com/example/ui/components/TabScreenHeader.kt": {
+      "bytes": 13792,
+      "sha256": "8c3e33865c8c8a54fa4c706714be50275cd5c53fba073547cd585769ef564644"
+    },
+    "app/src/main/java/com/example/ui/components/WeeklyReadingChart.kt": {
+      "bytes": 29800,
+      "sha256": "e93dfd99eff758bb33dc10f7062b9175bf69c5162175de2defd659cd7769d276"
+    },
+    "app/src/main/java/com/example/ui/design/DesignTokens.kt": {
+      "bytes": 4544,
+      "sha256": "f1d282ec390db6b1980f518cb1e948c58cfc977f89d6aaccbfb1cf9cc5c6cc6c"
+    },
+    "app/src/main/java/com/example/ui/design/README.md": {
+      "bytes": 775,
+      "sha256": "d1d7b80efb6920fbeb53301fff248f172ed7a01a85f7a27954aa37e1c6be8352"
+    },
+    "app/src/main/java/com/example/ui/favorite/ChapterStatusRow.kt": {
+      "bytes": 21950,
+      "sha256": "59ded32f5562c99bb49f75b1cbc3ae525de7f0ba44c96b1f69628e1edd1c96e8"
+    },
+    "app/src/main/java/com/example/ui/favorite/ComicDetailActions.kt": {
+      "bytes": 4631,
+      "sha256": "341ba71e00f932fc93f4a026476e46071c8b9c361f5970f835f4dffdb78b415b"
+    },
+    "app/src/main/java/com/example/ui/favorite/DuplicateComicSheet.kt": {
+      "bytes": 8020,
+      "sha256": "57b5a8577d1f8c44ef4965ddd3de0a73fadc195f50bca0de1559b4bd4161396e"
+    },
+    "app/src/main/java/com/example/ui/favorite/FavoriteCover.kt": {
+      "bytes": 4058,
+      "sha256": "b66db3e82a2f35b9bd2081677c1c6fe5783dbb159a85ace139c6683e1b1fca34"
+    },
+    "app/src/main/java/com/example/ui/favorite/FavoriteHeart.kt": {
+      "bytes": 11829,
+      "sha256": "c14c7343b4ea3be9a6aec01bc75790d11ea275d9dbb387d7c585dd574b5932cc"
+    },
+    "app/src/main/java/com/example/ui/favorite/FavoritesPanel.kt": {
+      "bytes": 23609,
+      "sha256": "c7612607fda8e6f998a5b1e6f6735437bff35b38b90a5a9f2f134bb0c0715d52"
+    },
+    "app/src/main/java/com/example/ui/favorite/HeartArt.kt": {
+      "bytes": 4305,
+      "sha256": "9b38109cbfec0b62e45529a8eae139f46e4fdaaed3126dc9740cc7079e6a8d4a"
+    },
+    "app/src/main/java/com/example/ui/favorite/README.md": {
+      "bytes": 486,
+      "sha256": "77c5acbabf981068fc5e915b6fc5f51d6f1d9503ec51f02a4a553d79ede9dd11"
+    },
+    "app/src/main/java/com/example/ui/favorite/SourceMigration.kt": {
+      "bytes": 9784,
+      "sha256": "60ab5192c3bd339b2137f015a4da39c783f3a73728aa5b7eb65a573ae0e20730"
+    },
+    "app/src/main/java/com/example/ui/feedback/Motion.kt": {
+      "bytes": 11023,
+      "sha256": "beb617f1c0cd4d33e882276786716b0015093df10c2aeb1b49a460c913e8f218"
+    },
+    "app/src/main/java/com/example/ui/feedback/NavigationMotion.kt": {
+      "bytes": 902,
+      "sha256": "6502d78ab99f4c4371294ffcf217abbfa946ee764e0c98a4fa3e81b1eeb9548b"
+    },
+    "app/src/main/java/com/example/ui/feedback/README.md": {
+      "bytes": 317,
+      "sha256": "bcd976f893c8037fbb3e295579e958985f47329405c3b4399487461b8a32e44d"
+    },
+    "app/src/main/java/com/example/ui/glasskit/GlassKit.kt": {
+      "bytes": 22511,
+      "sha256": "e79614e4e2c2c46fffc2bef2062d286260e0f57b840e651fd447146d7583b183"
+    },
+    "app/src/main/java/com/example/ui/glasskit/GlassManagementTopBar.kt": {
+      "bytes": 1372,
+      "sha256": "9181afd93b0e27a5f32a4541f10ed83bd133aed894971ae852c2abdf405b3d05"
+    },
+    "app/src/main/java/com/example/ui/glasskit/README.md": {
+      "bytes": 341,
+      "sha256": "06bf396da53dc3938eb7c365ff7dacc5c180ff7cdd0624d62949e3ddff1736a8"
+    },
+    "app/src/main/java/com/example/ui/help/FaqExpandableItem.kt": {
+      "bytes": 3209,
+      "sha256": "949602fc5e1c5e1c7a1f83f12543bdc4d90029312fe77ad53e86a570e2b29e22"
+    },
+    "app/src/main/java/com/example/ui/help/HelpSection.kt": {
+      "bytes": 3502,
+      "sha256": "ebf31b99c8d63f5c1e3ba9d27997cf40e745e85a754905e58c10785fedd119f3"
+    },
+    "app/src/main/java/com/example/ui/help/JsonSourceGuideCard.kt": {
+      "bytes": 5628,
+      "sha256": "017499774fc2c8e5b686cafe626def987720136c2527926a5417b965345471da"
+    },
+    "app/src/main/java/com/example/ui/help/LibraryHelpBottomSheet.kt": {
+      "bytes": 18170,
+      "sha256": "21fb56c6b2fde21580d3c953692a122bdb31b6753fcd2434eb00fefe6be5eb97"
+    },
+    "app/src/main/java/com/example/ui/help/README.md": {
+      "bytes": 393,
+      "sha256": "54bc61d43be366b35f7f78ef37c5710f4825fed43b636e34650804ee1fdbd249"
+    },
+    "app/src/main/java/com/example/ui/mascot/BookCompleteAnimation.kt": {
+      "bytes": 6920,
+      "sha256": "19216e09e933f891809f9701c45b7e3209112db6b0aa0de59820dd0818654fbd"
+    },
+    "app/src/main/java/com/example/ui/mascot/BookmarkHappyAnimation.kt": {
+      "bytes": 5534,
+      "sha256": "c24c6af3d2b8342c185383aa0919fc6a63f360b8cb9bfdef9cdcaaa7e3a9a3e6"
+    },
+    "app/src/main/java/com/example/ui/mascot/DeleteSadAnimation.kt": {
+      "bytes": 5479,
+      "sha256": "634da1345e3e4f53c28ac53d619e2cefd20a5a99508d1682116e09bca0d5b51d"
+    },
+    "app/src/main/java/com/example/ui/mascot/MascotAnimationController.kt": {
+      "bytes": 4101,
+      "sha256": "381dc6f7c3dd097fc53eb7404fcb95f1f57125afff115e0f1678c052f82a6457"
+    },
+    "app/src/main/java/com/example/ui/mascot/MascotSpriteSheet.kt": {
+      "bytes": 2057,
+      "sha256": "f1afd3b313221b9c5c6eb3b39feeeceb632004c3ea49d3facd1a6aa8fa66a12c"
+    },
+    "app/src/main/java/com/example/ui/mascot/MoveBookAnimation.kt": {
+      "bytes": 5382,
+      "sha256": "d7ef08031c71aac69043fb44fa25872854315e5d4372d4ebaf86050a00005339"
+    },
+    "app/src/main/java/com/example/ui/mascot/README.md": {
+      "bytes": 480,
+      "sha256": "8f910eeb078d4bb327dad40d33e6b1e2639ac18a2c90c9faea73567124e0d318"
+    },
+    "app/src/main/java/com/example/ui/pageturn/PageCurlReaderContainer.kt": {
+      "bytes": 21505,
+      "sha256": "fae932f0cb957c0db8bdea20454828d7570af0ecb12bb03e12ae1575ddaa7912"
+    },
+    "app/src/main/java/com/example/ui/pageturn/PageScrubber.kt": {
+      "bytes": 27891,
+      "sha256": "02a925258e89ba68007a8c26ded5e75dc42404d0a4f887ced1a27c930142c679"
+    },
+    "app/src/main/java/com/example/ui/pageturn/PageTurnContainer.kt": {
+      "bytes": 55220,
+      "sha256": "78b1d1e17df5cb0ba6de7393d005f3f77b905b5aa161a8b92853144357ad2457"
+    },
+    "app/src/main/java/com/example/ui/pageturn/PaperPalette.kt": {
+      "bytes": 3858,
+      "sha256": "ab024734c27b811ccb26e5ed6fdfb035f953318cdca3f91e4f047e1dde7a30a3"
+    },
+    "app/src/main/java/com/example/ui/pageturn/README.md": {
+      "bytes": 411,
+      "sha256": "35fe707ab18e6b903bb7326ad85c511c0a8ffa3df35abf7bb1ccace38a96fef6"
+    },
+    "app/src/main/java/com/example/ui/privacy/PrivacyWindows.kt": {
+      "bytes": 29893,
+      "sha256": "e73f15d014a343e1c6deac98fe8b8955799cc13065b323db80959c32454fa11e"
+    },
+    "app/src/main/java/com/example/ui/privacy/README.md": {
+      "bytes": 320,
+      "sha256": "9a5850c508ed5f2da4899fb28a7a20787152cea421afc85b321797bba6dec063"
+    },
+    "app/src/main/java/com/example/ui/reader/NovelImageFullscreen.kt": {
+      "bytes": 11725,
+      "sha256": "74b55c02d3a62a56ceccce9ab92662f403ad976869e44cfc154f3b6faee5bb08"
+    },
+    "app/src/main/java/com/example/ui/reader/NovelInlineImages.kt": {
+      "bytes": 20021,
+      "sha256": "4513d6e4edc35a36abd88dc218859cc8c4526dec04389021f6cd17822e4ae557"
+    },
+    "app/src/main/java/com/example/ui/reader/README.md": {
+      "bytes": 864,
+      "sha256": "fe0d73de115d4a575051b997deaaad6760cc98c887b044a96807ade3468a3207"
+    },
+    "app/src/main/java/com/example/ui/reader/ReadingGlass.kt": {
+      "bytes": 2256,
+      "sha256": "cd412538c7ef24f6d83d5cca1022d16b8f02715f9978913227979051bb096acd"
+    },
+    "app/src/main/java/com/example/ui/reader/ReadingSettingsPanel.kt": {
+      "bytes": 4764,
+      "sha256": "7413943630d0c6775878bc3ceaef25c3fc06b72eb38dd2f948086b96075ca6ca"
+    },
+    "app/src/main/java/com/example/ui/reader/TouchZoneEditor.kt": {
+      "bytes": 30278,
+      "sha256": "504caed3c80729bf94ec77ef077fe68f5b4dbc9dc40367faa6dff60b5b3e55b9"
+    },
+    "app/src/main/java/com/example/ui/reader/TouchZoneGestures.kt": {
+      "bytes": 6203,
+      "sha256": "5aed1f6c748f7269234efcf5f85efad36d5fc16b124f0b2ae3a58dee20ae9dfc"
+    },
+    "app/src/main/java/com/example/ui/reader/TouchZones.kt": {
+      "bytes": 5234,
+      "sha256": "32f468e41858dc954db839aefef7efcc1eaf92e7f2fb030dc0f8ada176e6c68e"
+    },
+    "app/src/main/java/com/example/ui/shelf/README.md": {
+      "bytes": 361,
+      "sha256": "a2dc6a3e4ff413184d6f3e93d0100cb074b887eacec16a42a30df4990246b4e7"
+    },
+    "app/src/main/java/com/example/ui/shelf/ShelfChips.kt": {
+      "bytes": 11899,
+      "sha256": "8968b392e093570aa4af2fb14109ae910188f9d5ef466bce85f5f5bfd520a33c"
+    },
+    "app/src/main/java/com/example/ui/shelf/ShelfMotion.kt": {
+      "bytes": 8449,
+      "sha256": "7f0ede49d63656df1c641a70bb894ed80295f09515caac9daf05e7672948de1e"
+    },
+    "app/src/main/java/com/example/ui/shelf/ShelfMultiSelect.kt": {
+      "bytes": 32041,
+      "sha256": "82aa09e4939c69edc864d23fbf5fb2886a0c7668f85a3253e0918598d434b6d0"
+    },
+    "app/src/main/java/com/example/ui/shelf/ShelfSelectionHost.kt": {
+      "bytes": 67535,
+      "sha256": "a24565233f288d81e2ecd28cd84a204e6a335dbb312d4d4064dfa06e4c2f0981"
+    },
+    "app/src/main/java/com/example/ui/source/README.md": {
+      "bytes": 437,
+      "sha256": "3807bdb87fec11512b34565cc766d7f3eb32b0238987e7e0568092f1320ae6c7"
+    },
+    "app/src/main/java/com/example/ui/source/SourceInfoDialog.kt": {
+      "bytes": 2369,
+      "sha256": "ed6010bb4eaa57db1a9688aa153ac9775103f2d4269046285b36de6df59a7e5e"
+    },
+    "app/src/main/java/com/example/ui/source/SourceManagementScreen.kt": {
+      "bytes": 69865,
+      "sha256": "62c45795f79d9712fc625a0f23da6dc9d8a9925ff726488dae2d6122edb5906d"
+    },
+    "app/src/main/java/com/example/ui/source/ZLibraryLoginDialog.kt": {
+      "bytes": 17209,
+      "sha256": "4ba7b957f05ab21b2d41fd044986379e212325a67f961558156a639a562b7a4f"
+    },
+    "app/src/main/java/com/example/ui/source/ZLibraryNodeManagementScreen.kt": {
+      "bytes": 24743,
+      "sha256": "393797258e6ec2ac3a1e6fe3883e857e860d7e222c434b47caae00d5db08aa41"
+    },
+    "app/src/main/java/com/example/ui/theme/AppFonts.kt": {
+      "bytes": 7670,
+      "sha256": "8371266cbc0587044ae85757b53efee13daff3eeee18b88ce2a6eb47f8874ad2"
+    },
+    "app/src/main/java/com/example/ui/theme/AppInsets.kt": {
+      "bytes": 1574,
+      "sha256": "145fa5c97def3a48a43184b5ba20bb66e6198d8749e7c61ca6c89cd685e74493"
+    },
+    "app/src/main/java/com/example/ui/theme/Color.kt": {
+      "bytes": 2276,
+      "sha256": "2c77be89c76af80b8dc99fbde9a12b928ebbb9556320992ff9a8c54d0671b397"
+    },
+    "app/src/main/java/com/example/ui/theme/IosMotion.kt": {
+      "bytes": 3308,
+      "sha256": "6b0ebd656e376097bba340909a141b1a8309ab1e2f121666816585a28237e1dc"
+    },
+    "app/src/main/java/com/example/ui/theme/ModifierExtensions.kt": {
+      "bytes": 5958,
+      "sha256": "1469cb2081c660ad7b78fa712e9eb3903f9e4dc80ee4a3e9f26170ba428c243a"
+    },
+    "app/src/main/java/com/example/ui/theme/README.md": {
+      "bytes": 420,
+      "sha256": "97ce7a8a27c3cf5c45c74ce8a60f13d6c0c0b4a80513eb4950b31d769904562a"
+    },
+    "app/src/main/java/com/example/ui/theme/Theme.kt": {
+      "bytes": 7956,
+      "sha256": "11c783a23259663a866be5401820f3d159ac4631cb88c1e1e354c53f3c612463"
+    },
+    "app/src/main/java/com/example/ui/theme/Type.kt": {
+      "bytes": 4718,
+      "sha256": "4ff6932b11069806f5bee670af82eaff6a13f0d9ceb4c01fdf9b67ca6c90da64"
+    },
+    "app/src/main/java/com/ramotion/README.md": {
+      "bytes": 380,
+      "sha256": "5a77e56ab4949272724ce628a74b3bc3b819afd435dbf8651bb071e8c2fca217"
+    },
+    "app/src/main/java/com/ramotion/fluidslider/FluidSlider.kt": {
+      "bytes": 21638,
+      "sha256": "6cda7a6a94e51299d0b8d701da6a8175664da4d46a9fef2220800d21d3e524a6"
+    },
+    "app/src/main/java/com/ramotion/fluidslider/FluidSliderCompose.kt": {
+      "bytes": 1306,
+      "sha256": "94c49ab667977d17c674272c0502c310195f4247a8aafddb49654b0c067f9b21"
+    },
+    "app/src/main/java/com/ramotion/fluidslider/README.md": {
+      "bytes": 424,
+      "sha256": "f23329146ebc1fc753dc0ba6d5ba95498ef8f5ccc000f84a9820e76c64633334"
+    },
+    "app/src/main/java/com/swapnil/README.md": {
+      "bytes": 380,
+      "sha256": "976bd1850acd7f9657106f5ad204c5208a1318027423d857c2771701a6771bb7"
+    },
+    "app/src/main/java/com/swapnil/squishyswitch/README.md": {
+      "bytes": 399,
+      "sha256": "abad94f36dad19f259340e437da08cebfb613aa346754c907f04bbebda5b3d30"
+    },
+    "app/src/main/java/com/swapnil/squishyswitch/presentation/README.md": {
+      "bytes": 414,
+      "sha256": "c56b6542460ee0b7c2910233a98ee0d025f31cae5d569bfadc4f9c629d198336"
+    },
+    "app/src/main/java/com/swapnil/squishyswitch/presentation/SquishyToggle.kt": {
+      "bytes": 8832,
+      "sha256": "0d5557c1425051e545e0cb964b6bb4f4bb9ef818d51bc4f7b529a8a3fb1d7819"
+    },
+    "app/src/main/java/eu/README.md": {
+      "bytes": 358,
+      "sha256": "b7d71f47a927bf85ba385d32b9d3d7e43d27ded9c3c624df8a480eadca4e58f0"
+    },
+    "app/src/main/java/eu/wewox/README.md": {
+      "bytes": 370,
+      "sha256": "b0461eacefe4217d4fab87edf9bf79bae0a426a4155d7db035275ec3a9521358"
+    },
+    "app/src/main/java/eu/wewox/pagecurl/ExperimentalPageCurlApi.kt": {
+      "bytes": 341,
+      "sha256": "4fb34340bf1bfd5a61a23f71dbc971cd4f5d8c6ac4ec80245558e9221c3857c9"
+    },
+    "app/src/main/java/eu/wewox/pagecurl/README.md": {
+      "bytes": 435,
+      "sha256": "d08c917af9a81be4e32bd581602cc6ee6efc03eb1a26b2604a1e100bfca8f689"
+    },
+    "app/src/main/java/eu/wewox/pagecurl/config/PageCurlConfig.kt": {
+      "bytes": 17231,
+      "sha256": "316f5a8864ca8340e6ccf3d3af78e9cda69e8684932d8346ccbfd491f82882e1"
+    },
+    "app/src/main/java/eu/wewox/pagecurl/config/README.md": {
+      "bytes": 395,
+      "sha256": "ff9c202a9cda8f4efe8124d54e8ca95e21e7ad2d1166355cedd62edc983fb22e"
+    },
+    "app/src/main/java/eu/wewox/pagecurl/page/CurlDraw.kt": {
+      "bytes": 10128,
+      "sha256": "52a846ce08f84d1f82e83aa28d5490af9b13793db483601b9f04655c7fdf2572"
+    },
+    "app/src/main/java/eu/wewox/pagecurl/page/DragCommonGesture.kt": {
+      "bytes": 6829,
+      "sha256": "5300a4d6e28b4b47192aed73fdfa39eb836db7067043aa3778332f3a5e7e89be"
+    },
+    "app/src/main/java/eu/wewox/pagecurl/page/DragGesture.kt": {
+      "bytes": 3507,
+      "sha256": "fe0ce60ec492e8971149683f7330ec39d46a1b1a9fb89e01fed6b13942dad8e3"
+    },
+    "app/src/main/java/eu/wewox/pagecurl/page/DragStartEnd.kt": {
+      "bytes": 3649,
+      "sha256": "ae78e7f1026b52416c16a0a773906ad209495123c3a02223c89574206e26ed7f"
+    },
+    "app/src/main/java/eu/wewox/pagecurl/page/PageCurl.kt": {
+      "bytes": 6469,
+      "sha256": "a48a5a354d0762ca1b04056a5f09f78dee876b6c10278602fe6baf55d70d16b8"
+    },
+    "app/src/main/java/eu/wewox/pagecurl/page/PageCurlState.kt": {
+      "bytes": 9948,
+      "sha256": "965514c9fbcb23c10646c7da6905a2cf1b4664f36cf1a98eb420337cc36188ad"
+    },
+    "app/src/main/java/eu/wewox/pagecurl/page/README.md": {
+      "bytes": 510,
+      "sha256": "719b8cfc77ab0b240ec976c37e3121ba959cd317a58424acb9cd393b01867e83"
+    },
+    "app/src/main/java/eu/wewox/pagecurl/page/TapGesture.kt": {
+      "bytes": 1798,
+      "sha256": "a3354ee88ea01e211e9c42ac1777b3198fd7c0f1c87ed94682e891b9f39f5b6b"
+    },
+    "app/src/main/java/eu/wewox/pagecurl/utils/MathUtils.kt": {
+      "bytes": 1020,
+      "sha256": "a6473673711eebddff9f6d224aa3d75c9cca684bfb101dc3ef7df4d89100604e"
+    },
+    "app/src/main/java/eu/wewox/pagecurl/utils/Polygon.kt": {
+      "bytes": 1353,
+      "sha256": "e6c59a521d324402cb2b73fe21269b3b99429a5a5656cd146feaf3811235aafc"
+    },
+    "app/src/main/java/eu/wewox/pagecurl/utils/README.md": {
+      "bytes": 422,
+      "sha256": "6bba1f7b2eb456894853a90befb4b0e0d477ef2887f28fbec2488336a14b740f"
+    },
+    "app/src/main/java/eu/wewox/pagecurl/utils/RectUtils.kt": {
+      "bytes": 371,
+      "sha256": "df5ddcd08771508dd8234b6b5fc5055a997ec9afc942928a78db27644b22be92"
+    },
+    "app/src/main/java/fi/README.md": {
+      "bytes": 359,
+      "sha256": "5c60fe5a6ea2aa7505d56733e7726782a77e83b589149e012806a1ecb4d8d066"
+    },
+    "app/src/main/java/fi/harism/README.md": {
+      "bytes": 368,
+      "sha256": "b63776bc90afad1420be94940e7a07deb378146f93ae0a87f583c08bb72ba3c7"
+    },
+    "app/src/main/java/fi/harism/curl/CurlMesh.java": {
+      "bytes": 33093,
+      "sha256": "d8bd5ad6338fb56b283b894693159e15c6e55d002f22451fa0dc282edbcbb674"
+    },
+    "app/src/main/java/fi/harism/curl/CurlPage.java": {
+      "bytes": 6070,
+      "sha256": "0968491adda99fd5280eab7d6d14e4d3ef6dd2e1533dffeec48f42350740dcf9"
+    },
+    "app/src/main/java/fi/harism/curl/CurlRenderer.java": {
+      "bytes": 12097,
+      "sha256": "f0019ac3f4a0a11d5dcb871f89d950895bf5ba959190928e293d0a657363f2ee"
+    },
+    "app/src/main/java/fi/harism/curl/CurlView.java": {
+      "bytes": 37709,
+      "sha256": "8362dea8e3d6f31fe5e5e7139a2069b8527fd8316bf7e8b867b1859e40d27d95"
+    },
+    "app/src/main/java/fi/harism/curl/LICENSE-APACHE2.txt": {
+      "bytes": 11560,
+      "sha256": "3ddf9be5c28fe27dad143a5dc76eea25222ad1dd68934a047064e56ed2fa40c5"
+    },
+    "app/src/main/java/fi/harism/curl/NOTICE": {
+      "bytes": 830,
+      "sha256": "43a49811b44361ab48f690fbed5c5768cb42843e0434d9d82cb8f73287b0a666"
+    },
+    "app/src/main/java/fi/harism/curl/README.md": {
+      "bytes": 477,
+      "sha256": "24c995de8191c4727cb3214d6575bf06c623aeec8d805af58228173de4a70a66"
+    },
+    "app/src/main/java/me/README.md": {
+      "bytes": 362,
+      "sha256": "22efc28e7c23a5f9601d7e7fe82e67ad65619f29361fad75f59e32a3a5ca57d5"
+    },
+    "app/src/main/java/me/trishiraj/README.md": {
+      "bytes": 380,
+      "sha256": "5fafdcd51335a5a1687a2ce57b8535cd0c10bca6b9beb940a2096e0c27b77708"
+    },
+    "app/src/main/java/me/trishiraj/shadowglow/Animation.kt": {
+      "bytes": 2171,
+      "sha256": "66ce39844cf82d96f439c2e828e7148911fdf75d49ac6ea8cfe73da4c19ae079"
+    },
+    "app/src/main/java/me/trishiraj/shadowglow/Drawing.kt": {
+      "bytes": 4520,
+      "sha256": "49665333c3edc922f88bee1c03c1e2acf485df8152e59c7ac59ad9e920e7839c"
+    },
+    "app/src/main/java/me/trishiraj/shadowglow/Parallax.kt": {
+      "bytes": 3457,
+      "sha256": "f53740ba64462f1d225454d5465493a897be1577fb2ac3de0c894f6f667be350"
+    },
+    "app/src/main/java/me/trishiraj/shadowglow/README.md": {
+      "bytes": 494,
+      "sha256": "d0ba77df06b8fa0e0d7239fbe649e3216a1b55f53b1ae38df271cfc090fd3994"
+    },
+    "app/src/main/java/me/trishiraj/shadowglow/ShadowBlurEngine.kt": {
+      "bytes": 23540,
+      "sha256": "2ce1d21f6c45c11abac49a195f40c9e6db91184c945eab23401df1d9d19748c8"
+    },
+    "app/src/main/java/me/trishiraj/shadowglow/ShadowBlurStyle.kt": {
+      "bytes": 686,
+      "sha256": "a142a30fe08f551526c704067081feab6cb0b794e9c494c818d9adb1cd7cd6e8"
+    },
+    "app/src/main/java/me/trishiraj/shadowglow/ShadowGlow.kt": {
+      "bytes": 17208,
+      "sha256": "8a97c416792044714f536518f4c54ca0f204e427baa2ba5fb18c118bc72a2579"
+    },
+    "app/src/main/java/net/README.md": {
+      "bytes": 363,
+      "sha256": "d028f6c37c868ca74a2517f948bfe6e616bc3e9b96b9908048a97460ae2bb768"
+    },
+    "app/src/main/java/net/engawapg/README.md": {
+      "bytes": 372,
+      "sha256": "833e26b8eeb68a3d69bb28093004bffd931c2ca321e12cf7faf9e39e21f27dfa"
+    },
+    "app/src/main/java/net/engawapg/lib/README.md": {
+      "bytes": 376,
+      "sha256": "625b3f9e2a21dfe38d15f9e7434cab08340ab26171f5649e4ef53b8560c034b1"
+    },
+    "app/src/main/java/net/engawapg/lib/zoomable/DetectMouseWheelZoom.kt": {
+      "bytes": 1040,
+      "sha256": "6854029522c6ab7fb71acc194c67ca0639bf58e0b4e0e4b9af3147d0f87a9ef8"
+    },
+    "app/src/main/java/net/engawapg/lib/zoomable/DetectZoomableGestures.kt": {
+      "bytes": 9268,
+      "sha256": "d284cbbb3d9af79735d61d3d467c5ed837a1891d3405355925cb3f8f656be97e"
+    },
+    "app/src/main/java/net/engawapg/lib/zoomable/ExperimentalZoomableApi.kt": {
+      "bytes": 234,
+      "sha256": "adcc9736c5fee1ea762ab3ca1091c6edff1e0fe4245b1b5a67cd34a05e466814"
+    },
+    "app/src/main/java/net/engawapg/lib/zoomable/LICENSE-APACHE2.txt": {
+      "bytes": 10349,
+      "sha256": "6d1d968fb225eca367cb7f0b8831ab012a35d92b547e945e17ef8e7b05c3e5cc"
+    },
+    "app/src/main/java/net/engawapg/lib/zoomable/MouseWheelZoom.kt": {
+      "bytes": 1584,
+      "sha256": "5c3b040c30f25396279e6cd66300c15fc236c24fa73205fe4572434e00566206"
+    },
+    "app/src/main/java/net/engawapg/lib/zoomable/README.md": {
+      "bytes": 610,
+      "sha256": "27e6c3f2aed3b280ff02fed02b666528670dc8910e48adc88cbb38f52907b78b"
+    },
+    "app/src/main/java/net/engawapg/lib/zoomable/ScrollGesturePrpagation.kt": {
+      "bytes": 593,
+      "sha256": "0cc52194505a3ac624dbad628f9130cb8cc16fa8074602620f6605a7cf2183ac"
+    },
+    "app/src/main/java/net/engawapg/lib/zoomable/SnapBackZoomableBox.kt": {
+      "bytes": 15946,
+      "sha256": "6915b3ec44b8b9e036fc468e064971346cee2ea52af5914f029f358b1d5cf85f"
+    },
+    "app/src/main/java/net/engawapg/lib/zoomable/ZoomState.kt": {
+      "bytes": 17410,
+      "sha256": "df771c3ecd0e77a266fa817eff25b46bf9b41ed96971eda7a7587fec8b6c877c"
+    },
+    "app/src/main/java/net/engawapg/lib/zoomable/Zoomable.kt": {
+      "bytes": 16974,
+      "sha256": "fe8094e5739909e2b13295e02523738283227de7bdb35bd447c48aaf1d77370c"
+    },
+    "app/src/main/res/README.md": {
+      "bytes": 677,
+      "sha256": "743703c20f6fc5a789848da1880ce705f01ba8a399700a39e502e1bce766de9b"
+    },
+    "app/src/main/res/drawable-nodpi/mascot_celebrate.webp": {
+      "bytes": 58186,
+      "sha256": "afd831d24397ba8380b256a50484ad044e0353c2e6f2b51c65a74227b279ae75"
+    },
+    "app/src/main/res/drawable-nodpi/mascot_idle.webp": {
+      "bytes": 49728,
+      "sha256": "8cfd00ba9c9044a466f3c088e7c07ce29f95f0f0e8dbe6c805cfcf17612ec218"
+    },
+    "app/src/main/res/drawable-nodpi/mascot_reading.webp": {
+      "bytes": 53368,
+      "sha256": "283d133bfa6cff76cfd3a3670752eb461f14f4a66154f7246b98a15632cd51fe"
+    },
+    "app/src/main/res/drawable-nodpi/mascot_run.webp": {
+      "bytes": 62094,
+      "sha256": "4b96505b70e63f5b0a350be14f92d668b9b200c95f56017aa944cb3104c7b385"
+    },
+    "app/src/main/res/drawable-nodpi/mascot_sad.webp": {
+      "bytes": 48470,
+      "sha256": "5eee5e1059423634b71c99de3a6e10188011b9766d3afbb8dc2966837e6cbc77"
+    },
+    "app/src/main/res/drawable-nodpi/splash_ciallo_logo.png": {
+      "bytes": 230481,
+      "sha256": "c57441741c33e5f5b7d0e06ab4f743ef57705a621dab1fb07fd68fe477c199ce"
+    },
+    "app/src/main/res/drawable/ic_launcher_background.xml": {
+      "bytes": 339,
+      "sha256": "37e3ae46ed36d5749b1fbf420bb7ed43d457f37902e923521f766124bfa8ba18"
+    },
+    "app/src/main/res/drawable/roxy_bookmark.xml": {
+      "bytes": 3705,
+      "sha256": "7e36f0a097030e2c55a3fca0c806e5b46cea5fa5fdfa923bc8d6f4105549911d"
+    },
+    "app/src/main/res/drawable/roxy_happy.xml": {
+      "bytes": 3751,
+      "sha256": "94909a4aa0c8ab2c7e7bd1689b007996d8affb1fa2f7c4f2e495e7b3d176e8ad"
+    },
+    "app/src/main/res/drawable/roxy_idle.xml": {
+      "bytes": 4145,
+      "sha256": "8ca3bf382547cc423976be4b61c4abd7eecbd8ecb219667fae76f3db1ed54d49"
+    },
+    "app/src/main/res/drawable/roxy_move.xml": {
+      "bytes": 3776,
+      "sha256": "f17eecba70f1a4c59f07507489171fd1771b214a8554e59f61f70aaadb3154a5"
+    },
+    "app/src/main/res/drawable/roxy_sad.xml": {
+      "bytes": 3112,
+      "sha256": "b2c1369006aa0349b3369342258cc104bf810c8a2e374d6b8de2e0501a4aa5cf"
+    },
+    "app/src/main/res/drawable/splash_icon_transparent.xml": {
+      "bytes": 484,
+      "sha256": "29fe96d015a11b14a66f60dde6d0a524f3e7412788aae2a03e163cd13c03ac42"
+    },
+    "app/src/main/res/font/noto_sans_sc_regular.otf": {
+      "bytes": 859944,
+      "sha256": "5941608ee5d4c6f589eaafbbe8cbf1cafa50d2ea9352bdf31f60f2f309beca34"
+    },
+    "app/src/main/res/font/noto_serif_sc_regular.otf": {
+      "bytes": 1202520,
+      "sha256": "b57ed172896c0d0693fd07d2023b5fc1e974b9146f67e68e4d25dac5b721bb56"
+    },
+    "app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml": {
+      "bytes": 274,
+      "sha256": "0f6da3d9522d9073c9f1cc3f3bf74d9ce699b47c616d3a08484ad459fa1bb955"
+    },
+    "app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml": {
+      "bytes": 274,
+      "sha256": "0f6da3d9522d9073c9f1cc3f3bf74d9ce699b47c616d3a08484ad459fa1bb955"
+    },
+    "app/src/main/res/mipmap-hdpi/ic_launcher.webp": {
+      "bytes": 2774,
+      "sha256": "9c9200598ca4c32dd0642e26551ce9e55fee32bc4c7f7e0f2213dae541a5047d"
+    },
+    "app/src/main/res/mipmap-hdpi/ic_launcher_foreground.webp": {
+      "bytes": 7932,
+      "sha256": "7a22b1b7023268c12d90f8a46986813b1b26b2222743092cf3fbdb17af4f2ef3"
+    },
+    "app/src/main/res/mipmap-hdpi/ic_launcher_legacy.webp": {
+      "bytes": 2774,
+      "sha256": "9c9200598ca4c32dd0642e26551ce9e55fee32bc4c7f7e0f2213dae541a5047d"
+    },
+    "app/src/main/res/mipmap-hdpi/ic_launcher_round.webp": {
+      "bytes": 2774,
+      "sha256": "9c9200598ca4c32dd0642e26551ce9e55fee32bc4c7f7e0f2213dae541a5047d"
+    },
+    "app/src/main/res/mipmap-mdpi/ic_launcher.webp": {
+      "bytes": 1524,
+      "sha256": "b8aa884920e4cd65acfb83cc35d538b3eeb9e5d7dba1d32fe9bcdf806890cb4b"
+    },
+    "app/src/main/res/mipmap-mdpi/ic_launcher_foreground.webp": {
+      "bytes": 4818,
+      "sha256": "310e944b5dfeaa7a1a5b4e5e5f362fd010ac23ed61ddd9d986bea7c91cd9bd9f"
+    },
+    "app/src/main/res/mipmap-mdpi/ic_launcher_legacy.webp": {
+      "bytes": 1524,
+      "sha256": "b8aa884920e4cd65acfb83cc35d538b3eeb9e5d7dba1d32fe9bcdf806890cb4b"
+    },
+    "app/src/main/res/mipmap-mdpi/ic_launcher_round.webp": {
+      "bytes": 1524,
+      "sha256": "b8aa884920e4cd65acfb83cc35d538b3eeb9e5d7dba1d32fe9bcdf806890cb4b"
+    },
+    "app/src/main/res/mipmap-xhdpi/ic_launcher.webp": {
+      "bytes": 4058,
+      "sha256": "e6dca778684eb0cc3935130206b4aa78f55e4fa06c872bbec7298ce99928982c"
+    },
+    "app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.webp": {
+      "bytes": 11342,
+      "sha256": "03de1b52eef322b0b06e6a576d7b28eb2beba0fded592b65a914471eed89f4c7"
+    },
+    "app/src/main/res/mipmap-xhdpi/ic_launcher_legacy.webp": {
+      "bytes": 4058,
+      "sha256": "e6dca778684eb0cc3935130206b4aa78f55e4fa06c872bbec7298ce99928982c"
+    },
+    "app/src/main/res/mipmap-xhdpi/ic_launcher_round.webp": {
+      "bytes": 4058,
+      "sha256": "e6dca778684eb0cc3935130206b4aa78f55e4fa06c872bbec7298ce99928982c"
+    },
+    "app/src/main/res/mipmap-xxhdpi/ic_launcher.webp": {
+      "bytes": 6938,
+      "sha256": "bb1ae7d97ec6a0da785a06e8bfc6546cb048d14775421377474b5c45aee42fb9"
+    },
+    "app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.webp": {
+      "bytes": 17874,
+      "sha256": "871d0885b199743a563612cc69eb6ca2964985ff51bbae29c9d739e5547e42db"
+    },
+    "app/src/main/res/mipmap-xxhdpi/ic_launcher_legacy.webp": {
+      "bytes": 6938,
+      "sha256": "bb1ae7d97ec6a0da785a06e8bfc6546cb048d14775421377474b5c45aee42fb9"
+    },
+    "app/src/main/res/mipmap-xxhdpi/ic_launcher_round.webp": {
+      "bytes": 6938,
+      "sha256": "bb1ae7d97ec6a0da785a06e8bfc6546cb048d14775421377474b5c45aee42fb9"
+    },
+    "app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp": {
+      "bytes": 9624,
+      "sha256": "6f1c24e850477cf4bb6b108a11411cbd71f987e64ce3dbdbd11b77acc7aa6283"
+    },
+    "app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.webp": {
+      "bytes": 25102,
+      "sha256": "61e6062c0506bc95b64c0ad40433213a17d35f7f151d7529ae53663049d939e9"
+    },
+    "app/src/main/res/mipmap-xxxhdpi/ic_launcher_legacy.webp": {
+      "bytes": 9624,
+      "sha256": "6f1c24e850477cf4bb6b108a11411cbd71f987e64ce3dbdbd11b77acc7aa6283"
+    },
+    "app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp": {
+      "bytes": 9624,
+      "sha256": "6f1c24e850477cf4bb6b108a11411cbd71f987e64ce3dbdbd11b77acc7aa6283"
+    },
+    "app/src/main/res/raw/page_flip.ogg": {
+      "bytes": 8625,
+      "sha256": "2a14922454a31d6492695f0706bfa5c907fb259bba29291e1fe49fe2aee4f14a"
+    },
+    "app/src/main/res/values-sw600dp/dimens.xml": {
+      "bytes": 598,
+      "sha256": "91891c6766ee9f94cfb5a5093aa23ed947edf829250abab1168fdab8ae65038b"
+    },
+    "app/src/main/res/values-sw840dp/dimens.xml": {
+      "bytes": 585,
+      "sha256": "6037470ae4b23ee0480ccf25258f9058eda2d9e1a4cf9bb55c367aa2fb1fb84a"
+    },
+    "app/src/main/res/values-v29/themes.xml": {
+      "bytes": 376,
+      "sha256": "b65add06a5f04cefde735c8efbcfe8833e11660a433d7dd3419902060fc2804e"
+    },
+    "app/src/main/res/values/dimens.xml": {
+      "bytes": 1482,
+      "sha256": "fc19bfc5c5c225eb22f16756544b045ddb996574e985639bdb5e2bfd3fcf12c9"
+    },
+    "app/src/main/res/values/splash_quotes.xml": {
+      "bytes": 11201,
+      "sha256": "a0838683ee209a2cf498cbf1a9e1a82d7868d4be5cf03cf54109b1a235b12815"
+    },
+    "app/src/main/res/values/strings.xml": {
+      "bytes": 119,
+      "sha256": "cf4380070168ea23b69a74b7159af2ae94bf9f07b7f78f07b9fc830ff2012ccb"
+    },
+    "app/src/main/res/values/themes.xml": {
+      "bytes": 3519,
+      "sha256": "9e1a21769d00a10dd8799c6d79e62465200d3bf5d9cca926c7426b31414e3fa4"
+    },
+    "app/src/main/res/xml/backup_rules.xml": {
+      "bytes": 269,
+      "sha256": "15bbb5a9678dafefc8050e365dc9d59d01c4c1ca5972317cbeea0a73ebdc98da"
+    },
+    "app/src/main/res/xml/data_extraction_rules.xml": {
+      "bytes": 521,
+      "sha256": "00b9c49f2fcbfef3b419fd720ec73ab10de398b4d5e6a6029b6e0ce811c70d8e"
+    },
+    "app/src/main/res/xml/file_paths.xml": {
+      "bytes": 441,
+      "sha256": "f7386ef583e701833d67c26cd77488c6408755d90021a7f6768b8ef72118a71f"
+    },
+    "backdrop/build.gradle.kts": {
+      "bytes": 1512,
+      "sha256": "27593ea60b0f21dcf5be07d361477c3b6b166c33592b8550e369a7a0aab6f469"
+    },
+    "backdrop/src/androidMain/README.md": {
+      "bytes": 159,
+      "sha256": "bf0079318b5ca3862ef7839656fbeed157bf9aa8eb695fdaed020022cf5d2053"
+    },
+    "backdrop/src/androidMain/kotlin/README.md": {
+      "bytes": 161,
+      "sha256": "49ecd22cc4f6a9fac86e46b922e9d52071f55f0db318e38bda94efd5a7f618c3"
+    },
+    "backdrop/src/androidMain/kotlin/com/README.md": {
+      "bytes": 167,
+      "sha256": "23d8f031c8eaca624edad3bba76e6f7332e5ad798c975cc97ee96c7d16bab1ca"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/README.md": {
+      "bytes": 181,
+      "sha256": "6bcc26875863d1e793cd0e7073048d9c13fb425af099e6e3ec7998993ba8545c"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/BackdropEffectScope.kt": {
+      "bytes": 2545,
+      "sha256": "933ffe90293dc853f5618cf53e0c2ef4ebf00e565522e40f9a1da12cd2a8ede3"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/DrawBackdropModifier.kt": {
+      "bytes": 14455,
+      "sha256": "a89e3e1b0f5643bd692b0da824ffd92361d8650b09509c3d33333e2d3e384df4"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/InverseLayerScope.kt": {
+      "bytes": 4022,
+      "sha256": "b43102c3409a828e2a2c71a650f530b8b3c0f5c6a35d8c66f60ebc75d1b1719c"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/LayerRecordKey.kt": {
+      "bytes": 1075,
+      "sha256": "89b76e06030670e70c9ac3b49dca1b8cb2db1b40bbe99d6a3ae98b54fb1a3f6e"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/LayerRecorder.kt": {
+      "bytes": 787,
+      "sha256": "609e9eb99005667db53729a7bce7546fe86365a0d85d6d8537bd93b2b347e80c"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/README.md": {
+      "bytes": 411,
+      "sha256": "6711c1ab0dfde3ebb8d3c7c7eccd10f27cbcb77fda3607a70e1bacf571706eb3"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/RuntimeShaderCache.kt": {
+      "bytes": 807,
+      "sha256": "c166ab84fbed6d72efd6088992d9196de88913a0d3b0a2f737295da2bcf2ab0d"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/Shaders.kt": {
+      "bytes": 10019,
+      "sha256": "425eeb15d3684666b8a15107e7153b6f8adb461116b25aeaf6c2567b050142fc"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/backdrops/LayerBackdrop.kt": {
+      "bytes": 3222,
+      "sha256": "cde4ad288367e5487841242aefcded87f08ec7ef5cd5cb6fcab0649540fbea45"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/backdrops/LayerBackdropModifier.kt": {
+      "bytes": 3033,
+      "sha256": "c5baa8932f5c95a248c175e4589ddf712c7cd338df199af2c3ecbe7500c4b2cc"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/backdrops/PreBlurredBackdrop.kt": {
+      "bytes": 7845,
+      "sha256": "9603bc21fa16bb5afaaf9c56af972defc62b2acc1c78df508c2715213e87e6e3"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/backdrops/README.md": {
+      "bytes": 254,
+      "sha256": "2f637703489c4ed08506ef2041913f907215f5225649e233fc4f761b214d2e8e"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/effects/Blur.kt": {
+      "bytes": 1045,
+      "sha256": "2fc80d8fd7024b3f5b725f501a7ef5a0787cd85c1ffd17e04eab383490da3db9"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/effects/ColorFilter.kt": {
+      "bytes": 4404,
+      "sha256": "be7259e56c076325305a7cb74e2513408a9e6224eabee8420fe99b7b7c047e85"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/effects/Lens.kt": {
+      "bytes": 4083,
+      "sha256": "25cb57d8bdb7fc4933882d72d904bcf19a0c7fe9ff08911e1710c7962afbba77"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/effects/PlatformEffectExt.kt": {
+      "bytes": 1042,
+      "sha256": "75899c8d9c688de818c1fc7ff373617db25c654a2292d61d0db090a9236d2cb2"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/effects/ProgressiveBlur.kt": {
+      "bytes": 2042,
+      "sha256": "b3eb7e2d2fe1db30d4a0093f68c267b7036a4054ef13e1b9afd518599d96554b"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/effects/README.md": {
+      "bytes": 310,
+      "sha256": "ec6f40d1dec312bba58eeaf632817c2e6adde47631af6beb89363f26f1c1f54b"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/effects/RenderEffect.kt": {
+      "bytes": 603,
+      "sha256": "b7f09b6096dd747b9074149b08c4cf68cac20da063389108e06a4cfa636d1554"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/effects/SdfShader.kt": {
+      "bytes": 4197,
+      "sha256": "d4609cc595cb674429773c9bfa95fcc0ad24dd96ac6903278f3d30a1dc6a5552"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/highlight/HighlightModifier.kt": {
+      "bytes": 6905,
+      "sha256": "8a77d1136cf805ce93b8835598bb01d7ed761e31f13cea7c50e36f57f21e3d4a"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/highlight/HighlightStyle.kt": {
+      "bytes": 5582,
+      "sha256": "48cca84ec01308a5956b721a68e57795e47598658290b7bd77b9f9368681bab6"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/highlight/README.md": {
+      "bytes": 219,
+      "sha256": "a1a1d8f55030c9b580e0b57d5ebb5f497c6b564516b38cf7d425562c6e847c26"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/platform/PlatformEffects.kt": {
+      "bytes": 5361,
+      "sha256": "6a0b977872651b3754d32a45accda7dc1055d09d7f17274c6be95acf33c0409f"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/platform/README.md": {
+      "bytes": 183,
+      "sha256": "ae8335dc55e3c3457ddc3f540a7c3e10a80ac3fe3fbe15f2c1715ae5245e991b"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/shadow/InnerShadowModifier.kt": {
+      "bytes": 6417,
+      "sha256": "b64e2ffbb75356994cac051f4fca4c32a6ff7138c54e201e0f8b85e67a2abf64"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/shadow/README.md": {
+      "bytes": 215,
+      "sha256": "79215f71d5e1e586ffb879c368598969212980f3442a2952cf575b2cb1ba5132"
+    },
+    "backdrop/src/androidMain/kotlin/com/kashif_e/backdrop/shadow/ShadowModifier.kt": {
+      "bytes": 5852,
+      "sha256": "6ece6672174ebdb14985c2b8f2aed187b1de8ff64f617e42604d08e9132a0832"
+    },
+    "backdrop/src/commonMain/README.md": {
+      "bytes": 195,
+      "sha256": "dceb5df90e50076dba84c4f3fccb22bbeb99ad9a5f1c92f7b040425c1728e2e7"
+    },
+    "backdrop/src/commonMain/kotlin/README.md": {
+      "bytes": 160,
+      "sha256": "e43504515142dad713a4bf3a0365cc1c551b0cb5cec8665e857780c490b9b81a"
+    },
+    "backdrop/src/commonMain/kotlin/com/README.md": {
+      "bytes": 166,
+      "sha256": "2b14ba709739ee6bcb7d8c6393c4555970c4f6b70d77c4fc538c2e968cf3a908"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/README.md": {
+      "bytes": 180,
+      "sha256": "b86ed71bd72b021967c3cbfa05020a77b62b7253136a854b5ae009990867c185"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/Backdrop.kt": {
+      "bytes": 1075,
+      "sha256": "b1d1b21ce3a9b25ca7b9c05b0e9fec0a41c01e25d27ccfcd2a482ce3c32195c7"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/BackdropEffectScope.kt": {
+      "bytes": 986,
+      "sha256": "219e7210dd3a558106c9e53e29a92420cce2b83ed48b907c00cf27cb09901e72"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/DrawBackdropModifier.kt": {
+      "bytes": 2636,
+      "sha256": "4f30769f0a293399306d144e5c2888ec8f978685c3c466468cbaff7286a12411"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/Outline.kt": {
+      "bytes": 585,
+      "sha256": "96539cab8ff93b3d010698bc44504f690a47423431d641a6a22af16f8eb9126f"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/README.md": {
+      "bytes": 345,
+      "sha256": "1f7071a7da1e0c73674e3fc0d372341a6f23f90979ce909d4b0d77a7efaf49c0"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/ShapeProvider.kt": {
+      "bytes": 1486,
+      "sha256": "61fb2240d9a10b07dad535b88ac5354a3b53e58079c0cbdb7bb2827adb8d1835"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/backdrops/CanvasBackdrop.kt": {
+      "bytes": 1390,
+      "sha256": "cdc0475b3adaf8c5747a2067743131a7ad6af942ef3096908153806f850b51ac"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/backdrops/CombinedBackdrop.kt": {
+      "bytes": 3162,
+      "sha256": "fdab4736203a2e0ede081037cc5b3602c7ff4548060e91d3854190ee5f14453e"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/backdrops/EmptyBackdrop.kt": {
+      "bytes": 819,
+      "sha256": "432f89be269c671a9dda3d82cf53e8173a900c5ea88cf226e0935fe395913fec"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/backdrops/LayerBackdrop.kt": {
+      "bytes": 1624,
+      "sha256": "3de687c6b14519d9c549c7f59819dac88c51779112776e3e003ffef8efba8bc9"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/backdrops/README.md": {
+      "bytes": 290,
+      "sha256": "4d09f5e998ae9c650c03bd317d6103fc211d0970cfca7e08d8df64d3bde62354"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/backdrops/WrappedBackdrop.kt": {
+      "bytes": 1387,
+      "sha256": "444fd530e53cf7ad752905cd628510e47af8cb9923dac2070aed795ad5dafc07"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/effects/Effects.kt": {
+      "bytes": 3087,
+      "sha256": "b897f084dc36ce3a827066c448a66a6c42379dc8b57972c5c90b3a4b4ee005db"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/effects/ProgressiveBlur.kt": {
+      "bytes": 862,
+      "sha256": "703cf537e2107604a4c34ecbebcf4b98067a85cbef449dd24682120cd7ed5328"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/effects/README.md": {
+      "bytes": 232,
+      "sha256": "9d19ec9e8286effbffd89e7ec2eff3a4c9911b0e945e480b6446167ba4380d6d"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/effects/SdfShader.kt": {
+      "bytes": 1822,
+      "sha256": "1698cd1d091fcad401fb83a25f85bc7b521f0a18116919115565e5959ef1d0b2"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/highlight/Highlight.kt": {
+      "bytes": 1420,
+      "sha256": "7d7cb04d2143faff196a0f4f3f7a86fa7872b7f4d9e1ece6fb03a7ae0ebdf511"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/highlight/HighlightStyle.kt": {
+      "bytes": 991,
+      "sha256": "b91210ecbd54e97fe091e7f976d1e1aeceab28ed86542169f49ee2a45c49902e"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/highlight/README.md": {
+      "bytes": 210,
+      "sha256": "beed5e52c3279b3210ee906c0b66b1e692bb06909f9208b4550dd44e833cce1a"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/shadow/InnerShadow.kt": {
+      "bytes": 1321,
+      "sha256": "8e8df20e9813f62d64e475193d7e3e528cb2d64abb467378928d58800bfed5b8"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/shadow/README.md": {
+      "bytes": 198,
+      "sha256": "812d7e2f9eff7a32136952e157b8c0f795ecd4ca7bae9d2891a505db1ca1b80a"
+    },
+    "backdrop/src/commonMain/kotlin/com/kashif_e/backdrop/shadow/Shadow.kt": {
+      "bytes": 749,
+      "sha256": "e93662f63842604629447eeab1b16072e798a982a909b4182e62272432155422"
+    },
+    "build.gradle.kts": {
+      "bytes": 488,
+      "sha256": "0455827c09cba9c8b37d8f812062c8ef12ca031c91a487fc444cc2346f7ecc54"
+    },
+    "gradle.properties": {
+      "bytes": 398,
+      "sha256": "cbe20e1689d6c3833cf69d048fb208a70857611c3c441481fb14b8c40ffb0759"
+    },
+    "gradle/libs.versions.toml": {
+      "bytes": 5358,
+      "sha256": "66f9428d505a46935ce7665c7a625e54f78b4374cc59329fa4937a19651c5551"
+    },
+    "liquidglass-compose/build.gradle.kts": {
+      "bytes": 1055,
+      "sha256": "d77b24886c3aee47c61804c4d73ea4b55713a95453a84f8ce9212e3fb7665771"
+    },
+    "liquidglass-compose/src/main/AndroidManifest.xml": {
+      "bytes": 54,
+      "sha256": "faaba9392e4f5baf2dfc419b7598c06068afc4cf53f57dee439078abd607da41"
+    },
+    "liquidglass-compose/src/main/README.md": {
+      "bytes": 268,
+      "sha256": "899b13519b3b260531a31e10fe7c6f24837bbf1dc697a60c8730fa8fccd82567"
+    },
+    "liquidglass-compose/src/main/kotlin/README.md": {
+      "bytes": 165,
+      "sha256": "00ba2fd3528a95578f1c3da6f52bb7bf3d23e065a138918067d6071d49d24345"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/README.md": {
+      "bytes": 174,
+      "sha256": "b8b8940db26afa3c3aacfab7dd7c0ca7b98d9df1b1009c9584c72f44599b29e1"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/README.md": {
+      "bytes": 190,
+      "sha256": "38158f5cb4473fc86a2ea06eba3cde3afe237a847f82746d23b62b606f206462"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/GlassShape.kt": {
+      "bytes": 1719,
+      "sha256": "da29834eb0eed4132318f604b384855efdc04372ba943657bedec7609d802216"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/GlassStyle.kt": {
+      "bytes": 8959,
+      "sha256": "5981d58316f926b6663e24d386429b6c05a3533dc201163422238ca301d0a763"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/LiquidGlass.kt": {
+      "bytes": 8585,
+      "sha256": "93258c11edfb6de71255207479dd694ed4d85d4954c5b164490ae53b588c5fbd"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/LiquidGlassProvider.kt": {
+      "bytes": 4121,
+      "sha256": "dcaa14d6920bf10556cf3253e16f7498956865811841b51b2edc6e95b7e67ccd"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/LiquidGlassProviderState.kt": {
+      "bytes": 2351,
+      "sha256": "745ed086b479a64774aea13d8221bd646dd64da90b4c7478fe7542b815363ff7"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/LiquidGlassTier.kt": {
+      "bytes": 707,
+      "sha256": "56e692b14b4bc4b6c0567fc4a8d9137e08c7feb306ca99f1ae1c69ad9c2761a5"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/README.md": {
+      "bytes": 364,
+      "sha256": "c3072e7589b0685fe82a7c6511c0e4d08c78f2f213420d2b020c7ac4b39a7ee6"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/components/GlassBottomBar.kt": {
+      "bytes": 1761,
+      "sha256": "71047cc19de5fa8b0028367983fbf28b5292c449d47865f826744b0dd6bb4175"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/components/GlassButton.kt": {
+      "bytes": 3406,
+      "sha256": "6cb4ed0739d679762353b336ea94a4a6d2c6b557ae80269b290fb4ee15151457"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/components/GlassCard.kt": {
+      "bytes": 1257,
+      "sha256": "eb1095e327c845f0f67720b3f0e5fe29258932755d094505c1dd2dd876d6fa67"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/components/GlassSurface.kt": {
+      "bytes": 1103,
+      "sha256": "f6983bffe23fb29884ee8bc7609a2326898396a0dddf5517b1e8ecbf03f04144"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/components/README.md": {
+      "bytes": 266,
+      "sha256": "d2551622fe30082fdabd2ec5b5943831027b83f80b039e51d8fb3d927812f6bb"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/container/GlassEffectChild.kt": {
+      "bytes": 5958,
+      "sha256": "9289572d737f59325eaf118789dfad6e8235b410c7caac1e269155c143161446"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/container/LiquidGlassContainer.kt": {
+      "bytes": 8509,
+      "sha256": "95f10361eadbaa921399f627df8bc951b6a68c7881e4bded8b0c8c48223ba952"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/container/LiquidGlassContainerState.kt": {
+      "bytes": 3957,
+      "sha256": "6ebc0c8e46bb543253bcaa73923043c46d5364dd7abe12a54003afabd3c1037c"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/container/README.md": {
+      "bytes": 276,
+      "sha256": "60c676ceb8281e82626b40ec9550491c41346a9d51a207a165a70acd601f0575"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/internal/GlassMotion.kt": {
+      "bytes": 1289,
+      "sha256": "45c9096ab894e93abf0e64eb3c652843de04ade05944da733e0daf444bd80e09"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/internal/GlassPainter.kt": {
+      "bytes": 10112,
+      "sha256": "97088f65a1e3b42c4ed78b14a3bcc5f77d78a51f7321c14ec9505d44a3ac5c25"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/internal/GlassRenderEffects.kt": {
+      "bytes": 4082,
+      "sha256": "1246abbf5092b239bf30f50212efdae6e110d3d2d2ef07e2fad605edad2130cf"
+    },
+    "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/internal/README.md": {
+      "bytes": 273,
+      "sha256": "a23a1fa226a2f5b54fd5767d181e76f5052fccbdb4b971eba0e3e2dbeaea5732"
+    },
+    "liquidglass-core/build.gradle.kts": {
+      "bytes": 634,
+      "sha256": "e5618c7604c144428990567113128b5c03a1521954e6ed5c1e010763b1c64efa"
+    },
+    "liquidglass-core/src/main/README.md": {
+      "bytes": 237,
+      "sha256": "5009095731252cf9b103e998edb7a1ec60206e75d82a41631d61e7c14770fb99"
+    },
+    "liquidglass-core/src/main/kotlin/README.md": {
+      "bytes": 162,
+      "sha256": "436ea6219df8ea22cd2f357c97b9374d8de327fcf7188e1f07fcbcb35303187a"
+    },
+    "liquidglass-core/src/main/kotlin/dev/README.md": {
+      "bytes": 171,
+      "sha256": "e488170aafa2f9d5f8d302dd4457e130cb669ee58a969a34b6ef50636c049af5"
+    },
+    "liquidglass-core/src/main/kotlin/dev/liquidglass/README.md": {
+      "bytes": 184,
+      "sha256": "2bf7ba3213945fcce9449de81f9a18a05947cbc7c2ddd9a8a8b1bb1d191e63e6"
+    },
+    "liquidglass-core/src/main/kotlin/dev/liquidglass/core/GlassMath.kt": {
+      "bytes": 5167,
+      "sha256": "7854694f40f69e16e770079f56d10fa786681e74b44616883fbe7eb370f29256"
+    },
+    "liquidglass-core/src/main/kotlin/dev/liquidglass/core/GlassRenderTier.kt": {
+      "bytes": 1933,
+      "sha256": "735e82793415095480679f3e73c26b77e955b59083b1b9df24ff78a1f1ab7467"
+    },
+    "liquidglass-core/src/main/kotlin/dev/liquidglass/core/GlassShapePacker.kt": {
+      "bytes": 2933,
+      "sha256": "70027cf46f36e60de18b08fa7b949c640dcbd14cf90bdf1c6fa245881a731a2e"
+    },
+    "liquidglass-core/src/main/kotlin/dev/liquidglass/core/GlassUniforms.kt": {
+      "bytes": 3195,
+      "sha256": "a6e636235184c4003b0ed0f73dba6a4e4b3ed6a2bb2ad0476c0d18eab0704388"
+    },
+    "liquidglass-core/src/main/kotlin/dev/liquidglass/core/LiquidGlassShaders.kt": {
+      "bytes": 5271,
+      "sha256": "6885dc560b911f04691f543772edd5602eba5b26588b09051ab125770a07db36"
+    },
+    "liquidglass-core/src/main/kotlin/dev/liquidglass/core/README.md": {
+      "bytes": 287,
+      "sha256": "ff1102839ae6f7f5cecf536bfc19c24bf6959afd0b8059abe97af5d89fe23882"
+    },
+    "settings.gradle.kts": {
+      "bytes": 434,
+      "sha256": "08f6f8717e9ba77889f9295acf621a9c815471dca8ddb9be106d65877187a6bb"
+    }
+  }
+}

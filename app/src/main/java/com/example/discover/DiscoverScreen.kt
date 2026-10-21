@@ -22,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.Color
@@ -70,16 +71,30 @@ import kotlin.math.abs
 fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favoriteKeys: Set<String>,
     onFollow: (SearchBook, Boolean) -> Unit, onOpen: (SearchBook) -> Unit,
     onLatest: (SearchBook) -> Unit, onSourceManagement: () -> Unit, readingTitles: Set<String> = emptySet(), refreshRequest: Int = 0) {
-    val (store, revision) = rememberDiscoverStore()
-    val model: DiscoverViewModel = viewModel(key = "discover", factory = remember(manager, store) {
+    var partition by rememberSaveable { mutableStateOf(DiscoverPartition.COMIC) }
+    val holder = rememberSaveableStateHolder()
+    holder.SaveableStateProvider(partition.name) {
+        DiscoverPartitionContent(manager, favorites, favoriteKeys, onFollow, onOpen, onLatest,
+            onSourceManagement, readingTitles, refreshRequest, partition, { partition = it })
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<FavoriteItem>, favoriteKeys: Set<String>,
+    onFollow: (SearchBook, Boolean) -> Unit, onOpen: (SearchBook) -> Unit,
+    onLatest: (SearchBook) -> Unit, onSourceManagement: () -> Unit, readingTitles: Set<String>, refreshRequest: Int,
+    partition: DiscoverPartition, onPartition: (DiscoverPartition) -> Unit) {
+    val (store, revision) = rememberDiscoverStore(partition)
+    val model: DiscoverViewModel = viewModel(key = "discover_${partition.name}", factory = remember(manager, store) {
         object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = DiscoverViewModel(manager, store) as T
+            @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = DiscoverViewModel(manager, store, partition) as T
         }
     })
     val state by model.state.collectAsStateWithLifecycle()
     val all by manager.allSources.collectAsStateWithLifecycle()
     val enabled by manager.enabledStates.collectAsStateWithLifecycle()
-    val sources = all.filter { it.isComicSource }
+    val sources = all.filter(partition::accepts)
     var sourceId by rememberSaveable { mutableStateOf(store.string("last_source", "aggregate")) }
     var dimension by rememberSaveable { mutableStateOf(DiscoverDimension.entries.firstOrNull {
         it in listOf(DiscoverDimension.UPDATES, DiscoverDimension.RANKING) && it.name == store.string("last_dimension", "UPDATES") } ?: DiscoverDimension.UPDATES) }
@@ -196,13 +211,18 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
                 LazyVerticalGrid(columns = GridCells.Fixed(if (layout == DiscoverLayout.GRID && (dimension != DiscoverDimension.RANKING || nativeFeed != null || nativeCategory != null || selected.isNotEmpty())) 2 else 1), state = grid,
                     modifier = Modifier.fillMaxSize().testTag("discover_content"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = LocalAppBottomInset.current + 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    item(key = "partition", span = { GridItemSpan(maxLineSpan) }) {
+                        LiquidSegmentedSelector(DiscoverPartition.entries.map { LiquidSegmentOption(it.ordinal, it.label) },
+                            partition.ordinal, { onPartition(DiscoverPartition.entries[it]) },
+                            modifier = Modifier.testTag("discover_partition"), fontSp = 14f)
+                    }
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         val native = nativeFeed != null || nativeCategory != null
                         val feeds = if (nativeFeed != null && sourceId != "aggregate") currentCatalogs.flatMap { it.feeds }.distinctBy { it.id } else emptyList()
                         val ranges = if (!native && availableRanges.size > 1) availableRanges else emptyList()
                         val statusKnown = currentCatalogs.any { c -> c.statuses.isNotEmpty() || c.categories.any { serialLabel(it.label) in setOf("连载", "完结") } } ||
-                            state.entries.any { e -> activeSources.any { it.id == e.book.sourceId } && serialLabel(e.book.comicInfo?.status) in setOf("连载", "完结") }
-                        val unknownStatus = state.entries.any { serialLabel(it.book.comicInfo?.status) == "状态未知" }
+                            state.entries.any { e -> activeSources.any { it.id == e.book.sourceId } && serialLabel(e.book.discoverStatus) in setOf("连载", "完结") }
+                        val unknownStatus = state.entries.any { serialLabel(it.book.discoverStatus) == "状态未知" }
                         DiscoverFilters(
                             tabs = listOf("推荐" to native) + availableDimensions.map { it.label to (!native && dimension == it) },
                             onTab = { index -> if (index == 0) { light(); nativeFeed = store.string("native_feed_$sourceId", "native"); nativeCategory = null } else switch(availableDimensions[index - 1]) },
@@ -212,7 +232,7 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
                             refreshing = state.loading, onRefresh = { light(); model.refresh() },
                             sorts = if (feeds.isNotEmpty()) feeds.map { it.label to (nativeFeed == it.id || (nativeFeed == "native" && it == feeds.first())) } else ranges.map { it to (range == it) },
                             onSort = { index -> light(); if (feeds.isNotEmpty()) { nativeFeed = feeds[index].id; nativeCategory = null; statusFilter = "全部" } else { range = ranges[index]; statusFilter = "全部" } },
-                            statuses = if (statusKnown && statusScope.showStatusChoices) listOf("全部", "连载", "完结") + (if (state.entries.any { serialLabel(it.book.comicInfo?.status) == "停更" }) listOf("停更") else emptyList()) + (if (unknownStatus) listOf("状态未知") else emptyList()) else emptyList(),
+                            statuses = if (statusKnown && statusScope.showStatusChoices) listOf("全部", "连载", "完结") + (if (state.entries.any { serialLabel(it.book.discoverStatus) == "停更" }) listOf("停更") else emptyList()) + (if (unknownStatus) listOf("状态未知") else emptyList()) else emptyList(),
                             status = effectiveStatus, statusHint = statusScope.hint, onStatus = { light(); statusFilter = it })
                     }
                     if (sourceId == "aggregate") item(span = { GridItemSpan(maxLineSpan) }) {
@@ -250,7 +270,7 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
                             onFollow = { follow(work, it) }, onBlock = { block(work) },
                             onMenu = { menuWork = work; menuBounds = it }, menuActive = menuWork?.key == work.key,
                             sourceLabel = { id -> sources.firstOrNull { it.id == id }?.name ?: id }, entryIndex = index,
-                            coverSource = { manager.getSource(it) as? ComicSource })
+                            coverSource = { manager.getSource(it) })
                     }
                     if (state.loading) items(if (rows.isEmpty()) 6 else 2) {
                         DiscoverSkeleton(if (dimension == DiscoverDimension.RANKING) DiscoverLayout.LIST else layout)
@@ -271,7 +291,7 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
                         DiscoverGlass(Modifier.fillMaxWidth().pullOutClickable { close { onOpen(entry.book) } }) {
                             Text(sources.firstOrNull { it.id == entry.book.sourceId }?.name ?: entry.book.sourceId, fontWeight = FontWeight.SemiBold)
                             Text(metric(DiscoverWork(work.key, listOf(entry), 0.0), dimension), fontSize = 12.sp)
-                            entry.book.comicInfo?.status?.let { Text(serialLabel(it), fontSize = 11.sp) }
+                            entry.book.discoverStatus?.let { Text(serialLabel(it), fontSize = 11.sp) }
                         }
                     }
                 }
@@ -292,7 +312,7 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
         }
         if (noticesExpanded) DiscoverSourceStatusSheet(activeSources, rows, state, effectiveStatus,
             onRetry = model::retry, onDismiss = { noticesExpanded = false })
-        if (showSettings) DiscoverSettings { showSettings = false }
+        if (showSettings) DiscoverSettings(partition) { showSettings = false }
         if (showSources) DiscoverSourcePicker(sources, enabled, sourceId, { id ->
             sourceId = id; nativeFeed = store.string("feed_$id", "native").ifBlank { null }
             nativeCategory = store.string("category_$id", "").ifBlank { null }; showSources = false
@@ -301,7 +321,7 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
             activeSources.mapNotNull { s -> state.catalogs[s.id]?.let { s to it } },
             { store.put("categories", it); expanded = false }, { id, category ->
                 sourceId = id; nativeFeed = null; nativeCategory = category; store.put("categories", emptySet()); expanded = false
-            }, { expanded = false }, model::loadCategories)
+            }, { expanded = false }, model::loadCategories, partition = partition)
 
     }
 }
@@ -333,10 +353,10 @@ internal fun serialLabel(status: String?): String = when (status?.trim()?.lowerc
 }
 internal fun filterWorkStatus(works: List<DiscoverWork>, status: String): List<DiscoverWork> =
     if (status == "全部") works else works.mapNotNull { work ->
-        work.variants.filter { serialLabel(it.book.comicInfo?.status) == status }.takeIf { it.isNotEmpty() }?.let { work.copy(variants = it) }
+        work.variants.filter { serialLabel(it.book.discoverStatus) == status }.takeIf { it.isNotEmpty() }?.let { work.copy(variants = it) }
     }
 internal fun workStatus(work: DiscoverWork): String {
-    val statuses = work.variants.map { serialLabel(it.book.comicInfo?.status) }.toSet()
+    val statuses = work.variants.map { serialLabel(it.book.discoverStatus) }.toSet()
     return listOf("完结", "连载", "停更").firstOrNull { it in statuses } ?: "状态未知"
 }
 internal fun dateLabel(time: Long?): String = time?.let {

@@ -75,6 +75,15 @@ class XbookcnSource(
         XbookcnParser.books(fetchHtml(path), id)
     }
 
+    private val discovery by lazy {
+        val home = (baseUrl.trimEnd('/') + "/").toHttpUrl()
+        HtmlNovelDiscovery(id, home, { url ->
+            Jsoup.parse(fetchHtml(url.encodedPath + (url.encodedQuery?.let { "?$it" } ?: "")), url.toString())
+        }, { url -> Regex("^/book/([0-9a-f]{6,16})(?:-[^/]+)?/?$").matchEntire(url.encodedPath)?.groupValues?.get(1) })
+    }
+    override suspend fun discoverCatalog(resolveDynamic: Boolean) = result { discovery.catalog() }
+    override suspend fun discover(query: com.example.discover.DiscoverQuery) = result { discovery.discover(query) }
+
     override suspend fun getDetail(bookId: String): SourceResult<SearchBook> = result {
         val html = fetchBook(bookId)
         XbookcnParser.detail(html, bookId, id)

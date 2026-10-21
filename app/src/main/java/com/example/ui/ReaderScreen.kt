@@ -3172,7 +3172,7 @@ fun ReaderScreen(
 
         com.example.ui.components.PullOutScrim(
 
-            visible = showBars && !showSettingsSheet,
+            visible = showBars,
 
             enter = fadeIn(tween(300)),
 
@@ -3224,7 +3224,7 @@ fun ReaderScreen(
 
                 PullOutVisibility(
 
-                                    visible = showBars && !showSettingsSheet) {
+                                    visible = showBars) {
 
                                     // ── 定制阅读器顶栏：圆角浮层 + 章节进度 + 主题自适应色 ──
 
@@ -3377,12 +3377,12 @@ fun ReaderScreen(
                                                     PullOutDropdownMenuItem(
                                                         text = { Text("全文搜索") },
                                                         leadingIcon = { Icon(Icons.Filled.Search, null, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
-                                                        onClick = { showReaderMoreMenu = false; showSearchDialog = true }
+                                                        onClick = com.example.ui.components.paperOpen { showReaderMoreMenu = false; showSearchDialog = true }
                                                     )
                                                     PullOutDropdownMenuItem(
                                                         text = { Text("书签列表") },
                                                         leadingIcon = { Icon(Icons.Filled.Bookmarks, null, tint = MintPrimary, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
-                                                        onClick = { showReaderMoreMenu = false; showAnnotationsSheet = true }
+                                                        onClick = com.example.ui.components.paperOpen { showReaderMoreMenu = false; showAnnotationsSheet = true }
                                                     )
                                                     PullOutDropdownMenuItem(
                                                         text = { Text(if (isAutoScrolling) "停止自动滚屏" else "自动滚屏") },
@@ -3400,7 +3400,7 @@ fun ReaderScreen(
                                                     PullOutDropdownMenuItem(
                                                         text = { Text("排版设置") },
                                                         leadingIcon = { Icon(Icons.Filled.Settings, null, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
-                                                        onClick = { showReaderMoreMenu = false; showSettingsSheet = true }
+                                                        onClick = com.example.ui.components.paperOpen { showReaderMoreMenu = false; showSettingsSheet = true }
                                                     )
                                                 }
                                             }
@@ -3417,7 +3417,7 @@ fun ReaderScreen(
 
                 PullOutVisibility(
 
-                                    visible = showBars && !showSettingsSheet && chapters.isNotEmpty()) {
+                                    visible = showBars && chapters.isNotEmpty()) {
 
                                     // ── 定制阅读器底栏：与顶栏同风格 ──
 

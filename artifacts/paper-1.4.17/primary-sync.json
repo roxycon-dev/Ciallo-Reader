@@ -1,0 +1,162 @@
+{
+  "base": "05683f0d533e28b6f2be1aab427e16fd37eb5bd2",
+  "conflicts": [],
+  "paths": [
+    {
+      "path": "CHANGELOG.md",
+      "mode": "direct"
+    },
+    {
+      "path": "README.md",
+      "mode": "direct"
+    },
+    {
+      "path": "README_EN.md",
+      "mode": "direct"
+    },
+    {
+      "path": "app/build.gradle.kts",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/androidTest/java/com/example/ui/UnifiedPaperPageDeviceTest.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/androidTest/java/com/example/ui/comic/ComicFeatureDeviceTest.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/MainActivity.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/discover/DiscoverCards.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/discover/DiscoverModels.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/discover/DiscoverNovelDetails.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/discover/DiscoverPanels.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/discover/DiscoverPartition.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/discover/DiscoverScreen.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/discover/DiscoverSettings.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/discover/DiscoverStore.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/discover/DiscoverViewModel.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/source/BookSource.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/source/ComicSource.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/source/SourceConfig.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/source/impl/AutoNovelSource.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/source/impl/HtmlNovelDiscovery.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/source/impl/IxdzsSource.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/source/impl/JsonBookSource.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/source/impl/PublicNovelSource.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/source/impl/Wenku8LibrarySource.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/source/impl/XbookcnSource.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/source/importer/SourceImporter.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/transfer/TransferScreen.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/ReaderScreen.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/comic/ComicReaderChrome.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/comic/ComicReaderCore.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/comic/ComicReaderSheets.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/PullOutHosts.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/PullOutMotion.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/PullOutRender.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/ReleaseHistoryDialog.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/help/LibraryHelpBottomSheet.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/test/java/com/example/discover/NovelDiscoverTest.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "docs/release-1.4.17-2026-10-21.md",
+      "mode": "direct"
+    }
+  ]
+}

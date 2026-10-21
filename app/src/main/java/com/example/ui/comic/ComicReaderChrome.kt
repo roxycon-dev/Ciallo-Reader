@@ -3,7 +3,9 @@ package com.example.ui.comic
 import com.example.ui.components.PullOutIconButton
 import com.example.ui.components.PullOutDropdownMenuItem
 import com.example.ui.components.PullOutDropdownMenu
+import com.example.ui.components.pullOutCombinedClickable
 import com.example.ui.components.PullOutVisibility
+import com.example.ui.components.paperSurface
 import com.example.ui.components.pullOutClickable
 import com.example.ui.design.DesignTokens
 import com.example.ui.design.ReadingPalette
@@ -157,6 +159,7 @@ private const val EXIT_MS = 180
 fun ComicReaderChrome(
     visible: Boolean,
     panel: ComicPanel,
+    panelVisibility: androidx.compose.animation.core.MutableTransitionState<Boolean>,
     onPanelChange: (ComicPanel) -> Unit,
     panelGlassBackdrop: Backdrop? = null,
     settingsInitialTab: Int = 0,
@@ -213,7 +216,7 @@ fun ComicReaderChrome(
 
     // 顶部控制栏
     PullOutVisibility(
-        visible = visible && panel == ComicPanel.NONE,
+        visible = visible,
     ) {
         ComicTopBar(
             title = title, chapterTitle = chapterTitle,
@@ -235,7 +238,7 @@ fun ComicReaderChrome(
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         PullOutVisibility(
             modifier = Modifier.onSizeChanged { onBottomBarHeightChanged(it.height) },
-            visible = visible && panel == ComicPanel.NONE,
+            visible = visible,
         ) {
             ComicBottomBar(
                 currentPage = currentPage, totalPages = totalPages,
@@ -277,8 +280,6 @@ fun ComicReaderChrome(
 
     var displayedPanel by remember { mutableStateOf(panel) }
     if (panel != ComicPanel.NONE) displayedPanel = panel
-    val panelVisibility = remember { androidx.compose.animation.core.MutableTransitionState(false) }
-    panelVisibility.targetState = panel != ComicPanel.NONE
     // Scrim and paper use exactly one retained lifecycle and physical progress.
     com.example.ui.components.ScrimEntrance(visibility = panelVisibility) {
         Box(
@@ -289,9 +290,10 @@ fun ComicReaderChrome(
         )
     }
 
+    CompositionLocalProvider(com.example.ui.components.LocalPaperFullSurface provides true) {
     PullOutVisibility(
         visibleState = panelVisibility,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize(), deformContent = false,
     ) {
         CompositionLocalProvider(LocalReadingGlass provides ReadingGlassStyle(panelGlassBackdrop, Color(0xFF232329), TextPrimary)) {
         AnimatedContent(
@@ -350,6 +352,7 @@ fun ComicReaderChrome(
         }
     }
 }
+}
 
 /* ══════════════ 顶栏 ══════════════ */
 
@@ -402,15 +405,15 @@ private fun ComicTopBar(
                     Modifier
                         .size(44.dp)
                         .clip(CircleShape)
-                        .pointerInput(store) {
-                            detectTapGestures(
-                                onLongPress = {
-                                    favorites = store.favoritePresets()
-                                    if (favorites.isNotEmpty()) favMenuOpen = true else onOpenPanel(ComicPanel.PRESET)
-                                },
-                                onTap = { onOpenPanel(ComicPanel.SETTINGS) },
-                            )
-                        },
+                        .pullOutCombinedClickable(
+                            role = androidx.compose.ui.semantics.Role.Button,
+                            onLongClick = {
+                                favorites = store.favoritePresets()
+                                if (favorites.isNotEmpty()) favMenuOpen = true else onOpenPanel(ComicPanel.PRESET)
+                            },
+                            indication = null,
+                            onClick = { onOpenPanel(ComicPanel.SETTINGS) },
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -456,12 +459,12 @@ private fun ComicTopBar(
                     PullOutDropdownMenuItem(
                         text = { Text("手动裁边", color = TextPrimary) },
                         leadingIcon = { Icon(Icons.Filled.Settings, null, tint = TextSecondary) },
-                        onClick = { menuOpen = false; onOpenPanel(ComicPanel.CROP) },
+                        onClick = com.example.ui.components.paperOpen { menuOpen = false; onOpenPanel(ComicPanel.CROP) },
                     )
                     PullOutDropdownMenuItem(
                         text = { Text("阅读预设", color = TextPrimary) },
                         leadingIcon = { Icon(Icons.Filled.ChevronLeft, null, tint = TextSecondary) },
-                        onClick = { menuOpen = false; onOpenPanel(ComicPanel.PRESET) },
+                        onClick = com.example.ui.components.paperOpen { menuOpen = false; onOpenPanel(ComicPanel.PRESET) },
                     )
                 }
             }
@@ -784,6 +787,7 @@ internal fun ComicSheetContainer(
             .padding(horizontal = if (wide) DesignTokens.SpaceLg else DesignTokens.SpaceSm, vertical = DesignTokens.SpaceSm)
             .widthIn(max = 620.dp).fillMaxWidth()
             .fillMaxHeight(if (wide) 0.94f else heightFraction)
+            .paperSurface()
             .clip(sheetShape)
             .comicPanelGlass(glassBackdrop, sheetShape)
             .border(0.5.dp, StrokeColor, sheetShape)

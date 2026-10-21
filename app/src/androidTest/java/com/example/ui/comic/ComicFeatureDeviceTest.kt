@@ -100,6 +100,9 @@ class ComicFeatureDeviceTest {
     }
 
     @Test fun settingsPauseAutoReadingAndVolumeKeysUntilThePanelCloses() {
+        val oldDrawing = androidx.test.platform.graphics.HardwareRendererCompat.isDrawingEnabled()
+        androidx.test.platform.graphics.HardwareRendererCompat.setDrawingEnabled(true)
+        try {
         reader(ComicReaderConfig(fit = ComicFit.FIT_PAGE, pageAnim = ComicPageAnim.NONE,
             direction = ComicDirection.LTR, autoPageIntervalSec = 1f))
         compose.onNodeWithContentDescription("开始自动阅读").performClick()
@@ -109,9 +112,19 @@ class ComicFeatureDeviceTest {
         SystemClock.sleep(1_400)
         compose.runOnUiThread { assertFalse(ComicVolumeKeyBridge.dispatch(android.view.KeyEvent.KEYCODE_VOLUME_DOWN, true)) }
         assertEquals(pageAtOpen, rawPage.get())
+        val dir = File(compose.activity.getExternalFilesDir(null), "paper-1.4.17").apply { mkdirs() }
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { bitmap ->
+            File(dir, "actual-comic-settings.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }; bitmap.recycle()
+        }
+        compose.mainClock.autoAdvance = false
         compose.onNodeWithContentDescription("关闭阅读设置").performClick()
+        compose.mainClock.advanceTimeBy(64)
+        compose.runOnUiThread { assertFalse("Volume must remain blocked during the physical close", ComicVolumeKeyBridge.dispatch(android.view.KeyEvent.KEYCODE_VOLUME_DOWN, true)) }
+        assertEquals(pageAtOpen, rawPage.get())
+        compose.mainClock.advanceTimeBy(1500); compose.mainClock.autoAdvance = true; compose.waitForIdle()
         compose.onNodeWithContentDescription("暂停自动阅读").assertIsDisplayed()
         compose.waitUntil(5_000) { rawPage.get() > pageAtOpen }
         compose.onNodeWithContentDescription("暂停自动阅读").performClick()
+        } finally { androidx.test.platform.graphics.HardwareRendererCompat.setDrawingEnabled(oldDrawing) }
     }
 }

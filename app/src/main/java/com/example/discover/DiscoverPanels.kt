@@ -61,7 +61,7 @@ internal fun DiscoverSourcePicker(sources: List<BookSource>, enabled: Map<String
             item { SourceOption("aggregate", "聚合 · 全部已启用书源", true, selected, closeThenSelect) }
             items(sources, key = { it.id }) { s -> SourceOption(s.id, s.name, enabled[s.id] != false, selected, closeThenSelect) }
         }
-        PullOutTextButton(onClick = paperDismiss(onManage), modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) { Text("管理书源") }
+        PullOutTextButton(onClick = paperOpen(onManage), modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) { Text("管理书源") }
     }
 }
 
@@ -81,7 +81,7 @@ private fun SourceOption(id: String, title: String, enabled: Boolean, selected: 
 @Composable
 internal fun DiscoverCategorySheet(entries: List<DiscoverEntry>, selected: Set<String>,
     catalogs: List<Pair<BookSource, DiscoverCatalog>>, onApply: (Set<String>) -> Unit,
-    onNative: (String, String) -> Unit, onDismiss: () -> Unit, onLoadCategories: (String) -> Unit = {}) {
+    onNative: (String, String) -> Unit, onDismiss: () -> Unit, onLoadCategories: (String) -> Unit = {}, partition: DiscoverPartition = DiscoverPartition.COMIC) {
     var draft by remember { mutableStateOf(selected) }
     var facet by remember { mutableStateOf("genre") }
     var search by remember { mutableStateOf("") }
@@ -101,7 +101,7 @@ internal fun DiscoverCategorySheet(entries: List<DiscoverEntry>, selected: Set<S
         val close = LocalOverlayClose.current
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("找你想看的漫画", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("找你想看的${partition.label}", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 PullOutIconButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Icon(Icons.Outlined.Close, "关闭分类窗口") }
             }
             if (facet == "native") {

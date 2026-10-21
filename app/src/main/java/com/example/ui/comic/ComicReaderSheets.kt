@@ -2,6 +2,7 @@
 
 package com.example.ui.comic
 
+import com.example.ui.components.paperSurface
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutFilledTonalButton
 import com.example.ui.components.PullOutIconButton
@@ -224,6 +225,7 @@ internal fun ComicSettingsSheet(
                 .widthIn(max = if (rail) 620.dp else 560.dp)
                 .fillMaxWidth()
                 .fillMaxHeight(if (wide) 0.96f else 0.82f)
+                .paperSurface()
                 .clip(sheetShape)
                 .comicPanelGlass(glassBackdrop, sheetShape)
                 .border(1.dp, StrokeColor, sheetShape)
@@ -1884,6 +1886,7 @@ internal fun ComicCropSheet(
     Box(
         Modifier
             .fillMaxSize()
+            .paperSurface()
             .background(Color(0xEE000000))
             .statusBarsPadding()
             .navigationBarsPadding()

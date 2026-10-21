@@ -103,7 +103,7 @@ fun TransferHost(backup:BackupManager,onEnablePrivacy:suspend(String)->Boolean={
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:suspend(String)->Boolean={false}) {
+fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:suspend(String)->Boolean={false},onBack:()->Unit=manager::hide) {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
     val state by manager.state.collectAsStateWithLifecycle()
@@ -146,14 +146,14 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
     val open=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if(uri!=null)manager.openShared(uri) }
     val activeState=localProgress?.let { TransferSessionState(it.phase,progress=it,message=it.message) }?:state
     val colors=MaterialTheme.colorScheme
-    BackHandler { manager.hide() }
+    BackHandler { onBack() }
     val scrollBehavior=TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     val statusTop=WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     GlassKitHost(topGradientHeight=statusTop+GlassTokens.ManagementTitleHeight+D.SpaceXxl) {
         Scaffold(containerColor=Color.Transparent,modifier=Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),topBar={
             Box {
                 GlassTopBarStrip(scrollBehavior.state.collapsedFraction,Modifier.fillMaxWidth().height(statusTop+GlassTokens.TopBarHeight))
-                GlassManagementTopBar("设备互传",scrollBehavior,manager::hide,
+                GlassManagementTopBar("设备互传",scrollBehavior,onBack,
                     actions={PullOutIconButton(onClick={showHistory=true}) {Icon(Icons.Default.History,"传输记录")}})
             }
         }) { padding ->
@@ -281,7 +281,7 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
             }
             if(state.busy && state.phase!=TransferPhase.AWAITING_CONFIRMATION)item(key="cancel",contentType="cancel") {
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.Center) {
-                    PullOutTextButton(onClick={manager.hide()}) {Text("收起，后台继续")}
+                    PullOutTextButton(onClick=onBack) {Text("收起，后台继续")}
                     if(state.phase!=TransferPhase.IMPORTING)PullOutTextButton(onClick={manager.cancel()}) {Text("取消传输")}
                 }
             }

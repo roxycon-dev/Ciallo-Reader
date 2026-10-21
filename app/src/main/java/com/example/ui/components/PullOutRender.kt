@@ -21,6 +21,13 @@ import kotlin.math.*
 /** Live-content deformation: one GPU sample, no capture, bitmap, borrowed layer or renderer. */
 @Composable
 internal fun StablePaperSurface(life: PaperLifecycle, content: @Composable () -> Unit) {
+    Box(Modifier.paperSurface(life)) { content() }
+}
+
+/** Attach deformation to the actual panel, rather than its full-screen positioning box. */
+@Composable
+internal fun Modifier.paperSurface(life: PaperLifecycle? = LocalPaperOwner.current): Modifier {
+    if (life == null) return this
     val view = LocalView.current
     val geometry = remember { PaperSurfaceGeometry() }
     val warp = remember(life.softPaper) {
@@ -28,7 +35,7 @@ internal fun StablePaperSurface(life: PaperLifecycle, content: @Composable () ->
             .onFailure { if (com.example.BuildConfig.DEBUG) { PaperWarpStats.failures++; android.util.Log.w("PaperWarp", "Shader unavailable", it) } }.getOrNull()
         else null
     }
-    Box(Modifier.onGloballyPositioned {
+    return this.onGloballyPositioned {
         geometry.bounds = it.boundsInWindow().translate(view.paperWindowOffset())
     }.graphicsLayer {
         val p = life.progress.coerceIn(0f, 1f)
@@ -77,7 +84,7 @@ internal fun StablePaperSurface(life: PaperLifecycle, content: @Composable () ->
                 if (life.inputBlocked) event.changes.forEach { it.consume() }
             }
         }
-    }) { content() }
+    }
 }
 
 private class PaperSurfaceGeometry {

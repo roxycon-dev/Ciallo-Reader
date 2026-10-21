@@ -121,6 +121,36 @@ class JsonBookSource(
         supportOnlineText = config.htmlChapters != null && !isComicLike
     )
 
+    override suspend fun discoverCatalog(resolveDynamic: Boolean) = SourceResult.Success(com.example.discover.DiscoverCatalog(
+        feeds = config.explore.mapIndexed { index, e -> com.example.discover.DiscoverFeed("explore:$index", e.label, e.kind) },
+        declared = true, explicit = true,
+        capabilities = buildMap {
+            if (config.explore.any { it.kind == "updates" }) put("updates", listOf("最新"))
+            if (config.explore.any { it.kind == "ranking" }) put("ranking", listOf("热门"))
+        }))
+    override suspend fun discover(query: com.example.discover.DiscoverQuery): SourceResult<com.example.discover.DiscoverPage> = withContext(Dispatchers.IO) {
+        val index = when {
+            query.feedId == "native" -> 0
+            query.feedId != null -> query.feedId.removePrefix("explore:").toIntOrNull() ?: -1
+            else -> config.explore.indexOfFirst { it.kind == query.dimension.name.lowercase() }
+        }
+        val feed = config.explore.getOrNull(index)
+            ?: return@withContext SourceResult.Success(com.example.discover.DiscoverPage(supported = false, notice = "该书源未声明此发现列表"))
+        if (query.categoryId != null) return@withContext SourceResult.Success(com.example.discover.DiscoverPage(supported = false))
+        val paged = feed.rule.url.contains("{page}") || feed.rule.body?.contains("{page}") == true
+        if (query.page > 1 && !paged) return@withContext SourceResult.Success(com.example.discover.DiscoverPage())
+        try {
+            when (val result = searchHtml("", feed.rule, query.page)) {
+                is SourceResult.Error -> result
+                is SourceResult.Success -> SourceResult.Success(com.example.discover.DiscoverPage(result.data.mapIndexed { i, b ->
+                    com.example.discover.DiscoverEntry(b, nativeOrder = query.offset + i, native = true, origin = feed.label,
+                        rank = if (feed.kind == "ranking") query.offset + i + 1 else null)
+                }, hasMore = paged && result.data.isNotEmpty(), native = true))
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (e: Exception) { SourceResult.Error(SourceException.ParseError(e.message ?: "发现列表读取失败")) }
+    }
+
     override suspend fun search(keyword: String): SourceResult<List<SearchBook>> {
         return withContext(Dispatchers.IO) {
             try {
@@ -311,8 +341,8 @@ class JsonBookSource(
         }
     }
 
-    private suspend fun searchHtml(keyword: String): SourceResult<List<SearchBook>> {
-        val rule = config.htmlSearch ?: return SourceResult.Error(SourceException.ParseError("缺少 htmlSearch 规则"))
+    private suspend fun searchHtml(keyword: String, overrideRule: HtmlSearchRule? = null, page: Int = 1): SourceResult<List<SearchBook>> {
+        val rule = overrideRule ?: config.htmlSearch ?: return SourceResult.Error(SourceException.ParseError("缺少 htmlSearch 规则"))
         val encoded = URLEncoder.encode(keyword, "UTF-8")
         val keywordB64 = android.util.Base64.encodeToString(
             keyword.toByteArray(Charsets.UTF_8),
@@ -322,12 +352,12 @@ class JsonBookSource(
             rule.url
                 .replace("{keyword}", encoded)
                 .replace("{keyword_b64}", keywordB64)
-                .replace("{page}", "1")
+                .replace("{page}", page.toString())
         )
         val body = rule.body
             ?.replace("{keyword}", encoded)
             ?.replace("{keyword_b64}", keywordB64)
-            ?.replace("{page}", "1")
+            ?.replace("{page}", page.toString())
         val raw = try {
             fetchHtml(url, rule.method, body)
         } catch (e: Exception) {

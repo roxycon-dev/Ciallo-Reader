@@ -13,8 +13,8 @@ import com.example.ui.components.*
 
 /** Discover owns its settings window; shared by the Discover and global Settings entries. */
 @Composable
-fun DiscoverSettings(onDismissRequest: () -> Unit) {
-    val (store, revision) = rememberDiscoverStore()
+fun DiscoverSettings(partition: DiscoverPartition = DiscoverPartition.COMIC, onDismissRequest: () -> Unit) {
+    val (store, revision) = rememberDiscoverStore(partition)
     var blockedOpen by remember { mutableStateOf(false) }
     AcrylicDialog(onDismissRequest = onDismissRequest, title = { Text("发现设置", style = MaterialTheme.typography.titleLarge) },
         text = {

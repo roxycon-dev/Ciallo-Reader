@@ -442,12 +442,16 @@ fun ComicReaderCore(
     var controlsVisible by remember { mutableStateOf(true) }
     var readerBottomBarHeightPx by remember { mutableIntStateOf(0) }
     var panel by remember { mutableStateOf(ComicPanel.NONE) }
+    val panelVisibility = remember { androidx.compose.animation.core.MutableTransitionState(false) }
+    panelVisibility.targetState = panel != ComicPanel.NONE
+    val panelLife = com.example.ui.components.rememberPaperLifecycle(panelVisibility)
+    val panelShown = panel != ComicPanel.NONE || panelLife.retained
     var settingsInitialTab by remember { mutableIntStateOf(0) }
     var autoRead by remember { mutableStateOf(false) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val lifecycleState by lifecycle.currentStateFlow.collectAsStateWithLifecycle()
     val readerResumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
-    val autoReadingActive = autoRead && panel == ComicPanel.NONE && readerResumed && !showTouchEditor
+    val autoReadingActive = autoRead && !panelShown && readerResumed && !showTouchEditor
     // 条漫与无缝模式共用滚动位置；页码仍跟随最可见项。
     var scrollMetrics by remember(pages, config.mode) { mutableStateOf<ComicScrollMetrics?>(null) }
     var scrollJump by remember(pages, config.mode) { mutableStateOf<Pair<Int, Float>?>(null) }
@@ -511,8 +515,8 @@ fun ComicReaderCore(
     val latestVolumeTurn by rememberUpdatedState<(Boolean) -> Unit> { next ->
         if (next) goNext() else goPrev()
     }
-    DisposableEffect(config.volumeKeyTurn, config.direction, panel, readerResumed) {
-        if (config.volumeKeyTurn && panel == ComicPanel.NONE && readerResumed) {
+    DisposableEffect(config.volumeKeyTurn, config.direction, panelShown, readerResumed) {
+        if (config.volumeKeyTurn && !panelShown && readerResumed) {
             ComicVolumeKeyBridge.handler = { isUp, isDownAction ->
                 if (!isDownAction) {
                     true   // UP 事件一并吞掉（防系统音量条），但不重复翻页
@@ -649,12 +653,7 @@ fun ComicReaderCore(
     // 面板玻璃使用独立的当前页位图采样层，避免纸面快照反向引用活动 RenderNode，
     // 供设置/目录/预设面板 drawBackdrop 高斯模糊采样（与底部 Tab 栏同机制）。
     // remember 无条件调用（Compose 规范），仅按需挂 modifier——阅读期零每帧重录开销
-    var retainPanelGlass by remember { mutableStateOf(false) }
-    LaunchedEffect(panel) {
-        if (panel != ComicPanel.NONE) retainPanelGlass = true
-        else { delay(240); retainPanelGlass = false }
-    }
-    val glassOpen = !minimal && (panel != ComicPanel.NONE || retainPanelGlass)
+    val glassOpen = !minimal && panelShown
     val panelGlassBackdrop = if (glassOpen) rememberComicGlassBackdrop(
         layout.spreads.getOrNull(currentSpread)?.slots.orEmpty(), displayConfig, loader, bookState, dynamicBg, touchViewport
     ) else null
@@ -708,7 +707,18 @@ fun ComicReaderCore(
                 else Modifier.graphicsLayer { alpha = engineFade }
             )
         ) {
-        when {
+        val pagePaper = com.example.ui.components.LocalPaperOwner.current
+        val movingNativePage = engineIsGl && pagePaper != null && !pagePaper.flat
+        if (movingNativePage) {
+            // SurfaceView is outside Compose's render tree. During the page transition,
+            // draw the same processed pixels through Compose so the *whole* page can deform.
+            // No GPU readback, screenshot, extra bitmap or native layer transform is involved.
+            val pixels = rememberComicGlassBackdrop(layout.spreads.getOrNull(currentSpread)?.slots.orEmpty(),
+                displayConfig, loader, bookState, dynamicBg, touchViewport)
+            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                with(pixels) { drawBackdrop(this@Canvas, null, null) }
+            }
+        } else when {
             verticalMode -> androidx.compose.runtime.key(bookKey, chapterSig) { ComicVerticalList(
                 layout = layout, config = displayConfig, loader = loader, bookState = bookState,
                 currentSpread = currentSpread,
@@ -777,7 +787,7 @@ fun ComicReaderCore(
             is com.example.mangatranslate.TranslateModelManager.DownloadState.Failed -> "OCR 模型下载失败 · 点按检查翻译设置"
             else -> "检查 OCR 模型…"
         }
-        if (config.translationEnabled && modelStatus != null && panel == ComicPanel.NONE) {
+        if (config.translationEnabled && modelStatus != null && !panelShown) {
             Text(modelStatus, color = Color.White, fontSize = DesignTokens.TypeCaption,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = translationStatusBottom, start = DesignTokens.SpaceXl, end = DesignTokens.SpaceXl)
                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(50)).background(PanelBg)
@@ -788,7 +798,7 @@ fun ComicReaderCore(
             "${slot.ref.id}|${slot.half}|${config.imagePipelineFingerprint()}|r$rot"
         }.orEmpty()
         val currentTranslationBusy = currentTranslationKeys.firstOrNull { it in translatingPages }
-        if (config.translationEnabled && currentTranslationBusy != null && panel == ComicPanel.NONE) {
+        if (config.translationEnabled && currentTranslationBusy != null && !panelShown) {
             Box(
                 Modifier
                     .align(Alignment.BottomCenter)
@@ -801,7 +811,7 @@ fun ComicReaderCore(
             }
         }
         val currentFailure = currentTranslationKeys.firstOrNull { it in translationFailures }?.let { translationFailureDetails[it] }
-        if (config.translationEnabled && currentFailure != null && currentTranslationBusy == null && panel == ComicPanel.NONE) {
+        if (config.translationEnabled && currentFailure != null && currentTranslationBusy == null && !panelShown) {
             val action = if (currentFailure.retryable) "点按重试" else "点按检查设置"
             Text("${currentFailure.description} · $action", color = Color.White, fontSize = DesignTokens.TypeCaption,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = translationStatusBottom, start = DesignTokens.SpaceXl, end = DesignTokens.SpaceXl)
@@ -814,7 +824,7 @@ fun ComicReaderCore(
                     }.padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceComfortable))
         }
         val currentNotice = currentTranslationKeys.firstNotNullOfOrNull { translationNotices[it] }
-        if (config.translationEnabled && currentNotice != null && currentFailure == null && currentTranslationBusy == null && panel == ComicPanel.NONE) {
+        if (config.translationEnabled && currentNotice != null && currentFailure == null && currentTranslationBusy == null && !panelShown) {
             Text(currentNotice, color = Color.White, fontSize = DesignTokens.TypeCaption,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = translationStatusBottom, start = DesignTokens.SpaceXl, end = DesignTokens.SpaceXl)
                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(50)).background(PanelBg)
@@ -839,6 +849,7 @@ fun ComicReaderCore(
 
     /* ── 控制层与面板 ── */
     ComicReaderChrome(
+        panelVisibility = panelVisibility,
         visible = controlsVisible,
         panel = panel,
         onPanelChange = { settingsInitialTab = 0; panel = it },

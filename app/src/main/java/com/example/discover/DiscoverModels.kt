@@ -63,7 +63,7 @@ data class DiscoverPage(val entries: List<DiscoverEntry> = emptyList(), val hasM
     val catalog: DiscoverCatalog? = null, val native: Boolean = false)
 data class DiscoverWork(val key: String, val variants: List<DiscoverEntry>, val score: Double) {
     val book get() = variants.first().book
-    val tags get() = variants.flatMap { it.book.comicInfo?.tags.orEmpty() }.distinct()
+    val tags get() = variants.flatMap { it.book.discoverTags }.distinct()
     val updatedAt get() = variants.mapNotNull { it.updatedAt }.maxOrNull()
 }
 

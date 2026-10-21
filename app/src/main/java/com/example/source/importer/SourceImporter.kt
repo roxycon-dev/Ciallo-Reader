@@ -328,6 +328,7 @@ object SourceImporter {
                 detail = detailRule,
                 download = downloadRule,
                 htmlSearch = htmlSearch,
+                explore = parseNativeExplore(obj, htmlSearch),
                 htmlChapters = htmlChapters,
                 htmlContent = htmlContent,
                 enabled = true,
@@ -446,12 +447,59 @@ object SourceImporter {
             detail = null,
             download = DownloadRule(),
             htmlSearch = htmlSearch,
+            explore = parseLegadoExplore(obj, htmlSearch),
             htmlChapters = htmlChapters,
             htmlContent = htmlContent,
             enabled = true,
             isCustom = true
         )
         return ConvertedSource(JsonBookSource(config), rawJson, name)
+    }
+
+    private fun parseNativeExplore(obj: JSONObject, fallback: HtmlSearchRule?): List<HtmlExploreRule> {
+        val entries = obj.optJSONArray("explore") ?: return emptyList()
+        return (0 until entries.length()).mapNotNull { i ->
+            val e = entries.optJSONObject(i) ?: return@mapNotNull null
+            val url = e.optString("url").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val label = e.optString("name", "原站推荐")
+            val selector = e.optString("listSelector").ifBlank { fallback?.listSelector.orEmpty() }
+            if (selector.isBlank()) return@mapNotNull null
+            HtmlExploreRule(label, HtmlSearchRule(url, selector,
+                titleSelector = e.optString("title").ifBlank { fallback?.titleSelector.orEmpty() },
+                authorSelector = e.optString("author").ifBlank { fallback?.authorSelector.orEmpty() },
+                coverSelector = e.optString("cover").ifBlank { fallback?.coverSelector.orEmpty() },
+                detailUrlSelector = e.optString("detailUrl").ifBlank { fallback?.detailUrlSelector.orEmpty() },
+                introSelector = e.optString("intro").ifBlank { fallback?.introSelector.orEmpty() }),
+                e.optString("kind").takeIf { it in setOf("updates", "ranking") })
+        }
+    }
+    /** Static Legado discovery lists only. Executable rule strings are never evaluated here. */
+    private fun parseLegadoExplore(obj: JSONObject, fallback: HtmlSearchRule): List<HtmlExploreRule> {
+        val raw = obj.optString("exploreUrl").trim()
+        if (raw.isBlank() || raw.contains("@js") || raw.contains("<js>") || raw.contains("{{java.")) return emptyList()
+        val rules = parseRuleObject(obj, "ruleExplore") ?: return emptyList()
+        val list = rules.optString("bookList").takeIf { it.isNotBlank() } ?: return emptyList()
+        val pairs = if (raw.startsWith("[")) runCatching {
+            val array = JSONArray(raw)
+            (0 until array.length()).mapNotNull { i -> array.optJSONObject(i)?.let { it.optString("title") to it.optString("url") } }
+        }.getOrDefault(emptyList()) else raw.split("&&").mapNotNull { line ->
+            val at = line.indexOf("::").takeIf { it >= 0 }
+            if (at != null) line.substring(0, at).trim() to line.substring(at + 2).trim()
+            else line.indexOf('@').takeIf { it > 0 }?.let { line.substring(0, it).trim() to line.substring(it + 1).trim() }
+        }
+        return pairs.mapNotNull { (title, value) ->
+            val converted = convertLegadoUrl(value) ?: return@mapNotNull null
+            if (title.isBlank() || converted.url.contains("{keyword}")) return@mapNotNull null
+            val kind = when {
+                Regex("最新|更新").containsMatchIn(title) -> "updates"
+                Regex("排行|榜单|热门|人气|点击").containsMatchIn(title) -> "ranking"
+                else -> null
+            }
+            HtmlExploreRule(title, fallback.copy(url = converted.url, method = converted.method, body = converted.body,
+                listSelector = list, titleSelector = rules.optString("name"), authorSelector = rules.optString("author"),
+                coverSelector = rules.optString("coverUrl"), detailUrlSelector = rules.optString("bookUrl"),
+                introSelector = rules.optString("intro")), kind)
+        }
     }
 
     private fun parseRuleObject(obj: JSONObject, key: String): JSONObject? {

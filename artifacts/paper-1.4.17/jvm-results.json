@@ -1,0 +1,44 @@
+[
+  {
+    "name": "com.example.discover.NovelDiscoverTest",
+    "tests": "5",
+    "failures": "0",
+    "errors": "0",
+    "time": "0.551"
+  },
+  {
+    "name": "com.example.discover.DiscoverViewModelTest",
+    "tests": "23",
+    "failures": "0",
+    "errors": "0",
+    "time": "4.725"
+  },
+  {
+    "name": "com.example.discover.DiscoverEngineTest",
+    "tests": "12",
+    "failures": "0",
+    "errors": "0",
+    "time": "0.11"
+  },
+  {
+    "name": "com.example.source.LegadoImporterTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "time": "2.229"
+  },
+  {
+    "name": "com.example.source.SourceImporterTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "time": "0.057"
+  },
+  {
+    "name": "com.example.ui.components.PaperAndSliderTest",
+    "tests": "21",
+    "failures": "0",
+    "errors": "0",
+    "time": "3.357"
+  }
+]

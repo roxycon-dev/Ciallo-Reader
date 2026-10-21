@@ -6,8 +6,18 @@ interface BookSource {
     val capabilities: SourceCapabilities
     val requiresLogin: Boolean get() = capabilities.requiresLogin
 
+    val supportsDiscoverMetadata: Boolean get() = false
+    suspend fun getDiscoverMetadata(bookId: String): SourceResult<SearchBook> =
+        SourceResult.Error(SourceException.ParseError("书源没有轻量元数据接口"))
+    suspend fun discoverCatalog(resolveDynamic: Boolean = false): SourceResult<com.example.discover.DiscoverCatalog> =
+        SourceResult.Success(com.example.discover.DiscoverCatalog())
+    suspend fun discover(query: com.example.discover.DiscoverQuery): SourceResult<com.example.discover.DiscoverPage> =
+        SourceResult.Success(com.example.discover.DiscoverPage(supported = false, notice = "该书源未提供此维度数据"))
+
     suspend fun search(keyword: String): SourceResult<List<SearchBook>>
     suspend fun getDetail(bookId: String): SourceResult<SearchBook>
+    /** Cover requests are shared by ebook and chapter sources. */
+    suspend fun getCoverHeaders(url: String): Map<String, String> = emptyMap()
     /** Public work detail page; never a chapter, image, or download endpoint. */
     suspend fun getShareUrl(bookId: String): String? = DetailLink.valid(bookId)
     suspend fun getDownloadInfo(bookId: String): SourceResult<DownloadInfo>

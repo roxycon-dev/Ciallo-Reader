@@ -1,7 +1,11 @@
 package com.example
 
 import com.example.ui.components.openPaperPage
+import com.example.discover.discoverUsesNovelDetails
 import com.example.ui.components.pullOutPage
+import com.example.ui.components.paperComposable
+import com.example.ui.components.dismissPaperPage
+import com.example.ui.components.replacePaperPage
 import com.example.ui.components.PullOutVisibility
 import android.net.Uri
 import android.os.Bundle
@@ -404,7 +408,7 @@ class MainActivity : ComponentActivity() {
                             if (transferOpen) {
                                 navController.navigate("device_transfer") { launchSingleTop = true }
                             } else if (navController.currentDestination?.route == "device_transfer") {
-                                navController.popBackStack()
+                                navController.dismissPaperPage()
                             }
                         }
                         val sharedEntry by navController.currentBackStackEntryAsState()
@@ -519,8 +523,8 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         startDestination = "splash",
                         enterTransition = { com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion) },
-                        exitTransition = { com.example.ui.feedback.NavigationMotion.leave(navigationReduceMotion) },
-                        popEnterTransition = { com.example.ui.feedback.NavigationMotion.returnEnter(navigationReduceMotion) },
+                        exitTransition = { androidx.compose.animation.ExitTransition.None },
+                        popEnterTransition = { androidx.compose.animation.EnterTransition.None },
                         popExitTransition = { com.example.ui.feedback.NavigationMotion.returnLeave(navigationReduceMotion) }
                     ) {
                         composable("splash") {
@@ -550,6 +554,11 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable("home") { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+                            var discoveredNovel by remember { mutableStateOf<com.example.source.SearchBook?>(null) }
+                            com.example.discover.DiscoverNovelDetails(discoveredNovel, libraryViewModel,
+                                onDismiss = { discoveredNovel = null }, onRead = { book ->
+                                    viewModel.selectBook(book); navController.openPaperPage("reader")
+                                })
                             val books by viewModel.allBooks.collectAsStateWithLifecycle()
                             val categories by viewModel.allCategories.collectAsStateWithLifecycle()
                             val readingRecords by viewModel.allReadingRecords.collectAsStateWithLifecycle()
@@ -769,7 +778,11 @@ class MainActivity : ComponentActivity() {
                                                 favorites = if (viewModel.favoritesProtected.collectAsStateWithLifecycle().value) emptyList() else favoriteItems,
                                                 favoriteKeys = favoriteKeys,
                                                 onFollow = { book, next -> viewModel.toggleFavorite(book, next) },
-                                                onOpen = { book -> discoverReadJob?.cancel(); libraryViewModel.openComic(book); navController.navigate("comic_chapters") },
+                                                onOpen = { book ->
+                                                    discoverReadJob?.cancel()
+                                                    if (libraryViewModel.sourceManager.getSource(book.sourceId)?.discoverUsesNovelDetails == true) discoveredNovel = book
+                                                    else { libraryViewModel.openComic(book); navController.openPaperPage("comic_chapters") }
+                                                },
                                                 onLatest = {},
                                                 onSourceManagement = { navController.openPaperPage("source_management") },
                                             )
@@ -1081,7 +1094,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
  }
-                        composable("settings") {
+                        paperComposable("settings", navController) {
                             val categories by viewModel.allCategories.collectAsStateWithLifecycle()
                             // 排行榜陈列方式按钮的跳转信标：读一次即清空
                             val focusGodSettings = remember {
@@ -1102,7 +1115,7 @@ class MainActivity : ComponentActivity() {
                                     viewModel.addCategory(name)
                                 },
                                 onBack = {
-                                    navController.popBackStack()
+                                    navController.dismissPaperPage()
                                 },
                                 autoNightModeVal = autoNightMode,
                                 onAutoNightModeChange = { viewModel.updateAutoNightMode(it) },
@@ -1142,14 +1155,14 @@ class MainActivity : ComponentActivity() {
                         }
 
                         /* ── 神回排行榜（全屏完整版） ── */
-                        composable("god_ranking") {
+                        paperComposable("god_ranking", navController) {
                             com.example.god.GodRankingScreen(
                                 moments = viewModel.godMoments.collectAsStateWithLifecycle().value,
                                 style = viewModel.godSettings.rankingStyle
                                     .collectAsStateWithLifecycle(initialValue = com.example.god.GodRankingStyle.PODIUM).value,
                                 gyroEnabled = viewModel.godSettings.gyroParallaxEnabled
                                     .collectAsStateWithLifecycle(initialValue = true).value,
-                                onBack = { navController.popBackStack() },
+                                onBack = { navController.dismissPaperPage() },
                                 onItemClick = { m ->
                                     val parts = m.bookId.split("::")
                                     val sid = parts.getOrNull(0).orEmpty()
@@ -1169,8 +1182,7 @@ class MainActivity : ComponentActivity() {
                                                 comicId = cid, format = "comic",
                                             )
                                         )
-                                        navController.popBackStack()
-                                        navController.navigate("comic_chapters")
+                                        navController.replacePaperPage("comic_chapters")
                                     }
                                 },
                                 onEdit = { m ->
@@ -1187,13 +1199,16 @@ class MainActivity : ComponentActivity() {
                         }
 
                         /* ── 神回编辑窗口（从排行榜 / 设置进入的独立路由） ── */
-                        composable("god_editor") {
+                        composable("god_editor", enterTransition = { androidx.compose.animation.EnterTransition.None },
+                            exitTransition = { androidx.compose.animation.ExitTransition.None },
+                            popEnterTransition = { androidx.compose.animation.EnterTransition.None },
+                            popExitTransition = { androidx.compose.animation.ExitTransition.None }) {
                             val binding = com.example.god.rememberGodEditBinding()
                             var started by remember { mutableStateOf(false) }
                             LaunchedEffect(Unit) {
                                 val e = com.example.god.GodMomentEditTarget.entity
                                 if (e == null) {
-                                    navController.popBackStack()
+                                    navController.dismissPaperPage()
                                 } else {
                                     binding.openEdit(e)
                                     started = true
@@ -1203,20 +1218,14 @@ class MainActivity : ComponentActivity() {
                                 // 窗口关闭（保存或取消）→ 退回上一个界面
                                 if (started && binding.request == null) {
                                     com.example.god.GodMomentEditTarget.entity = null
-                                    navController.popBackStack()
+                                    navController.dismissPaperPage()
                                 }
                             }
                             androidx.activity.compose.BackHandler { binding.request = null }
                             com.example.god.GodMomentEditHost(binding = binding, onSaved = { })
                         }
 
-                        composable(
-                            "reader",
-                            enterTransition = { com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion) },
-                            exitTransition = { com.example.ui.feedback.NavigationMotion.leave(navigationReduceMotion) },
-                            popEnterTransition = { com.example.ui.feedback.NavigationMotion.returnEnter(navigationReduceMotion) },
-                            popExitTransition = { com.example.ui.feedback.NavigationMotion.returnLeave(navigationReduceMotion) }
-                        ) { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+                        paperComposable("reader", navController) { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null) {
                             val selectedBook by viewModel.selectedBook.collectAsStateWithLifecycle()
                             val chapters by viewModel.chapters.collectAsStateWithLifecycle()
                             val readerLoading by viewModel.readerLoading.collectAsStateWithLifecycle()
@@ -1243,7 +1252,7 @@ class MainActivity : ComponentActivity() {
                                 readerLoadError = readerLoadError,
                                 onRetryLoad = viewModel::retrySelectedBook,
                                 onEnsureChapterLoaded = viewModel::ensureActiveChapter,
-                                onBack = { navController.popBackStack() },
+                                onBack = { navController.dismissPaperPage() },
                                 onUpdateProgress = { id, chapterIdx, offset, isFinished ->
                                     viewModel.updateProgress(id, chapterIdx, offset, isFinished)
                                 },
@@ -1282,13 +1291,7 @@ class MainActivity : ComponentActivity() {
                             com.example.library.NovelUpdatePanel(libraryViewModel, selectedBook)
                         }
  }
-                        composable(
-                            "comic_reader",
-                            enterTransition = { com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion) },
-                            exitTransition = { com.example.ui.feedback.NavigationMotion.leave(navigationReduceMotion) },
-                            popEnterTransition = { com.example.ui.feedback.NavigationMotion.returnEnter(navigationReduceMotion) },
-                            popExitTransition = { com.example.ui.feedback.NavigationMotion.returnLeave(navigationReduceMotion) }
-                        ) { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+                        paperComposable("comic_reader", navController) { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null) {
                             val selectedBook by viewModel.selectedBook.collectAsStateWithLifecycle()
                             val chapters by viewModel.chapters.collectAsStateWithLifecycle()
                             val libraryBooks by viewModel.allBooks.collectAsStateWithLifecycle()
@@ -1300,7 +1303,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenBook = { nextBook ->
                                     viewModel.selectBook(nextBook)
                                 },
-                                onBack = { navController.popBackStack() },
+                                onBack = { navController.dismissPaperPage() },
                                 onUpdateProgress = { id, pageIdx, offset, isFinished ->
                                     viewModel.updateProgress(id, pageIdx, offset, isFinished)
                                 },
@@ -1329,7 +1332,7 @@ class MainActivity : ComponentActivity() {
                             )
                         } }
 
-                        composable(LIBRARY_SEARCH_ROUTE) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+                        paperComposable(LIBRARY_SEARCH_ROUTE, navController) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null) {
                             val searchViewModel = remember(entry, sharedLibraryViewModel) {
                                 librarySearchViewModel(entry, sharedLibraryViewModel)
                             }
@@ -1351,18 +1354,11 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onOpenLocalNovel = { book -> viewModel.selectBook(book); navController.navigate("reader") },
                                 extraBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
-                                onBack = { navController.popBackStack() },
+                                onBack = { navController.dismissPaperPage() },
                             )
                         } }
 
-                        composable(
-                            "comic_chapters?$LIBRARY_SESSION_ARGUMENT={$LIBRARY_SESSION_ARGUMENT}",
-                            arguments = librarySessionArguments(),
-                            enterTransition = { com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion) },
-                            exitTransition = { com.example.ui.feedback.NavigationMotion.leave(navigationReduceMotion) },
-                            popEnterTransition = { com.example.ui.feedback.NavigationMotion.returnEnter(navigationReduceMotion) },
-                            popExitTransition = { com.example.ui.feedback.NavigationMotion.returnLeave(navigationReduceMotion) }
-                        ) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+                        paperComposable("comic_chapters?$LIBRARY_SESSION_ARGUMENT={$LIBRARY_SESSION_ARGUMENT}", navController, arguments = librarySessionArguments()) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null) {
                             val librarySessionId = entry.arguments?.getString(LIBRARY_SESSION_ARGUMENT)
                             val libraryViewModel = remember(entry, sharedLibraryViewModel) {
                                 libraryViewModelForSession(navController, librarySessionId, sharedLibraryViewModel)
@@ -1555,7 +1551,7 @@ class MainActivity : ComponentActivity() {
                                     comicBook?.let { libraryViewModel.startDownload(it, "epub") }
                                     AppToast.makeText(comicContext, "已请求整本下载，可在下载管理查看进度", Toast.LENGTH_SHORT).show()
                                 }) else null,
-                                onBack = { navController.popBackStack() },
+                                onBack = { navController.dismissPaperPage() },
                                 onRetry = { comicBook?.let { libraryViewModel.openComic(it) } },
                                 onChapterClick = { chapter ->
                                     if (comicIsTextMode) {
@@ -1654,14 +1650,7 @@ class MainActivity : ComponentActivity() {
                             )
                         } }
 
-                        composable(
-                            "comic_reader_online?$LIBRARY_SESSION_ARGUMENT={$LIBRARY_SESSION_ARGUMENT}",
-                            arguments = librarySessionArguments(),
-                            enterTransition = { com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion) },
-                            exitTransition = { com.example.ui.feedback.NavigationMotion.leave(navigationReduceMotion) },
-                            popEnterTransition = { com.example.ui.feedback.NavigationMotion.returnEnter(navigationReduceMotion) },
-                            popExitTransition = { com.example.ui.feedback.NavigationMotion.returnLeave(navigationReduceMotion) }
-                        ) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+                        paperComposable("comic_reader_online?$LIBRARY_SESSION_ARGUMENT={$LIBRARY_SESSION_ARGUMENT}", navController, arguments = librarySessionArguments()) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null) {
                             val librarySessionId = entry.arguments?.getString(LIBRARY_SESSION_ARGUMENT)
                             val libraryViewModel = remember(entry, sharedLibraryViewModel) {
                                 libraryViewModelForSession(navController, librarySessionId, sharedLibraryViewModel)
@@ -1711,7 +1700,7 @@ class MainActivity : ComponentActivity() {
                                             )
                                         }
                                     }
-                                    navController.popBackStack()
+                                    navController.dismissPaperPage()
                                 },
                                 onRetry = { activeChapter?.let { libraryViewModel.loadChapterImages(it) } },
                                 bookKey = comicBook?.let { "online_${it.sourceId}_${it.id}" },
@@ -1785,12 +1774,7 @@ class MainActivity : ComponentActivity() {
                             )
                         } }
 
-                        composable(
-                            "novel_reader_online?$LIBRARY_SESSION_ARGUMENT={$LIBRARY_SESSION_ARGUMENT}",
-                            arguments = librarySessionArguments(),
-                            enterTransition = { com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion) },
-                            exitTransition = { com.example.ui.feedback.NavigationMotion.leave(navigationReduceMotion) }
-                        ) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+                        paperComposable("novel_reader_online?$LIBRARY_SESSION_ARGUMENT={$LIBRARY_SESSION_ARGUMENT}", navController, arguments = librarySessionArguments()) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null) {
                             val librarySessionId = entry.arguments?.getString(LIBRARY_SESSION_ARGUMENT)
                             val libraryViewModel = remember(entry, sharedLibraryViewModel) {
                                 libraryViewModelForSession(navController, librarySessionId, sharedLibraryViewModel)
@@ -1811,7 +1795,7 @@ class MainActivity : ComponentActivity() {
                                 error = novelError,
                                 hasPrevChapter = idx > 0,
                                 hasNextChapter = idx >= 0 && idx < chapters.size - 1,
-                                onBack = { navController.popBackStack() },
+                                onBack = { navController.dismissPaperPage() },
                                 onRetry = { novelChapter?.let { libraryViewModel.loadChapterText(it) } },
                                 onLoadPrev = {
                                     if (idx > 0) {
@@ -1840,8 +1824,9 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        composable("device_transfer") {
-                            com.example.transfer.TransferScreen(transferManager,viewModel.backupManager,viewModel::enablePrivacyMode)
+                        paperComposable("device_transfer", navController) {
+                            DisposableEffect(Unit) { onDispose { transferManager.hide() } }
+                            com.example.transfer.TransferScreen(transferManager,viewModel.backupManager,viewModel::enablePrivacyMode, onBack = { navController.dismissPaperPage() })
                         }
 
                     }

@@ -6,6 +6,7 @@ import com.kashif_e.backdrop.backdrops.layerBackdrop
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.dialog
+import androidx.navigation.compose.composable
 import com.example.ui.design.DesignTokens
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.background
@@ -128,11 +129,76 @@ fun NavController.openPaperPage(route: String) {
     navigate(route) { launchSingleTop = true }
 }
 
+/** Atomic forward replacement; do not start an asynchronous close and navigate immediately. */
+fun NavController.replacePaperPage(route: String) {
+    PullOutSources.claim()?.freezeForHandoff()?.let(PullOutSources::activate)
+    val outgoing = currentDestination?.id
+    navigate(route) {
+        if (outgoing != null) popUpTo(outgoing) { inclusive = true }
+        launchSingleTop = true
+    }
+}
+
 fun NavGraphBuilder.pullOutPage(route: String, onDismiss: () -> Unit,
     content: @Composable (close: () -> Unit) -> Unit) {
     dialog(route, dialogProperties = DialogProperties(usePlatformDefaultWidth = false,
         dismissOnClickOutside = false, dismissOnBackPress = false, decorFitsSystemWindows = false)) {
         PullOutPageContent(onDismiss, content)
+    }
+}
+
+/** Activity-window page host: readers keep their brightness, inset and native-surface ownership.
+ * Saveable presentation state prevents a second opening when returning to an existing entry.
+ * All back buttons and system back share the same interruptible paper close.
+ */
+private val paperPageOrigins = java.util.WeakHashMap<androidx.navigation.NavBackStackEntry, PullOutSource>()
+private val paperPageClosers = java.util.WeakHashMap<androidx.navigation.NavBackStackEntry, () -> Unit>()
+fun NavController.dismissPaperPage() {
+    val entry = currentBackStackEntry
+    val close = paperPageClosers[entry]
+    if (close != null) close() else popBackStack()
+}
+fun NavGraphBuilder.paperComposable(
+    route: String, navController: NavController,
+    arguments: List<androidx.navigation.NamedNavArgument> = emptyList(),
+    content: @Composable androidx.compose.animation.AnimatedContentScope.(androidx.navigation.NavBackStackEntry) -> Unit,
+) {
+    composable(route, arguments = arguments,
+        enterTransition = { androidx.compose.animation.EnterTransition.None },
+        exitTransition = { androidx.compose.animation.ExitTransition.None },
+        popEnterTransition = { androidx.compose.animation.EnterTransition.None },
+        popExitTransition = { androidx.compose.animation.ExitTransition.None }) { entry ->
+        val navScope = this
+        var presented by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+        var savedOrigin by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<FloatArray?>(null) }
+        val origin = remember(entry) {
+            paperPageOrigins.getOrPut(entry) {
+                if (presented && savedOrigin != null) PullOutSource().apply {
+                    val b = savedOrigin!!
+                    bounds = androidx.compose.ui.geometry.Rect(b[0], b[1], b[2], b[3]); virtual = b[4] == 1f
+                } else PullOutSources.claim() ?: PullOutSource().apply { virtual = true }
+            }.also { source ->
+                val saved = if (source.frozenOpening) source.returnSource() else source
+                savedOrigin = floatArrayOf(saved.bounds.left, saved.bounds.top, saved.bounds.right, saved.bounds.bottom, if (saved.virtual) 1f else 0f)
+            }
+        }
+        val visibility = remember { MutableTransitionState(presented).apply { targetState = true } }
+        val close = rememberPaperClose(visibility) {
+            if (navController.currentBackStackEntry === entry) navController.popBackStack()
+        }
+        val latestClose by rememberUpdatedState(close)
+        DisposableEffect(entry) {
+            paperPageClosers[entry] = { latestClose {} }
+            onDispose { paperPageClosers.remove(entry) }
+        }
+        LaunchedEffect(entry) { presented = true }
+        BackHandler { close {} }
+        CompositionLocalProvider(LocalPaperOrigin provides origin, LocalPaperOwner provides null,
+            LocalPaperFullSurface provides true, LocalPaperHandoff provides null) {
+            PullOutVisibility(visibility, Modifier.fillMaxSize()) {
+                PaperPageBackground { navScope.content(entry) }
+            }
+        }
     }
 }
 

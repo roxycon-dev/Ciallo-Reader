@@ -5,13 +5,14 @@ import android.content.SharedPreferences
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import com.example.source.ComicInfo
+import com.example.source.NovelInfo
 import com.example.source.SearchBook
 import org.json.JSONArray
 import org.json.JSONObject
 
-class DiscoverStore(context: Context) {
-    val prefs: SharedPreferences = context.getSharedPreferences("discover_preferences", Context.MODE_PRIVATE)
-    val cache: SharedPreferences = context.getSharedPreferences("discover_cache", Context.MODE_PRIVATE)
+class DiscoverStore(context: Context, val partition: DiscoverPartition = DiscoverPartition.COMIC) {
+    val prefs: SharedPreferences = context.getSharedPreferences("discover_preferences${partition.preferenceSuffix}", Context.MODE_PRIVATE)
+    val cache: SharedPreferences = context.getSharedPreferences("discover_cache${partition.preferenceSuffix}", Context.MODE_PRIVATE)
     fun string(key: String, default: String) = prefs.getString(key, default) ?: default
     fun flag(key: String, default: Boolean = true) = prefs.getBoolean(key, default)
     fun selection(key: String) = prefs.getStringSet(key, emptySet()).orEmpty().toSet()
@@ -62,7 +63,16 @@ class DiscoverStore(context: Context) {
             val aliases = row.optJSONArray("aliases") ?: JSONArray()
             fun long(name: String): Long? = if (row.has(name) && !row.isNull(name)) row.getLong(name) else null
             DiscoverEntry(SearchBook(row.getString("id"), row.getString("source"), row.getString("title"), row.optString("author"),
-                row.optString("cover").ifBlank { null }, format = "漫画", comicId = row.getString("id"),
+                row.optString("cover").ifBlank { null }, format = row.optString("format", "漫画"), comicId = row.optString("comicId").ifBlank { null },
+                description = row.optString("description").ifBlank { null },
+                language = row.optString("language").ifBlank { null },
+                downloadUrl = row.optString("downloadUrl").ifBlank { null },
+                novelInfo = row.optJSONObject("novel")?.let { n -> NovelInfo(
+                    synopsis = n.optString("synopsis").ifBlank { null }, status = n.optString("status").ifBlank { null },
+                    category = n.optString("category").ifBlank { null }, latestChapter = n.optString("latestChapter").ifBlank { null },
+                    updatedAt = n.optString("updatedAt").ifBlank { null }, translation = n.optString("translation").ifBlank { null },
+                    notice = n.optString("notice").ifBlank { null },
+                    tags = n.optJSONArray("tags")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()) },
                 comicInfo = ComicInfo(tags = (0 until tags.length()).map { tags.getString(it) },
                     alternateTitles = (0 until aliases.length()).map { aliases.getString(it) }, status = row.optString("status").ifBlank { null })),
                 updatedAt = long("updatedAt"), latestChapter = row.optString("latestChapter").ifBlank { null },
@@ -82,6 +92,11 @@ class DiscoverStore(context: Context) {
         if (!flag("cache")) return
         val rows = JSONArray()
         entries.take(300).forEach { e -> rows.put(JSONObject().put("id", e.book.id).put("source", e.book.sourceId)
+            .put("format", e.book.format).put("comicId", e.book.comicId.orEmpty())
+            .put("description", e.book.description.orEmpty()).put("language", e.book.language.orEmpty()).put("downloadUrl", e.book.downloadUrl.orEmpty())
+            .put("novel", e.book.novelInfo?.let { n -> JSONObject().put("synopsis", n.synopsis.orEmpty()).put("status", n.status.orEmpty())
+                .put("category", n.category.orEmpty()).put("latestChapter", n.latestChapter.orEmpty()).put("updatedAt", n.updatedAt.orEmpty())
+                .put("translation", n.translation.orEmpty()).put("notice", n.notice.orEmpty()).put("tags", JSONArray(n.tags)) })
             .put("title", e.book.title).put("author", e.book.author).put("cover", e.book.cover.orEmpty())
             .put("tags", JSONArray(e.book.comicInfo?.tags.orEmpty())).put("aliases", JSONArray(e.book.comicInfo?.alternateTitles.orEmpty())).put("status", e.book.comicInfo?.status.orEmpty())
             .put("updatedAt", e.updatedAt).put("latestChapter", e.latestChapter).put("discussions", e.discussions)
@@ -96,9 +111,9 @@ class DiscoverStore(context: Context) {
 }
 
 @Composable
-fun rememberDiscoverStore(): Pair<DiscoverStore, Int> {
+fun rememberDiscoverStore(partition: DiscoverPartition = DiscoverPartition.COMIC): Pair<DiscoverStore, Int> {
     val context = LocalContext.current
-    val store = remember(context) { DiscoverStore(context.applicationContext) }
+    val store = remember(context, partition) { DiscoverStore(context.applicationContext, partition) }
     var revision by remember { mutableIntStateOf(0) }
     DisposableEffect(store) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> revision++ }

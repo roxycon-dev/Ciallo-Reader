@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.discover.NovelDiscoverTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-21T04:23:57.781Z" hostname="DESKTOP-PIFGGNS" time="3.877">
+  <properties/>
+  <testcase name="nativeCataloguesKeepTheirRealOrderAndFollowOnlyPublicNextLinks" classname="com.example.discover.NovelDiscoverTest" time="3.317"/>
+  <testcase name="pendingNovelLoadsCannotReplaceComicsAndSwitchingBackReusesItsSession" classname="com.example.discover.NovelDiscoverTest" time="0.162"/>
+  <testcase name="chapterNovelsKeepTheirOnlineCatalogueAndEbookCoversKeepReferer" classname="com.example.discover.NovelDiscoverTest" time="0.15"/>
+  <testcase name="plainBookSourcesAndComicSourcesNeverCrossPartitions" classname="com.example.discover.NovelDiscoverTest" time="0.047"/>
+  <testcase name="importedStaticLegadoExplorePreservesRulesAndPageSubstitution" classname="com.example.discover.NovelDiscoverTest" time="0.073"/>
+  <testcase name="settingsBlocksAndCacheAreIndependentAndNovelMetadataSurvivesRestarts" classname="com.example.discover.NovelDiscoverTest" time="0.124"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

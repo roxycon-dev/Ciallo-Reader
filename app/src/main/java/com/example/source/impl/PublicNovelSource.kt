@@ -57,6 +57,7 @@ class PublicNovelSource(
     override val name = site.label
     // Chapter APIs are used to assemble the EPUB. Expose offline reading, which preserves
     // illustrations, rather than advertising the plain-text preview as a complete reader.
+    override suspend fun getCoverHeaders(url: String) = mapOf("Referer" to baseUrl.toString())
     override val capabilities = SourceCapabilities(supportEbook = true, supportOnlineText = site == PublicNovelSite.FANQIE)
     internal val http = client ?: JsSourceProxy.failoverClient(context.applicationContext,
         SharedHttpTransport.builder().cookieJar(okhttp3.CookieJar.NO_COOKIES)
@@ -184,6 +185,12 @@ class PublicNovelSource(
                     status = card.selectFirst(".novel-item-state")?.text(), translation = "中文", notice = "免登录公开正文；下载会核对全部目录，任何一章失败均不会标为完成。"))
         }.distinctBy { it.id }
     }
+
+    private val discovery by lazy { HtmlNovelDiscovery(id, baseUrl, ::page, { url ->
+        runCatching { bookId(url) }.getOrNull()
+    }) }
+    override suspend fun discoverCatalog(resolveDynamic: Boolean) = result { discovery.catalog() }
+    override suspend fun discover(query: com.example.discover.DiscoverQuery) = result { discovery.discover(query) }
 
     override suspend fun getDetail(bookId: String) = result { detail(bookId) }
     override suspend fun refreshNovelDetail(bookId: String) = result { detail(bookId) }

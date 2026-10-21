@@ -1,0 +1,75 @@
+{
+  "version": "1.4.17",
+  "versionCode": 240,
+  "jvm": {
+    "initialPasses": 67,
+    "followupPasses": 6,
+    "uniqueTests": 68,
+    "initialSuites": [
+      {
+        "name": "com.example.discover.NovelDiscoverTest",
+        "tests": "5",
+        "failures": "0",
+        "errors": "0",
+        "time": "0.551"
+      },
+      {
+        "name": "com.example.discover.DiscoverViewModelTest",
+        "tests": "23",
+        "failures": "0",
+        "errors": "0",
+        "time": "4.725"
+      },
+      {
+        "name": "com.example.discover.DiscoverEngineTest",
+        "tests": "12",
+        "failures": "0",
+        "errors": "0",
+        "time": "0.11"
+      },
+      {
+        "name": "com.example.source.LegadoImporterTest",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "time": "2.229"
+      },
+      {
+        "name": "com.example.source.SourceImporterTest",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "time": "0.057"
+      },
+      {
+        "name": "com.example.ui.components.PaperAndSliderTest",
+        "tests": "21",
+        "failures": "0",
+        "errors": "0",
+        "time": "3.357"
+      }
+    ],
+    "followup": {
+      "name": "com.example.discover.NovelDiscoverTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "time": "3.877"
+    },
+    "scope": "Only novel protocol rerun after chapter-route/cover-header compatibility changes; final modal retention and trigger changes covered by the real reader device test."
+  },
+  "device": {
+    "uniqueTests": 5,
+    "unifiedPageTests": 4,
+    "realComicReaderTests": 1,
+    "shaderFailuresObserved": 0,
+    "framesPerSecondMeasured": false,
+    "followup": "The existing full-page test was extended with origin preservation and restored-page folding assertions; only that test was rerun after the origin fix (passed)."
+  },
+  "uiGate": "original baseline passed",
+  "productionInputCount": 718,
+  "sourceFiles": 727,
+  "guideMissing": 0,
+  "guideStale": "4 explicitly deleted historical files",
+  "fullTestSuiteRun": false
+}

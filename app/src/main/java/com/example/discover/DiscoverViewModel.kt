@@ -18,11 +18,11 @@ data class DiscoverState(val entries: List<DiscoverEntry> = emptyList(), val loa
     val notices: Map<String, String> = emptyMap(), val cached: Boolean = false,
     val catalogs: Map<String, DiscoverCatalog> = emptyMap())
 
-class DiscoverViewModel(private val manager: SourceManager, private val store: DiscoverStore) : ViewModel() {
+class DiscoverViewModel(private val manager: SourceManager, private val store: DiscoverStore, private val partition: DiscoverPartition = DiscoverPartition.COMIC) : ViewModel() {
     private val _state = MutableStateFlow(DiscoverState())
     val state = _state.asStateFlow()
     private var job: Job? = null
-    private var sources: List<ComicSource> = emptyList()
+    private var sources: List<BookSource> = emptyList()
     private var query = DiscoverQuery(DiscoverDimension.UPDATES, "最新")
     private var pages = mutableMapOf<String, Int>()
     private val cursors = mutableMapOf<String, String?>()
@@ -44,14 +44,14 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
         val history: Map<String, Set<String>>, val progress: Map<String, Int>)
     private val sessions = LinkedHashMap<String, Session>(16, .75f, true)
     private val refreshTimes = mutableMapOf<String, Long>()
-    private val catalogOwners = mutableMapOf<String, ComicSource>()
+    private val catalogOwners = mutableMapOf<String, BookSource>()
     private val dynamicResolved = mutableSetOf<String>()
     private val categoryLoading = mutableSetOf<String>()
     private val catalogLocks = mutableMapOf<String, Mutex>()
     private val viewports = mutableMapOf<String, Pair<Int, Int>>()
     private val metadataJobs = mutableMapOf<String, Job>()
     private val metadataAttempts = LinkedHashMap<Pair<String, String>, Long>()
-    private fun enrich(source: ComicSource, entries: List<DiscoverEntry>, key: String) {
+    private fun enrich(source: BookSource, entries: List<DiscoverEntry>, key: String) {
         if (!source.supportsDiscoverMetadata) return
         val previous = metadataJobs[source.id]
         metadataJobs[source.id] = viewModelScope.launch {
@@ -89,7 +89,7 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
     fun viewport(key: String): Pair<Int, Int>? = viewports[key]
     fun loadCategories(sourceId: String) {
         if (sourceId in categoryLoading) return
-        val source = manager.availableSources.value.filterIsInstance<ComicSource>().firstOrNull { it.id == sourceId } ?: return
+        val source = manager.availableSources.value.firstOrNull { it.id == sourceId && partition.accepts(it) } ?: return
         if (sourceId in dynamicResolved && catalogOwners[sourceId] === source) return
         categoryLoading.add(sourceId)
         viewModelScope.launch {
@@ -104,7 +104,7 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
             finally { categoryLoading.remove(sourceId) }
         }
     }
-    private suspend fun catalogFor(source: ComicSource, resolveDynamic: Boolean): SourceResult<DiscoverCatalog> =
+    private suspend fun catalogFor(source: BookSource, resolveDynamic: Boolean): SourceResult<DiscoverCatalog> =
         catalogLocks.getOrPut(source.id) { Mutex() }.withLock {
             val previous = catalogs[source.id]
             if (catalogOwners[source.id] === source && previous != null &&
@@ -130,8 +130,8 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
 
     fun configure(sourceId: String, dimension: DiscoverDimension, range: String, feedId: String? = null,
         categoryId: String? = null, standardCategories: Set<String> = emptySet(), force: Boolean = false, status: String? = null) {
-        val nextSources = manager.availableSources.value.filterIsInstance<ComicSource>().filter {
-            it.isComicSource && (sourceId == "aggregate" || it.id == sourceId) }
+        val nextSources = manager.availableSources.value.filter {
+            partition.accepts(it) && (sourceId == "aggregate" || it.id == sourceId) }
         val signature = nextSources.sortedBy { it.id }.joinToString { "${it.id}@${(it as? com.example.source.js.JsComicSource)?.version.orEmpty()}" }
         val window = if (dimension == DiscoverDimension.UPDATES && feedId == null && categoryId == null) DiscoverEngine.rangeStart(range, System.currentTimeMillis()) ?: 0L else 0L
         val nextKey = "$sourceId:${dimension.name}:$range:${feedId.orEmpty()}:${categoryId.orEmpty()}:${standardCategories.sorted()}:$signature:$status:$window:v3"
@@ -193,7 +193,7 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
         if (targets.isEmpty()) return
         job = viewModelScope.launch { fetch(targets, append = true) }
     }
-    private suspend fun fetch(targets: List<ComicSource>, append: Boolean) = coroutineScope {
+    private suspend fun fetch(targets: List<BookSource>, append: Boolean) = coroutineScope {
         val key = cacheKey
         val requested = query
         _state.update { it.copy(loading = true) }

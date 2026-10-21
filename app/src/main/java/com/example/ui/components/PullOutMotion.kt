@@ -209,7 +209,7 @@ internal class PaperSpring {
 /** Draw state is read in the draw phase; animating a paper never recomposes its content each frame. */
 @Composable
 fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: Modifier = Modifier,
-    content: @Composable AnimatedVisibilityScope.() -> Unit) {
+    deformContent: Boolean = true, content: @Composable AnimatedVisibilityScope.() -> Unit) {
     val life = rememberPaperLifecycle(visibleState)
     val parentPaper = LocalPaperOwner.current
     val reduce = com.example.ui.feedback.LocalReduceMotion.current || LocalRenderQuality.current.minimal
@@ -219,11 +219,13 @@ fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: M
     val currentDragTarget by rememberUpdatedState(dragTarget)
     val target = visibleState.targetState
     val currentTarget by rememberUpdatedState(target)
-    val initiallyVisible = remember { visibleState.currentState || (target && parentPaper != null) }
+    val initiallyVisible = remember { visibleState.currentState || (target && parentPaper != null && !parentPaper.flat) }
     if (target && !life.retained) {
-        life.origin = PullOutSources.claim() ?: parentOrigin ?: PullOutSource().apply { virtual = true }
-        life.softPaper = !reduce && android.os.Build.VERSION.SDK_INT >= 33 && life.origin?.virtual == false && !(initiallyVisible && !life.registered)
-        life.allowFullViewport = fullSurface && parentPaper == null
+        life.origin = (if (fullSurface && parentPaper == null) parentOrigin ?: PullOutSources.claim()
+            else PullOutSources.claim() ?: parentOrigin) ?: PullOutSource().apply { virtual = true }
+        life.softPaper = !reduce && android.os.Build.VERSION.SDK_INT >= 33 && life.origin?.virtual == false &&
+            !(initiallyVisible && !life.registered && parentPaper != null && !parentPaper.flat)
+        life.allowFullViewport = fullSurface && (parentPaper == null || parentPaper.flat)
         life.retained = true; life.closed = false; life.handingOff = false
         if (initiallyVisible && !life.registered) {
             life.spring.position = 1f; life.progress = 1f; life.flat = true; life.inputBlocked = false
@@ -268,7 +270,9 @@ fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: M
         AnimatedVisibility(true, modifier, enter = EnterTransition.None, exit = ExitTransition.None) {
             val scope = this
             CompositionLocalProvider(LocalPaperOwner provides life, LocalPaperOrigin provides life.origin) {
-                key(life.origin) { StablePaperSurface(life) { scope.content() } }
+                // Returning from a disposed menu changes geometry, not content identity.
+                // Re-keying here would rebuild every glass card during the close animation.
+                if (deformContent) StablePaperSurface(life) { scope.content() } else scope.content()
             }
         }
     }
@@ -277,9 +281,9 @@ fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: M
 fun PullOutVisibility(visible: Boolean, modifier: Modifier = Modifier, enter: EnterTransition = EnterTransition.None,
     exit: ExitTransition = ExitTransition.None, label: String = "pullOut", content: @Composable AnimatedVisibilityScope.() -> Unit) {
     val state = remember { MutableTransitionState(false) }; state.targetState = visible
-    PullOutVisibility(state, modifier, content)
+    PullOutVisibility(state, modifier, content = content)
 }
 @Composable
 fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: Modifier = Modifier,
     enter: EnterTransition, exit: ExitTransition, label: String = "pullOut", content: @Composable AnimatedVisibilityScope.() -> Unit) =
-    PullOutVisibility(visibleState, modifier, content)
+    PullOutVisibility(visibleState, modifier, content = content)

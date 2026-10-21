@@ -27,6 +27,7 @@ class IxdzsSource(
     override val id = "ixdzs8"
     override val name = "爱下电子书"
     override suspend fun getShareUrl(bookId: String): String = bookUrl(bookId).toString()
+    override suspend fun getCoverHeaders(url: String) = mapOf("Referer" to baseUrl.toString())
     override val capabilities = SourceCapabilities(supportEbook = true)
     private val http = client ?: JsSourceProxy.failoverClient(context.applicationContext,
         SharedHttpTransport.builder().connectTimeout(10, TimeUnit.SECONDS)
@@ -100,6 +101,12 @@ class IxdzsSource(
                     translation = "中文网文", notice = "原站下载包可能缺章或更新滞后。"))
         }.distinctBy { it.id }
     }
+    private val discovery by lazy { HtmlNovelDiscovery(id, baseUrl, ::page, { url ->
+        if (url.host == baseUrl.host) Regex("^/read/([1-9][0-9]{0,8})/$").matchEntire(url.encodedPath)?.groupValues?.get(1) else null
+    }, format = "txt") }
+    override suspend fun discoverCatalog(resolveDynamic: Boolean) = result { discovery.catalog() }
+    override suspend fun discover(query: com.example.discover.DiscoverQuery) = result { discovery.discover(query) }
+
     override suspend fun getDetail(bookId: String) = result { detail(bookId).book }
     override suspend fun refreshNovelDetail(bookId: String) = result { detail(bookId, fresh = true).book }
     override suspend fun getDownloadInfo(bookId: String) = result {

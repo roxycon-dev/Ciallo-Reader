@@ -1,0 +1,247 @@
+Picked up JAVA_TOOL_OPTIONS: -Djdk.net.unixdomain.tmpdir=C:/tmp-ciallo -Djava.io.tmpdir=C:/tmp-ciallo -Djava.net.preferIPv4Stack=true
+
+> Configure project :backdrop
+w: Kotlin Multiplatform <-> Android Gradle Plugin compatibility issue:
+The applied Android Gradle Plugin version (8.7.3) is higher
+than the maximum known to the Kotlin Gradle Plugin.
+Tooling stability in such configuration isn't tested, please report encountered issues to https://kotl.in/issue
+
+Minimum supported Android Gradle Plugin version: 7.1
+Maximum tested Android Gradle Plugin version: 8.5
+
+To suppress this message add 'kotlin.mpp.androidGradlePluginCompatibility.nowarn=true' to your gradle.properties
+
+
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :backdrop:preBuild UP-TO-DATE
+> Task :backdrop:preDebugBuild UP-TO-DATE
+> Task :backdrop:writeDebugAarMetadata UP-TO-DATE
+> Task :liquidglass-compose:preBuild UP-TO-DATE
+> Task :liquidglass-compose:preDebugBuild UP-TO-DATE
+> Task :liquidglass-compose:writeDebugAarMetadata UP-TO-DATE
+> Task :liquidglass-core:preBuild UP-TO-DATE
+> Task :liquidglass-core:preDebugBuild UP-TO-DATE
+> Task :liquidglass-core:writeDebugAarMetadata UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :backdrop:generateDebugResValues UP-TO-DATE
+> Task :backdrop:generateDebugResources UP-TO-DATE
+> Task :backdrop:packageDebugResources UP-TO-DATE
+> Task :liquidglass-compose:generateDebugResValues UP-TO-DATE
+> Task :liquidglass-compose:generateDebugResources UP-TO-DATE
+> Task :liquidglass-compose:packageDebugResources UP-TO-DATE
+> Task :liquidglass-core:generateDebugResValues UP-TO-DATE
+> Task :liquidglass-core:generateDebugResources UP-TO-DATE
+> Task :liquidglass-core:packageDebugResources UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :backdrop:extractDeepLinksDebug UP-TO-DATE
+> Task :backdrop:processDebugManifest UP-TO-DATE
+> Task :liquidglass-compose:extractDeepLinksDebug UP-TO-DATE
+> Task :liquidglass-compose:processDebugManifest UP-TO-DATE
+> Task :liquidglass-core:extractDeepLinksDebug UP-TO-DATE
+> Task :liquidglass-core:processDebugManifest UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :backdrop:compileDebugLibraryResources UP-TO-DATE
+> Task :backdrop:parseDebugLocalResources UP-TO-DATE
+> Task :backdrop:generateDebugRFile UP-TO-DATE
+> Task :liquidglass-compose:compileDebugLibraryResources UP-TO-DATE
+> Task :liquidglass-compose:parseDebugLocalResources UP-TO-DATE
+> Task :liquidglass-compose:generateDebugRFile UP-TO-DATE
+> Task :liquidglass-core:compileDebugLibraryResources UP-TO-DATE
+> Task :liquidglass-core:parseDebugLocalResources UP-TO-DATE
+> Task :liquidglass-core:generateDebugRFile UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :backdrop:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :backdrop:convertXmlValueResourcesForAndroidMain NO-SOURCE
+> Task :backdrop:copyNonXmlValueResourcesForAndroidMain NO-SOURCE
+> Task :backdrop:prepareComposeResourcesTaskForAndroidMain NO-SOURCE
+> Task :backdrop:generateResourceAccessorsForAndroidMain SKIPPED
+> Task :backdrop:convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :backdrop:copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :backdrop:prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :backdrop:generateResourceAccessorsForCommonMain SKIPPED
+> Task :backdrop:generateActualResourceCollectorsForAndroidMain SKIPPED
+> Task :backdrop:generateComposeResClass SKIPPED
+> Task :backdrop:generateExpectResourceCollectorsForCommonMain SKIPPED
+> Task :backdrop:convertXmlValueResourcesForAndroidDebug NO-SOURCE
+> Task :backdrop:copyNonXmlValueResourcesForAndroidDebug NO-SOURCE
+> Task :backdrop:prepareComposeResourcesTaskForAndroidDebug NO-SOURCE
+> Task :backdrop:generateResourceAccessorsForAndroidDebug SKIPPED
+> Task :backdrop:compileDebugKotlinAndroid UP-TO-DATE
+> Task :backdrop:javaPreCompileDebug UP-TO-DATE
+> Task :backdrop:compileDebugJavaWithJavac NO-SOURCE
+> Task :backdrop:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :liquidglass-compose:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :liquidglass-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :liquidglass-core:compileDebugKotlin UP-TO-DATE
+> Task :liquidglass-core:javaPreCompileDebug UP-TO-DATE
+> Task :liquidglass-core:compileDebugJavaWithJavac NO-SOURCE
+> Task :liquidglass-core:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :liquidglass-compose:compileDebugKotlin UP-TO-DATE
+> Task :liquidglass-compose:javaPreCompileDebug UP-TO-DATE
+> Task :liquidglass-compose:compileDebugJavaWithJavac NO-SOURCE
+> Task :liquidglass-compose:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :app:kspDebugKotlin
+> Task :app:compileDebugKotlin
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/data/favorite/FavoriteDao.kt:228:33 Condition is always 'true'.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/discover/DiscoverCards.kt:152:61 'val Icons.Outlined.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.MenuBook.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/discover/DiscoverPanels.kt:72:76 'val Icons.Outlined.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.MenuBook.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/god/GodSettingsSection.kt:239:25 'fun quadraticBezierTo(x1: Float, y1: Float, x2: Float, y2: Float): Unit' is deprecated. Use quadraticTo() for consistency with cubicTo().
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/library/LibraryScreen.kt:811:55 'fun Modifier.animateItemPlacement(animationSpec: FiniteAnimationSpec<IntOffset> = ...): Modifier' is deprecated. Use Modifier.animateItem() instead.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/library/LibraryScreen.kt:1015:47 'fun Modifier.animateItemPlacement(animationSpec: FiniteAnimationSpec<IntOffset> = ...): Modifier' is deprecated. Use Modifier.animateItem() instead.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/library/LibraryScreen.kt:1967:45 'val Icons.Filled.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.MenuBook.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/library/LibraryScreen.kt:2608:68 'val Icons.Filled.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.MenuBook.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/library/NovelBookUi.kt:60:36 'val Icons.Filled.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.MenuBook.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/library/NovelBookUi.kt:222:257 'val Icons.Filled.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.MenuBook.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/mangatranslate/BubblePipeline.kt:167:14 'fun computeBounds(p0: RectF, p1: Boolean): Unit' is deprecated. Deprecated in Java.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/mangatranslate/MangaTranslationCore.kt:236:27 Condition is always 'true'.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/mangatranslate/MangaTranslationCore.kt:259:27 Condition is always 'true'.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/source/anilist/AniListClient.kt:118:69 Java type mismatch: inferred type is 'kotlin.Nothing?', but 'kotlin.String' was expected.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/source/anilist/AniListClient.kt:119:71 Java type mismatch: inferred type is 'kotlin.Nothing?', but 'kotlin.String' was expected.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/source/anilist/AniListClient.kt:120:69 Java type mismatch: inferred type is 'kotlin.Nothing?', but 'kotlin.String' was expected.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/source/impl/MangaDexSource.kt:318:52 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'org.json.JSONArray?'.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/source/impl/MangaDexSource.kt:319:47 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'org.json.JSONArray?'.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/source/importer/SourceImporter.kt:280:58 Java type mismatch: inferred type is 'kotlin.Nothing?', but 'kotlin.String' was expected.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/source/importer/SourceImporter.kt:339:46 Java type mismatch: inferred type is 'kotlin.Nothing?', but 'kotlin.String' was expected.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/source/js/JsMessageHandler.kt:23:8 'class UploadDataProviders : Any' is deprecated. Deprecated in Java.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/source/js/JsMessageHandler.kt:803:43 'class UploadDataProviders : Any' is deprecated. Deprecated in Java.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/source/js/JsMessageHandler.kt:993:23 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'kotlin.Any?'.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/source/parser/JsonPathResolver.kt:48:17 Condition is always 'true'.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/source/zlibrary/ZLibraryEapiClient.kt:93:45 Java type mismatch: inferred type is 'kotlin.Nothing?', but 'kotlin.String' was expected.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/source/zlibrary/ZLibraryEapiClient.kt:94:57 Java type mismatch: inferred type is 'kotlin.Nothing?', but 'kotlin.String' was expected.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/source/zlibrary/ZLibraryWebViewHelper.kt:222:30 'var databaseEnabled: Boolean' is deprecated. Deprecated in Java.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/transfer/TransferManager.kt:205:121 Java type mismatch: inferred type is 'kotlin.String?', but 'kotlin.String' was expected.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/transfer/TransferManager.kt:304:73 'val allNetworks: (Array<Network!>..Array<out Network!>)' is deprecated. Deprecated in Java.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/transfer/TransferManager.kt:305:40 'val allNetworks: (Array<Network!>..Array<out Network!>)' is deprecated. Deprecated in Java.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/CacheManagementScreen.kt:199:91 'val externalMediaDirs: (Array<File!>..Array<out File!>?)' is deprecated. Deprecated in Java.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/CacheManagementScreen.kt:325:29 'val externalMediaDirs: (Array<File!>..Array<out File!>?)' is deprecated. Deprecated in Java.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/ComicChaptersScreen.kt:1383:46 'val Icons.Filled.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.MenuBook.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/ComicReaderScreen.kt:84:21 Check for instance is always 'true'.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/ComicReaderScreen.kt:85:21 Check for instance is always 'false'.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/ComicReaderScreen.kt:87:26 Check for instance is always 'false'.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/HomeScreen.kt:1280:73 'val Icons.Filled.Sort: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Sort.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/HomeScreen.kt:1613:74 'val Icons.Filled.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.MenuBook.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/HomeScreen.kt:2027:93 'val Icons.Filled.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.MenuBook.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/HomeScreen.kt:2279:30 'val Icons.Filled.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.MenuBook.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/HomeScreen.kt:2786:54 'val Icons.Filled.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.MenuBook.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/OnboardingScreen.kt:115:103 'fun EnterTransition.with(exit: ExitTransition): ContentTransform' is deprecated. Infix fun EnterTransition.with(ExitTransition) has been renamed to togetherWith.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/OnboardingScreen.kt:118:104 'fun EnterTransition.with(exit: ExitTransition): ContentTransform' is deprecated. Infix fun EnterTransition.with(ExitTransition) has been renamed to togetherWith.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/ReaderScreen.kt:2209:143 Condition is always 'true'.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/ReaderScreen.kt:3777:49 'fun Modifier.animateItemPlacement(animationSpec: FiniteAnimationSpec<IntOffset> = ...): Modifier' is deprecated. Use Modifier.animateItem() instead.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/ReaderScreen.kt:4267:42 'fun Modifier.animateItemPlacement(animationSpec: FiniteAnimationSpec<IntOffset> = ...): Modifier' is deprecated. Use Modifier.animateItem() instead.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/ReaderScreen.kt:4386:38 'fun Modifier.animateItemPlacement(animationSpec: FiniteAnimationSpec<IntOffset> = ...): Modifier' is deprecated. Use Modifier.animateItem() instead.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/SettingsTabScreen.kt:1273:64 'val Icons.Filled.HelpCenter: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.HelpCenter.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/SettingsTabScreen.kt:1284:60 'val Icons.Filled.KeyboardArrowRight: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.KeyboardArrowRight.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/SettingsTabScreen.kt:1362:109 'val Icons.Filled.OpenInNew: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.OpenInNew.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/comic/Anime4KCnn.kt:62:13 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/comic/ComicReaderCore.kt:287:14 This declaration is in a preview state and can be changed in a backwards-incompatible manner with a best-effort migration. Its usage should be marked with '@kotlinx.coroutines.FlowPreview' or '@OptIn(kotlinx.coroutines.FlowPreview::class)' if you accept the drawback of relying on preview API
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/comic/ComicReaderCore.kt:372:55 This declaration is in a preview state and can be changed in a backwards-incompatible manner with a best-effort migration. Its usage should be marked with '@kotlinx.coroutines.FlowPreview' or '@OptIn(kotlinx.coroutines.FlowPreview::class)' if you accept the drawback of relying on preview API
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/comic/ComicReaderCore.kt:1561:37 This declaration is in a preview state and can be changed in a backwards-incompatible manner with a best-effort migration. Its usage should be marked with '@kotlinx.coroutines.FlowPreview' or '@OptIn(kotlinx.coroutines.FlowPreview::class)' if you accept the drawback of relying on preview API
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/comic/ComicReaderSheets.kt:982:41 'val Icons.Filled.RotateRight: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.RotateRight.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/comic/ComicReaderSheets.kt:1484:30 'fun Modifier.animateItemPlacement(animationSpec: FiniteAnimationSpec<IntOffset> = ...): Modifier' is deprecated. Use Modifier.animateItem() instead.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/comic/ComicSceneFx.kt:500:18 'fun quadraticBezierTo(x1: Float, y1: Float, x2: Float, y2: Float): Unit' is deprecated. Use quadraticTo() for consistency with cubicTo().
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/comic/ComicSceneFx.kt:504:18 'fun quadraticBezierTo(x1: Float, y1: Float, x2: Float, y2: Float): Unit' is deprecated. Use quadraticTo() for consistency with cubicTo().
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/comic/MangaJaNai.kt:70:66 'static field TRIM_MEMORY_RUNNING_LOW: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/ChasingDotsTransition.kt:26:35 'fun KeyframesSpec.KeyframeEntity<Float>.with(easing: Easing): Unit' is deprecated. Use version that returns an instance of the entity so it can be re-used in other keyframe builders.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/ChasingDotsTransition.kt:29:55 'fun KeyframesSpec.KeyframeEntity<Float>.with(easing: Easing): Unit' is deprecated. Use version that returns an instance of the entity so it can be re-used in other keyframe builders.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/ChasingDotsTransition.kt:32:77 'fun KeyframesSpec.KeyframeEntity<Float>.with(easing: Easing): Unit' is deprecated. Use version that returns an instance of the entity so it can be re-used in other keyframe builders.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/ChasingDotsTransition.kt:33:55 'fun KeyframesSpec.KeyframeEntity<Float>.with(easing: Easing): Unit' is deprecated. Use version that returns an instance of the entity so it can be re-used in other keyframe builders.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/ChasingDotsTransition.kt:36:77 'fun KeyframesSpec.KeyframeEntity<Float>.with(easing: Easing): Unit' is deprecated. Use version that returns an instance of the entity so it can be re-used in other keyframe builders.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/ChasingDotsTransition.kt:37:85 'fun KeyframesSpec.KeyframeEntity<Float>.with(easing: Easing): Unit' is deprecated. Use version that returns an instance of the entity so it can be re-used in other keyframe builders.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/ChasingDotsTransition.kt:38:55 'fun KeyframesSpec.KeyframeEntity<Float>.with(easing: Easing): Unit' is deprecated. Use version that returns an instance of the entity so it can be re-used in other keyframe builders.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/ChasingDotsTransition.kt:41:77 'fun KeyframesSpec.KeyframeEntity<Float>.with(easing: Easing): Unit' is deprecated. Use version that returns an instance of the entity so it can be re-used in other keyframe builders.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/ChasingDotsTransition.kt:42:85 'fun KeyframesSpec.KeyframeEntity<Float>.with(easing: Easing): Unit' is deprecated. Use version that returns an instance of the entity so it can be re-used in other keyframe builders.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/ChasingDotsTransition.kt:43:85 'fun KeyframesSpec.KeyframeEntity<Float>.with(easing: Easing): Unit' is deprecated. Use version that returns an instance of the entity so it can be re-used in other keyframe builders.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/ChasingDotsTransition.kt:44:55 'fun KeyframesSpec.KeyframeEntity<Float>.with(easing: Easing): Unit' is deprecated. Use version that returns an instance of the entity so it can be re-used in other keyframe builders.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/GlassCard.kt:124:14 'fun quadraticBezierTo(x1: Float, y1: Float, x2: Float, y2: Float): Unit' is deprecated. Use quadraticTo() for consistency with cubicTo().
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/MaxCardEffects.kt:143:5 'fun quadraticBezierTo(x1: Float, y1: Float, x2: Float, y2: Float): Unit' is deprecated. Use quadraticTo() for consistency with cubicTo().
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/MaxCardEffects.kt:145:5 'fun quadraticBezierTo(x1: Float, y1: Float, x2: Float, y2: Float): Unit' is deprecated. Use quadraticTo() for consistency with cubicTo().
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/MaxCardEffects.kt:147:5 'fun quadraticBezierTo(x1: Float, y1: Float, x2: Float, y2: Float): Unit' is deprecated. Use quadraticTo() for consistency with cubicTo().
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/MaxCardEffects.kt:149:5 'fun quadraticBezierTo(x1: Float, y1: Float, x2: Float, y2: Float): Unit' is deprecated. Use quadraticTo() for consistency with cubicTo().
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/ReadingTrendCard.kt:92:42 'val Icons.Filled.ShowChart: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ShowChart.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/WeeklyReadingChart.kt:350:42 'val Icons.Filled.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.MenuBook.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/components/WeeklyReadingChart.kt:516:38 'val Icons.Filled.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.MenuBook.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/favorite/FavoritesPanel.kt:239:57 'fun Modifier.animateItemPlacement(animationSpec: FiniteAnimationSpec<IntOffset> = ...): Modifier' is deprecated. Use Modifier.animateItem() instead.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/main/java/com/example/ui/privacy/PrivacyWindows.kt:355:65 'val Icons.Filled.Backspace: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Backspace.
+
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:compileDebugJavaWithJavac UP-TO-DATE
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:kspDebugUnitTestKotlin
+
+> Task :app:compileDebugUnitTestKotlin
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/test/java/com/example/data/NovelSearchRaceTest.kt:34:34 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/test/java/com/example/data/NovelSearchRaceTest.kt:39:21 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/test/java/com/example/data/NovelSearchRaceTest.kt:73:21 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/test/java/com/example/discover/DiscoverUiTest.kt:323:9 This declaration needs opt-in. Its usage should be marked with '@com.github.takahirom.roborazzi.ExperimentalRoborazziApi' or '@OptIn(com.github.takahirom.roborazzi.ExperimentalRoborazziApi::class)'
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/test/java/com/example/library/FavoriteShareHelperTest.kt:35:27 'fun <T : Parcelable!> getParcelableExtra(p0: String!): T?' is deprecated. Deprecated in Java.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/test/java/com/example/mangatranslate/MangaTranslateTest.kt:211:14 'fun computeBounds(p0: RectF, p1: Boolean): Unit' is deprecated. Deprecated in Java.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/test/java/com/example/network/AppUpdateLiveDownloadTest.kt:51:13 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'java.io.File?'.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/test/java/com/example/network/GithubUpdateLiveTest.kt:35:9 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'java.io.File?'.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/test/java/com/example/network/KeywordLookupLiveTest.kt:96:9 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'java.io.File?'.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/test/java/com/example/ui/comic/ComicCurlGestureArbitrationTest.kt:100:28 'static fun obtain(p0: Long, p1: Long, p2: Int, p3: Int, p4: IntArray!, p5: (Array<MotionEvent.PointerCoords!>..Array<out MotionEvent.PointerCoords!>?), p6: Int, p7: Float, p8: Float, p9: Int, p10: Int, p11: Int, p12: Int): MotionEvent!' is deprecated. Deprecated in Java.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/test/java/com/example/ui/comic/ComicCurlTrackingTest.kt:21:56 Java type mismatch: inferred type is 'kotlin.Any?', but 'kotlin.Any' was expected.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/test/java/com/example/ui/comic/Release132Test.kt:178:84 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'java.io.File?'.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/test/java/com/example/ui/components/LiquidSegmentSelectorTest.kt:84:95 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'java.io.File?'.
+w: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/app/src/test/java/com/example/ui/components/TabBarMotionTest.kt:39:9 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'java.io.File?'.
+
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :backdrop:mergeDebugShaders UP-TO-DATE
+> Task :backdrop:compileDebugShaders NO-SOURCE
+> Task :backdrop:copyDebugComposeResourcesToAndroidAssets UP-TO-DATE
+> Task :backdrop:debugAssetsCopyForAGP NO-SOURCE
+> Task :backdrop:generateDebugAssets UP-TO-DATE
+> Task :backdrop:packageDebugAssets UP-TO-DATE
+> Task :liquidglass-compose:mergeDebugShaders UP-TO-DATE
+> Task :liquidglass-compose:compileDebugShaders NO-SOURCE
+> Task :liquidglass-compose:generateDebugAssets UP-TO-DATE
+> Task :liquidglass-compose:packageDebugAssets UP-TO-DATE
+> Task :liquidglass-core:mergeDebugShaders UP-TO-DATE
+> Task :liquidglass-core:compileDebugShaders NO-SOURCE
+> Task :liquidglass-core:generateDebugAssets UP-TO-DATE
+> Task :liquidglass-core:packageDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:packageDebugUnitTestForUnitTest UP-TO-DATE
+> Task :app:generateDebugUnitTestConfig UP-TO-DATE
+> Task :app:processDebugJavaRes UP-TO-DATE
+> Task :app:processDebugUnitTestJavaRes UP-TO-DATE
+> Task :backdrop:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :backdrop:processDebugJavaRes UP-TO-DATE
+> Task :liquidglass-compose:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :liquidglass-compose:processDebugJavaRes UP-TO-DATE
+> Task :liquidglass-core:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :liquidglass-core:processDebugJavaRes UP-TO-DATE
+
+> Task :app:testDebugUnitTest
+Picked up JAVA_TOOL_OPTIONS: -Djdk.net.unixdomain.tmpdir=C:/tmp-ciallo -Djava.io.tmpdir=C:/tmp-ciallo -Djava.net.preferIPv4Stack=true
+
+> Task :app:finalizeTestRoborazziDebug SKIPPED
+
+[Incubating] Problems report is available at: file:///C:/Users/GuanXingRen/.codex/worktrees/reader-interactions-1-4-11/novel-reader/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.3.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 2m 10s
+79 actionable tasks: 7 executed, 72 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.0/userguide/configuration_cache_enabling.html

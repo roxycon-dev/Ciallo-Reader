@@ -58,7 +58,7 @@ fun LibraryHelpBottomSheet(
         shape = RoundedCornerShape(24.dp)
     ) {
                 val close = com.example.ui.components.paperDismiss {}
-                val openSourceManager = com.example.ui.components.paperDismiss(onOpenSourceManager)
+                val openSourceManager = com.example.ui.components.paperOpen(onOpenSourceManager)
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
 Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize()) {
             // 顶部标题栏
