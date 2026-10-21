@@ -87,8 +87,8 @@ android {
     applicationId = "com.aistudio.novelreader.kxmpzq"
     minSdk = 24
     targetSdk = 35
-    versionCode = 238
-    versionName = "1.4.15"
+    versionCode = 239
+    versionName = "1.4.16"
     externalNativeBuild {
       cmake { arguments += "-DANDROID_STL=c++_static" }
     }

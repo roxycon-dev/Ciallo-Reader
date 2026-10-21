@@ -5,8 +5,6 @@ import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutAlertDialog
 import com.example.ui.components.PullOutDialog
 import com.example.ui.components.pullOutClickable
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -45,7 +43,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -64,7 +61,7 @@ import com.example.download.DownloadTaskEntity
  * 逐文件/逐目录列表（可读名+大小），单删、批删、全选、全清。
  * 漫画译文缓存条目附加智能标签（原文→译文，复用 TranslationCacheIndex）。
  *
- * 窗口弹出动画：缩放 0.92→1 + 淡入（180ms）。
+ * 窗口开合统一由 PullOutDialog 驱动，避免独立缩放与纸面竞争。
  */
 data class StorageFileEntry(
     val file: File,
@@ -259,10 +256,6 @@ fun StorageDetailDialog(
     var scanning by remember { mutableStateOf(true) }
     val checked = remember { mutableStateMapOf<File, Boolean>() }
     var pendingDeletion by remember { mutableStateOf<List<File>?>(null) }
-    // 弹出动画：0.92→1 缩放 + 淡入
-    var appeared by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (appeared) 1f else 0.92f, tween(180), label = "detailScale")
-    val alpha by animateFloatAsState(if (appeared) 1f else 0f, tween(180), label = "detailAlpha")
 
     fun refresh() {
         scope.launch {
@@ -299,7 +292,6 @@ fun StorageDetailDialog(
     }
     LaunchedEffect(Unit) {
         refresh()
-        appeared = true
     }
 
     val selectedFiles = entries.filter { checked[it.file] == true }.map { it.file }
@@ -311,11 +303,7 @@ fun StorageDetailDialog(
             color = MaterialTheme.colorScheme.surface,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .graphicsLayer {
-                    scaleX = scale; scaleY = scale
-                    this.alpha = alpha
-                },
+                .padding(horizontal = 16.dp),
         ) {
             Column(Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

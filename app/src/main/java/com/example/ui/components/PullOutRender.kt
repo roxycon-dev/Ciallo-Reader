@@ -37,7 +37,7 @@ internal fun StablePaperSurface(life: PaperLifecycle, content: @Composable () ->
         val valid = source != null && !source.isEmpty && !life.origin!!.virtual && bounds.width > 0 && bounds.height > 0
         val fullViewport = size.width >= view.width * PullOutConfig.WARP_VIEWPORT_CUTOFF &&
             size.height >= view.height * PullOutConfig.WARP_VIEWPORT_CUTOFF
-        val deform = !fullViewport && Build.VERSION.SDK_INT >= 33 && warp != null && !warp.failed && life.softPaper && valid &&
+        val deform = (!fullViewport || life.allowFullViewport) && Build.VERSION.SDK_INT >= 33 && warp != null && !warp.failed && life.softPaper && valid &&
             size.width >= PullOutConfig.WARP_MIN_WIDTH_DP * density && size.height >= PullOutConfig.WARP_MIN_HEIGHT_DP * density && p < 1f
         // Every branch sets every property, so closing/reopening cannot retain an old effect.
         transformOrigin = TransformOrigin(0f, 0f)

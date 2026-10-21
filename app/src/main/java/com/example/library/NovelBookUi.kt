@@ -219,10 +219,10 @@ fun NovelDetailSheet(book: SearchBook, sourceName: String, imageLoader: ImageLoa
                         }
                         is DownloadState.Pending -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("准备整本文件…", fontSize = 12.sp); PullOutTextButton(onClick = onCancel) { Text("取消") } }
                         is DownloadState.Paused -> PullOutButton(onClick = onResume, colors = novelActionColors(), modifier = Modifier.fillMaxWidth()) { Text("继续整本下载") }
-                        is DownloadState.Success -> PullOutButton(onClick = if (hasLocal) read else onDownload, colors = novelActionColors(), modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) { Icon(Icons.Default.MenuBook, null); Spacer(Modifier.width(8.dp)); Text(if (hasLocal) "打开书架里的小说" else "整本下载到书架") }
+                        is DownloadState.Success -> PullOutButton(onClick = if (hasLocal) read else onDownload, colors = novelActionColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = RoundedCornerShape(14.dp)) { Icon(Icons.Default.MenuBook, null); Spacer(Modifier.width(8.dp)); Text(if (hasLocal) "打开书架里的小说" else "整本下载到书架") }
                         else -> {
                             if (state is DownloadState.Error) Text(state.message, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
-                            PullOutButton(onClick = onDownload, enabled = !loading, colors = novelActionColors(), modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) {
+                            PullOutButton(onClick = onDownload, enabled = !loading, colors = novelActionColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = RoundedCornerShape(14.dp)) {
                                 Icon(Icons.Default.Download, null); Spacer(Modifier.width(8.dp)); Text(if (state is DownloadState.Error) "重试整本下载" else "整本下载到书架")
                             }
                         }
@@ -260,14 +260,14 @@ fun NovelUpdateSheet(update: LibraryViewModel.NovelUpdate, state: DownloadState,
                             if (state.path != update.local.filePath.removePrefix("file://")) {
                                 Text("新版已存入书架", color = novelAccentColor())
                                 PullOutButton(onClick = com.example.ui.components.paperDismiss(onDismiss), colors = novelActionColors(), modifier = Modifier.fillMaxWidth()) { Text("完成，继续阅读") }
-                            } else PullOutButton(onClick = onDownload, colors = novelActionColors(), modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) { Text(if (update.changed == true) "下载整本新版" else "重新下载整本") }
+                            } else PullOutButton(onClick = onDownload, colors = novelActionColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = RoundedCornerShape(14.dp)) { Text(if (update.changed == true) "下载整本新版" else "重新下载整本") }
                         }
                         is DownloadState.Downloading -> { LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth()); Text("正在下载整本新版 ${(state.progress * 100).toInt()}%"); Row { PullOutTextButton(onClick = onPause) { Text("暂停") }; PullOutTextButton(onClick = onCancel) { Text("取消") } } }
                         is DownloadState.Pending -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("正在准备整本新版…") }
                         is DownloadState.Paused -> PullOutButton(onClick = onResume, colors = novelActionColors(), modifier = Modifier.fillMaxWidth()) { Text("继续下载新版") }
                         else -> {
                             if (state is DownloadState.Error) Text(state.message, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                            PullOutButton(onClick = onDownload, colors = novelActionColors(), modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) {
+                            PullOutButton(onClick = onDownload, colors = novelActionColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = RoundedCornerShape(14.dp)) {
                                 Text(if (update.changed == true) "下载整本新版" else "重新下载整本")
                             }
                         }

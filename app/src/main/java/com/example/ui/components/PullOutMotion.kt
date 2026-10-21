@@ -42,7 +42,8 @@ object PullOutConfig {
     const val WARP_MIN_HEIGHT_DP = 48f
     const val WARP_VIEWPORT_CUTOFF = .96f
     const val OPEN_K = 140f
-    const val OPEN_D = 15f
+    // Near-critical arrival: a flat surface must never re-enter the warp on a late rebound.
+    const val OPEN_D = 24f
     const val CLOSE_K = 260f
     const val CLOSE_D = 34f
     const val SOURCE_LIFETIME_MS = 900L
@@ -63,8 +64,14 @@ internal class PullOutSource {
     var parent: PullOutSource? = null
     var virtual = false
     var disposed = false
+    var frozenOpening = false
     var claimed = false
     var activatedAt = 0L
+    fun freezeForHandoff() = PullOutSource().also { snapshot ->
+        snapshot.bounds = bounds; snapshot.view = view; snapshot.virtual = virtual
+        snapshot.parent = parent?.returnSource() ?: returnSource()
+        snapshot.disposed = true; snapshot.frozenOpening = true
+    }
     fun returnSource(): PullOutSource {
         var origin = this
         repeat(8) {
@@ -81,10 +88,11 @@ internal object PullOutSources {
     fun activate(source: PullOutSource) { latest = source; source.activatedAt = android.os.SystemClock.uptimeMillis(); source.claimed = false }
     fun claim(): PullOutSource? = latest?.takeIf {
         it.bounds.width > 0 && it.bounds.height > 0 && !it.claimed && android.os.SystemClock.uptimeMillis() - it.activatedAt <= PullOutConfig.SOURCE_LIFETIME_MS
-    }?.also { it.claimed = true }?.returnSource()
+    }?.also { it.claimed = true }?.let { if (it.frozenOpening) it else it.returnSource() }
 }
 internal val LocalPaperOrigin = compositionLocalOf<PullOutSource?> { null }
 internal val LocalPaperOwner = compositionLocalOf<PaperLifecycle?> { null }
+internal val LocalPaperFullSurface = compositionLocalOf { false }
 
 internal fun android.view.View.paperWindowOffset(): Offset {
     val screen = IntArray(2); val window = IntArray(2)
@@ -154,6 +162,8 @@ internal class PaperLifecycle {
     var afterDismiss: (() -> Unit)? = null
     var origin: PullOutSource? = null
     var softPaper = false
+    var allowFullViewport = false
+    var handingOff = false
     val spring = PaperSpring()
 }
 private val paperLifecycles = WeakHashMap<MutableTransitionState<Boolean>, PaperLifecycle>()
@@ -204,6 +214,7 @@ fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: M
     val parentPaper = LocalPaperOwner.current
     val reduce = com.example.ui.feedback.LocalReduceMotion.current || LocalRenderQuality.current.minimal
     val parentOrigin = LocalPaperOrigin.current
+    val fullSurface = LocalPaperFullSurface.current
     val dragTarget = if (parentPaper == null) LocalPaperVisibleTarget.current else 1f
     val currentDragTarget by rememberUpdatedState(dragTarget)
     val target = visibleState.targetState
@@ -212,7 +223,8 @@ fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: M
     if (target && !life.retained) {
         life.origin = PullOutSources.claim() ?: parentOrigin ?: PullOutSource().apply { virtual = true }
         life.softPaper = !reduce && android.os.Build.VERSION.SDK_INT >= 33 && life.origin?.virtual == false && !(initiallyVisible && !life.registered)
-        life.retained = true; life.closed = false
+        life.allowFullViewport = fullSurface && parentPaper == null
+        life.retained = true; life.closed = false; life.handingOff = false
         if (initiallyVisible && !life.registered) {
             life.spring.position = 1f; life.progress = 1f; life.flat = true; life.inputBlocked = false
         }
@@ -228,6 +240,7 @@ fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: M
             val opening = currentTarget
             var destination = if (opening) currentDragTarget else 0f
             if (life.retained) {
+                if (!opening && life.origin?.frozenOpening == true) life.origin = life.origin?.returnSource()
                 life.inputBlocked = true; life.flat = false
                 if (reduce) {
                     life.spring.position = destination; life.spring.velocity = 0f; life.progress = destination

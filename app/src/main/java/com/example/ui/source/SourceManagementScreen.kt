@@ -287,9 +287,6 @@ fun SourceManagementScreen(
         return
     }
 
-    // 书源管理进入动画：与登录卡片一致的 Q 弹缩放 + 上滑 + 淡入
-    var contentVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { contentVisible = true }
 
     // 登录状态检测：负责提示用户进入书库前是否已配置账号
     var loggedIn by remember { mutableStateOf(false) }
@@ -362,9 +359,7 @@ fun SourceManagementScreen(
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-    PullOutVisibility(
-        visible = contentVisible,
-        modifier = Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize()) {
         // ── 可读性由 GlassKitHost 一次提供 ──────────────────────────────
         // ① 壁纸采样模糊 + 全屏遮罩、② 顶部渐变，都画在**被录制的层**里；
         //    因此玻璃卡采样到的是「已压暗、已保护标题」的背景，而不是原始壁纸；

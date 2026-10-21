@@ -1,0 +1,5 @@
+visible=Rect.fromLTRB(297.0, 1391.0, 479.0, 1430.0)
+layout=182 x 39
+overflowHeight=false
+offsetY=0
+safeBottom=1478

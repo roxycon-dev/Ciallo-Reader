@@ -144,10 +144,18 @@ class PaperAndSliderTest {
         }
     }
 
-    @Test fun paperOpensWithASmallSpringReboundAndLandsExactlyFlat() {
-        val spring = PaperSpring(); var peak = 0f
-        repeat(300) { spring.advance(1f, true, 1f/120); peak = maxOf(peak, spring.position) }
-        assertTrue(peak in 1.06f..1.09f); assertEquals(1f, spring.position, 0f); assertEquals(0f, spring.velocity, 0f)
+    @Test fun openingNeverRewarpsAWindowAfterItHasLandedFlat() {
+        for (hz in listOf(30, 60, 90, 120)) {
+            val spring = PaperSpring(); var previous = 0f; var flat = false
+            repeat(hz * 3) {
+                spring.advance(1f, true, 1f / hz)
+                assertTrue(spring.position >= previous && spring.position <= 1f)
+                if (flat) assertEquals(1f, spring.position, 0f)
+                if (spring.position == 1f) flat = true
+                previous = spring.position
+            }
+            assertTrue(flat); assertEquals(0f, spring.velocity, 0f)
+        }
     }
     @Test fun closingUsesTheFasterSpringWithoutRebound() {
         val spring = PaperSpring().apply { position = 1f }; var previous = 1f
@@ -181,6 +189,18 @@ class PaperAndSliderTest {
         val item = PullOutSource().apply { bounds = Rect(40f, 100f, 180f, 150f); this.parent = parent; disposed = true }
         PullOutSources.activate(item)
         assertSame(parent, PullOutSources.claim())
+    }
+
+    @Test fun handoffKeepsTheClickedRectForOpeningAndTheLivingParentForReturn() {
+        val parent = PullOutSource().apply { bounds = Rect(10f, 10f, 80f, 60f) }
+        val button = PullOutSource().apply { bounds = Rect(240f, 400f, 340f, 435f); this.parent = parent }
+        val frozen = button.freezeForHandoff()
+        button.disposed = true; button.bounds = Rect.Zero
+        PullOutSources.activate(frozen)
+        assertSame(frozen, PullOutSources.claim())
+        assertEquals(Rect(240f, 400f, 340f, 435f), frozen.bounds)
+        assertSame(parent, frozen.returnSource())
+        assertNull(PullOutSources.claim())
     }
 
     @Test fun liveWarpEndpointsAreExactAndInverseRowsStayOrderedForExternalSources() {

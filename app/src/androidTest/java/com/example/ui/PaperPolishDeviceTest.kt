@@ -1,5 +1,8 @@
 package com.example.ui
 
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import android.graphics.Bitmap
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.background
@@ -44,7 +47,7 @@ class PaperPolishDeviceTest {
     @After fun restoreHardware() {
         androidx.test.platform.graphics.HardwareRendererCompat.setDrawingEnabled(previousDrawing)
     }
-    private val dir get() = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "paper-1.4.15").apply { mkdirs() }
+    private val dir get() = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "paper-1.4.16").apply { mkdirs() }
     private fun shot(name: String) {
         compose.onAllNodes(isRoot()).onLast().captureToImage()
         InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { image ->
@@ -230,6 +233,227 @@ class PaperPolishDeviceTest {
         compose.waitUntil(5000) { page == 0 && actions == 2 }
         assertEquals(0, PaperWarpStats.failures)
         File(dir, "live-warp.txt").writeText("shaderFrames=${PaperWarpStats.frames}\nfailures=${PaperWarpStats.failures}\nmaxGeometryMs=${PaperWarpStats.maxGeometryNanos/1e6}\n")
+    }
+
+    @Test fun chooserHandsOffToPageWithoutRetractingTheCallerOrItsTabs() {
+        var picker by mutableStateOf(false)
+        var dismissals = 0; var navigations = 0
+        var pageLife: PaperLifecycle? = null
+        compose.setContent { MyApplicationTheme {
+            val nav = rememberNavController()
+            NavHost(nav, startDestination = "caller") {
+                composable("caller") {
+                    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                        PullOutButton({ picker = true }) { Text("选择入口") }
+                        Spacer(Modifier.weight(1f))
+                        Text("底栏位置不变", Modifier.testTag("stationary-tabs"))
+                    }
+                    if (picker) com.example.library.SourcePickerSheet(
+                        aggregateMode = true, aggregateKind = "comic", currentSource = null,
+                        comicSources = emptyList(), novelSources = emptyList(), multiLanguageSearch = false,
+                        onToggleMultiLanguageSearch = {}, onlineKeywordLookup = false, onToggleOnlineKeywordLookup = {},
+                        onSelectAggregate = {}, onSelectSource = {},
+                        onManageSources = { navigations++; nav.navigate("managed") },
+                        onDismiss = { dismissals++; picker = false })
+                }
+                pullOutPage("managed", onDismiss = { nav.popBackStack() }) { close ->
+                    pageLife = LocalPaperOwner.current
+                    Column(Modifier.fillMaxSize()) {
+                        Text("完整管理页")
+                        PullOutButton(close) { Text("返回入口") }
+                    }
+                }
+            }
+        } }
+        compose.onNodeWithText("选择入口").performClick()
+        compose.waitForIdle()
+        val tabs = compose.onNodeWithTag("stationary-tabs").fetchSemanticsNode().boundsInRoot
+        val manage = compose.onNodeWithText("管理书源").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action!!
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { manage(); manage() }
+        // There is no exit-spring wait before the destination is composed.
+        compose.mainClock.advanceTimeBy(96)
+        compose.onNodeWithText("选择书源").assertDoesNotExist()
+        compose.onNodeWithText("完整管理页").assertExists()
+        compose.runOnIdle {
+            assertEquals(1, dismissals); assertEquals(1, navigations)
+            assertTrue(pageLife!!.origin!!.frozenOpening)
+            assertTrue(pageLife!!.allowFullViewport)
+            assertTrue(pageLife!!.progress < .5f)
+        }
+        assertEquals(tabs, compose.onNodeWithTag("stationary-tabs").fetchSemanticsNode().boundsInRoot)
+        compose.waitUntil(8000) {
+            compose.mainClock.advanceTimeByFrame()
+            pageLife!!.progress in .35f.. .65f
+        }
+        shot("chooser-to-full-page")
+        compose.mainClock.advanceTimeBy(1600); compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        assertEquals(0, PaperWarpStats.failures)
+        // System back follows the same return spring as the toolbar action.
+        compose.mainClock.autoAdvance = false
+        InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+        compose.mainClock.advanceTimeBy(64)
+        compose.onNodeWithText("完整管理页").assertExists()
+        compose.mainClock.advanceTimeBy(1500); compose.mainClock.autoAdvance = true
+        compose.waitUntil(5000) { compose.onAllNodesWithText("完整管理页").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithText("选择入口").assertIsDisplayed()
+        assertEquals(tabs, compose.onNodeWithTag("stationary-tabs").fetchSemanticsNode().boundsInRoot)
+    }
+
+    @Test fun realManagementUsesItsOwnGlassBackgroundAndDeduplicatesNavigation() {
+        PaperWarpStats.reset()
+        val source = com.example.source.SourceViewModel(compose.activity.application)
+        var life: PaperLifecycle? = null
+        compose.setContent { MyApplicationTheme {
+            val nav = rememberNavController()
+            NavHost(nav, startDestination = "caller") {
+                composable("caller") {
+                    PullOutButton({ nav.openPaperPage("sources"); nav.openPaperPage("sources") }) { Text("实际管理入口") }
+                }
+                pullOutPage("sources", onDismiss = { nav.popBackStack() }) { close ->
+                    life = LocalPaperOwner.current
+                    Box(Modifier.fillMaxSize().testTag("actual-management")) {
+                        com.example.ui.source.SourceManagementScreen(source, close)
+                    }
+                }
+            }
+        } }
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithText("实际管理入口").performClick()
+        compose.waitUntil(10000) {
+            compose.mainClock.advanceTimeByFrame()
+            life?.progress?.let { it in .35f.. .65f } == true
+        }
+        shot("real-source-management-opening")
+        compose.mainClock.advanceTimeBy(1600); compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.onAllNodesWithTag("actual-management").assertCountEquals(1)
+        shot("real-source-management-flat")
+        assertTrue(life!!.flat); assertTrue(PaperWarpStats.frames > 0); assertEquals(0, PaperWarpStats.failures)
+        InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+        compose.waitUntil(5000) { compose.onAllNodesWithTag("actual-management").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithText("实际管理入口").assertIsDisplayed()
+    }
+
+    @Test fun cacheEntryAndDetailsUseTheirActualButtonsAndOnePaperClock() {
+        PaperWarpStats.reset()
+        val fixture = File(compose.activity.cacheDir, "ehimg/paper-transition-probe").apply {
+            parentFile!!.mkdirs(); writeBytes(ByteArray(4096))
+        }
+        var open by mutableStateOf(false)
+        compose.setContent { MyApplicationTheme {
+            PullOutButton({ open = true }) { Text("存储入口") }
+            if (open) CacheManagementScreen { open = false }
+        } }
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithText("存储入口").performClick()
+        compose.waitUntil(5000) {
+            compose.mainClock.advanceTimeByFrame()
+            PaperWarpStats.frames > 0
+        }
+        compose.mainClock.advanceTimeBy(180)
+        shot("cache-direct-opening")
+        compose.mainClock.advanceTimeBy(1600); compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.waitUntil(15000) {
+            compose.onAllNodes(hasText("占用 ·", substring = true)).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("网页图片缓存"))
+        val beforeDetail = PaperWarpStats.frames
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithText("网页图片缓存").performClick()
+        compose.waitUntil(5000) {
+            compose.mainClock.advanceTimeByFrame()
+            PaperWarpStats.frames > beforeDetail
+        }
+        compose.mainClock.advanceTimeBy(180)
+        shot("cache-detail-opening")
+        compose.mainClock.advanceTimeBy(1600); compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        assertTrue(PaperWarpStats.frames > beforeDetail)
+        compose.onNode(hasContentDescription("关闭") and hasAnyAncestor(
+            hasAnyDescendant(hasText("paper-transition-probe")))).performClick()
+        compose.waitUntil(8000) {
+            compose.onAllNodesWithText("paper-transition-probe").fetchSemanticsNodes().isEmpty()
+        }
+        assertTrue(open)
+        assertTrue(PaperWarpStats.frames > 0)
+        assertEquals(0, PaperWarpStats.failures)
+        compose.onAllNodesWithContentDescription("关闭").assertCountEquals(1)
+        compose.onNodeWithContentDescription("关闭").performTouchInput { click(center) }
+        compose.waitUntil(8000) { !open }
+        compose.onNodeWithText("存储入口").assertIsDisplayed()
+        fixture.delete()
+        File(dir, "handoff-warp.txt").writeText("deformationUpdates=${PaperWarpStats.frames}\nfailures=${PaperWarpStats.failures}\n")
+    }
+
+    @Test fun novelFooterTextIsNotClippedByTheSheetOrItsButton() {
+        val book = com.example.source.SearchBook("layout-probe", "fixture", "小说详情布局检查", "作者",
+            description = "详情介绍。".repeat(100))
+        val loader = coil.ImageLoader(compose.activity)
+        var open by mutableStateOf(false)
+        compose.setContent { MyApplicationTheme {
+            PullOutButton({ open = true }) { Text("小说详情入口") }
+            if (open) com.example.library.NovelDetailSheet(book, "小说聚合", loader, false, null,
+                com.example.download.DownloadState.Idle, onDismiss = { open = false }, onDownload = {},
+                onRead = {}, onPause = {}, onResume = {}, onCancel = {})
+        } }
+        compose.onNodeWithText("小说详情入口").performClick()
+        compose.waitForIdle(); compose.mainClock.advanceTimeBy(1600); compose.waitForIdle()
+        val node = compose.onNodeWithText("整本下载到书架", useUnmergedTree = true)
+        val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        node.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val text = layouts.single()
+        val visible = node.fetchSemanticsNode().boundsInRoot
+        var offsetY = 0
+        var navigationBottom = 0
+        compose.runOnIdle {
+            fun findCompose(view: android.view.View): android.view.View? {
+                if (view.javaClass.simpleName == "AndroidComposeView") return view
+                if (view is android.view.ViewGroup) for (i in 0 until view.childCount) findCompose(view.getChildAt(i))?.let { return it }
+                return null
+            }
+            val window = android.view.inspector.WindowInspector.getGlobalWindowViews().last { it.hasWindowFocus() }
+            val location = IntArray(2)
+            checkNotNull(findCompose(window)).getLocationOnScreen(location); offsetY = location[1]
+            navigationBottom = androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
+                ?.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0
+        }
+        val display = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()!!
+        val safeBottom = display.height - navigationBottom; display.recycle()
+        File(dir, "novel-footer-bounds.txt").writeText("visible=$visible\nlayout=${text.size}\noverflowHeight=${text.didOverflowHeight}\noffsetY=$offsetY\nsafeBottom=$safeBottom\n")
+        shot("novel-footer-whole")
+        assertTrue("Footer text must remain above the physical navigation area", visible.bottom + offsetY <= safeBottom + 1f)
+        assertFalse("Button must allocate the full text line", text.didOverflowHeight)
+        assertTrue("Sheet must not clip the lower half of the download label", visible.height + 1f >= text.size.height)
+        compose.onNodeWithContentDescription("关闭面板").performClick()
+        compose.waitUntil(8000) { !open }
+        loader.shutdown()
+    }
+
+    @Test fun commonActionButtonsKeepLargeTextWholeInBothRenderingModes() {
+        var minimal by mutableStateOf(false)
+        compose.setContent { MyApplicationTheme {
+            val base = androidx.compose.ui.platform.LocalDensity.current
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(base.density, 2f),
+                LocalRenderQuality provides if (minimal) RenderQuality.MINIMAL else RenderQuality.HIGH) {
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    for (size in AppButtonSize.values()) AppActionButton("完整按钮文字", {}, buttonSize = size,
+                        modifier = Modifier.fillMaxWidth().testTag("large-button-${size.name}"))
+                }
+            }
+        } }
+        for (simple in listOf(false, true)) {
+            compose.runOnIdle { minimal = simple }; compose.waitForIdle()
+            for (node in compose.onAllNodesWithText("完整按钮文字", useUnmergedTree = true).fetchSemanticsNodes()) {
+                val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                checkNotNull(node.config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult].action).invoke(layouts)
+                val text = layouts.single()
+                assertFalse(text.didOverflowHeight)
+                assertTrue(node.boundsInRoot.height + 1f >= text.size.height)
+            }
+        }
     }
 
     @Test fun hiddenBackdropCannotPaintWhiteIntoTheWindow() {

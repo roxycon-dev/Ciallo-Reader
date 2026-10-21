@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -141,7 +141,7 @@ fun AppActionButton(
             AppButtonVariant.Tertiary -> cs.primary
         }
         Row(modifier.pullOutAnchor(paperSource).then(if (fullWidth) Modifier.fillMaxWidth() else Modifier)
-            .height(buttonSize.height).clip(RoundedCornerShape(12.dp))
+            .heightIn(min = buttonSize.height).clip(RoundedCornerShape(12.dp))
             .background(bg).clickable(enabled = enabled && !loading, onClick = paperAction)
             .padding(horizontal = buttonSize.horizontalPadding),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
@@ -191,7 +191,7 @@ fun AppActionButton(
             scaleY = scale
             alpha = if (enabled) 1f else disabledAlpha
         }
-        .height(buttonSize.height)
+        .heightIn(min = buttonSize.height)
         .let { if (fullWidth) it.fillMaxWidth() else it }
 
     Box(

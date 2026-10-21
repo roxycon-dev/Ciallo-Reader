@@ -1820,7 +1820,7 @@ internal fun SourcePickerSheet(
                         .pullOutClickable(
                             interactionSource = manageInteraction,
                             indication = null,
-                            onClick = { close { onManageSources() } }
+                            onClick = com.example.ui.components.paperOpen(onManageSources)
                         )
                         .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.Center

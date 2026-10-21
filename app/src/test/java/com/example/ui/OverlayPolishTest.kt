@@ -104,5 +104,52 @@ class OverlayPolishTest {
         compose.mainClock.advanceTimeBy(1800); compose.waitForIdle()
         assertEquals(1, dismissals)
     }
+    @Test fun aForwardButtonInAConfirmationSlotBypassesTheDismissalSpring() {
+        var panel by mutableStateOf("first"); var actions = 0; var dismissals = 0
+        compose.setContent { MyApplicationTheme {
+            if (panel == "first") AcrylicDialog(onDismissRequest = { dismissals++; panel = "" },
+                title = { Text("旧选择窗口") }, confirmButton = {
+                    com.example.ui.components.PullOutTextButton(
+                        onClick = com.example.ui.components.paperOpen { actions++; panel = "second" }
+                    ) { Text("进入管理") }
+                })
+            if (panel == "second") AcrylicDialog(onDismissRequest = { panel = "" }, title = { Text("新管理窗口") })
+        } }
+        compose.waitForIdle(); compose.mainClock.autoAdvance = false
+        compose.onNodeWithText("进入管理").performClick()
+        compose.mainClock.advanceTimeBy(96)
+        compose.waitForIdle()
+        assertEquals("Handoff must dismiss synchronously", 1, dismissals)
+        assertEquals("Forward must not wait for a dismissal spring", 1, actions)
+        assertEquals("second", panel)
+        compose.waitForIdle()
+        compose.onNodeWithText("旧选择窗口").assertDoesNotExist()
+        compose.onNodeWithText("新管理窗口").assertExists()
+        assertEquals(1, actions); assertEquals(1, dismissals)
+        compose.mainClock.autoAdvance = true
+    }
+    @Test fun aControlledMenuRetiresImmediatelyBeforeForwardingAndCanOpenAgain() {
+        var menu by mutableStateOf(false); var child by mutableStateOf(false); var opens = 0
+        compose.setContent { MyApplicationTheme {
+            com.example.ui.components.PullOutButton({ menu = true }) { Text("菜单入口") }
+            com.example.ui.components.PullOutDropdownMenu(menu, { menu = false }) {
+                com.example.ui.components.PullOutDropdownMenuItem(text = { Text("打开管理") },
+                    onClick = com.example.ui.components.paperOpen { opens++; child = true })
+            }
+            if (child) AcrylicDialog(onDismissRequest = { child = false }, title = { Text("菜单管理页") })
+        } }
+        compose.onNodeWithText("菜单入口").performClick(); compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithText("打开管理").performClick()
+        compose.mainClock.advanceTimeBy(96)
+        compose.onNodeWithText("打开管理").assertDoesNotExist()
+        compose.onNodeWithText("菜单管理页").assertExists()
+        assertEquals(1, opens)
+        compose.mainClock.autoAdvance = true
+        compose.runOnIdle { child = false }
+        compose.waitForIdle()
+        compose.onNodeWithText("菜单入口").performClick(); compose.waitForIdle()
+        compose.onNodeWithText("打开管理").assertExists()
+    }
 
 }

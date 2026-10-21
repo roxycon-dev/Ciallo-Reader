@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ui.components.PaperAndSliderTest" tests="21" skipped="0" failures="0" errors="0" timestamp="2026-10-21T01:46:46.201Z" hostname="DESKTOP-PIFGGNS" time="4.444">
+  <properties/>
+  <testcase name="horizontalIntentAndCompletionNotifyExactlyOneDragLifecycle" classname="com.example.ui.components.PaperAndSliderTest" time="3.962"/>
+  <testcase name="nearbyThumbPressRetainsRelativeOffset" classname="com.example.ui.components.PaperAndSliderTest" time="0.023"/>
+  <testcase name="springMotionIsIndependentOfFrameSubdivision" classname="com.example.ui.components.PaperAndSliderTest" time="0.023"/>
+  <testcase name="verticalScrollingDoesNotChangeTheValue" classname="com.example.ui.components.PaperAndSliderTest" time="0.021"/>
+  <testcase name="reversingTheTargetPreservesCurrentPositionAndMomentum" classname="com.example.ui.components.PaperAndSliderTest" time="0.02"/>
+  <testcase name="bubbleSpaceIsNotAHiddenSeekTarget" classname="com.example.ui.components.PaperAndSliderTest" time="0.022"/>
+  <testcase name="emptyTrackTapSelectsTheRequestedPosition" classname="com.example.ui.components.PaperAndSliderTest" time="0.021"/>
+  <testcase name="liveWarpHasANarrowNeckAndReusesItsUniformStorage" classname="com.example.ui.components.PaperAndSliderTest" time="0.021"/>
+  <testcase name="discreteSliderOnlyPublishesStopsAndEventuallySleeps" classname="com.example.ui.components.PaperAndSliderTest" time="0.023"/>
+  <testcase name="openingNeverRewarpsAWindowAfterItHasLandedFlat" classname="com.example.ui.components.PaperAndSliderTest" time="0.021"/>
+  <testcase name="handoffKeepsTheClickedRectForOpeningAndTheLivingParentForReturn" classname="com.example.ui.components.PaperAndSliderTest" time="0.018"/>
+  <testcase name="aCollapsedRangeCanBeExpandedAgain" classname="com.example.ui.components.PaperAndSliderTest" time="0.019"/>
+  <testcase name="trackDownDoesNotMoveTheLensBeforeScrollIntentIsKnown" classname="com.example.ui.components.PaperAndSliderTest" time="0.079"/>
+  <testcase name="nativeSliderRendersBothThemesAndTheMagnifyingLens" classname="com.example.ui.components.PaperAndSliderTest" time="0.034"/>
+  <testcase name="touchingASettlingLensDoesNotPublishItsLaggingVisualPosition" classname="com.example.ui.components.PaperAndSliderTest" time="0.018"/>
+  <testcase name="closingUsesTheFasterSpringWithoutRebound" classname="com.example.ui.components.PaperAndSliderTest" time="0.017"/>
+  <testcase name="disposedMenuItemReturnsToItsLivingParentTrigger" classname="com.example.ui.components.PaperAndSliderTest" time="0.017"/>
+  <testcase name="pendingTriggerIsClaimedOnceAndCannotLeakIntoTheNextUnrelatedOverlay" classname="com.example.ui.components.PaperAndSliderTest" time="0.019"/>
+  <testcase name="rangeLensesCannotCrossOrViolateTheMinimumGap" classname="com.example.ui.components.PaperAndSliderTest" time="0.018"/>
+  <testcase name="aSecondFingerCannotTakeOverTheSlider" classname="com.example.ui.components.PaperAndSliderTest" time="0.018"/>
+  <testcase name="liveWarpEndpointsAreExactAndInverseRowsStayOrderedForExternalSources" classname="com.example.ui.components.PaperAndSliderTest" time="0.03"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

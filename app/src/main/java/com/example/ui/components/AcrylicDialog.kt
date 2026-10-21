@@ -88,12 +88,13 @@ fun AcrylicDialog(
     val blurPx = with(LocalDensity.current) { 18.dp.toPx() }
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val close = overlayDismiss(visibility, onDismissRequest)
+    val forward = rememberPaperHandoff(visibility, onDismissRequest)
     PullOutDialog(
         animateContent = false, lifecycleState = visibility,
         onDismissRequest = { close {} },
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
     ) {
-        CompositionLocalProvider(LocalOverlayClose provides close) { DialogLiquidGlass {
+        CompositionLocalProvider(LocalOverlayClose provides close, LocalPaperHandoff provides forward) { DialogLiquidGlass {
             GlassDialogWindowEffect(activity = activity, blurRadiusPx = blurPx)
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 ScrimEntrance(visibility = visibility) {
@@ -108,7 +109,7 @@ fun AcrylicDialog(
                             )
                     )
                 }
-                DialogEntrance(visibility = visibility) {
+                DialogEntrance(modifier = Modifier.safeDrawingPadding().imePadding(), visibility = visibility) {
                 Column(
                     modifier = modifier
                         .adaptiveDialogWidth(0.86f)
@@ -155,14 +156,16 @@ fun AcrylicBottomOverlay(
     val blurPx = with(LocalDensity.current) { 18.dp.toPx() }
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val close = overlayDismiss(visibility, onDismissRequest)
+    val forward = rememberPaperHandoff(visibility, onDismissRequest)
     PullOutDialog(
         animateContent = false, lifecycleState = visibility,
         onDismissRequest = { close {} },
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false, decorFitsSystemWindows = !fitAvailableHeight)
     ) {
-        CompositionLocalProvider(LocalOverlayClose provides close) { DialogLiquidGlass {
+        CompositionLocalProvider(LocalOverlayClose provides close, LocalPaperHandoff provides forward) { DialogLiquidGlass {
             GlassDialogWindowEffect(activity = activity, blurRadiusPx = blurPx)
-            BoxWithConstraints(modifier = Modifier.fillMaxSize().then(if (fitAvailableHeight) Modifier.safeDrawingPadding().imePadding().padding(bottom = 16.dp) else Modifier)) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize().safeDrawingPadding().imePadding()
+                .then(if (fitAvailableHeight) Modifier.padding(bottom = 16.dp) else Modifier)) {
                 ScrimEntrance(visibility = visibility) {
                     Box(
                         modifier = Modifier

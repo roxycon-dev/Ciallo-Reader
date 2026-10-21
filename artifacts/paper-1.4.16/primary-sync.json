@@ -1,0 +1,82 @@
+{
+  "base": "ff69fcae32c04ed56dc90c555c7cb7dd9b141c79",
+  "conflicts": [],
+  "paths": [
+    {
+      "path": "CHANGELOG.md",
+      "mode": "direct"
+    },
+    {
+      "path": "README.md",
+      "mode": "direct"
+    },
+    {
+      "path": "README_EN.md",
+      "mode": "direct"
+    },
+    {
+      "path": "app/build.gradle.kts",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/androidTest/java/com/example/ui/PaperPolishDeviceTest.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/MainActivity.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/library/LibraryScreen.kt",
+      "mode": "three-way"
+    },
+    {
+      "path": "app/src/main/java/com/example/library/NovelBookUi.kt",
+      "mode": "three-way"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/StorageDetailDialog.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/AcrylicDialog.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/AppButton.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/PullOutHosts.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/PullOutMotion.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/PullOutRender.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/ReleaseHistoryDialog.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/source/SourceManagementScreen.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/test/java/com/example/ui/OverlayPolishTest.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/test/java/com/example/ui/components/PaperAndSliderTest.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "docs/release-1.4.16-2026-10-21.md",
+      "mode": "direct"
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "version": "1.4.16",
+  "versionCode": 239,
+  "jvm": {
+    "uniquePassed": 27,
+    "initial": {
+      "PaperAndSliderTest": 21,
+      "OverlayPolishTest": 4
+    },
+    "additional": [
+      "aControlledMenuRetiresImmediatelyBeforeForwardingAndCanOpenAgain",
+      "aForwardButtonInAConfirmationSlotBypassesTheDismissalSpring"
+    ],
+    "scope": "Spring/source lifecycle and action ordering; later native-window bounds and button sizing are covered by device checks, not an exact-head JVM rerun."
+  },
+  "device": {
+    "uniquePassed": 5,
+    "platform": "Android 15 / API 35 emulator, host NVIDIA GPU; not a physical ARM64 phone",
+    "finalContractRun": [
+      "novelFooterTextIsNotClippedByTheSheetOrItsButton",
+      "chooserHandsOffToPageWithoutRetractingTheCallerOrItsTabs",
+      "cacheEntryAndDetailsUseTheirActualButtonsAndOnePaperClock"
+    ],
+    "otherPassedBeforeFinalContract": [
+      "realManagementUsesItsOwnGlassBackgroundAndDeduplicatesNavigation",
+      "commonActionButtonsKeepLargeTextWholeInBothRenderingModes"
+    ],
+    "otherScope": "The last change only made the existing full-window correction explicit for non-page hosts; full-page and standalone button branches are unchanged."
+  },
+  "footer": {
+    "baselineLocalTextBottom": 1472,
+    "baselineScreenOffsetY": 42,
+    "baselineScreenTextBottom": 1514,
+    "safeScreenBottom": 1478,
+    "finalLocalTextBottom": 1430,
+    "finalScreenOffsetY": 0,
+    "finalScreenTextBottom": 1430,
+    "textLayoutHeight": 39,
+    "textOverflowHeight": false
+  },
+  "paper": {
+    "cacheLifecycleDeformationUpdates": 200,
+    "shaderFailures": 0,
+    "note": "Updates are graphicsLayer deformation updates, not presented frames or an FPS/GPU benchmark."
+  },
+  "intermediateFindings": [
+    "Initial cache fixture had no positive-size cache row; seeded a deterministic 4 KiB file and selected the detail window explicitly.",
+    "Robolectric direct callback driving left window disposal queued; the confirmation-slot case passes through the normal semantics click driver. Device duplicate-click handoff also passes.",
+    "Local semantics bounds passed while the footer was physically below the navigation-safe area. The new physical-coordinate assertion caught it.",
+    "The first bounds patch relied on initial LayoutParams.width, which was still WRAP_CONTENT in non-page windows. Replaced it with the explicit host fillWindow contract; the final three affected device cases pass."
+  ],
+  "checks": {
+    "uiGate": "passed without updating baseline",
+    "sourceFilesCovered": 722,
+    "missingFromGuide": 0,
+    "explicitlyDeletedGuideReferences": 4,
+    "frozenProductionInputs": 715
+  },
+  "limitations": [
+    "No physical ARM64 device performance certification.",
+    "No unrelated full regression suite rerun.",
+    "The one-sample warp still costs more GPU work than a plain matrix transition."
+  ]
+}

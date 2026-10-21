@@ -1,5 +1,7 @@
 package com.example
 
+import com.example.ui.components.openPaperPage
+import com.example.ui.components.pullOutPage
 import com.example.ui.components.PullOutVisibility
 import android.net.Uri
 import android.os.Bundle
@@ -742,7 +744,7 @@ class MainActivity : ComponentActivity() {
                                                         selectedTab = 2
                                                     },
                                                     onOpenSourceManagement = {
-                                                        navController.navigate("source_management")
+                                                        navController.openPaperPage("source_management")
                                                     },
                                                     onImportLocalBook = {
                                                         selectedCategoryForImport = "全部"
@@ -769,7 +771,7 @@ class MainActivity : ComponentActivity() {
                                                 onFollow = { book, next -> viewModel.toggleFavorite(book, next) },
                                                 onOpen = { book -> discoverReadJob?.cancel(); libraryViewModel.openComic(book); navController.navigate("comic_chapters") },
                                                 onLatest = {},
-                                                onSourceManagement = { navController.navigate("source_management") },
+                                                onSourceManagement = { navController.openPaperPage("source_management") },
                                             )
                                             2 -> HomeScreen(
                                                 books = visibleBooks,
@@ -1010,7 +1012,7 @@ class MainActivity : ComponentActivity() {
                                                         viewModel.addCategory(name)
                                                     },
                                                 onOpenSourceManager = {
-                                                    navController.navigate("source_management")
+                                                    navController.openPaperPage("source_management")
                                                 },
                                                 autoNightModeVal = autoNightMode,
                                                 onAutoNightModeChange = { viewModel.updateAutoNightMode(it) },
@@ -1090,7 +1092,7 @@ class MainActivity : ComponentActivity() {
                             SettingsTabScreen(
                                 focusGodSettings = focusGodSettings,
                                 onOpenSourceManager = {
-                                    navController.navigate("source_management")
+                                    navController.openPaperPage("source_management")
                                 },
                                 prefs = viewModel.prefs,
                                 backupManager = viewModel.backupManager,
@@ -1336,7 +1338,7 @@ class MainActivity : ComponentActivity() {
                             com.example.library.LibraryScreen(
                                 viewModel = searchViewModel,
                                 onBookImported = { selectedTab = 2 },
-                                onOpenSourceManagement = { navController.navigate("source_management") },
+                                onOpenSourceManagement = { navController.openPaperPage("source_management") },
                                 onImportLocalBook = {
                                     selectedCategoryForImport = "全部"
                                     fileLauncher.launch("*/*")
@@ -1831,10 +1833,10 @@ class MainActivity : ComponentActivity() {
                             )
                         } }
 
-                        composable("source_management") {
+                        pullOutPage("source_management", onDismiss = { navController.popBackStack() }) { close ->
                             com.example.ui.source.SourceManagementScreen(
                                 viewModel = sourceViewModel,
-                                onBack = { navController.popBackStack() }
+                                onBack = close
                             )
                         }
 

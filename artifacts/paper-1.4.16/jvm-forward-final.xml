@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ui.OverlayPolishTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-21T02:08:15.381Z" hostname="DESKTOP-PIFGGNS" time="27.618">
+  <properties/>
+  <testcase name="aForwardButtonInAConfirmationSlotBypassesTheDismissalSpring" classname="com.example.ui.OverlayPolishTest" time="27.603"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
