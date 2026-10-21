@@ -2,12 +2,14 @@ package com.example.ui.shelf
 
 
 import com.example.ui.components.PullOutBottomSheet
-import com.example.ui.components.PullOutVisibility
 import com.example.ui.components.pullOutClickable
 import androidx.activity.compose.BackHandler
 import kotlin.math.roundToInt
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -465,7 +467,9 @@ data class ShelfAction(
     val destructive: Boolean = false,
 )
 
-/** 底部悬浮操作栏（毛玻璃胶囊，弹簧滑入，替换底部导航栏）。 */
+/** 底部悬浮操作栏（毛玻璃胶囊，弹簧滑入，替换底部导航栏）。
+ *  长按书籍进入多选属于「选中态切换」，不是打开内容，因此不再走抽纸动效：
+ *  这里用独立的弹簧滑入 / 滑出，避免每次选择都拉起一张纸面。 */
 @Composable
 fun MultiSelectActionBar(
     actions: List<ShelfAction>,
@@ -475,9 +479,14 @@ fun MultiSelectActionBar(
 ) {
     val shape = RoundedCornerShape(26.dp)
     val primary = MintPrimary
-    PullOutVisibility(
+    AnimatedVisibility(
         visible = visible,
         modifier = modifier,
+        enter = slideInVertically(
+            animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
+            initialOffsetY = { it },
+        ) + fadeIn(animationSpec = tween(140)),
+        exit = slideOutVertically(animationSpec = tween(180), targetOffsetY = { it }) + fadeOut(animationSpec = tween(120)),
     ) {
         Column(
             modifier = Modifier

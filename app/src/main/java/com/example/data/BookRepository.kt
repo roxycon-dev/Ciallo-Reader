@@ -883,88 +883,19 @@ class BookRepository(
             android.util.Log.e("BookRepository", "Error cleaning old test books", e)
         }
 
-        // 2. Seed 《Ciallo Reader使用指南》 as default book
-        val guideFilePath = "ciallo_guide_novel"
-        val existingGuideCount = bookDao.getBookCountByFilePath(guideFilePath)
-
-        if (existingGuideCount == 0) {
-            val guideTitle = "《Ciallo Reader使用指南》"
-            val guideBook = Book(
-                title = guideTitle,
-                author = "Ciallo Reader团队",
-                filePath = guideFilePath,
-                totalChapters = 7,
-                contentType = "NOVEL"
-            )
-            val bookId = bookDao.insertBook(guideBook).toInt()
-            val guideChapters = listOf(
-                Chapter(
-                    bookId = bookId,
-                    chapterOrder = 0,
-                    title = "第一章：欢迎使用 Ciallo Reader",
-                    content = "欢迎使用 Ciallo Reader！\n\nCiallo Reader是一款专为二次元与小说/漫画爱好者打造的极简、流畅且充满陪伴感的高品质阅读应用。\n\n无论你是喜爱阅读长篇网络小说、经典文学著作，还是习惯追更日漫与条漫，Ciallo Reader都能为你提供极佳的阅读排版体验与智能贴心的辅助功能。\n\n本指南将带你快速了解 Ciallo Reader的各项核心功能与使用技巧，帮助你开启一段惬意的阅读之旅。"
-                ),
-                Chapter(
-                    bookId = bookId,
-                    chapterOrder = 1,
-                    title = "第二章：书架管理与图书导入",
-                    content = "【图书导入与支持格式】\n1. 点击书架右上角或底部的「+」导入按钮，即可从手机本地文件选择并导入图书。\n2. 应用原生支持 TXT 纯文本小说、EPUB 电子书以及 CBZ/ZIP/PDF 格式的漫画文件。\n\n【分类与搜索】\n• 可以在书架顶栏搜索框中快速搜索书名或作者名。\n• 支持创建自定义分类标签（如：奇幻、科幻、漫画、轻小说），长按书籍卡片即可方便地归类或编辑书籍信息。\n• 最近阅读区域将置顶显示你近期读过的书籍，方便一键继续阅读。"
-                ),
-                Chapter(
-                    bookId = bookId,
-                    chapterOrder = 2,
-                    title = "第三章：小说阅读与个性化排版",
-                    content = "【精确排版引擎】\nCiallo Reader采用了基于真实控件高度与逐行测量的动态排版算法。无论在竖屏还是横屏下切换，文字都不会出现被半截切断或丢失漏行的现象，同时会自动保持位置锚点衔接。\n\n【版式与主题定制】\n• 点击屏幕中央区域唤出阅读控制栏，点击「设置」图标即可调整：\n  - 字号大小与行间距\n  - 首行缩进与段落边距\n  - 阅读背景主题：包含羊皮纸、夜间深色、护眼绿、极简白等多款精心调配的色彩组合\n  - 字体切换：支持自定义系统字体与优雅衬线/无衬线体选择。"
-                ),
-                Chapter(
-                    bookId = bookId,
-                    chapterOrder = 3,
-                    title = "第四章：仿真翻页与书签互动",
-                    content = "【多样化翻页模式】\n应用内置了多种高帧率平滑翻页效果，可在阅读设置中自由切换：\n1. 仿真翻页：还原纸质书的卷角与平滑弯曲视差。\n2. 覆盖/平移：现代优雅的推移效果。\n3. 淡入淡出：柔和不刺眼的渐变过渡。\n4. 连续滚动：适合快速浏览的长图文模式。\n\n【书签与划词高亮】\n• 点击顶部控制栏的书签图标，或长按页面右上角即可快速添加书签。\n• 在正文中长按并拖动选取文字，可呼出高亮与笔记菜单，记录你的阅读心得与精彩名句。"
-                ),
-                Chapter(
-                    bookId = bookId,
-                    chapterOrder = 4,
-                    title = "第五章：漫画阅读器使用技巧",
-                    content = "【漫画专享优化】\n当你打开 CBZ / ZIP / PDF 漫画或图集时，Ciallo Reader会自动切换至专属漫画引擎：\n1. 支持双指自由缩放与双击快速放大图像，细节一览无余。\n2. 支持切换「横向翻页」与「纵向条漫」模式，满足不同漫画排版需求。\n3. 支持调整读向：可切换日漫（右至左）或欧美漫（左至右）阅读顺序。"
-                ),
-                Chapter(
-                    bookId = bookId,
-                    chapterOrder = 5,
-                    title = "第六章：Roxy 助手与阅读统计",
-                    content = "【看板娘 Roxy 动态陪伴】\n在阅读界面与应用主页中，可爱贴心的魔法少女 Roxy 会静静陪伴着你：\n• 添加书签或完成阅读目标时，Roxy 会展示萌趣的交互与魔法动画。\n• 互动响应流畅，并在连续触发时具备打断重播平滑过渡。\n\n【阅读统计与成就】\n进入「统计」标签页，可以直观查看你的总阅读时长、阅读天数、章节进度分布以及每日阅读趋势图表，记录你读过的点点滴滴。\n\n祝你阅读愉快！—— Ciallo Reader团队"
-                )
-            )
-            bookDao.insertChapters(guideChapters)
-        }
-
-        // Update the preinstalled guide on existing installs without replacing reading state.
-        val guideBook = bookDao.getBookByFilePath(guideFilePath)
-        if (guideBook != null) {
-            val existingChapters = bookDao.getChaptersListForBook(guideBook.id)
-            val newChapterTitle = "第七章：在线书库、成人源与漫画标签"
-            val newChapterContent = "【在线书库与小说来源】\n在「书库」页顶部选择来源，按书名或作者搜索。可使用小说聚合搜索、已启用的在线书源和漫画源；来源列表可在设置的书源管理中更新或导入 Legado / JSON 书源。支持的在线来源与站点可用性会随网络和上游站点变化。\n\n【开启成人漫画源】\n1. 打开底部「设置」标签页。\n2. 连续点击六次「主色按钮实时联动效果」，显示「高级内容」。\n3. 打开「高级内容」中的「带你登大郎~~~」。\n4. 等待 Venera 漫画源列表更新完成，返回「书库」，在漫画书源选择器中选择需要的来源。\n关闭该开关后，成人源会从书库来源列表中隐藏。\n\n【漫画详情、书签与神回】\n漫画详情页可查看作品标签和章节；阅读时可为章节添加书签。作品详情提供神回入口，神回排行榜可查看热门章节。在线阅读会优先加载当前页并逐步载入后续图片；需要离线阅读时，可从章节列表下载章节。\n\n【下载与更新】\n小说支持整本下载与离线阅读；整本更新会保留原有阅读位置、书签和笔记。书库下载面板可查看任务进度，漫画下载支持暂停后继续。\n\n来源内容由第三方站点提供，请按当地法律和来源站点规则使用。"
-            val existingChapter = existingChapters.firstOrNull { it.title == newChapterTitle }
-            if (existingChapter == null) {
-                val nextOrder = (existingChapters.maxOfOrNull { it.chapterOrder } ?: -1) + 1
-                bookDao.insertChapters(
-                    listOf(
-                        Chapter(
-                            bookId = guideBook.id,
-                            chapterOrder = nextOrder,
-                            title = newChapterTitle,
-                            content = newChapterContent
-                        )
-                    )
-                )
-            } else if (existingChapter.content != newChapterContent) {
-                // Refresh the seeded guide chapter without resetting the user's reading progress or bookmarks.
-                bookDao.insertChapters(listOf(existingChapter.copy(content = newChapterContent)))
+        // 2. Retire the built-in 《Ciallo Reader使用指南》.
+        //    It is no longer seeded, so new installs start with an empty shelf; installs that
+        //    already have it drop it on next launch with the same cleanup the legacy
+        //    placeholders above get, leaving no orphan chapters or reading records behind.
+        try {
+            val retiredGuide = bookDao.getBookByFilePath("ciallo_guide_novel")
+            if (retiredGuide != null) {
+                bookDao.deleteChaptersForBook(retiredGuide.id)
+                bookDao.nullifyBookIdInReadingRecords(retiredGuide.id)
+                bookDao.deleteBook(retiredGuide)
             }
-            val chapterCount = bookDao.getChaptersListForBook(guideBook.id).size
-            if (guideBook.totalChapters < chapterCount) {
-                bookDao.updateBook(guideBook.copy(totalChapters = chapterCount))
-            }
+        } catch (e: Exception) {
+            android.util.Log.e("BookRepository", "Error removing the built-in guide", e)
         }
     }
 }

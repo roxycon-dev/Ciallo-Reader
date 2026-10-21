@@ -2120,11 +2120,17 @@ fun HomeScreen(
                            盖在页头上方从顶部滑入/淡出。因为它只是 Box 的 overlay，
                            下方网格一像素都不会动 —— 长按进入多选时不会再"跳一下"，
                            书卡的 itemRect 也不会瞬间失效导致误命中。 */
-                        val reduceMotion = com.example.ui.feedback.LocalReduceMotion.current
-                        PullOutVisibility(
+                        /* 长按选中书籍只切换「选中态」，不打开任何内容，所以这一层
+                           不参与抽纸：顶部栏自己用弹簧滑入 / 淡出即可，避免每次
+                           长按都凭空拉起一张纸面。 */
+                        AnimatedVisibility(
                             visible = shelfSelection.phase != com.example.ui.shelf.ShelfPhase.BROWSE,
                             modifier = Modifier.align(Alignment.TopCenter),
-                            label = "multiselect_topbar",
+                            enter = slideInVertically(
+                                animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
+                                initialOffsetY = { -it },
+                            ) + fadeIn(animationSpec = tween(140)),
+                            exit = slideOutVertically(animationSpec = tween(180), targetOffsetY = { -it }) + fadeOut(animationSpec = tween(120)),
                         ) {
                             com.example.ui.shelf.MultiSelectTopBar(
                                 // 计数 = 名单大小。名单已按板块锁死，所以它天然就是
