@@ -1,0 +1,44 @@
+{
+  "version": "1.4.14",
+  "versionCode": 237,
+  "jvm": {
+    "com.example.ui.components.PaperAndSliderTest": {
+      "tests": 18,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "com.example.ui.OverlayPolishTest": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "device": {
+    "tests": 3,
+    "failures": 0,
+    "fastFlicks": 12,
+    "rapidTaps": 72,
+    "modalCycles": 6,
+    "followUpActions": 6,
+    "settledPixelDifference": 0.0,
+    "reversals": 24,
+    "manualHeaders": 1,
+    "cacheHeaders": 1
+  },
+  "rendering": "Unified live-content Compose layer transition; no mesh/readback/source hiding",
+  "limitations": [
+    "Host-GPU Android emulator; no physical ARM64 GPU frame-rate guarantee",
+    "Targeted regression only; no unrelated full-suite rerun"
+  ],
+  "uiGate": {
+    "passed": true,
+    "baselineChanged": false
+  },
+  "guideCoverage": {
+    "sources": 722,
+    "missing": 0,
+    "explicitlyDeletedReferences": 4
+  }
+}

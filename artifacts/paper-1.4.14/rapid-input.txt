@@ -1,0 +1,5 @@
+fastFlicks=12
+rapidTaps=72
+windowCycles=6
+actions=6
+settledPixelDifference=0.0

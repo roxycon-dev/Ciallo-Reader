@@ -1,0 +1,13 @@
+{
+  "versionName": "1.4.14",
+  "versionCode": 237,
+  "package": "com.aistudio.novelreader.kxmpzq",
+  "bytes": 29152412,
+  "sha256": "6b43715607810e918c9689ec1725c300ffe000cbffeef1dd7afa1f427a16f359",
+  "abis": [
+    "arm64-v8a"
+  ],
+  "zipEntries": 207,
+  "verified": true,
+  "certificateSha256": "d2115e3cc5880b210a120558aaab03eb30ee5de2952a80f3376dda7e45501146"
+}

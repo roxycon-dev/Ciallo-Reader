@@ -20,58 +20,6 @@ import kotlin.math.abs
 @Config(sdk = [33], qualifiers = "w411dp-h891dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PaperAndSliderTest {
-    @Test fun offscreenRowsPreservePixelBytesAndTruncatedFinalPadding() {
-        val rows = PaperPixelBuffer(2, 2)
-        for (stride in listOf(8, 16)) {
-            val data = java.nio.ByteBuffer.allocateDirect(stride + 8)
-            data.put(byteArrayOf(-1, 0, 0, -1, 0, -1, 0, -1))
-            data.position(stride); data.put(byteArrayOf(0, 0, -1, -1, -128, 64, 32, -128))
-            val bitmap = rows.copy(data, stride, 4)
-            // Native Robolectric's desktop Skia N32 order differs from Android's
-            // RGBA surface. Verify byte preservation, including premultiplied alpha,
-            // independently of the host's getPixel channel interpretation.
-            val copied = java.nio.ByteBuffer.allocateDirect(16)
-            bitmap.copyPixelsToBuffer(copied); copied.rewind()
-            val bytes = ByteArray(16); copied.get(bytes)
-            assertArrayEquals(byteArrayOf(-1, 0, 0, -1, 0, -1, 0, -1,
-                0, 0, -1, -1, -128, 64, 32, -128), bytes)
-            bitmap.recycle()
-        }
-    }
-    @Test fun firstAndFinalMeshFramesAreExactAtEveryVertex() {
-        val anchor = Rect(180f, 700f, 340f, 748f)
-        for (row in 0..150) for (col in 0..26) {
-            val u = col / 26f; val v = row / 150f
-            assertEquals(Offset(anchor.left + u * anchor.width, anchor.top + v * anchor.height), PaperMesh.vertex(u, v, 350f, 550f, anchor, 0f, 1f))
-            assertEquals(Offset(u * 350f, v * 550f), PaperMesh.vertex(u, v, 350f, 550f, anchor, 1f, 1f))
-            assertEquals(0f, PaperMesh.blend(v, 550f, 550f, 0f), 0f)
-            assertEquals(1f, PaperMesh.blend(v, 550f, 550f, 1f), 0f)
-        }
-    }
-    @Test fun endpointsHaveNoHiddenDiscontinuityForSourcesOutsideThePanel() {
-        for (anchor in listOf(Rect(100f, -120f, 260f, -72f), Rect(100f, 700f, 260f, 748f), Rect(80f, 200f, 240f, 248f))) {
-            for (u in listOf(0f, .5f, 1f)) for (v in listOf(0f, .5f, 1f)) {
-                val start = PaperMesh.vertex(u, v, 350f, 550f, anchor, 0f, 1f)
-                val nearStart = PaperMesh.vertex(u, v, 350f, 550f, anchor, .00001f, 1f)
-                assertTrue((start - nearStart).getDistance() < .1f)
-                val end = PaperMesh.vertex(u, v, 350f, 550f, anchor, 1f, 1f)
-                val nearEnd = PaperMesh.vertex(u, v, 350f, 550f, anchor, .99999f, 1f)
-                assertTrue((end - nearEnd).getDistance() < .1f)
-            }
-        }
-    }
-    @Test fun meshHasNoReversedRowsOrNonFiniteVerticesThroughoutOpeningAndOvershoot() {
-        val anchor = Rect(130f, 520f, 270f, 568f)
-        for (step in 0..108) for (col in 0..26) {
-            var last = -Float.MAX_VALUE
-            for (row in 0..150) {
-                val point = PaperMesh.vertex(col / 26f, row / 150f, 390f, 600f, anchor, step / 100f, 1f)
-                assertTrue(point.x.isFinite() && point.y.isFinite())
-                assertTrue("Mesh must be continuous and never fold into inverted triangles", point.y >= last - .001f)
-                last = point.y
-            }
-        }
-    }
     private fun slider(a: Float = .25f, b: Float? = null, gap: Float = 0f, steps: Int = 0): LiquidSliderView {
         val context = ApplicationProvider.getApplicationContext<Context>()
         return LiquidSliderView(context).apply {
@@ -219,25 +167,6 @@ class PaperAndSliderTest {
         repeat(10) { whole.advance(1f, true, 1f/60); repeat(2) { half.advance(1f, true, 1f/120) } }
         assertEquals(whole.position, half.position, .00001f); assertEquals(whole.velocity, half.velocity, .0001f)
     }
-    @Test fun optimizedRowsPreserveTheOriginalSoftPaperGeometry() {
-        val vertices = FloatArray(27 * 151 * 2)
-        val colors = IntArray(27 * 151); val sourceColors = IntArray(colors.size)
-        for (source in listOf(Rect(20f, -90f, 150f, -40f), Rect(120f, 540f, 280f, 588f))) {
-            for (p in listOf(0f, .1f, .4f, .7f, 1f, 1.07f)) {
-                val contributions = fillPaperMesh(vertices, colors, sourceColors, 390f, 620f, source, p, 1.5f)
-                val expected = (if (colors.any { it ushr 24 > 0 }) 1 else 0) or
-                    (if (sourceColors.any { it ushr 24 > 0 }) 2 else 0)
-                assertEquals("Only zero-contribution texture passes may be omitted", expected, contributions)
-                for (row in 0..150) for (col in 0..26) {
-                    val expected = PaperMesh.vertex(col / 26f, row / 150f, 390f, 620f, source, p, 1.5f)
-                    val index = (row * 27 + col) * 2
-                    assertEquals(expected.x, vertices[index], .02f)
-                    assertEquals(expected.y, vertices[index + 1], .02f)
-                }
-            }
-        }
-    }
-
     @Test fun pendingTriggerIsClaimedOnceAndCannotLeakIntoTheNextUnrelatedOverlay() {
         val source = PullOutSource().apply { bounds = Rect(10f, 10f, 80f, 60f) }
         PullOutSources.activate(source)

@@ -487,16 +487,17 @@ fun GlassCard(
                                 (((down.position.x / size.width) - 0.5f) * 2f).coerceIn(-1f, 1f),
                                 (((down.position.y / size.height) - 0.5f) * 2f).coerceIn(-1f, 1f)
                             )
-                            var consumedStreak = 0
                             try {
                                 while (true) {
                                     val ev = awaitPointerEvent()
                                     // 滚动门控：列表开始消费移动事件（滚动接管）后立即熄灭全套按压
                                     // 特效 —— 划过/拖动列表不再被误判为"按压卡片"
-                                    if (ev.changes.any { it.isConsumed }) consumedStreak++ else consumedStreak = 0
-                                    if (consumedStreak >= 3) break
-                                    val ch = ev.changes.firstOrNull() ?: break
-                                    if (!ch.pressed) break
+                                    val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (!ch.pressed || ev.changes.count { it.pressed } > 1) break
+                                    // Relinquish on the first real scroll, not three events later.
+                                    // Fast flicks must not keep moving the text/parallax touch point.
+                                    if ((ch.position - down.position).getDistance() > viewConfiguration.touchSlop ||
+                                        (ch.isConsumed && ch.position != ch.previousPosition)) break
                                     pressPos = ch.position
                                     pressNorm = Offset(
                                         (((ch.position.x / size.width) - 0.5f) * 2f).coerceIn(-1f, 1f),

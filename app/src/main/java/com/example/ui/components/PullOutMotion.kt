@@ -1,8 +1,5 @@
 package com.example.ui.components
 
-import android.graphics.Bitmap
-import android.graphics.Canvas as NativeCanvas
-import android.graphics.Paint as NativePaint
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.clickable
@@ -13,15 +10,8 @@ import androidx.compose.foundation.Indication
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.layer.GraphicsLayer
-import androidx.compose.ui.graphics.layer.drawLayer
-import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.platform.LocalGraphicsContext
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
@@ -31,24 +21,17 @@ import java.util.WeakHashMap
 import kotlinx.coroutines.flow.first
 import kotlin.math.*
 
-/** One configuration for native GPU paper, its reduced-motion fallback and all modal hosts. */
+/** Shared spring and geometry for every modal; live Compose content stays in its own window. */
 object PullOutConfig {
-    const val COLUMNS = 26
-    const val ROWS = 150
-    const val NECK = .30f
-    const val DECAY = 90f
-    const val BEND = 16f
-    const val ARCH = 10f
-    const val FLUTTER = 4f
+    const val SCRIM = .35f
+    const val DISMISS_DISTANCE = 64f
+    const val DRAG_TRAVEL = 300f
+    const val SURFACE_SCALE = .96f
+    const val SURFACE_TRAVEL_DP = 12f
     const val OPEN_K = 140f
     const val OPEN_D = 15f
     const val CLOSE_K = 260f
     const val CLOSE_D = 34f
-    const val SCRIM = .35f
-    const val DISMISS_DISTANCE = 64f
-    const val DRAG_TRAVEL = 300f
-    const val MAX_TEXTURE_PIXELS = 1_000_000f
-    const val MAX_TEXTURE_SIDE = 1600f
     const val SOURCE_LIFETIME_MS = 900L
     const val FALLBACK_OPEN_K = 800f
     const val FALLBACK_OPEN_D = 50f
@@ -63,20 +46,12 @@ object PullOutConfig {
 
 internal class PullOutSource {
     var bounds = Rect.Zero // Screen coordinates, shared safely across Dialog windows.
-    var hidden by mutableStateOf(false)
-    var hideOwners = 0
-    var preview: WeakReference<android.graphics.Bitmap>? = null
-    fun hide() { hideOwners++; hidden = true }
-    fun reveal() { hideOwners = (hideOwners - 1).coerceAtLeast(0); hidden = hideOwners > 0 }
     var view: WeakReference<android.view.View>? = null
     var parent: PullOutSource? = null
     var virtual = false
     var disposed = false
     var claimed = false
     var activatedAt = 0L
-    var capture by mutableStateOf<kotlinx.coroutines.CompletableDeferred<GraphicsLayer>?>(null)
-    var capturedLayer: GraphicsLayer? = null
-    var releaseCapture: (() -> Unit)? = null
     fun returnSource(): PullOutSource {
         var origin = this
         repeat(8) {
@@ -122,39 +97,9 @@ internal fun rememberPaperTrigger(): PullOutSource {
 fun Modifier.pullOutAnchor(): Modifier = composed { pullOutAnchor(rememberPaperTrigger()) }
 internal fun Modifier.pullOutAnchor(source: PullOutSource): Modifier = composed {
     val view = LocalView.current
-    val graphics = LocalGraphicsContext.current
     source.view = WeakReference(view)
-    DisposableEffect(source, graphics) {
-        source.releaseCapture = {
-            source.capturedLayer?.let { graphics.releaseGraphicsLayer(it) }
-            source.capturedLayer = null; source.capture = null
-        }
-        onDispose { source.capture?.cancel(); source.releaseCapture?.invoke(); source.releaseCapture = null }
-    }
+    // Geometry only: never record, hide or take ownership of a card's render nodes.
     onGloballyPositioned { source.bounds = it.boundsInWindow().translate(view.paperWindowOffset()) }
-        .pointerInput(source) {
-            awaitPointerEventScope {
-                while (true) {
-                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                    if (event.changes.any { it.pressed && !it.previousPressed }) PullOutSources.activate(source)
-                }
-            }
-        }.drawWithContent {
-            if (!source.hidden || source.capture?.isCompleted == false) {
-                val request = source.capture
-                if (request != null && !request.isCompleted && size.width > 0 && size.height > 0) {
-                    val captured = graphics.createGraphicsLayer()
-                    source.capturedLayer = captured
-                    val ratio = min(1f, min(PullOutConfig.MAX_TEXTURE_SIDE / max(size.width, size.height),
-                        sqrt(PullOutConfig.MAX_TEXTURE_PIXELS / (size.width * size.height))))
-                    captured.record(size = IntSize((size.width * ratio).toInt().coerceAtLeast(1), (size.height * ratio).toInt().coerceAtLeast(1))) {
-                        withTransform({ scale(ratio, ratio, Offset.Zero) }) { this@drawWithContent.drawContent() }
-                    }
-                    if (!source.hidden) withTransform({ scale(1f / ratio, 1f / ratio, Offset.Zero) }) { drawLayer(captured) }
-                    request.complete(captured)
-                } else if (!source.hidden) drawContent()
-            }
-        }
 }
 /** Selection and long presses register at activation, including accessibility and held presses. */
 fun Modifier.pullOutSelectable(selected: Boolean, interactionSource: MutableInteractionSource?, indication: Indication?,
@@ -189,65 +134,18 @@ internal class PaperLifecycle {
     var progress by mutableFloatStateOf(0f)
     var retained by mutableStateOf(false)
     var closed by mutableStateOf(true)
-    var ready by mutableStateOf(false)
-    var flat = false
+    var flat by mutableStateOf(false)
     var inputBlocked by mutableStateOf(true)
     var registered by mutableStateOf(false)
-    var captureRevision by mutableIntStateOf(0)
     var hostAttached = false
     var afterDismiss: (() -> Unit)? = null
-    var meshEnabled = false
     var origin: PullOutSource? = null
-    var carriedByParent = false
     val spring = PaperSpring()
 }
 private val paperLifecycles = WeakHashMap<MutableTransitionState<Boolean>, PaperLifecycle>()
 @Composable
 internal fun rememberPaperLifecycle(state: MutableTransitionState<Boolean>): PaperLifecycle = remember(state) {
     paperLifecycles.getOrPut(state) { PaperLifecycle() }
-}
-
-/** Smooth hinge integral: the released length has unit slope; only the material at the slit compresses. */
-internal object PaperMesh {
-    private fun softplus(x: Float, softness: Float): Float = when {
-        x / softness > 20f -> x
-        x / softness < -20f -> 0f
-        else -> softness * ln(1f + exp(x / softness))
-    }
-    fun vertex(u: Float, v: Float, width: Float, height: Float, source: Rect, p: Float, density: Float): Offset {
-        if (p <= 0f) return Offset(source.left + u * source.width, source.top + v * source.height)
-        if (p == 1f) return Offset(u * width, v * height)
-        val q = p.coerceIn(0f, 1f)
-        val wave = sin(PI * q).toFloat()
-        val slit = source.center.y.coerceIn(0f, height)
-        val finalY = v * height
-        val delta = finalY - slit
-        val far = max(slit, height - slit).coerceAtLeast(1f)
-        val softness = 12f * density
-        val lock = (1f - q) * (far + softness * 10f) - q * softness * 10f
-        val released = softplus(abs(delta) - lock, softness) - softplus(-lock, softness)
-        val compressedScale = source.height / height.coerceAtLeast(1f)
-        val mapped = released + (abs(delta) - released) * compressedScale
-        val free = (released / far).coerceIn(0f, 1f)
-        val y0 = source.center.y + (slit / height.coerceAtLeast(1f) - .5f) * source.height * (1f - q) + (slit - source.center.y) * q
-        val neck = 1f - (1f - PullOutConfig.NECK) * wave.pow(.7f) * exp(-abs(mapped) / (PullOutConfig.DECAY * density))
-        val unfold = q + (1f - q) * (1f - exp(-released / (24f * density)))
-        val openWidth = source.width + (width - source.width) * unfold
-        val centerX = source.center.x + (width / 2 - source.center.x) * q
-        val bend = PullOutConfig.BEND * density * wave * free * free
-        val flutter = PullOutConfig.FLUTTER * density * wave * free * sin(v * 4f + q * 5f)
-        val arch = PullOutConfig.ARCH * density * wave * free * (1f - (2 * u - 1).pow(2))
-        val overshoot = (p - 1f).coerceAtLeast(0f)
-        return Offset(centerX + (u - .5f) * openWidth * neck + bend + flutter,
-            y0 + delta.sign * (mapped + arch) - overshoot * height * .10f)
-    }
-    fun blend(v: Float, height: Float, slit: Float, p: Float): Float {
-        if (p <= 0) return 0f
-        if (p >= 1) return 1f
-        val far = abs(v * height - slit) / height.coerceAtLeast(1f)
-        val t = (p * 1.7f + far * sin(PI * p).toFloat() * .8f - .3f).coerceIn(0f, 1f)
-        return t * t * (3 - 2 * t)
-    }
 }
 
 /** Exact spring integration retains both displacement and velocity across target changes. */
@@ -295,78 +193,54 @@ fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: M
     val dragTarget = if (parentPaper == null) LocalPaperVisibleTarget.current else 1f
     val currentDragTarget by rememberUpdatedState(dragTarget)
     val target = visibleState.targetState
-    var previousTarget by remember { mutableStateOf(target) }
+    val currentTarget by rememberUpdatedState(target)
+    val initiallyVisible = remember { visibleState.currentState || (target && parentPaper != null) }
     if (target && !life.retained) {
         life.origin = PullOutSources.claim() ?: parentOrigin ?: PullOutSource().apply { virtual = true }
-        life.meshEnabled = !reduce && android.os.Build.VERSION.SDK_INT >= 26
-        life.retained = true; life.closed = false; life.ready = !life.meshEnabled
-        if (parentPaper != null && !parentPaper.flat) {
-            // Initial visible children belong to the parent's one texture. Do not
-            // read back/animate a whole stack of nested papers at the same time.
-            life.carriedByParent = true; life.meshEnabled = false; life.ready = true
+        life.retained = true; life.closed = false
+        if (initiallyVisible && !life.registered) {
             life.spring.position = 1f; life.progress = 1f; life.flat = true; life.inputBlocked = false
         }
     }
-    if (previousTarget != target) {
-        previousTarget = target
-        life.inputBlocked = true
-        if (!target && life.carriedByParent) {
-            life.carriedByParent = false
-            life.origin = PullOutSources.claim() ?: life.origin
-            life.meshEnabled = !reduce && android.os.Build.VERSION.SDK_INT >= 26
-        }
-        if (!target && life.flat && life.meshEnabled) {
-            life.ready = false; life.captureRevision++ // Capture current content, not its opening snapshot.
-        }
-    }
-    if (target && life.flat && dragTarget != 1f && life.meshEnabled) {
-        // Data and controls may have changed since opening. The first header drag
-        // freezes the current surface once, never an old loading/skeleton frame.
-        life.flat = false; life.inputBlocked = true
-        life.ready = false; life.captureRevision++
-    }
     SideEffect { life.registered = true }
     DisposableEffect(life) { onDispose { life.registered = false } }
-    // Keep legacy callers' state observable without letting its transition dispose the real paper.
+    // Preserve existing callers' transition state while our one clock owns retention.
     AnimatedVisibility(visibleState, enter = EnterTransition.None, exit = ExitTransition.None) { }
-    LaunchedEffect(target, life.ready, reduce) {
-        if (!target && !life.ready) {
-            // An opening dismissed before capture finishes has nothing visible to animate back.
-            if (life.spring.position == 0f) { life.retained = false; life.closed = true; return@LaunchedEffect }
-        }
-        if (!life.ready || !life.retained) return@LaunchedEffect
-        var destination = if (target) currentDragTarget else 0f
-        while (life.retained && life.ready) {
-        life.inputBlocked = true; life.flat = false
-        if (reduce) { life.spring.position = destination; life.spring.velocity = 0f; life.progress = destination }
-        else {
-            var last = withFrameNanos { it }
-            do {
-                val now = withFrameNanos { it }
-                destination = if (target) currentDragTarget else 0f
-                var remaining = ((now - last) / 1e9f).coerceIn(0f, .5f)
-                var moving = true
-                while (remaining > 0f) {
-                    val step = min(.033f, remaining)
-                    moving = life.spring.advance(destination, target, step, lightweight = !life.meshEnabled); remaining -= step
+    // Do not key this effect on target: repeated taps/reversals retain velocity and
+    // cannot cancel an exit completion or strand a retained window halfway closed.
+    LaunchedEffect(life, reduce) {
+        while (true) {
+            val opening = currentTarget
+            var destination = if (opening) currentDragTarget else 0f
+            if (life.retained) {
+                life.inputBlocked = true; life.flat = false
+                if (reduce) {
+                    life.spring.position = destination; life.spring.velocity = 0f; life.progress = destination
+                } else {
+                    var last = withFrameNanos { it }
+                    do {
+                        val now = withFrameNanos { it }
+                        destination = if (currentTarget) currentDragTarget else 0f
+                        // A paused/overloaded device must not do an unbounded catch-up loop.
+                        val dt = ((now - last) / 1e9f).coerceIn(0f, .033f)
+                        val moving = life.spring.advance(destination, currentTarget, dt, lightweight = true)
+                        last = now; life.progress = life.spring.position
+                    } while (moving)
                 }
-                last = now; life.progress = life.spring.position
-            } while (moving)
-        }
-        life.flat = target && destination == 1f
-        life.inputBlocked = !life.flat
-        if (!target) { life.retained = false; life.closed = true; break }
-        // Stay asleep at rest. Moving the header changes the destination sampled by
-        // the running clock; it never cancels/restarts that clock on every MOVE.
-        val settled = destination
-        destination = snapshotFlow { currentDragTarget }.first { it != settled }
+                life.flat = currentTarget && destination == 1f
+                life.inputBlocked = !life.flat
+                if (!currentTarget) { life.retained = false; life.closed = true }
+            }
+            val settled = currentTarget to currentDragTarget
+            // No frame loop, readback, renderer or timer survives a settled transition.
+            snapshotFlow { currentTarget to currentDragTarget }.first { it != settled }
         }
     }
     if (life.retained) {
         AnimatedVisibility(true, modifier, enter = EnterTransition.None, exit = ExitTransition.None) {
             val scope = this
             CompositionLocalProvider(LocalPaperOwner provides life, LocalPaperOrigin provides life.origin) {
-                key(life.origin) { HardwarePaperSurface(life, reduce) { scope.content() } }
+                key(life.origin) { StablePaperSurface(life) { scope.content() } }
             }
         }
     }

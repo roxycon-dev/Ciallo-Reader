@@ -40,10 +40,6 @@ class OverlayPolishTest {
                 })
         } }
         compose.waitForIdle()
-        // Robolectric's dialog root does not produce an HWUI surface. This test
-        // exercises the close clock: explicitly supply the texture-ready signal.
-        // Real capture/mesh/source ownership is covered by PaperPolishDeviceTest.
-        compose.runOnIdle { checkNotNull(paper).ready = true }
         compose.mainClock.advanceTimeBy(1800)
         compose.runOnIdle { check(checkNotNull(paper).flat) }
         compose.mainClock.autoAdvance = false
@@ -51,8 +47,6 @@ class OverlayPolishTest {
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithText("确认操作").assertExists()
         assertEquals(0, actions)
-        // Closing freezes the current content again; supply that handshake too.
-        compose.runOnIdle { checkNotNull(paper).ready = true }
         compose.mainClock.advanceTimeBy(1000)
         compose.waitForIdle()
         compose.onNodeWithText("确认操作").assertDoesNotExist()

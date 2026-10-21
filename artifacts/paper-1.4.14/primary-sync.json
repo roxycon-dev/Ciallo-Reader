@@ -1,0 +1,66 @@
+{
+  "base": "0db0915d76938e99baf379514a1ce0f0e67833d7",
+  "conflicts": [],
+  "paths": [
+    {
+      "path": "CHANGELOG.md",
+      "mode": "direct"
+    },
+    {
+      "path": "README.md",
+      "mode": "direct"
+    },
+    {
+      "path": "README_EN.md",
+      "mode": "direct"
+    },
+    {
+      "path": "app/build.gradle.kts",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/androidTest/java/com/example/ui/PaperPolishDeviceTest.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/androidTest/java/com/example/ui/TouchZoneInteractionDeviceTest.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/GlassCard.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/PaperSnapshotCapture.kt",
+      "mode": "delete-unchanged-backend"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/PullOutMotion.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/PullOutRender.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/README.md",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/ReleaseHistoryDialog.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/test/java/com/example/ui/OverlayPolishTest.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/test/java/com/example/ui/components/PaperAndSliderTest.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "docs/release-1.4.14-2026-10-21.md",
+      "mode": "direct"
+    }
+  ]
+}

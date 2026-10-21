@@ -203,8 +203,7 @@ class TouchZoneInteractionDeviceTest {
         compose.waitForIdle(); assertFalse(editing); assertFalse(previewActive); assertNull(saved)
     }
 
-    @Test fun paperModalKeepsTheTriggerHiddenUntilTheIndependentClosingSpringEnds() {
-        PaperRenderStats.reset()
+    @Test fun modalUsesLiveContentAndCompletesItsIndependentClosingSpring() {
         var open by mutableStateOf(false)
         var actions = 0
         compose.setContent { MyApplicationTheme {
@@ -216,12 +215,9 @@ class TouchZoneInteractionDeviceTest {
             }
         } }
         compose.onNodeWithText("书库使用手册").performTouchInput { click() }
-        val originalSource = PullOutSources.latest
         compose.onNodeWithText("完成").assertExists()
-        compose.waitUntil(5000) { originalSource?.hidden == true }
         compose.mainClock.advanceTimeBy(1400)
         compose.waitForIdle(); shot("paper-open")
-        assertTrue("The original center-aligned trigger must be hidden", originalSource?.hidden == true)
         compose.mainClock.autoAdvance = false
         compose.onNodeWithText("完成").performClick()
         compose.mainClock.advanceTimeBy(144)
@@ -232,12 +228,8 @@ class TouchZoneInteractionDeviceTest {
         compose.mainClock.autoAdvance = true
         compose.waitUntil(5000) { !open }
         assertEquals(1, actions)
-        assertFalse(originalSource?.hidden == true)
         compose.onNodeWithText("书库使用手册").assertExists()
-        assertTrue("A real window must use hardware mesh frames", PaperRenderStats.gpuFrames > 0)
-        val stats = "gpuFrames=${PaperRenderStats.gpuFrames}\nmaxMeshBuildMs=${PaperRenderStats.maxMeshBuildNanos / 1e6}\nsnapshots=${PaperRenderStats.snapshots}\nfallbackFrames=${PaperRenderStats.fallbackFrames}\n"
-        val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "paper-1.4.12").apply { mkdirs() }
-        File(dir, "render-stats.txt").writeText(stats)
+
     }
     @Test fun rangeAndDiscreteLensesRemainUsableWithARealAndroidCanvas() {
         var low by mutableFloatStateOf(18f); var high by mutableFloatStateOf(64f)
@@ -340,7 +332,6 @@ class TouchZoneInteractionDeviceTest {
         shot("manga-native-curl-rtl")
     }
     @Test fun ordinaryButtonClicksNeverCaptureTexturesOrAllocatePaperSnapshots() {
-        PaperRenderStats.reset()
         var clicks by mutableIntStateOf(0)
         compose.setContent { MyApplicationTheme {
             Column { PullOutButton(onClick = { clicks++ }) { Text("普通按钮") }; Text("$clicks") }
@@ -348,8 +339,6 @@ class TouchZoneInteractionDeviceTest {
         repeat(8) { compose.onNodeWithText("普通按钮").performTouchInput { click(center) } }
         compose.waitForIdle()
         assertEquals(8, clicks)
-        assertEquals(0, PaperRenderStats.snapshots)
-        assertEquals(0, PaperRenderStats.gpuFrames)
     }
 
 }
