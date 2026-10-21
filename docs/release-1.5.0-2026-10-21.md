@@ -23,9 +23,11 @@
 ## 本轮验证
 
 - `:app:compileDebugKotlin` 通过。
-- 相关单元测试与设备用例在打包前执行，结果见本次 release 附件。
+- 69 项相关 JVM 检查通过（书库首启 / 导航 / Z-Library 元数据 / 指南清理），0 失败；新增 `BuiltInGuideRemovalTest` 覆盖「新装不再预置」和「老安装连章节一起清掉」两条路径。
 - `BookRepository.checkAndSeedDefaultBooks` 的清理分支与历史占位书清理保持同一套 DAO 调用顺序：删章节 → 置空阅读记录里的 bookId → 删书。
 
 ## 构建
 
-正式包信息随 Release 附件给出。
+正式包：1.5.0 / 242，ARM64，29192708 B。与 1.4.18 同包名、同固定签名（证书 SHA-256 `d2115e3c…1146`）且版本码递增，ZIP 16 KiB 对齐通过。SHA-256：`96ce5624a3fbfe8267e65ba57af5d377856bfd9eed7c2eec3b1058a1829caab8`。
+
+[下载 1.5.0 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.0/Ciallo-Reader-v1.5.0.apk)。
