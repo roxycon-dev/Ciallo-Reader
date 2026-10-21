@@ -1692,7 +1692,7 @@ private fun HistoryChip(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SourcePickerSheet(
+internal fun SourcePickerSheet(
     aggregateMode: Boolean,
     aggregateKind: String,
     currentSource: BookSource?,
@@ -1709,27 +1709,10 @@ private fun SourcePickerSheet(
 ) {
     val density = androidx.compose.ui.platform.LocalDensity.current
     val activity = androidx.compose.ui.platform.LocalContext.current as? Activity
-    var visible by remember { mutableStateOf(false) }
-    var dismissed by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { visible = true }
-    val dismiss = {
-        if (!dismissed) {
-            dismissed = true
-            visible = false
-        }
-    }
-    LaunchedEffect(dismissed) {
-        if (dismissed) {
-            kotlinx.coroutines.delay(280)
-            onDismiss()
-        }
-    }
-
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     val backdrop = rememberGlassPanelBackdrop()
     val iridescentColors = rememberIridescentColors()
     val blurPx = with(density) { 24.dp.toPx() }
-    var dragOffsetY by remember { mutableStateOf(0f) }
     // 系统"减少透明度/关闭动画"开启时降级：不再用折射等重效果，面板更实
     val sheetContext = androidx.compose.ui.platform.LocalContext.current
     val reduceEffects = remember {
@@ -1751,215 +1734,172 @@ private fun SourcePickerSheet(
         reduceTransparency || animationsOff
     }
 
-    PullOutDialog(
-        onDismissRequest = dismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
-    ) {
-        // 透明窗口 + 实时模糊宿主窗口（decorView RenderEffect）
+    PullOutBottomSheet(onDismissRequest = onDismiss, shape = sheetShape,
+        containerColor = Color.Transparent, dragHandle = null) {
         GlassDialogWindowEffect(activity = activity, blurRadiusPx = blurPx)
-        PullOutVisibility(
-            visible = visible) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                // 径向渐变遮罩：中心亮、四周暗，聚光灯打在立牌上
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .radialGlassScrim()
+        val close = com.example.ui.components.LocalOverlayClose.current
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .zIndex(1f)
+                // 双层阴影：环境阴影（品牌色）+ 贴地接触阴影
+                .consistentShadow(
+                    elevation = 32.dp,
+                    shape = sheetShape,
+                    ambientColor = iridescentColors.first().copy(alpha = 0.12f),
+                    spotColor = iridescentColors.first().copy(alpha = 0.12f)
                 )
-                // 点击空白处关闭
+                .consistentShadow(
+                    elevation = 8.dp,
+                    shape = sheetShape,
+                    ambientColor = Color.Black.copy(alpha = 0.20f),
+                    spotColor = Color.Black.copy(alpha = 0.20f)
+                )
+                // 整个弹窗只有「一层」毛玻璃：blur 24 + surface 62~70%，
+                // 内部分区一律不设独立背景（色差的根因）。
+                .liquidGlass(
+                    highlightEnabled = false,
+                    backdrop = backdrop,
+                    shape = sheetShape,
+                    surfaceColor = MaterialTheme.colorScheme.surface.copy(
+                        alpha = if (reduceEffects) 0.70f else 0.66f
+                    ),
+                    blurRadius = 24.dp,
+                    refraction = false
+                )
+                .clip(sheetShape)
+                // 极细噪点（可选项，不改变分区底色）
+                .filmGrain(alpha = 0.035f)
+        ) {
+            // 拖拽手柄（弹窗内容最顶部）
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 6.dp)
+                    .paperSheetDragHandle(),
+                contentAlignment = Alignment.Center
+            ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .width(36.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f))
+                )
+            }
+            // 标题栏：左「选择书源」20 加粗；右「管理书源」纯 primary 文字按钮（不加底、不加框）
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "选择书源",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                val manageInteraction = remember { MutableInteractionSource() }
+                val managePressed by manageInteraction.collectIsPressedAsState()
+                val manageScale by animateFloatAsState(
+                    targetValue = if (managePressed) 0.96f else 1f,
+                    animationSpec = tween(200, easing = CubicBezierEasing(0f, 0f, 0.2f, 1f)),
+                    label = "managePress"
+                )
+                // 规范：标题右侧「管理书源」= **primary 10% 底的小胶囊，高 28**
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer {
+                            scaleX = manageScale
+                            scaleY = manageScale
+                        }
+                        .clip(RoundedCornerShape(50))
+                        .height(28.dp)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
                         .pullOutClickable(
-                            interactionSource = remember { MutableInteractionSource() },
+                            interactionSource = manageInteraction,
                             indication = null,
-                            onClick = dismiss
+                            onClick = { close { onManageSources() } }
                         )
-                )
-                // 液态玻璃弹窗本体：半透明 + 折射 + 高光 + 投影
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .offset { IntOffset(0, dragOffsetY.roundToInt()) }
-                        .zIndex(1f)
-                        // 双层阴影：环境阴影（品牌色）+ 贴地接触阴影
-                        .consistentShadow(
-                            elevation = 32.dp,
-                            shape = sheetShape,
-                            ambientColor = iridescentColors.first().copy(alpha = 0.12f),
-                            spotColor = iridescentColors.first().copy(alpha = 0.12f)
-                        )
-                        .consistentShadow(
-                            elevation = 8.dp,
-                            shape = sheetShape,
-                            ambientColor = Color.Black.copy(alpha = 0.20f),
-                            spotColor = Color.Black.copy(alpha = 0.20f)
-                        )
-                        // 整个弹窗只有「一层」毛玻璃：blur 24 + surface 62~70%，
-                        // 内部分区一律不设独立背景（色差的根因）。
-                        .liquidGlass(
-                            backdrop = backdrop,
-                            shape = sheetShape,
-                            surfaceColor = MaterialTheme.colorScheme.surface.copy(
-                                alpha = if (reduceEffects) 0.70f else 0.66f
-                            ),
-                            blurRadius = 24.dp,
-                            refraction = false
-                        )
-                        .clip(sheetShape)
-                        // 极细噪点（可选项，不改变分区底色）
-                        .filmGrain(alpha = 0.035f)
-                        // 1px 顶部渐变高光描边（左上白 70% → 右下白 10%）
-                        .glassEdge(focused = false, shape = sheetShape, accent = Color.Transparent)
-                        .navigationBarsPadding()
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // 拖拽手柄（弹窗内容最顶部）
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 12.dp, bottom = 6.dp)
-                            .pointerInput(Unit) {
-                                val dismissThreshold = with(density) { 120.dp.toPx() }
-                                detectVerticalDragGestures(
-                                    onDragEnd = {
-                                        if (dragOffsetY > dismissThreshold) {
-                                            dismiss()
-                                        } else {
-                                            dragOffsetY = 0f
-                                        }
-                                    },
-                                    onDragCancel = { dragOffsetY = 0f },
-                                    onVerticalDrag = { _, dragAmount ->
-                                        dragOffsetY = (dragOffsetY + dragAmount).coerceAtLeast(0f)
-                                    }
-                                )
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .width(36.dp)
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f))
+                    Text(
+                        text = "管理书源",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // A7：原写死 420.dp，小屏或横屏（可用高可能只有 ~360dp）
+                    // 会溢出且无法滚动。改为"最多 420dp"，空间不足时收缩。
+                    .heightIn(max = 420.dp),
+                contentPadding = PaddingValues(bottom = 24.dp)
+            ) {
+                item {
+                    // 分区标题（12px 灰色 + 0.04em 字距）—— 层次只靠 间距 / 分组标题 / 细分割线
+                    SourceSectionLabel("聚合搜索")
+                }
+                item {
+                    // v1.0.1：聚合搜索按类别分区——聚合漫画 / 聚合小说 互斥选择
+                    AggregateOptionItem(
+                        title = "聚合漫画（全部）",
+                        subtitle = "同时搜索所有已启用的漫画源",
+                        selected = aggregateMode && aggregateKind == "comic",
+                        onClick = { close { onSelectAggregate("comic") } }
+                    )
+                }
+                item {
+                    AggregateOptionItem(
+                        title = "聚合小说（全部）",
+                        subtitle = "同时搜索所有已启用的小说源（网文/电子书）",
+                        selected = aggregateMode && aggregateKind == "novel",
+                        onClick = { close { onSelectAggregate("novel") } }
+                    )
+                }
+                // 第十一轮第 6 条：多语言搜索开关——搜索词自动扩展各语言标题变体
+                //（如"无职转生"→ 無職転生 / Mushoku Tensei / Jobless Reincarnation）
+                item {
+                    SourceSheetDivider()
+                }
+                item {
+                    KeywordSearchOptions(
+                        enabled = multiLanguageSearch,
+                        onEnabledChange = onToggleMultiLanguageSearch,
+                        online = onlineKeywordLookup,
+                        onOnlineChange = onToggleOnlineKeywordLookup,
+                    )
+                }
+                item {
+                    SourceSheetDivider()
+                }
+                // v1.0.1：书源按类型分区展示——漫画源 / 小说源
+                if (comicSources.isNotEmpty()) {
+                    item { SourceSectionLabel("漫画源") }
+                    columnItems(comicSources, key = { it.id }) { source ->
+                        SourceOptionItem(
+                            source = source,
+                            selected = !aggregateMode && currentSource?.id == source.id,
+                            onClick = { close { onSelectSource(source.id) } }
                         )
-                    }
-                    // 标题栏：左「选择书源」20 加粗；右「管理书源」纯 primary 文字按钮（不加底、不加框）
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "选择书源",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp,
-                            modifier = Modifier.weight(1f)
-                        )
-                        val manageInteraction = remember { MutableInteractionSource() }
-                        val managePressed by manageInteraction.collectIsPressedAsState()
-                        val manageScale by animateFloatAsState(
-                            targetValue = if (managePressed) 0.96f else 1f,
-                            animationSpec = tween(200, easing = CubicBezierEasing(0f, 0f, 0.2f, 1f)),
-                            label = "managePress"
-                        )
-                        // 规范：标题右侧「管理书源」= **primary 10% 底的小胶囊，高 28**
-                        Box(
-                            modifier = Modifier
-                                .graphicsLayer {
-                                    scaleX = manageScale
-                                    scaleY = manageScale
-                                }
-                                .clip(RoundedCornerShape(50))
-                                .height(28.dp)
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
-                                .pullOutClickable(
-                                    interactionSource = manageInteraction,
-                                    indication = null,
-                                    onClick = onManageSources
-                                )
-                                .padding(horizontal = 12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "管理书源",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            // A7：原写死 420.dp，小屏或横屏（可用高可能只有 ~360dp）
-                            // 会溢出且无法滚动。改为"最多 420dp"，空间不足时收缩。
-                            .heightIn(max = 420.dp),
-                        contentPadding = PaddingValues(bottom = 24.dp)
-                    ) {
-                        item {
-                            // 分区标题（12px 灰色 + 0.04em 字距）—— 层次只靠 间距 / 分组标题 / 细分割线
-                            SourceSectionLabel("聚合搜索")
-                        }
-                        item {
-                            // v1.0.1：聚合搜索按类别分区——聚合漫画 / 聚合小说 互斥选择
-                            AggregateOptionItem(
-                                title = "聚合漫画（全部）",
-                                subtitle = "同时搜索所有已启用的漫画源",
-                                selected = aggregateMode && aggregateKind == "comic",
-                                onClick = { onSelectAggregate("comic") }
-                            )
-                        }
-                        item {
-                            AggregateOptionItem(
-                                title = "聚合小说（全部）",
-                                subtitle = "同时搜索所有已启用的小说源（网文/电子书）",
-                                selected = aggregateMode && aggregateKind == "novel",
-                                onClick = { onSelectAggregate("novel") }
-                            )
-                        }
-                        // 第十一轮第 6 条：多语言搜索开关——搜索词自动扩展各语言标题变体
-                        //（如"无职转生"→ 無職転生 / Mushoku Tensei / Jobless Reincarnation）
-                        item {
-                            SourceSheetDivider()
-                        }
-                        item {
-                            KeywordSearchOptions(
-                                enabled = multiLanguageSearch,
-                                onEnabledChange = onToggleMultiLanguageSearch,
-                                online = onlineKeywordLookup,
-                                onOnlineChange = onToggleOnlineKeywordLookup,
-                            )
-                        }
-                        item {
-                            SourceSheetDivider()
-                        }
-                        // v1.0.1：书源按类型分区展示——漫画源 / 小说源
-                        if (comicSources.isNotEmpty()) {
-                            item { SourceSectionLabel("漫画源") }
-                            columnItems(comicSources, key = { it.id }) { source ->
-                                SourceOptionItem(
-                                    source = source,
-                                    selected = !aggregateMode && currentSource?.id == source.id,
-                                    onClick = { onSelectSource(source.id) }
-                                )
-                            }
-                        }
-                        if (novelSources.isNotEmpty()) {
-                            item { SourceSectionLabel("小说源") }
-                            columnItems(novelSources, key = { it.id }) { source ->
-                                SourceOptionItem(
-                                    source = source,
-                                    selected = !aggregateMode && currentSource?.id == source.id,
-                                    onClick = { onSelectSource(source.id) }
-                                )
-                            }
-                        }
-                        // 末尾不再单独画一条线（最后一行与底部间距已足够区分层次）
                     }
                 }
+                if (novelSources.isNotEmpty()) {
+                    item { SourceSectionLabel("小说源") }
+                    columnItems(novelSources, key = { it.id }) { source ->
+                        SourceOptionItem(
+                            source = source,
+                            selected = !aggregateMode && currentSource?.id == source.id,
+                            onClick = { close { onSelectSource(source.id) } }
+                        )
+                    }
+                }
+                // 末尾不再单独画一条线（最后一行与底部间距已足够区分层次）
             }
         }
     }

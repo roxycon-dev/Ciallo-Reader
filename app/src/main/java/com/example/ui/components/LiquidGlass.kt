@@ -239,7 +239,8 @@ fun Modifier.liquidGlass(
     refraction: Boolean = false,
     saturation: Float = 1.30f,
     refractionHeight: Dp = 16.dp,
-    refractionAmount: Dp = 28.dp
+    refractionAmount: Dp = 28.dp,
+    highlightEnabled: Boolean = true
 ): Modifier =
     // ── 跨机型降级（API < 31 无 RenderEffect）──────────────────────────
     // KMPLiquidGlass 的 blur 在低版本静默 no-op，backdrop 会以未模糊的
@@ -268,7 +269,7 @@ fun Modifier.liquidGlass(
         }
     },
     highlight = {
-        Highlight(
+        if (!highlightEnabled) null else Highlight(
             width = 1.2.dp,
             blurRadius = 1.dp,
             alpha = 0.8f,

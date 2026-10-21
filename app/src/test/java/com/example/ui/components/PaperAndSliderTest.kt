@@ -183,4 +183,39 @@ class PaperAndSliderTest {
         assertSame(parent, PullOutSources.claim())
     }
 
+    @Test fun liveWarpEndpointsAreExactAndInverseRowsStayOrderedForExternalSources() {
+        val geometry = PaperWarpGeometry()
+        val sources = listOf(Rect(120f, -140f, 280f, -100f), Rect(120f, 720f, 280f, 760f), Rect(100f, 260f, 260f, 310f))
+        for (source in sources) {
+            geometry.update(400f, 600f, source, 0f, 1f); assertEquals(source, geometry.frame)
+            geometry.update(400f, 600f, source, 1f, 1f); assertEquals(Rect(0f, 0f, 400f, 600f), geometry.frame)
+            for (i in 0..100) {
+                geometry.update(400f, 600f, source, i / 100f, 1f)
+                assertTrue(geometry.frame.width > 0f && geometry.frame.height > 0f)
+                var previous = -1f
+                for (row in 0 until PullOutConfig.WARP_ROWS) {
+                    val k = row * 4
+                    assertTrue(geometry.rows[k] >= previous); previous = geometry.rows[k]
+                    assertTrue(geometry.rows[k] in 0f..1f)
+                    assertTrue(geometry.rows[k+2] > 0f)
+                    repeat(4) { assertTrue(geometry.rows[k+it].isFinite()) }
+                }
+            }
+        }
+    }
+
+    @Test fun liveWarpHasANarrowNeckAndReusesItsUniformStorage() {
+        val geometry = PaperWarpGeometry(); val data = geometry.rows
+        geometry.update(400f, 600f, Rect(140f, 270f, 260f, 310f), .5f, 1f)
+        val middle = data[(PullOutConfig.WARP_ROWS / 2) * 4 + 2]
+        assertTrue(middle < data[2] * .8f)
+        geometry.update(400f, 600f, Rect(140f, 270f, 260f, 310f), 1f, 1f)
+        assertSame(data, geometry.rows)
+        for (row in 0 until PullOutConfig.WARP_ROWS) {
+            assertEquals(.5f, data[row*4+1], .001f)
+            assertEquals(.5f, data[row*4+2], .001f)
+            assertEquals(1f, data[row*4+3], .001f)
+        }
+    }
+
 }

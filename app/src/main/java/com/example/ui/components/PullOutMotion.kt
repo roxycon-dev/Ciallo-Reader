@@ -28,6 +28,19 @@ object PullOutConfig {
     const val DRAG_TRAVEL = 300f
     const val SURFACE_SCALE = .96f
     const val SURFACE_TRAVEL_DP = 12f
+    const val WARP_ROWS = 64
+    const val WARP_FORWARD_ROWS = 128
+    const val WARP_NECK = .30f
+    const val WARP_DECAY_DP = 90f
+    const val WARP_SOFTNESS_DP = 12f
+    const val WARP_UNFOLD_DP = 24f
+    const val WARP_BEND_DP = 16f
+    const val WARP_FLUTTER_DP = 4f
+    const val WARP_SHADE = .025f
+    const val WARP_OPACITY_GAIN = 5f
+    const val WARP_MIN_WIDTH_DP = 100f
+    const val WARP_MIN_HEIGHT_DP = 48f
+    const val WARP_VIEWPORT_CUTOFF = .96f
     const val OPEN_K = 140f
     const val OPEN_D = 15f
     const val CLOSE_K = 260f
@@ -140,6 +153,7 @@ internal class PaperLifecycle {
     var hostAttached = false
     var afterDismiss: (() -> Unit)? = null
     var origin: PullOutSource? = null
+    var softPaper = false
     val spring = PaperSpring()
 }
 private val paperLifecycles = WeakHashMap<MutableTransitionState<Boolean>, PaperLifecycle>()
@@ -197,6 +211,7 @@ fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: M
     val initiallyVisible = remember { visibleState.currentState || (target && parentPaper != null) }
     if (target && !life.retained) {
         life.origin = PullOutSources.claim() ?: parentOrigin ?: PullOutSource().apply { virtual = true }
+        life.softPaper = !reduce && android.os.Build.VERSION.SDK_INT >= 33 && life.origin?.virtual == false && !(initiallyVisible && !life.registered)
         life.retained = true; life.closed = false
         if (initiallyVisible && !life.registered) {
             life.spring.position = 1f; life.progress = 1f; life.flat = true; life.inputBlocked = false
@@ -223,7 +238,7 @@ fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: M
                         destination = if (currentTarget) currentDragTarget else 0f
                         // A paused/overloaded device must not do an unbounded catch-up loop.
                         val dt = ((now - last) / 1e9f).coerceIn(0f, .033f)
-                        val moving = life.spring.advance(destination, currentTarget, dt, lightweight = true)
+                        val moving = life.spring.advance(destination, currentTarget, dt, lightweight = !life.softPaper)
                         last = now; life.progress = life.spring.position
                     } while (moving)
                 }

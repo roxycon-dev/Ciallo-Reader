@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 
 internal data class ReleaseSummary(val version: String, val date: String, val summary: String)
 internal val releaseHistory = listOf(
+    ReleaseSummary("1.4.15", "10-21", "轻量柔性抽纸 · 修复底栏跳动 · 移除弹层角落白光"),
     ReleaseSummary("1.4.14", "10-21", "快速滚动与连续点击稳定性修复 · 抽纸简化为统一轻量过渡"),
     ReleaseSummary("1.4.13", "10-21", "毛玻璃抽纸稳定性与性能打磨 · 滑动条触控修复"),
     ReleaseSummary("1.4.12", "10-21", "抽纸加速 · 弹层生命周期修复"),

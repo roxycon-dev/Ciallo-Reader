@@ -34,3 +34,7 @@
 ## 1.4.14 稳定性回退
 
 以本节为准：抽纸已统一简化为 `StablePaperSurface` 常规图层过渡。`PullOutMotion.kt` 仅保留坐标来源、唯一弹簧时钟和内容生命周期；`PullOutRender.kt` 不再捕获或隐藏来源、不录制子显示列表、不读回位图。`PaperSnapshotCapture.kt` 已删除。业务调用和关闭器保持统一；不得为追求形变重新接管列表卡片的 RenderNode。
+
+## 1.4.15 轻量柔性路径
+
+API 33+ 有实际来源的弹层在原窗口 RenderEffect 内使用单次内容采样；128 前向点生成复用的 64 行逆向表，AGSL 常量索引平衡树选择三次插值段。没有截图、来源隐藏或额外渲染器；停稳卸载效果，旧平台与全屏 / 小容器保留稳定路径。背景 Provider 必须通过 DrawScope.record 转移绘图上下文，不能用显式 density/layoutDirection 的底层重载调用外层 drawContent，否则隐藏来源会画到窗口上。

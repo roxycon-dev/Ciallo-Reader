@@ -130,6 +130,7 @@ fun ZLibraryLoginDialog(
                         onClick = {}
                     )
                     .liquidGlass(
+                            highlightEnabled = false,
                         backdrop = dialogBackdrop,
                         shape = cardShape,
                         surfaceColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),

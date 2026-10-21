@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -41,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -54,6 +56,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -194,14 +197,13 @@ fun AppBottomTabBar(
         label = "tabBarContrast"
     )
 
-    val barHeight by animateDpAsState(
-        targetValue = if (collapseState.collapsed) 52.dp else 68.dp,
-        animationSpec = spring(
-            dampingRatio = TAB_COLLAPSE_DAMPING,
-            stiffness = TAB_COLLAPSE_STIFFNESS
-        ),
-        label = "tabBarHeight"
+    val collapseProgress by animateFloatAsState(
+        targetValue = if (collapseState.collapsed) 1f else 0f,
+        animationSpec = spring(dampingRatio = TAB_COLLAPSE_DAMPING, stiffness = TAB_COLLAPSE_STIFFNESS),
+        label = "tabBarCollapse"
     )
+    val labelFraction = 1f - collapseProgress.coerceIn(0f, 1f)
+    val barHeight = 52.dp + 16.dp * labelFraction
     // Keep the bar's horizontal frame fixed while a list scrolls. Animating the
     // outer margin changed the Row width and made the selected black indicator
     // visibly drift left/right on every vertical gesture.
@@ -355,7 +357,7 @@ fun AppBottomTabBar(
                         TabIcon(
                             item = item,
                             selected = index == selectedIndex,
-                            collapsed = collapseState.collapsed,
+                            labelFraction = labelFraction,
                             contrast = contrast,
                             ringColor = barBase,
                             onClick = { onTabSelected(index) }
@@ -449,7 +451,7 @@ private fun TabBadge(count: Int, ringColor: Color, modifier: Modifier = Modifier
 private fun TabIcon(
     item: AppTabItem,
     selected: Boolean,
-    collapsed: Boolean,
+    labelFraction: Float,
     contrast: Color,
     ringColor: Color,
     onClick: () -> Unit
@@ -465,6 +467,8 @@ private fun TabIcon(
         ),
         label = "tabPressScale"
     )
+    val labelLineHeight = MaterialTheme.typography.labelSmall.lineHeight
+    val labelHeight = with(LocalDensity.current) { labelLineHeight.toDp() } + 2.dp
     val haptics = LocalHapticFeedback.current
     // 只在「未按下 -> 按下」跳变时振一次；写在组合期会随重组重复触发
     LaunchedEffect(isPressed) {
@@ -520,13 +524,18 @@ private fun TabIcon(
             }
         }
 
-        PullOutVisibility(
-            visible = !collapsed) {
+        // Keep one label node: its reserved space and the bar use the same clock.
+        // Removing AnimatedVisibility at exit used to move all five icons in one frame.
+        Box(Modifier.height(labelHeight * labelFraction).clipToBounds()
+            .graphicsLayer { alpha = labelFraction }, contentAlignment = Alignment.TopCenter) {
             Text(
                 text = item.label,
                 fontSize = 10.sp,
+                lineHeight = labelLineHeight,
                 color = iconColor,
-                modifier = Modifier.padding(top = 2.dp)
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.wrapContentHeight(unbounded = true).padding(top = 2.dp)
             )
         }
     }

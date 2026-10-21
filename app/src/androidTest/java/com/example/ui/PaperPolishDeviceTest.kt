@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
+import dev.liquidglass.compose.liquidGlassProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.ui.comic.ComicReaderTestActivity
@@ -43,7 +44,7 @@ class PaperPolishDeviceTest {
     @After fun restoreHardware() {
         androidx.test.platform.graphics.HardwareRendererCompat.setDrawingEnabled(previousDrawing)
     }
-    private val dir get() = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "paper-1.4.14").apply { mkdirs() }
+    private val dir get() = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "paper-1.4.15").apply { mkdirs() }
     private fun shot(name: String) {
         compose.onAllNodes(isRoot()).onLast().captureToImage()
         InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { image ->
@@ -183,4 +184,74 @@ class PaperPolishDeviceTest {
         compose.onNodeWithContentDescription("关闭").performClick()
         compose.waitUntil(5000) { page == 0 }
     }
+    @Test fun livePaperUsesOneShaderForOpeningClosingAndRealSourceSheet() {
+        PaperWarpStats.reset()
+        var page by mutableIntStateOf(0); var actions = 0
+        var life: PaperLifecycle? = null
+        compose.setContent { MyApplicationTheme {
+            Column {
+                PullOutButton({ page = 1 }) { Text("打开轻量纸面") }
+                PullOutButton({ page = 2 }) { Text("打开实际书源") }
+            }
+            if (page == 1) AcrylicDialog({ page = 0 }, title = {
+                life = LocalPaperOwner.current; Text("轻量纸面窗口")
+            }, text = { Column { repeat(5) { GlassCard(Modifier.fillMaxWidth()) { Text("实时毛玻璃与文字 $it") } } } },
+                confirmButton = { PullOutTextButton({ actions++ }) { Text("纸面确认") } })
+            if (page == 2) com.example.library.SourcePickerSheet(
+                aggregateMode = true, aggregateKind = "comic", currentSource = null,
+                comicSources = emptyList(), novelSources = emptyList(), multiLanguageSearch = false,
+                onToggleMultiLanguageSearch = {}, onlineKeywordLookup = false, onToggleOnlineKeywordLookup = {},
+                onSelectAggregate = { actions++ }, onSelectSource = {}, onManageSources = {}, onDismiss = { page = 0 })
+        } }
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithText("打开轻量纸面").performTouchInput { click(center) }
+        compose.waitUntil(5000) {
+            compose.mainClock.advanceTimeByFrame()
+            life?.progress?.let { it in .35f.. .65f } == true
+        }
+        shot("live-paper-opening")
+        assertTrue("Live GPU deformation must actually render", PaperWarpStats.frames > 0)
+        assertEquals(0, PaperWarpStats.failures)
+        compose.mainClock.advanceTimeBy(1800); compose.mainClock.autoAdvance = true; compose.waitForIdle()
+        shot("no-corner-light-dialog")
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithText("纸面确认").performClick()
+        compose.waitUntil(5000) {
+            compose.mainClock.advanceTimeByFrame()
+            life?.progress?.let { it in .35f.. .65f } == true
+        }
+        shot("live-paper-closing")
+        assertEquals(0, actions)
+        compose.mainClock.advanceTimeBy(1500); compose.mainClock.autoAdvance = true
+        compose.waitUntil(5000) { page == 0 }; assertEquals(1, actions)
+        compose.onNodeWithText("打开实际书源").performTouchInput { click(center) }
+        compose.waitForIdle(); shot("source-no-corner-light")
+        compose.onNodeWithText("聚合小说（全部）").performClick()
+        compose.waitUntil(5000) { page == 0 && actions == 2 }
+        assertEquals(0, PaperWarpStats.failures)
+        File(dir, "live-warp.txt").writeText("shaderFrames=${PaperWarpStats.frames}\nfailures=${PaperWarpStats.failures}\nmaxGeometryMs=${PaperWarpStats.maxGeometryNanos/1e6}\n")
+    }
+
+    @Test fun hiddenBackdropCannotPaintWhiteIntoTheWindow() {
+        var visible by mutableStateOf(false)
+        val background = androidx.compose.ui.graphics.Color(0xff203129)
+        compose.setContent {
+            val source = dev.liquidglass.compose.rememberLiquidGlassProviderState()
+            Box(Modifier.size(160.dp).background(background).testTag("hidden-provider")) {
+                Box(Modifier.matchParentSize().liquidGlassProvider(source, visible)
+                    .background(androidx.compose.ui.graphics.Color.White))
+            }
+        }
+        compose.waitForIdle()
+        fun centerPixel(): Int {
+            val image = compose.onNodeWithTag("hidden-provider").captureToImage().asAndroidBitmap()
+            return image.getPixel(image.width / 2, image.height / 2)
+        }
+        assertEquals("A hidden optical source must paint no pixels", 0xff203129.toInt(), centerPixel())
+        compose.runOnIdle { visible = true }
+        compose.waitForIdle()
+        assertEquals(android.graphics.Color.WHITE, centerPixel())
+
+    }
+
 }

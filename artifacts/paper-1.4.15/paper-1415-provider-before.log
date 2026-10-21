@@ -1,0 +1,44 @@
+INSTRUMENTATION_STATUS: class=com.example.ui.PaperPolishDeviceTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+com.example.ui.PaperPolishDeviceTest:
+INSTRUMENTATION_STATUS: test=hiddenBackdropCannotPaintWhiteIntoTheWindow
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.example.ui.PaperPolishDeviceTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: A hidden optical source must paint no pixels expected:<-14667479> but was:<-1>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at com.example.ui.PaperPolishDeviceTest.hiddenBackdropCannotPaintWhiteIntoTheWindow(PaperPolishDeviceTest.kt:250)
+
+INSTRUMENTATION_STATUS: stream=
+Error in hiddenBackdropCannotPaintWhiteIntoTheWindow(com.example.ui.PaperPolishDeviceTest):
+java.lang.AssertionError: A hidden optical source must paint no pixels expected:<-14667479> but was:<-1>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at com.example.ui.PaperPolishDeviceTest.hiddenBackdropCannotPaintWhiteIntoTheWindow(PaperPolishDeviceTest.kt:250)
+
+INSTRUMENTATION_STATUS: test=hiddenBackdropCannotPaintWhiteIntoTheWindow
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_RESULT: stream=
+
+Time: 1.32
+There was 1 failure:
+1) hiddenBackdropCannotPaintWhiteIntoTheWindow(com.example.ui.PaperPolishDeviceTest)
+java.lang.AssertionError: A hidden optical source must paint no pixels expected:<-14667479> but was:<-1>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at com.example.ui.PaperPolishDeviceTest.hiddenBackdropCannotPaintWhiteIntoTheWindow(PaperPolishDeviceTest.kt:250)
+
+FAILURES!!!
+Tests run: 1,  Failures: 1
+
+
+INSTRUMENTATION_CODE: -1

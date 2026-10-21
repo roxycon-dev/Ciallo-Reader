@@ -89,9 +89,10 @@ private class LiquidGlassProviderNode(
             drawContent()
             return
         }
+        // Use DrawScope.record: it redirects this ContentDrawScope's canvas and
+        // layer owner. The raw GraphicsLayer.record overload leaves drawContent()
+        // painting into the window, even when this optical source is hidden.
         contentLayer.record(
-            density = this,
-            layoutDirection = layoutDirection,
             size = IntSize(ceil(size.width).toInt(), ceil(size.height).toInt()),
         ) {
             this@draw.drawContent()

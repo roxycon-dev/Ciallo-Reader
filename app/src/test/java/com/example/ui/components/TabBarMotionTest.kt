@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -87,4 +88,39 @@ class TabBarMotionTest {
         screenshot("tab-collapsed.png")
         compose.mainClock.autoAdvance = true
     }
+    @Test fun allFiveIconsMoveContinuouslyUntilLabelSpaceReachesZero() {
+        val collapse = TabBarCollapseState()
+        val labels = listOf("书库", "发现", "书架", "统计", "设置")
+        compose.setContent { MyApplicationTheme {
+            CompositionLocalProvider(LocalRenderQuality provides RenderQuality.MID) {
+                Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+                    AppBottomTabBar(labels.map { AppTabItem(it, Icons.Default.Home) }, 4, {}, collapseState = collapse)
+                }
+            }
+        } }
+        compose.waitForIdle(); compose.mainClock.autoAdvance = false
+        fun positions() = labels.map { compose.onNodeWithContentDescription(it).fetchSemanticsNode().boundsInRoot.center }
+        var previous = positions(); val original = previous
+        compose.runOnIdle { collapse.connection().onPreScroll(Offset(0f, -12f), NestedScrollSource.UserInput) }
+        val limit = with(compose.density) { 3.dp.toPx() }
+        repeat(100) {
+            compose.mainClock.advanceTimeByFrame(); compose.waitForIdle()
+            val now = positions()
+            now.indices.forEach { index ->
+                assertEquals(original[index].x, now[index].x, .5f)
+                assertTrue("Collapse frame $it, icon $index jumped: ${now[index].y - previous[index].y}",
+                    kotlin.math.abs(now[index].y - previous[index].y) < limit)
+            }
+            previous = now
+        }
+        compose.runOnIdle { collapse.connection().onPreScroll(Offset(0f, 12f), NestedScrollSource.UserInput) }
+        repeat(100) {
+            compose.mainClock.advanceTimeByFrame(); compose.waitForIdle()
+            val now = positions()
+            now.indices.forEach { index -> assertTrue(kotlin.math.abs(now[index].y - previous[index].y) < limit) }
+            previous = now
+        }
+        compose.mainClock.autoAdvance = true
+    }
+
 }

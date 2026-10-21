@@ -11,7 +11,7 @@ Read local ebooks, novels, and comics in one Android app.
 
 [🌐 Product site](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ Download the latest APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.4.14 release notes](docs/release-1.4.14-2026-10-21.md) ·
+[1.4.15 release notes](docs/release-1.4.15-2026-10-21.md) ·
 [See screenshots](#screenshots) ·
 [Features](#features) ·
 [Report an issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -24,6 +24,8 @@ Read local ebooks, novels, and comics in one Android app.
 </div>
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
+
+**1.4.15 / 238** adds a lightweight live-content paper warp: one GPU sample retains the neck, progressive release, bend, flutter and return without snapshots or hidden source cards. Tab height and label space now share one progress value, eliminating the final-frame icon jump. Partial-window corner glints are removed, and the source picker waits for the shared close lifecycle. See [release notes](docs/release-1.4.15-2026-10-21.md).
 
 **1.4.14 / 237** replaces the complex paper mesh with one lightweight spring transition to address disappearing cards and displaced text reported during rapid scrolling and repeated taps in 1.4.13. It removes the extra offscreen renderer, GPU readbacks, trigger hiding and capture waits. Existing glass styling, themes, dismissal ordering, sliders and reading gestures remain. Glass press tracking stops as soon as scrolling takes over. See [release notes](docs/release-1.4.14-2026-10-21.md).
 

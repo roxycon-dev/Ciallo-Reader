@@ -371,6 +371,7 @@ fun GlassKitCard(
     // API 31 以下不支持模糊：回退为近乎不透明的纯色底（文档 §9）
     val solidTint = if (dark) cs.surface.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.78f)
 
+    val overlay = com.example.ui.components.LocalPaperOwner.current != null
     val realtime = backdrop != null && quality.realtimeGlass && supportsRealtimeBlur
     val glassModifier = if (realtime) {
         Modifier.drawBackdrop(
@@ -392,11 +393,11 @@ fun GlassKitCard(
                     }
                 }
             },
-            highlight = { Highlight.Default },
+            highlight = { if (overlay) null else Highlight.Default },
             shadow = { Shadow.Default },
             layerBlock = { scaleX = press; scaleY = press },
             onDrawSurface = { drawRect(tint) },
-            onDrawFront = if (interactiveHighlight) {
+            onDrawFront = if (interactiveHighlight && !overlay) {
                 {
                     val p = pressPoint
                     if (p != Offset.Unspecified) {

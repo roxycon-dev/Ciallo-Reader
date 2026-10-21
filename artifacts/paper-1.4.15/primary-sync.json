@@ -1,0 +1,86 @@
+{
+  "base": "cf21a766ec16d1cf565b5ec781b177cc2528d26c",
+  "conflicts": [],
+  "paths": [
+    {
+      "path": "CHANGELOG.md",
+      "mode": "direct"
+    },
+    {
+      "path": "README.md",
+      "mode": "direct"
+    },
+    {
+      "path": "README_EN.md",
+      "mode": "direct"
+    },
+    {
+      "path": "app/build.gradle.kts",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/androidTest/java/com/example/ui/PaperPolishDeviceTest.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/library/LibraryLoginDialog.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/library/LibraryScreen.kt",
+      "mode": "three-way"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/AcrylicDialog.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/AppBottomTabBar.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/LiquidGlass.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/PullOutMotion.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/PullOutRender.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/README.md",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/components/ReleaseHistoryDialog.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/glasskit/GlassKit.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/main/java/com/example/ui/source/ZLibraryLoginDialog.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/test/java/com/example/ui/components/PaperAndSliderTest.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "app/src/test/java/com/example/ui/components/TabBarMotionTest.kt",
+      "mode": "direct"
+    },
+    {
+      "path": "docs/release-1.4.15-2026-10-21.md",
+      "mode": "direct"
+    },
+    {
+      "path": "liquidglass-compose/src/main/kotlin/dev/liquidglass/compose/LiquidGlassProvider.kt",
+      "mode": "direct"
+    }
+  ]
+}

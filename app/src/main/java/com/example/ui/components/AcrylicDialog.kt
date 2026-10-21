@@ -38,7 +38,7 @@ private fun overlayDismiss(visibility: MutableTransitionState<Boolean>, onDismis
     return rememberPaperClose(visibility, onDismiss)
 }
 
-/** 亚克力立牌面板：品牌色 tint + 镜面光束 + 顶棱聚光 + 颗粒噪点 + 水晶棱镜描边 + 倒角高光 + 双层阴影。 */
+/** 亚克力面板：主题 tint、颗粒底纹、克制描边与阴影；无左上角镜面光束或聚光。 */
 @Composable
 fun Modifier.acrylicPanel(
     shape: Shape = RoundedCornerShape(24.dp),
@@ -64,36 +64,6 @@ fun Modifier.acrylicPanel(
         )
         .clip(shape)
         .background(surface)
-        .drawBehind {
-            // 顶棱抛光聚光带
-            drawRect(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.08f),
-                        Color.White.copy(alpha = 0.50f),
-                        Color.White.copy(alpha = 0.72f),
-                        Color.White.copy(alpha = 0.50f),
-                        Color.White.copy(alpha = 0.08f)
-                    )
-                ),
-                topLeft = androidx.compose.ui.geometry.Offset.Zero,
-                size = androidx.compose.ui.geometry.Size(size.width, 2.5.dp.toPx())
-            )
-            // 125° 对角镜面光束与底部微晕染
-            drawRect(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.20f),
-                        Color.White.copy(alpha = 0.05f),
-                        Color.Transparent,
-                        primary.copy(alpha = 0.035f),
-                        secondary.copy(alpha = 0.055f)
-                    ),
-                    start = androidx.compose.ui.geometry.Offset(0f, 0f),
-                    end = androidx.compose.ui.geometry.Offset(size.width, size.height)
-                )
-            )
-        }
         .filmGrain(alpha = 0.035f)
         .iridescentBorder(
             shape = shape,
@@ -101,7 +71,6 @@ fun Modifier.acrylicPanel(
             width = 1.5.dp,
             alpha = 0.38f
         )
-        .crystalInnerBevel(shape = shape, width = 1.dp)
 }
 
 /** 统一亚克力弹窗：径向遮罩 + 玻璃面板 + 主题一致的按钮区。 */

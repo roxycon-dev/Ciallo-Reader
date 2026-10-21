@@ -1,0 +1,51 @@
+{
+  "version": "1.4.15",
+  "versionCode": 238,
+  "jvm": {
+    "com.example.ui.components.TabBarMotionTest": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "com.example.ui.components.PaperAndSliderTest": {
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "com.example.ui.OverlayPolishTest": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "device": {
+    "tests": 5,
+    "failures": 0,
+    "fastFlicks": 12,
+    "rapidTaps": 72,
+    "modalCycles": 6,
+    "settledPixelDifference": 0.0,
+    "shaderFailures": 0,
+    "maxGeometryWallMs": 2.199485,
+    "hiddenProviderRegression": "Pre-fix build paints white instead of the expected dark background; final build passes invisible/visible pixel assertions",
+    "warpUpdates": 160,
+    "counterSemantics": "Counts graphicsLayer deformation updates, not presented GPU frames; staged window screenshots verify actual rendering."
+  },
+  "uiGate": {
+    "passed": true,
+    "baselineChanged": false
+  },
+  "guideCoverage": {
+    "sources": 722,
+    "missing": 0,
+    "explicitDeletedReferences": 4
+  },
+  "limitations": [
+    "Host-GPU Android emulator, Debug build; geometry timing is not total GPU or frame cost",
+    "26 JVM cases preceded the final shader-index/provider rendering fixes; those fixes are covered by the final 5 native cases",
+    "No claim of equal total compute to a matrix spring, no physical ARM64 frame-rate guarantee"
+  ]
+}
