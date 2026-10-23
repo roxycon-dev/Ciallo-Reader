@@ -838,14 +838,13 @@ fun ReaderScreen(
 
     // 滚动模式：1.5 秒防抖保存，避免滚动时每帧写数据库导致掉帧
 
-    LaunchedEffect(scrollState.value) {
-
-        if (isScrollMode && book != null && chapters.isNotEmpty()) {
-
-            delay(1500)
-
-            val offsetToSave = scrollState.value
-
+    ReaderScrollProgressEffect(
+        scrollState = scrollState,
+        enabled = isScrollMode && book != null && chapters.isNotEmpty(),
+        bookId = book?.id,
+        chapterIndex = currentChapterIndex,
+    ) { offsetToSave ->
+        if (book != null) {
             val isFinished = book.isFinished || reachedBookEnd ||
                 (currentChapterIndex == chapters.lastIndex && currentChapter?.content?.isNotEmpty() == true &&
                     scrollState.maxValue > 0 && offsetToSave >= scrollState.maxValue)
@@ -878,9 +877,7 @@ fun ReaderScreen(
 
     // 退出阅读页时兜底保存一次最新进度
 
-    DisposableEffect(Unit) {
-
-        onDispose {
+    val saveLatestProgress by rememberUpdatedState(newValue = {
 
             if (book != null && chapters.isNotEmpty()) {
 
@@ -894,8 +891,9 @@ fun ReaderScreen(
 
             }
 
-        }
-
+    })
+    DisposableEffect(Unit) {
+        onDispose { saveLatestProgress() }
     }
 
 
@@ -1049,9 +1047,7 @@ fun ReaderScreen(
 
     var scrollChunks by remember(currentChapter, firstLineIndent) {
 
-        val formatted = if (smallChapter) formatForReader(currentChapter?.content ?: "", firstLineIndent) else ""
-
-        mutableStateOf(if (smallChapter) chunkForScroll(formatted) else emptyList())
+        mutableStateOf(if (smallChapter) chunkForScroll(formattedContent) else emptyList())
 
     }
 
@@ -3096,9 +3092,11 @@ fun ReaderScreen(
 
         // 滚动模式：滚过 20% 时显示"回到顶部"按钮
 
+        val scrollTopVisible by rememberReaderScrollTopVisible(scrollState, isScrollMode && !isAutoScrolling)
+
         PullOutVisibility(
 
-            visible = isScrollMode && !isAutoScrolling && scrollState.value > scrollState.maxValue * 0.2f,
+            visible = scrollTopVisible,
 
             modifier = Modifier.align(Alignment.BottomEnd).padding(end = DesignTokens.SpaceXl, bottom = 80.dp)
 

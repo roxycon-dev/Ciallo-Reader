@@ -104,6 +104,21 @@ class MainActivity : ComponentActivity() {
     private var mainViewModel: MainViewModel? = null
     private var sharedDetail by mutableStateOf<com.example.library.SharedWorkLink.Target?>(null)
 
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) releaseReaderCaches()
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        releaseReaderCaches()
+    }
+
+    private fun releaseReaderCaches() {
+        ReaderPaginationCache.clear()
+        com.example.ui.reader.NovelInlineImages.NovelImageCache.clear()
+    }
+
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -561,8 +576,6 @@ class MainActivity : ComponentActivity() {
                                 })
                             val books by viewModel.allBooks.collectAsStateWithLifecycle()
                             val categories by viewModel.allCategories.collectAsStateWithLifecycle()
-                            val readingRecords by viewModel.allReadingRecords.collectAsStateWithLifecycle()
-                            val readingSessions by viewModel.allReadingSessions.collectAsStateWithLifecycle()
                             /* 神回的三个订阅**刻意不放这里**：统计页/设置页才需要，
                                放到 home 顶部会让冷启动就去读 DataStore + 查库 ——
                                一旦神回侧有任何问题，表现就是"一打开就闪退"。
@@ -771,8 +784,10 @@ class MainActivity : ComponentActivity() {
                                                     onOpenLocalNovel = { book -> viewModel.selectBook(book); navController.navigate("reader") },
                                                     extraBottomPadding = LocalAppBottomInset.current
                                                 )
-                                            1 -> com.example.discover.DiscoverScreen(
-                                                readingTitles = readingRecords.map { it.bookTitle }.toSet(),
+                                            1 -> {
+                                                val readingTitles by viewModel.readingTitles.collectAsStateWithLifecycle()
+                                                com.example.discover.DiscoverScreen(
+                                                readingTitles = readingTitles,
                                                 manager = libraryViewModel.sourceManager,
                                                 refreshRequest = discoverRefreshRequest,
                                                 favorites = if (viewModel.favoritesProtected.collectAsStateWithLifecycle().value) emptyList() else favoriteItems,
@@ -786,6 +801,7 @@ class MainActivity : ComponentActivity() {
                                                 onLatest = {},
                                                 onSourceManagement = { navController.openPaperPage("source_management") },
                                             )
+                                            }
                                             2 -> HomeScreen(
                                                 books = visibleBooks,
                                                 categories = categories,
@@ -931,6 +947,8 @@ class MainActivity : ComponentActivity() {
                                                 onDeleteFavoriteCategory = { viewModel.deleteFavoriteCategory(it) },
                                             )
                                             3 -> {
+                                                val readingRecords by viewModel.allReadingRecords.collectAsStateWithLifecycle()
+                                                val readingSessions by viewModel.allReadingSessions.collectAsStateWithLifecycle()
                                                 var dailyGoalState by remember { mutableIntStateOf(viewModel.prefs.dailyGoalMinutes) }
                                                 /* 神回订阅只在这一 Tab 内：切到统计页才读 DataStore / 查库 */
                                                 val godMoments by viewModel.godMoments.collectAsStateWithLifecycle()

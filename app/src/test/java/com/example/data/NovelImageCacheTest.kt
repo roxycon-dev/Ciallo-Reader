@@ -24,6 +24,17 @@ import java.io.File
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class NovelImageCacheTest {
 
+    @Test fun memoryTrimDropsOwnershipWithoutRecyclingVisibleBitmap() {
+        val bitmap = android.graphics.Bitmap.createBitmap(4, 4, android.graphics.Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(0xFF123456.toInt())
+        NovelInlineImages.NovelImageCache.put("visible-page", bitmap)
+        NovelInlineImages.NovelImageCache.clear()
+        assertNull(NovelInlineImages.NovelImageCache.get("visible-page"))
+        assertTrue(!bitmap.isRecycled)
+        assertEquals(0xFF123456.toInt(), bitmap.getPixel(0, 0))
+        bitmap.recycle()
+    }
+
     private fun redPngBytes(w: Int = 4, h: Int = 4): ByteArray {
         val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
         bmp.eraseColor(0xFFFF0000.toInt())

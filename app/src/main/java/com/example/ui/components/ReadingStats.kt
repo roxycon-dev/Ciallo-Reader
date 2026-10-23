@@ -46,6 +46,12 @@ fun rememberTodayCalendar(): Calendar {
 
 // ---------------- 纯聚合工具（统计页共用，全部查询时动态计算） ----------------
 
+/** Index the displayed dates in one pass, preserving the original record order in each day. */
+internal fun readingRecordsForDates(records: List<ReadingRecord>, dates: List<String>): Map<String, List<ReadingRecord>> {
+    val included = dates.toHashSet()
+    return records.asSequence().filter { it.dateStr in included }.groupBy { it.dateStr }
+}
+
 /** reading_records -> 日期 -> 秒（天 x 书 已按天聚合，作为所有周期统计的唯一基准）。 */
 fun readingRecordsToDailyTotals(records: List<ReadingRecord>): Map<String, Long> {
     val map = HashMap<String, Long>()

@@ -39,20 +39,31 @@ import kotlin.math.roundToInt
  */
 object ReaderPaginationCache {
     private val lock = Any()
-    private val entries = LinkedHashMap<PaginationKey, List<String>>(16, 0.75f, true)
+    private data class Entry(val pages: List<String>, val bytes: Long)
+    private val entries = LinkedHashMap<PaginationKey, Entry>(16, 0.75f, true)
     private const val MAX_ENTRIES = 8
+    internal const val MAX_BYTES = 8L * 1024 * 1024
+    private var bytes = 0L
 
-    fun get(key: PaginationKey): List<String>? = synchronized(lock) { entries[key] }
+    fun get(key: PaginationKey): List<String>? = synchronized(lock) { entries[key]?.pages }
 
     fun put(key: PaginationKey, pages: List<String>) {
         synchronized(lock) {
-            entries[key] = pages
-            while (entries.size > MAX_ENTRIES) {
+            // Account for both chapter text and page strings, plus conservative object overhead.
+            val size = key.content.length * 2L + pages.sumOf { it.length * 2L + 40L } + 128L
+            if (size > MAX_BYTES) return
+            bytes -= entries.remove(key)?.bytes ?: 0L
+            entries[key] = Entry(pages, size)
+            bytes += size
+            while (entries.size > MAX_ENTRIES || bytes > MAX_BYTES) {
                 val oldest = entries.keys.firstOrNull() ?: break
-                entries.remove(oldest)
+                bytes -= entries.remove(oldest)!!.bytes
             }
         }
     }
+
+    fun clear() = synchronized(lock) { entries.clear(); bytes = 0L }
+    internal fun retainedBytes(): Long = synchronized(lock) { bytes }
 }
 
 data class PaginationKey(

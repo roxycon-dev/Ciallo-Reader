@@ -453,7 +453,7 @@ fun ComicReaderCore(
     val readerResumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
     val autoReadingActive = autoRead && !panelShown && readerResumed && !showTouchEditor
     // 条漫与无缝模式共用滚动位置；页码仍跟随最可见项。
-    var scrollMetrics by remember(pages, config.mode) { mutableStateOf<ComicScrollMetrics?>(null) }
+    val scrollMetrics = remember(pages, config.mode) { mutableStateOf<ComicScrollMetrics?>(null) }
     var scrollJump by remember(pages, config.mode) { mutableStateOf<Pair<Int, Float>?>(null) }
     var scrollJumpAnimated by remember(pages, config.mode) { mutableStateOf(false) }
     val latestExit by rememberUpdatedState(onExit)
@@ -538,7 +538,7 @@ fun ComicReaderCore(
             fun swipePage(next: Boolean) {
                 if (controlsVisible || !config.gestureSwipe) return
                 if (verticalMode) {
-                    val metrics = scrollMetrics ?: return
+                    val metrics = scrollMetrics.value ?: return
                     if (if (next) metrics.canScrollForward else metrics.canScrollBackward) {
                         scrollJumpAnimated = true
                         scrollJump = ((scrollJump?.first ?: 0) + 1) to metrics.pageFraction(next)
@@ -737,7 +737,7 @@ fun ComicReaderCore(
                 autoScrollActive = autoReadingActive,
                 autoScrollSpeedDp = config.autoScrollSpeedDp,
                 onReachEnd = { goNext() },
-                onScrollMetrics = { scrollMetrics = it },
+                onScrollMetrics = { scrollMetrics.value = it },
                 scrollJump = scrollJump,
                 animateScrollJump = scrollJumpAnimated,
                 onPreviousChapter = { navigateChapter(next = false) },
@@ -904,12 +904,12 @@ fun ComicReaderCore(
         onGoNext = { goNext() },
         autoRead = autoRead,
         onAutoReadToggle = { autoRead = !autoRead },
-        continuousFraction = if (verticalMode) scrollMetrics?.fraction ?: 0f else -1f,
+        continuousFractionSource = { if (verticalMode) scrollMetrics.value?.fraction ?: 0f else -1f },
         onJumpToScrollFraction = if (verticalMode) ({ fraction ->
             scrollJumpAnimated = false
             scrollJump = ((scrollJump?.first ?: 0) + 1) to fraction
         }) else null,
-        spreadAtScrollFraction = { fraction -> scrollMetrics?.target(fraction)?.index ?: currentSpread },
+        spreadAtScrollFraction = { fraction -> scrollMetrics.value?.target(fraction)?.index ?: currentSpread },
         toc = toc,
         currentChapterIndex = currentChapterIndex,
         onJumpToChapter = onJumpToChapter,
@@ -1578,7 +1578,7 @@ private fun ComicVerticalList(
     val strategy = remember(config.mode, config.pageSpacingDp, config.webtoonSnap) {
         ComicScrollStrategy.forConfig(config)
     }
-    val measuredHeights = remember(layout.spreads) { mutableMapOf<Int, Int>() }
+    val scrollGeometry = remember(layout.spreads) { ComicScrollGeometryCache() }
     val latestScrollMetrics by rememberUpdatedState(onScrollMetrics)
     val latestReachEnd by rememberUpdatedState(onReachEnd)
     var latestMetrics by remember(layout.spreads) { mutableStateOf<ComicScrollMetrics?>(null) }
@@ -1680,16 +1680,17 @@ private fun ComicVerticalList(
 
     // 每次项内像素偏移变化都上报；单张长图也有进度，末图滚到底才到 100%。
     LaunchedEffect(listState, layout.spreads, strategy.spacingDp) {
-        snapshotFlow { listState.layoutInfo }.collect { info ->
+        // A scroll can reuse its layout-info object. Observe the pixel position explicitly
+        // so snapshotFlow equality cannot suppress progress within one tall image.
+        snapshotFlow { Triple(listState.layoutInfo, listState.firstVisibleItemIndex,
+            listState.firstVisibleItemScrollOffset) }.collect { (info, firstIndex, pixelOffset) ->
             if (info.visibleItemsInfo.isEmpty()) return@collect
-            info.visibleItemsInfo.forEach { measuredHeights[it.index] = it.size.coerceAtLeast(1) }
-            val estimatedHeight = measuredHeights.values.average().toInt().coerceAtLeast(1)
+            info.visibleItemsInfo.forEach { scrollGeometry.record(it.index, it.size) }
             val metrics = ComicScrollMetrics(
-                itemSizes = List(info.totalItemsCount) { measuredHeights[it] ?: estimatedHeight },
-                itemSpacing = info.mainAxisItemSpacing,
-                viewportSize = info.viewportEndOffset - info.viewportStartOffset,
-                firstVisibleItemIndex = listState.firstVisibleItemIndex,
-                firstVisibleItemScrollOffset = listState.firstVisibleItemScrollOffset,
+                geometry = scrollGeometry.geometry(info.totalItemsCount, info.mainAxisItemSpacing,
+                    info.viewportEndOffset - info.viewportStartOffset),
+                firstVisibleItemIndex = firstIndex,
+                firstVisibleItemScrollOffset = pixelOffset,
                 canScrollBackward = listState.canScrollBackward,
                 canScrollForward = listState.canScrollForward,
             )

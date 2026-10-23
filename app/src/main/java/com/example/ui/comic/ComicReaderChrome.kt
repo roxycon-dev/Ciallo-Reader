@@ -182,6 +182,7 @@ fun ComicReaderChrome(
     autoRead: Boolean,
     onAutoReadToggle: () -> Unit,
     continuousFraction: Float = -1f,
+    continuousFractionSource: (() -> Float)? = null,
     onJumpToScrollFraction: ((Float) -> Unit)? = null,
     spreadAtScrollFraction: (Float) -> Int = { 0 },
     toc: List<ComicTocEntry>,
@@ -255,6 +256,7 @@ fun ComicReaderChrome(
                 onPrevChapter = onPrevChapter, onNextChapter = onNextChapter,
                 chapterNavLabel = chapterNavLabel,
                 continuousFraction = continuousFraction,
+                continuousFractionSource = continuousFractionSource,
                 onJumpToScrollFraction = onJumpToScrollFraction,
                 spreadAtScrollFraction = spreadAtScrollFraction,
             )
@@ -492,13 +494,15 @@ private fun ComicBottomBar(
     onNextChapter: (() -> Unit)?,
     chapterNavLabel: String,
     continuousFraction: Float = -1f,
+    continuousFractionSource: (() -> Float)? = null,
     onJumpToScrollFraction: ((Float) -> Unit)? = null,
     spreadAtScrollFraction: (Float) -> Int = { 0 },
 ) {
     var dragging by remember { mutableStateOf(false) }
-    val scrolling = continuousFraction in 0f..1f && onJumpToScrollFraction != null
+    val scrollFraction = continuousFractionSource?.invoke() ?: continuousFraction
+    val scrolling = scrollFraction in 0f..1f && onJumpToScrollFraction != null
     val sliderRange = 0f..if (scrolling) 1f else (spreadCount - 1).coerceAtLeast(1).toFloat()
-    val sliderValue = if (scrolling) continuousFraction else currentSpread.toFloat()
+    val sliderValue = if (scrolling) scrollFraction else currentSpread.toFloat()
     var dragTarget by remember(scrolling) { mutableFloatStateOf(sliderValue) }
     val sliderEnabled = spreadCount > 1 || scrolling
     val reverse = config.direction == ComicDirection.RTL &&
@@ -522,7 +526,7 @@ private fun ComicBottomBar(
             Text(
                 // 垂直列表按滚动位置，其余模式按页数。
                 "· ${
-                    if (continuousFraction in 0f..1f) (continuousFraction * 100).toInt()
+                    if (scrollFraction in 0f..1f) (scrollFraction * 100).toInt()
                     else (currentPage.toFloat() / totalPages.coerceAtLeast(1) * 100).toInt()
                 }%",
                 color = TextSecondary, fontSize = DesignTokens.TypeCaption

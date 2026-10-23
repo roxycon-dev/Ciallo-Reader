@@ -45,6 +45,9 @@ data class Book(
     var isCoverValid: Boolean = false
 }
 
+/** Lightweight query result; reading offsets never enter the favorite download-count flow. */
+data class DownloadedComicCount(val sourceId: String?, val comicId: String?, val chapterCount: Int)
+
 @Entity(tableName = "chapters", indices = [Index(value = ["bookId", "chapterOrder"])])
 data class Chapter(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,

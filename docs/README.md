@@ -8,6 +8,9 @@
 
 ## 内容
 
+- [Ciallo Reader 1.5.1 性能优化与下载](release-1.5.1-2026-10-23.md)
+- [平板性能专项验证](performance-2026-10-23.md)
+
 - [小说书源接入检查与验收清单](novel-source-integration-checklist.md)
 - [Ciallo Reader 1.4.10 发布说明与下载](release-1.4.10-2026-10-19.md)
 - [书阁（xbookcn）书源验收](xbookcn-source-verification-2026-10-19.md)

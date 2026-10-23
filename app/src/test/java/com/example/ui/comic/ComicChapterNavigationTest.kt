@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -257,19 +258,25 @@ class ComicChapterNavigationTest {
             swipe(ComicDirection.TTB, false)
             assertTrue("反向滚动要回退进度", progress() < down)
             compose.onNodeWithText("1 / 1").assertExists()
-            compose.onNodeWithContentDescription("阅读进度").performTouchInput {
-                click(percentOffset(0.75f, 0.5f))
+            // Set the exact logical value: the liquid track has end insets, so a
+            // percentage of the entire touch rectangle is not the same percentage value.
+            compose.onNodeWithContentDescription("阅读进度").performSemanticsAction(SemanticsActions.SetProgress) {
+                it(0.75f)
             }
             compose.waitForIdle()
             assertEquals(0.75f, progress(), 0.015f)
-            compose.onNodeWithContentDescription("阅读进度").performTouchInput {
-                click(percentOffset(0.99f, 0.5f))
+            // Set the exact logical value: the liquid track has end insets, so a
+            // percentage of the entire touch rectangle is not the same percentage value.
+            compose.onNodeWithContentDescription("阅读进度").performSemanticsAction(SemanticsActions.SetProgress) {
+                it(0.99f)
             }
             compose.waitForIdle()
             swipe(ComicDirection.TTB, true)
             assertEquals(1f, progress(), 0.001f)
-            compose.onNodeWithContentDescription("阅读进度").performTouchInput {
-                click(percentOffset(0f, 0.5f))
+            // Set the exact logical value: the liquid track has end insets, so a
+            // percentage of the entire touch rectangle is not the same percentage value.
+            compose.onNodeWithContentDescription("阅读进度").performSemanticsAction(SemanticsActions.SetProgress) {
+                it(0f)
             }
             compose.waitForIdle()
             assertEquals(0f, progress(), 0.001f)

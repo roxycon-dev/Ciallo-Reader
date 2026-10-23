@@ -77,19 +77,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * 已下载话数用 sourceId/comicId 反查本地 books（一个已下载章节 = 一本本地漫画）。
      */
     val favoriteItems: StateFlow<List<com.example.data.favorite.FavoriteItem>> =
-        combine(favorites, favoriteRepository.progressByKey, repository.allBooks) { favs, progressMap, books ->
+        combine(favorites, favoriteRepository.progressByKey,
+            database.bookDao().getDownloadedComicCounts().distinctUntilChanged()) { favs, progressMap, counts ->
             val key = { s: String, c: String -> com.example.data.favorite.favoriteKey(s, c) }
-            val downloadedByKey = books
-                .filter { it.isComic && !it.sourceId.isNullOrBlank() && !it.comicId.isNullOrBlank() }
-                .groupBy { key(it.sourceId!!, it.comicId!!) }
+            val downloadedByKey = counts
+                .filter { !it.sourceId.isNullOrBlank() && !it.comicId.isNullOrBlank() }
+                .associate { key(it.sourceId!!, it.comicId!!) to it.chapterCount }
             favs.map { fav ->
                 com.example.data.favorite.FavoriteItem(
                     favorite = fav,
                     progress = progressMap[key(fav.sourceId, fav.comicId)],
-                    downloadedChapters = downloadedByKey[key(fav.sourceId, fav.comicId)]?.size ?: 0,
+                    downloadedChapters = downloadedByKey[key(fav.sourceId, fav.comicId)] ?: 0,
                 )
             }
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        }.flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun toggleFavorite(
         book: com.example.source.SearchBook,
@@ -501,6 +503,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
+    val readingTitles: StateFlow<Set<String>> = database.bookDao().getReadingTitles()
+        .map { it.toSet() }.distinctUntilChanged().flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
     val allReadingSessions: StateFlow<List<ReadingSession>> = repository.allReadingSessions.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -550,49 +555,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val token = readerSelectionToken
         val mapping = chapterMapping
         val metadata = cachedMetadataList
+        val previous = _chapters.value
+        val loaded = _loadedChapterIndices.value
         val needsCurrentChapter = currentLogicalIdx !in _loadedChapterIndices.value
         _readerLoading.value = needsCurrentChapter
         readerContentJob = viewModelScope.launch {
             try {
                 check(metadata.isNotEmpty() && mapping != null) { "没有可读取的章节" }
 
-                val targetLogical = listOf(currentLogicalIdx - 1, currentLogicalIdx, currentLogicalIdx + 1)
-                    .filter { it >= 0 && it < metadata.size }
-
-                val targetOrders = targetLogical
-                    .flatMap { mapping!!.logicalToPhysicalOrders[it].asIterable() }
-                    .distinct()
-
-                val activeParts = repository.getChaptersByOrders(bookId, targetOrders).associateBy { it.chapterOrder }
-
-                val merged = metadata.mapIndexed { logicalIdx, chapter ->
-                    if (logicalIdx !in targetLogical) {
-                        chapter
-                    } else {
-                        val parts = mapping!!.logicalToPhysicalOrders[logicalIdx]
-                            .map { activeParts[it] }
-                            .filterNotNull()
-                        if (parts.isEmpty()) {
-                            chapter
-                        } else {
-                            chapter.copy(content = parts.joinToString(separator = "") { it.content })
-                        }
-                    }
-                }
-
-                check(currentLogicalIdx in merged.indices &&
-                    mapping.logicalToPhysicalOrders[currentLogicalIdx].all { it in activeParts }) {
-                    "当前章节数据缺失，请重试加载"
+                val window = loadReaderChapterWindow(mapping, currentLogicalIdx, previous, loaded) { orders ->
+                    repository.getChaptersByOrders(bookId, orders)
                 }
                 if (token != readerSelectionToken || _selectedBook.value?.id != bookId ||
                     lastLoadedChapterIndex != currentLogicalIdx) return@launch
-                _chapters.value = merged
-                _loadedChapterIndices.value = targetLogical.filter { logicalIdx ->
-                    mapping.logicalToPhysicalOrders[logicalIdx].all { it in activeParts }
-                }.toSet()
+                _chapters.value = window.chapters
+                _loadedChapterIndices.value = window.loaded
                 _readerLoadError.value = null
                 _readerLoading.value = false
-                android.util.Log.d("BookImport", "[MainViewModel] Lazy loaded content for logical chapters: $targetLogical, physical: $targetOrders")
+                android.util.Log.d("BookImport", "[MainViewModel] Loaded chapter window: ${window.loaded}")
             } catch (e: CancellationException) {
                 throw e
             } catch (t: Throwable) {
@@ -655,7 +635,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     val effectiveBook = migratedBook ?: book
                     val metadata = repository.getChaptersMetadataList(effectiveBook.id)
-                    val logical = ChapterMerger.buildLogicalChapters(metadata)
+                    val logical = withContext(Dispatchers.Default) { ChapterMerger.buildLogicalChapters(metadata) }
                     check(logical.chapters.isNotEmpty()) { "这本书没有可读取的章节" }
                     if (token != readerSelectionToken || _selectedBook.value?.id != book.id) return@launch
                     cachedMetadataList = logical.chapters

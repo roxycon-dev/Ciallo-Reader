@@ -24,6 +24,7 @@ import java.io.File
 @Config(sdk = [35])
 class AppUpdateManagerTest {
     private val context get() = ApplicationProvider.getApplicationContext<Context>()
+    private val nextVersion get() = com.example.BuildConfig.VERSION_CODE.toLong() + 1
     private val asset = UpdateApkAsset("Ciallo-Reader-v1.2.4.apk", "$UPDATE_REPOSITORY/releases/download/v1.2.4/Ciallo-Reader-v1.2.4.apk")
     private val release = UpdateRelease("v1.2.4", "$UPDATE_REPOSITORY/releases/tag/v1.2.4", apk = asset)
     private fun downloader() = AppUpdateDownload(context, OkHttpClient.Builder().addInterceptor {
@@ -35,7 +36,7 @@ class AppUpdateManagerTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         AppUpdateStore(context).clear()
         try {
-            val manager = AppUpdateManager(context, scope, downloader()) { _, _ -> 205 }
+            val manager = AppUpdateManager(context, scope, downloader()) { _, _ -> nextVersion }
             manager.offer(release).join()
             manager.startDownload()
             val ready = withTimeout(10_000) { manager.state.first { it.stage == AppUpdateStage.READY } }
@@ -59,7 +60,7 @@ class AppUpdateManagerTest {
         var reject = true
         try {
             val manager = AppUpdateManager(context, scope, downloader()) { _, _ ->
-                if (reject) error("Invalid signature") else 205
+                if (reject) error("Invalid signature") else nextVersion
             }
             manager.offer(release).join()
             manager.startDownload()
@@ -83,9 +84,9 @@ class AppUpdateManagerTest {
         val store = AppUpdateStore(context)
         store.clear()
         val file = store.newTransferFile().apply { writeText("fixture apk") }
-        store.save(file, PendingAppUpdate(release, 205, updateFileSha256(file)))
+        store.save(file, PendingAppUpdate(release, nextVersion, updateFileSha256(file)))
         try {
-            val manager = AppUpdateManager(context, scope, downloader()) { _, _ -> 205 }
+            val manager = AppUpdateManager(context, scope, downloader()) { _, _ -> nextVersion }
             manager.awaitInitialization()
             assertEquals(AppUpdateStage.READY, manager.state.value.stage)
             assertFalse(manager.state.value.visible)
@@ -100,11 +101,11 @@ class AppUpdateManagerTest {
         val store = AppUpdateStore(context)
         store.clear()
         val file = store.newTransferFile().apply { writeText("fixture apk") }
-        store.save(file, PendingAppUpdate(release, 205, updateFileSha256(file)))
+        store.save(file, PendingAppUpdate(release, nextVersion, updateFileSha256(file)))
         store.apkFile.writeText("changed bytes")
         val partial = store.newTransferFile().apply { writeText("interrupted") }
         try {
-            val manager = AppUpdateManager(context, scope, downloader()) { _, _ -> fail("Tampered file should fail before APK validation"); 205 }
+            val manager = AppUpdateManager(context, scope, downloader()) { _, _ -> fail("Tampered file should fail before APK validation"); nextVersion }
             manager.awaitInitialization()
             assertNull(manager.state.value.release)
             assertFalse(store.apkFile.exists())
@@ -116,7 +117,7 @@ class AppUpdateManagerTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         AppUpdateStore(context).clear()
         try {
-            val manager = AppUpdateManager(context, scope, downloader()) { _, _ -> 205 }
+            val manager = AppUpdateManager(context, scope, downloader()) { _, _ -> nextVersion }
             manager.offer(release).join()
             manager.startDownload()
             manager.cancelDownload()
@@ -129,7 +130,7 @@ class AppUpdateManagerTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         AppUpdateStore(context).clear()
         try {
-            val manager = AppUpdateManager(context, scope, downloader()) { _, _ -> 205 }
+            val manager = AppUpdateManager(context, scope, downloader()) { _, _ -> nextVersion }
             manager.awaitInitialization()
             manager.installationReturned().join()
             assertFalse(manager.state.value.hasPackage)

@@ -4,6 +4,42 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ComicScrollMetricsTest {
+    @Test fun thousandsOfPixelUpdatesReuseOneGeometryUntilAMeasurementChanges() {
+        val cache = ComicScrollGeometryCache()
+        cache.record(0, 1200); cache.record(1, 1600)
+        val geometry = cache.geometry(5000, 8, 800)
+        repeat(10_000) { offset ->
+            cache.record(0, 1200); cache.record(1, 1600)
+            val next = cache.geometry(5000, 8, 800)
+            org.junit.Assert.assertSame(geometry, next)
+            val metrics = ComicScrollMetrics(next, 1, offset, true, true)
+            org.junit.Assert.assertSame(geometry.starts, metrics.geometry.starts)
+        }
+        cache.record(1, 2000)
+        val resized = cache.geometry(5000, 8, 800)
+        org.junit.Assert.assertNotSame(geometry, resized)
+        assertEquals(listOf(1200, 2000, 1600), resized.itemSizes.take(3))
+        org.junit.Assert.assertNotSame(resized, cache.geometry(5000, 9, 800))
+        org.junit.Assert.assertNotSame(resized, cache.geometry(5000, 8, 900))
+    }
+
+    @Test fun binarySeekMatchesPreviousLinearSearchAtBoundariesAndLongChapterOffsets() {
+        val random = kotlin.random.Random(151)
+        repeat(12) {
+            val sizes = List(10_000) { random.nextInt(-10, 50_000) }
+            val spacing = random.nextInt(-3, 20)
+            val viewport = random.nextInt(0, 1600)
+            val value = ComicScrollMetrics(sizes, spacing, viewport, 0, 0, false, true)
+            val geometry = value.geometry
+            val fractions = List(100) { random.nextFloat() } + listOf(0f, 1f, -1f, 2f, Float.NaN)
+            for (fraction in fractions) {
+                val safe = if (fraction.isFinite()) fraction.coerceIn(0f, 1f) else 0f
+                val pixel = java.lang.Math.round(safe * geometry.scrollRange.toDouble())
+                val expected = geometry.starts.indexOfLast { it <= pixel }.coerceAtLeast(0)
+                assertEquals(ComicScrollTarget(expected, (pixel - geometry.starts[expected]).toInt()), value.target(fraction))
+            }
+        }
+    }
     private fun metrics(sizes: List<Int>, index: Int = 0, offset: Int = 0, spacing: Int = 0,
         viewport: Int = 600, backward: Boolean = true, forward: Boolean = true) =
         ComicScrollMetrics(sizes, spacing, viewport, index, offset, backward, forward)

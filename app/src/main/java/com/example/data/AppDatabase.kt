@@ -11,6 +11,12 @@ interface BookDao {
     @Query("SELECT * FROM books")
     suspend fun getAllBooksSync(): List<Book>
 
+    @Query("SELECT sourceId, comicId, COUNT(*) AS chapterCount FROM books WHERE contentType = 'COMIC' GROUP BY sourceId, comicId")
+    fun getDownloadedComicCounts(): Flow<List<DownloadedComicCount>>
+
+    @Query("SELECT b.* FROM books b WHERE b.contentType != 'COMIC' AND EXISTS (SELECT 1 FROM chapters c WHERE c.bookId = b.id AND length(c.content) > :limit)")
+    suspend fun getBooksWithOversizedChapters(limit: Int): List<Book>
+
     @Query("SELECT COUNT(*) FROM books")
     suspend fun getBooksCount(): Int
 
@@ -136,6 +142,9 @@ interface BookDao {
 
     @Query("SELECT * FROM reading_records ORDER BY dateStr DESC")
     fun getAllReadingRecordsFlow(): Flow<List<ReadingRecord>>
+
+    @Query("SELECT DISTINCT bookTitle FROM reading_records")
+    fun getReadingTitles(): Flow<List<String>>
 
     @Query("SELECT COALESCE(SUM(durationSeconds),0) FROM reading_records")
     suspend fun totalRecordedSeconds(): Long

@@ -70,6 +70,8 @@ object NovelInlineImages {
             override fun sizeOf(key: String, value: android.graphics.Bitmap): Int = value.byteCount
         }
         private val inflight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+        private val prewarmGate = kotlinx.coroutines.sync.Semaphore(1)
+        private val cacheGeneration = java.util.concurrent.atomic.AtomicLong()
         private val prewarmScope = kotlinx.coroutines.CoroutineScope(
             kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
         )
@@ -78,6 +80,12 @@ object NovelInlineImages {
 
         fun put(path: String, bmp: android.graphics.Bitmap) {
             cache.put(path, bmp)
+        }
+
+        /** Drop cache ownership only: the current page may still be drawing its bitmap. */
+        fun clear() {
+            cacheGeneration.incrementAndGet()
+            cache.evictAll()
         }
 
         /**
@@ -158,12 +166,18 @@ object NovelInlineImages {
 
         /** 后台预解码；已在缓存或解码中的跳过。 */
         fun prewarm(paths: List<String>) {
+            val generation = cacheGeneration.get()
             paths.filter { it.isNotBlank() && get(it) == null && inflight.add(it) }
                 .forEach { path ->
                     prewarmScope.launch {
                         try {
-                            (if (path.startsWith("epzip:")) decodeSampledFromEpub(path) else decodeSampled(path))
-                                ?.let { put(path, it) }
+                            prewarmGate.acquire()
+                            try {
+                                if (generation == cacheGeneration.get() && get(path) == null) {
+                                    (if (path.startsWith("epzip:")) decodeSampledFromEpub(path) else decodeSampled(path))
+                                        ?.let { if (generation == cacheGeneration.get()) put(path, it) }
+                                }
+                            } finally { prewarmGate.release() }
                         } finally {
                             inflight.remove(path)
                         }

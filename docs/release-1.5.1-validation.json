@@ -1,0 +1,60 @@
+{
+  "version": "1.5.1",
+  "versionCode": 243,
+  "testSuites": 21,
+  "tests": {
+    "tests": 119,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "pixelComparisons": [
+    {
+      "scene": "novel-minimal-scroll",
+      "width": 1280,
+      "height": 800,
+      "changedPixels": 0
+    },
+    {
+      "scene": "novel-high-pagination",
+      "width": 1280,
+      "height": 800,
+      "changedPixels": 0
+    },
+    {
+      "scene": "comic-minimal-chrome",
+      "width": 1280,
+      "height": 800,
+      "changedPixels": 0
+    },
+    {
+      "scene": "comic-high-chrome",
+      "width": 1280,
+      "height": 800,
+      "changedPixels": 0
+    }
+  ],
+  "physicalTabletProfiled": false,
+  "geometryReuse": {
+    "items": 5000,
+    "positionUpdates": 10000,
+    "geometryTables": 1
+  },
+  "continuousProgressParentRecompositions": 0,
+  "apk": {
+    "apk": "Ciallo-Reader-v1.5.1.apk",
+    "package": "com.aistudio.novelreader.kxmpzq",
+    "versionCode": 243,
+    "versionName": "1.5.1",
+    "bytes": 29192964,
+    "sha256": "58f0c24712dad6056e90ae9c5eee8372c341241ff79db681dae9757cb666eae6",
+    "certificateSha256": "d2115e3cc5880b210a120558aaab03eb30ee5de2952a80f3376dda7e45501146",
+    "upgradeFrom150": true,
+    "abis": [
+      "arm64-v8a"
+    ],
+    "zipCrcValid": true,
+    "zipalign16KiB": true,
+    "sourceInputsMatched": 1496
+  }
+}

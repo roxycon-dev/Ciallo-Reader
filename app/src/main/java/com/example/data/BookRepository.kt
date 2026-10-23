@@ -7,6 +7,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -28,10 +29,10 @@ class BookRepository(
         ".doc", ".rtf", ".chm"
     )
 
-    val allBooks: Flow<List<Book>> = bookDao.getAllBooks()
-    val allCategories: Flow<List<CategoryEntity>> = bookDao.getAllCategories()
-    val allReadingRecords: Flow<List<ReadingRecord>> = bookDao.getAllReadingRecordsFlow()
-    val allReadingSessions: Flow<List<ReadingSession>> = bookDao.getAllReadingSessionsFlow()
+    val allBooks: Flow<List<Book>> = bookDao.getAllBooks().distinctUntilChanged()
+    val allCategories: Flow<List<CategoryEntity>> = bookDao.getAllCategories().distinctUntilChanged()
+    val allReadingRecords: Flow<List<ReadingRecord>> = bookDao.getAllReadingRecordsFlow().distinctUntilChanged()
+    val allReadingSessions: Flow<List<ReadingSession>> = bookDao.getAllReadingSessionsFlow().distinctUntilChanged()
 
     private fun detectCharset(context: Context, uri: Uri): java.nio.charset.Charset {
         // 采样更大范围（256KB），并做严格解码校验 + BOM 识别，
@@ -510,9 +511,8 @@ class BookRepository(
         ContentMutationGate.mutex.lock()
         try {
         try {
-            val books = bookDao.getAllBooks().first()
+            val books = bookDao.getBooksWithOversizedChapters(MAX_CHAPTER_LENGTH)
             for (book in books) {
-                if(book.isComic || !bookDao.hasOversizedChapter(book.id,MAX_CHAPTER_LENGTH)) continue
                 val chapters = bookDao.getChaptersListForBook(book.id)
                 if (chapters.isEmpty() || chapters.none { it.content.length > MAX_CHAPTER_LENGTH }) {
                     continue

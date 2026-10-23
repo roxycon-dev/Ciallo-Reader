@@ -4,26 +4,25 @@ import kotlin.math.roundToLong
 
 /** 列表实测高度对应的滚动范围；尚未进入视口的图片由调用方估算高度。 */
 internal data class ComicScrollMetrics(
-    val itemSizes: List<Int>,
-    val itemSpacing: Int,
-    val viewportSize: Int,
+    val geometry: ComicScrollGeometry,
     val firstVisibleItemIndex: Int,
     val firstVisibleItemScrollOffset: Int,
     val canScrollBackward: Boolean,
     val canScrollForward: Boolean,
 ) {
-    private val starts = LongArray(itemSizes.size)
-    private val scrollRange: Long
+    constructor(itemSizes: List<Int>, itemSpacing: Int, viewportSize: Int,
+        firstVisibleItemIndex: Int, firstVisibleItemScrollOffset: Int,
+        canScrollBackward: Boolean, canScrollForward: Boolean) : this(
+        ComicScrollGeometry(itemSizes, itemSpacing, viewportSize), firstVisibleItemIndex,
+        firstVisibleItemScrollOffset, canScrollBackward, canScrollForward,
+    )
 
-    init {
-        var height = 0L
-        itemSizes.forEachIndexed { index, size ->
-            starts[index] = height
-            height += size.coerceAtLeast(1)
-            if (index < itemSizes.lastIndex) height += itemSpacing.coerceAtLeast(0)
-        }
-        scrollRange = (height - viewportSize.coerceAtLeast(0)).coerceAtLeast(0)
-    }
+    val itemSizes get() = geometry.itemSizes
+    val itemSpacing get() = geometry.itemSpacing
+    val viewportSize get() = geometry.viewportSize
+    private val starts get() = geometry.starts
+    private val scrollRange get() = geometry.scrollRange
+
 
     val fraction: Float get() = when {
         itemSizes.isEmpty() || !canScrollBackward -> 0f
@@ -45,8 +44,46 @@ internal data class ComicScrollMetrics(
         if (itemSizes.isEmpty()) return ComicScrollTarget(0, 0)
         val safeFraction = if (fraction.isFinite()) fraction.coerceIn(0f, 1f) else 0f
         val pixel = (safeFraction * scrollRange.toDouble()).roundToLong()
-        val index = starts.indexOfLast { it <= pixel }.coerceAtLeast(0)
+        var low = 0
+        var high = starts.lastIndex
+        while (low < high) {
+            val middle = (low + high + 1) ushr 1
+            if (starts[middle] <= pixel) low = middle else high = middle - 1
+        }
+        val index = low
         return ComicScrollTarget(index, (pixel - starts[index]).coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+    }
+}
+
+/** Geometry changes on measurement/viewport updates, not on every scroll pixel. */
+internal data class ComicScrollGeometry(val itemSizes: List<Int>, val itemSpacing: Int, val viewportSize: Int) {
+    val starts = LongArray(itemSizes.size)
+    val scrollRange: Long
+    init {
+        var height = 0L
+        itemSizes.forEachIndexed { index, size ->
+            starts[index] = height
+            height += size.coerceAtLeast(1)
+            if (index < itemSizes.lastIndex) height += itemSpacing.coerceAtLeast(0)
+        }
+        scrollRange = (height - viewportSize.coerceAtLeast(0)).coerceAtLeast(0)
+    }
+}
+
+internal class ComicScrollGeometryCache {
+    private val heights = HashMap<Int, Int>()
+    private var dirty = true
+    private var cached: ComicScrollGeometry? = null
+    fun record(index: Int, height: Int) {
+        val size = height.coerceAtLeast(1)
+        if (heights[index] != size) { heights[index] = size; dirty = true }
+    }
+    fun geometry(count: Int, spacing: Int, viewport: Int): ComicScrollGeometry {
+        cached?.let { if (!dirty && it.itemSizes.size == count && it.itemSpacing == spacing && it.viewportSize == viewport) return it }
+        val estimated = heights.values.average().toInt().coerceAtLeast(1)
+        return ComicScrollGeometry(List(count) { heights[it] ?: estimated }, spacing, viewport).also {
+            cached = it; dirty = false
+        }
     }
 }
 

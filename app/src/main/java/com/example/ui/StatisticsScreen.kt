@@ -241,22 +241,24 @@ LazyColumn(
                         // 整个塞进“今天”那一格（表现为“今天读了 197 分钟，但我根本没看”），
                         // 并凭空把书架第一本书当成今天读的书。这是凭空伪造数据，一律删除：
                         // 没有记录就是 0，空状态交给 WeeklyReadingChart 自己呈现。
-                        val minutesList = remember(readingRecords, weekDates) {
+                        val recordsByDay = remember(readingRecords, weekDates) {
+                            com.example.ui.components.readingRecordsForDates(readingRecords, weekDates)
+                        }
+                        val minutesList = remember(recordsByDay, weekDates) {
                             weekDates.map { date ->
-                                (readingRecords.filter { it.dateStr == date }
+                                (recordsByDay[date].orEmpty()
                                     .sumOf { it.durationSeconds } / 60).toInt()
                             }
                         }
-                        val booksList = remember(readingRecords, weekDates) {
+                        val booksList = remember(recordsByDay, weekDates) {
                             weekDates.map { date ->
-                                val daily = readingRecords.filter { it.dateStr == date }
+                                val daily = recordsByDay[date].orEmpty()
                                 if (daily.isEmpty()) "" else daily.map { it.bookTitle }.distinct().joinToString(", ")
                             }
                         }
-                        val dayRecords = remember(readingRecords, weekDates) {
+                        val dayRecords = remember(recordsByDay, weekDates) {
                             weekDates.map { date ->
-                                readingRecords
-                                    .filter { it.dateStr == date }
+                                recordsByDay[date].orEmpty()
                                     .sortedByDescending { it.id }
                                     .let { mergeDuplicateReadingRecords(it) }
                             }
