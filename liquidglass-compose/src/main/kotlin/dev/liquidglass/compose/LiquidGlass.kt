@@ -90,6 +90,11 @@ private class LiquidGlassNode(
     private var lastPosition: Offset = Offset.Unspecified
     private val pressProgress = Animatable(0f)
     private var pressPoint = Offset.Zero
+    private var pressJob: kotlinx.coroutines.Job? = null
+    private var requestedPress = 0f
+    private var shapeSize = androidx.compose.ui.geometry.Size.Unspecified
+    private var shapeRadius = Float.NaN
+    private var packedShapes: List<PackedGlassShape> = emptyList()
 
     fun update(newState: LiquidGlassProviderState, newStyle: GlassStyle) {
         var changed = false
@@ -101,7 +106,7 @@ private class LiquidGlassNode(
             style = newStyle
             changed = true
         }
-        if (!style.isInteractive && pressProgress.targetValue != 0f) {
+        if (!style.isInteractive && requestedPress != 0f) {
             releasePress()
         }
         if (changed) invalidateDraw()
@@ -112,6 +117,9 @@ private class LiquidGlassNode(
     }
 
     override fun onDetach() {
+        pressJob?.cancel()
+        pressJob = null
+        painter.detach()
         glassLayer?.let { currentValueOf(LocalGraphicsContext).releaseGraphicsLayer(it) }
         glassLayer = null
         consumerCoordinates = null
@@ -142,21 +150,19 @@ private class LiquidGlassNode(
         val drawGlassAndContent: ContentDrawScope.() -> Unit = {
             if (providerLayer != null && layer != null && position.isSpecified) {
                 val cornerRadius = style.shape.resolveCornerRadiusPx(size, this)
+                if (shapeSize != size || shapeRadius != cornerRadius) {
+                    shapeSize = size
+                    shapeRadius = cornerRadius
+                    packedShapes = listOf(PackedGlassShape(size.width / 2f, size.height / 2f,
+                        size.width / 2f, size.height / 2f, cornerRadius))
+                }
                 painter.drawScene(
                     scope = this,
                     tier = resolveTier(),
                     providerLayer = providerLayer,
                     positionInProvider = position,
                     glassLayer = layer,
-                    shapes = listOf(
-                        PackedGlassShape(
-                            centerX = size.width / 2f,
-                            centerY = size.height / 2f,
-                            halfWidth = size.width / 2f,
-                            halfHeight = size.height / 2f,
-                            cornerRadius = cornerRadius,
-                        ),
-                    ),
+                    shapes = packedShapes,
                     mergeSmoothingPx = 0f,
                     style = style,
                     pressAmount = press,
@@ -184,7 +190,8 @@ private class LiquidGlassNode(
         when (pointerEvent.type) {
             PointerEventType.Press -> {
                 pointerEvent.changes.firstOrNull()?.let { pressPoint = it.position }
-                coroutineScope.launch { pressProgress.animateTo(1f, GlassMotion.PressIn) }
+                invalidateDraw()
+                animatePress(1f)
             }
             PointerEventType.Release -> {
                 if (pointerEvent.changes.none { it.pressed }) releasePress()
@@ -197,7 +204,22 @@ private class LiquidGlassNode(
     }
 
     private fun releasePress() {
-        coroutineScope.launch { pressProgress.animateTo(0f, GlassMotion.Release) }
+        animatePress(0f)
+    }
+
+    private fun animatePress(target: Float) {
+        // Track requests before launch: a DOWN and UP can arrive before animateTo starts.
+        // Animatable.targetValue still describes the previous request in that interval.
+        if (requestedPress == target && (pressJob?.isActive == true || pressProgress.value == target)) return
+        requestedPress = target
+        // Explicit cancellation resets Animatable.velocity. Capture it first so a
+        // reversal keeps the momentum that animateTo's implicit handoff preserved.
+        val initialVelocity = pressProgress.velocity
+        pressJob?.cancel()
+        pressJob = coroutineScope.launch {
+            pressProgress.animateTo(target, if (target == 1f) GlassMotion.PressIn else GlassMotion.Release,
+                initialVelocity = initialVelocity)
+        }
     }
 
     private fun resolveTier(): GlassRenderTier {

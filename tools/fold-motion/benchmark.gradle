@@ -1,0 +1,21 @@
+// Opt-in local release-equivalent probe. Does not alter any normal build type.
+gradle.beforeProject { project ->
+    if (project.path != ':app') return
+    project.plugins.withId('com.android.application') {
+        project.extensions.getByName('androidComponents').finalizeDsl { android ->
+            def probe = android.buildTypes.create('motionBenchmark')
+            probe.initWith(android.buildTypes.getByName('release'))
+            probe.debuggable = false
+            probe.applicationIdSuffix = '.debug'
+            probe.signingConfig = android.signingConfigs.getByName('debugConfig')
+            probe.matchingFallbacks = ['release']
+            def sources = android.sourceSets.getByName('motionBenchmark')
+            sources.java.srcDir(new File(project.projectDir, 'src/debug/java/com/example/ui/perf'))
+            if (project.findProperty('motionKernelProbe')) sources.java.srcDir(project.property('motionKernelProbe'))
+            sources.manifest.srcFile(project.property('motionBenchmarkManifest'))
+            if (project.findProperty('motionShadowBackend') == 'kotlin') {
+                android.packaging.jniLibs.excludes.add('**/libshadowblur.so')
+            }
+        }
+    }
+}

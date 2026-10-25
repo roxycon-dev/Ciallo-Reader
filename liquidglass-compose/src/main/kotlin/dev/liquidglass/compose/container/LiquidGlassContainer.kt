@@ -133,6 +133,7 @@ private class LiquidGlassContainerNode(
     }
 
     override fun onDetach() {
+        painter.detach()
         glassLayer?.let { currentValueOf(LocalGraphicsContext).releaseGraphicsLayer(it) }
         glassLayer = null
         state.coordinates = null

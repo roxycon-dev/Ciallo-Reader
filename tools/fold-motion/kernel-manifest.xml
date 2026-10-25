@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <profileable android:shell="true" />
+        <activity android:name="com.example.ui.perf.MotionResourceProbeActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|fontScale|keyboardHidden|uiMode"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+    <activity android:name="com.example.ui.perf.ShadowKernelProbeActivity" android:exported="true" />
+</application>
+</manifest>

@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
@@ -300,6 +301,61 @@ private fun blurRadiusToSigma(radiusPx: Float): Float =
  * @param offsetY 额外垂直偏移（在 elevation 自动偏移之上叠加）
  * @param alpha 整体透明度倍率，便于按压态等动态调淡
  */
+@Composable
+fun Modifier.consistentShadow(
+    elevation: () -> Dp,
+    shape: Shape,
+    ambientColor: Color = Color.Black.copy(alpha = 0.08f),
+    spotColor: Color = Color.Black.copy(alpha = 0.15f),
+    offsetY: Dp = 0.dp,
+    alpha: Float = 1f
+): Modifier {
+    if (alpha <= 0f) return this
+    val clipShape = shape
+    return drawWithCache {
+        if (size.width <= 0f || size.height <= 0f) return@drawWithCache onDrawBehind { }
+        // Elevation changes blur/offset, never the outline. Keep geometry outside
+        // the animated read and resolve only when its exact Float value changes.
+        val outline = shape.createOutline(size, layoutDirection, this)
+        val shadowPath = outline.toAndroidPath()
+        val bounds = RectF()
+        @Suppress("DEPRECATION")
+        shadowPath.computeBounds(bounds, true)
+        val signature = outline.shadowOutlineSignature()
+        val totalAlpha = alpha.coerceIn(0f, 1f)
+        val ambientAlpha = ambientColor.alpha * SHADOW_AMBIENT_ALPHA_GAIN * totalAlpha
+        val spotAlpha = spotColor.alpha * SHADOW_SPOT_ALPHA_GAIN * totalAlpha
+        val ambientInk = if (ambientAlpha > 0.002f) ambientColor.copy(alpha = 1f) else ambientColor
+        val spotInk = if (spotAlpha > 0.002f) spotColor.copy(alpha = 1f) else spotColor
+        val baseOffsetY = offsetY.toPx()
+        var lastElevation = Float.NaN
+        var ambient: ResolvedBlurredShadow? = null
+        var spot: ResolvedBlurredShadow? = null
+        onDrawBehind {
+            val e = elevation().toPx()
+            if (e != lastElevation) {
+                lastElevation = e
+                ambient = if (e <= 0f || !(ambientAlpha > 0.002f)) null else resolveBlurredShadow(
+                    path = shadowPath, bounds = bounds, signature = signature,
+                    color = ambientInk, sigmaPx = e * SHADOW_AMBIENT_BLUR_FACTOR,
+                    dx = 0f, dy = baseOffsetY, strokeWidthPx = 0f, style = Fill, alpha = ambientAlpha,
+                )
+                spot = if (e <= 0f || !(spotAlpha > 0.002f)) null else resolveBlurredShadow(
+                    path = shadowPath, bounds = bounds, signature = signature,
+                    color = spotInk, sigmaPx = e * SHADOW_SPOT_BLUR_FACTOR,
+                    dx = 0f, dy = baseOffsetY + e * SHADOW_SPOT_OFFSET_FACTOR,
+                    strokeWidthPx = 0f, style = Fill, alpha = spotAlpha,
+                )
+            }
+            ambient?.let { drawResolvedBlurredShadow(it) }
+            spot?.let { drawResolvedBlurredShadow(it) }
+        }
+    }.graphicsLayer {
+        this.shape = clipShape
+        clip = !(elevation() <= 0.dp)
+    }
+}
+
 @Composable
 fun Modifier.consistentShadow(
     elevation: Dp,

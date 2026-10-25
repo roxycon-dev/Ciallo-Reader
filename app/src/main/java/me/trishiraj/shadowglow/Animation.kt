@@ -21,7 +21,7 @@ internal fun rememberAnimatedBreathingValue(
     durationMillis: Int
 ): State<Float> {
     val density = LocalDensity.current
-    val intensityPx = remember(intensity) { with(density) { intensity.toPx() } }
+    val intensityPx = remember(intensity, density) { with(density) { intensity.toPx() } }
 
     if (!enabled || intensityPx <= 0f || durationMillis <= 0) {
         return remember { mutableFloatStateOf(0f) }

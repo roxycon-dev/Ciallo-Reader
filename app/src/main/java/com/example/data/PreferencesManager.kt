@@ -7,6 +7,7 @@ class PreferencesManager(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("novel_reader_prefs", Context.MODE_PRIVATE)
 
+
     /** Structured keyword metadata only, separate from the reading translation engines. */
     var multiLanguageOnlineLookup: Boolean
         get() = prefs.getBoolean("multi_language_online_lookup", true)
@@ -299,8 +300,10 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putBoolean("has_imported_community_comics_v1", value).apply()
 
     var showAdultSources: Boolean
-        get() = prefs.getBoolean("show_adult_sources", false)
-        set(value) = prefs.edit().putBoolean("show_adult_sources", value).apply()
+        // Keep the old interface compatible; the former hidden gate is retired.
+        get() = true
+        @Suppress("UNUSED_PARAMETER")
+        set(value) = prefs.edit().putBoolean("show_adult_sources", true).apply()
 
     var jsSourceRepoUrl: String
         get() = prefs.getString(

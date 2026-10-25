@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 
 internal data class ReleaseSummary(val version: String, val date: String, val summary: String)
 internal val releaseHistory = listOf(
+    ReleaseSummary("1.5.2", "10-26", "动效计算与缓冲复用 · 折叠分页保持 · 成人源固定启用"),
     ReleaseSummary("1.5.1", "10-23", "平板性能优化 · 滚动与章节复用 · 缓存预算"),
     ReleaseSummary("1.5.0", "10-21", "移除内置阅读指南 · 书架多选不再触发抽纸"),
     ReleaseSummary("1.4.18", "10-21", "小说多源推荐更新榜单 · 原站分类精准适配 · 卡片参数排版修复"),

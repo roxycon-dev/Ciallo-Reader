@@ -29,6 +29,8 @@ internal fun StablePaperSurface(life: PaperLifecycle, content: @Composable () ->
 internal fun Modifier.paperSurface(life: PaperLifecycle? = LocalPaperOwner.current): Modifier {
     if (life == null) return this
     val view = LocalView.current
+    val screenLocation = remember(view) { IntArray(2) }
+    val windowLocation = remember(view) { IntArray(2) }
     val geometry = remember { PaperSurfaceGeometry() }
     val warp = remember(life.softPaper) {
         if (life.softPaper && Build.VERSION.SDK_INT >= 33) runCatching { PaperWarpEffect() }
@@ -36,7 +38,7 @@ internal fun Modifier.paperSurface(life: PaperLifecycle? = LocalPaperOwner.curre
         else null
     }
     return this.onGloballyPositioned {
-        geometry.bounds = it.boundsInWindow().translate(view.paperWindowOffset())
+        geometry.bounds = it.boundsInWindow().translate(view.paperWindowOffset(screenLocation, windowLocation))
     }.graphicsLayer {
         val p = life.progress.coerceIn(0f, 1f)
         val bounds = geometry.bounds

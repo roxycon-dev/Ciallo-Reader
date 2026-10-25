@@ -149,40 +149,6 @@ class SourceViewModel(
         }
     }
 
-    /**
-     * 成人源开关：开启时自动从 Venera 仓库拉取并注册成人源；关闭时只移除成人源。
-     * 不再做“能否连网站”的自动开关检测，开关状态完全由用户控制。
-     */
-    fun setAdultSourcesEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            val prefs = com.example.data.PreferencesManager(getApplication())
-            prefs.showAdultSources = enabled
-            if (enabled) {
-                _importStatus.value = "正在更新成人源…"
-                val sources = JsSourceRepo.install(
-                    context = getApplication(),
-                    repoUrl = prefs.jsSourceRepoUrl,
-                    includeAdult = true
-                )
-                if (sources.isNotEmpty()) {
-                    sourceManager.allSources.value
-                        .filter { it.id.startsWith("js_") }
-                        .forEach { sourceManager.unregisterSource(it.id) }
-                    sources.forEach { source ->
-                        sourceManager.registerSource(source, defaultEnabled = true)
-                    }
-                    _importStatus.value = "成人源已更新（共 ${sources.size} 个漫画源）"
-                } else {
-                    _importStatus.value = "成人源更新失败，请检查网络后重试"
-                }
-            } else {
-                val adultKeys = JsSourceRepo.ADULT_KEYS
-                sourceManager.allSources.value
-                    .filter { it.id.startsWith("js_") }
-                    .filter { it is com.example.source.js.JsComicSource && it.sourceKey in adultKeys }
-                    .forEach { sourceManager.unregisterSource(it.id) }
-                _importStatus.value = "成人源已隐藏"
-            }
-        }
-    }
+    /** Legacy callers can refresh the full catalog; the adult-content gate is retired. */
+    fun setAdultSourcesEnabled(@Suppress("UNUSED_PARAMETER") enabled: Boolean) = refreshJsSources()
 }

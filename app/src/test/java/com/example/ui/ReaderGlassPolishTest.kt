@@ -33,7 +33,11 @@ class ReaderGlassPolishTest {
         compose.onNodeWithContentDescription("关闭阅读排版").performClick()
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithText("阅读排版").assertExists()
-        compose.mainClock.advanceTimeBy(500)
+        // Closing follows the physical spring, including the click-to-close handoff.
+        // A fixed 500 ms cutoff also failed on the unchanged 1.5.1 baseline.
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 2000) {
+            compose.onAllNodesWithText("阅读排版").fetchSemanticsNodes().isEmpty()
+        }
         compose.waitForIdle()
         compose.onNodeWithText("阅读排版").assertDoesNotExist()
     }

@@ -41,6 +41,13 @@ public object GlassShapePacker {
      */
     public fun packShapes(shapes: List<PackedGlassShape>): FloatArray {
         val packed = FloatArray(GlassUniforms.MAX_SHAPES * GlassUniforms.SHAPE_FLOATS)
+        packShapesInto(shapes, packed)
+        return packed
+    }
+
+    /** Caller-owned scratch storage; unused slots are reset on every update. */
+    public fun packShapesInto(shapes: List<PackedGlassShape>, packed: FloatArray, offset: Float = 0f) {
+        require(packed.size == GlassUniforms.MAX_SHAPES * GlassUniforms.SHAPE_FLOATS)
         for (i in 0 until GlassUniforms.MAX_SHAPES) {
             val base = i * GlassUniforms.SHAPE_FLOATS
             val shape = shapes.getOrNull(i)
@@ -50,13 +57,12 @@ public object GlassShapePacker {
                 packed[base + 2] = 1f
                 packed[base + 3] = 1f
             } else {
-                packed[base] = shape.centerX
-                packed[base + 1] = shape.centerY
+                packed[base] = shape.centerX + offset
+                packed[base + 1] = shape.centerY + offset
                 packed[base + 2] = shape.halfWidth
                 packed[base + 3] = shape.halfHeight
             }
         }
-        return packed
     }
 
     /**
@@ -66,11 +72,17 @@ public object GlassShapePacker {
      */
     public fun packCornerRadii(shapes: List<PackedGlassShape>): FloatArray {
         val packed = FloatArray(GlassUniforms.MAX_SHAPES)
+        packCornerRadiiInto(shapes, packed)
+        return packed
+    }
+
+    public fun packCornerRadiiInto(shapes: List<PackedGlassShape>, packed: FloatArray) {
+        require(packed.size == GlassUniforms.MAX_SHAPES)
+        packed.fill(0f)
         for (i in 0 until GlassUniforms.MAX_SHAPES) {
             val shape = shapes.getOrNull(i) ?: continue
             val maxRadius = max(min(shape.halfWidth, shape.halfHeight), 0f)
             packed[i] = min(shape.cornerRadius, maxRadius)
         }
-        return packed
     }
 }

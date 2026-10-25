@@ -75,7 +75,7 @@ object JsSourceRepo {
     // Raw cache format stays stable when compatibility patches change.
     private const val RAW_CACHE_PREFIX = "// EASYREADER_RAW_SOURCE_V28\n"
 
-    /** 已知成人源 key 黑名单（默认隐藏，设置彩蛋开启后可见）。 */
+    /** 成人源分类；主应用固定包含这些来源，保留分类供兼容接口使用。 */
     val ADULT_KEYS = setOf(
         "nhentai", "ehentai", "hitomi", "jm", "picacg", "wnacg", "mxs",
         "mh18", "hcomic", "hot_manga"

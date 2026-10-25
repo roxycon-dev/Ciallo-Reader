@@ -182,36 +182,15 @@ private object ShadowMaskCache {
  * `buildMaskBitmap` 每次调用都需要 3 张 `IntArray`（源像素 / alpha 通道 / 模糊中间量）。
  * 在逐帧动画（呼吸辉光、巡游光尾）场景下这是每秒上百次的大块分配 → 明显的 GC 抖动。
  * 这里按「不小于申请长度的最小 4096-int 档位」复用数组：
+ * 同档位同时借出源像素、alpha、水平临时量及列累计量，每档最多复用 4 个。
+ * 全池最多保留 4 MiB，按最近使用次序逐个淘汰；超大数组不驻留。
  * 缓冲区只在一次构建内部使用、构建结束即归还，不参与任何绘制结果，
  * **对输出像素零影响**（纯内存复用）。
  */
 private object MaskScratchBuffers {
-    private const val GRANULARITY = 4096
-
-    /** 只复用 ≤ 1 MB（262144 个 int）的缓冲：异常大尺寸不进池，避免常驻大对象。 */
-    private const val MAX_POOLED_INTS = 262144
-
-    /** 档位 → 一个空闲缓冲；每个档位最多留存一个，内存有界。 */
-    private val pool = HashMap<Int, IntArray>()
-
-    @Synchronized
-    fun acquire(length: Int): IntArray {
-        if (length > MAX_POOLED_INTS) return IntArray(length)
-        val bucket = bucketOf(length)
-        return pool.remove(bucket) ?: IntArray(bucket)
-    }
-
-    @Synchronized
-    fun release(buffer: IntArray) {
-        if (buffer.size > MAX_POOLED_INTS) return
-        val bucket = bucketOf(buffer.size)
-        if (!pool.containsKey(bucket)) {
-            pool[bucket] = buffer
-        }
-    }
-
-    private fun bucketOf(length: Int): Int =
-        ((length + GRANULARITY - 1) / GRANULARITY) * GRANULARITY
+    private val pool = ShadowScratchPool()
+    fun acquire(length: Int): IntArray = pool.acquire(length)
+    fun release(buffer: IntArray) = pool.release(buffer)
 }
 
 /** 浮点量化到 0.5px（用于把 `Float` 尺寸变成可稳定比较的 `Int` 缓存键）。 */
@@ -474,19 +453,18 @@ private fun buildMaskBitmap(
         val n = bw * bh
         // 三块临时缓冲都走复用池：逐帧动画场景下省掉每秒上百次的大块分配。
         val pixels = MaskScratchBuffers.acquire(n)
-        val alpha = MaskScratchBuffers.acquire(n)
         try {
             bitmap.getPixels(pixels, 0, bw, 0, 0, bw, bh)
-            for (i in 0 until n) {
-                alpha[i] = (pixels[i] ushr 24) and 0xFF
-            }
-            boxBlurThreePass(alpha, bw, bh, boxRadius, n)
-            for (i in 0 until n) {
-                pixels[i] = rgb or (alpha[i] shl 24)
+            val alpha = MaskScratchBuffers.acquire(n)
+            try {
+                for (i in 0 until n) alpha[i] = (pixels[i] ushr 24) and 0xFF
+                boxBlurThreePass(alpha, bw, bh, boxRadius, n)
+                for (i in 0 until n) pixels[i] = rgb or (alpha[i] shl 24)
+            } finally {
+                MaskScratchBuffers.release(alpha)
             }
             bitmap.setPixels(pixels, 0, bw, 0, 0, bw, bh)
         } finally {
-            MaskScratchBuffers.release(alpha)
             MaskScratchBuffers.release(pixels)
         }
     }
@@ -545,23 +523,33 @@ private fun boxBlurHorizontal(src: IntArray, dst: IntArray, w: Int, h: Int, r: I
     }
 }
 
-/** 垂直方向盒式模糊。 */
-private fun boxBlurVertical(src: IntArray, dst: IntArray, w: Int, h: Int, r: Int) {
+/** Same column sums and rounding, traversed by contiguous rows instead of strided columns. */
+internal fun boxBlurVertical(src: IntArray, dst: IntArray, w: Int, h: Int, r: Int) {
     val div = 2 * r + 1
     val inv = 1f / div
     val last = h - 1
-    for (x in 0 until w) {
-        var sum = 0
-        for (i in -r..r) {
-            val row = if (i < 0) 0 else if (i > last) last else i
-            sum += src[row * w + x]
+    val sums = MaskScratchBuffers.acquire(w)
+    try {
+        for (x in 0 until w) sums[x] = src[x] * (r + 1)
+        for (row in 1..minOf(r, last)) {
+            val base = row * w
+            for (x in 0 until w) sums[x] += src[base + x]
         }
+        if (r > last) {
+            val base = last * w
+            for (x in 0 until w) sums[x] += src[base + x] * (r - last)
+        }
+        var base = 0
         for (y in 0 until h) {
-            dst[y * w + x] = ((sum * inv) + 0.5f).toInt()
-            val addRow = y + r + 1
-            val subRow = y - r
-            sum += (if (addRow > last) src[last * w + x] else src[addRow * w + x]) -
-                (if (subRow < 0) src[x] else src[subRow * w + x])
+            val addBase = minOf(y + r + 1, last) * w
+            val subBase = maxOf(y - r, 0) * w
+            for (x in 0 until w) {
+                dst[base + x] = ((sums[x] * inv) + 0.5f).toInt()
+                sums[x] += src[addBase + x] - src[subBase + x]
+            }
+            base += w
         }
+    } finally {
+        MaskScratchBuffers.release(sums)
     }
 }

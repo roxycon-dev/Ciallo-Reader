@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -24,6 +25,7 @@ import kotlin.math.*
 object LiquidSliderConfig {
     const val HEIGHT = 110f
     const val SAMPLES = 96
+    const val MAX_STOPS = 200
     const val TRACK = 6f
     const val BEND = 11f
     const val TAIL = .045f
@@ -63,7 +65,9 @@ fun LiquidSlider(
     val reduce = com.example.ui.feedback.LocalReduceMotion.current
     val haptics = com.example.ui.feedback.LocalHapticsEnabled.current
     AndroidView(
-        modifier = modifier.fillMaxWidth().height(LiquidSliderConfig.HEIGHT.dp).semantics {
+        // An identity RenderNode isolates the View's frame invalidations. Keep Auto
+        // compositing (no offscreen texture or clip) so the native pixels are unchanged.
+        modifier = modifier.fillMaxWidth().height(LiquidSliderConfig.HEIGHT.dp).graphicsLayer {}.semantics {
             progressBarRangeInfo = ProgressBarRangeInfo(value.coerceIn(valueRange), valueRange, steps)
             stateDescription = if (rangeEnd == null) formatLabel(value) else "${formatLabel(value)} – ${formatLabel(rangeEnd)}"
             if (!enabled) disabled()
@@ -111,13 +115,24 @@ fun Slider(value: Float, onValueChange: (Float) -> Unit, modifier: Modifier = Mo
 
 internal class LiquidSliderView(context: Context) : View(context) {
     private val cfg = LiquidSliderConfig
-    private val d = resources.displayMetrics.density
+    private var d = resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val path = Path()
     private val trackPath = Path()
     private val liquidPath = Path()
     private val sampleY = FloatArray(LiquidSliderConfig.SAMPLES + 1)
     private val sampleHalfWidth = FloatArray(LiquidSliderConfig.SAMPLES + 1)
+    private val lensPosition = FloatArray(2)
+    private val lensVelocity = FloatArray(2)
+    private val tailCenter = FloatArray(2)
+    private val thicknessGain = FloatArray(2)
+    private val stopX = FloatArray(LiquidSliderConfig.MAX_STOPS + 2)
+    private val stopY = FloatArray(LiquidSliderConfig.MAX_STOPS + 2)
+    private val stopRadius = FloatArray(LiquidSliderConfig.MAX_STOPS + 2)
+    private val stopColor = IntArray(LiquidSliderConfig.MAX_STOPS + 2)
+    private val lensGradientMatrix = Matrix()
+    private var tintGradient: RadialGradient? = null
+    private val lightGradient = RadialGradient(0f, 0f, 1f, 0xe6ffffff.toInt(), Color.TRANSPARENT, Shader.TileMode.CLAMP)
     private val bubbleTypeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     private val bitmapDestination = Rect()
     private var bitmapCanvas: Canvas? = null
@@ -150,7 +165,7 @@ internal class LiquidSliderView(context: Context) : View(context) {
     private var pointerId = MotionEvent.INVALID_POINTER_ID
     private var thumbPress = false
     private var dragging = false
-    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop / d
+    private var touchSlop = ViewConfiguration.get(context).scaledTouchSlop / d
     private var horizontal = false
     private var abandoned = false
     private var published = false
@@ -169,20 +184,30 @@ internal class LiquidSliderView(context: Context) : View(context) {
     private fun value(f: Float) = lower + f * (upper - lower)
     fun configure(range: ClosedFloatingPointRange<Float>, steps: Int, enabled: Boolean, reverse: Boolean,
                   minGap: Float, color: Int, dark: Boolean, reduce: Boolean, haptics: Boolean) {
+        val appearanceChanged = accent != color || this.dark != dark || this.reverse != reverse || stops != steps.coerceIn(0, cfg.MAX_STOPS)
+        val reductionChanged = reduced != reduce
+        if (accent != color || tintGradient == null) {
+            tintGradient = RadialGradient(0f, 0f, 1f,
+                (color and 0x00ffffff) or ((.38f * 255).toInt() shl 24), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+        }
         if (active >= 0 && (!enabled || lower != range.start || upper != range.endInclusive || this.reverse != reverse)) release(false)
-        lower = range.start; upper = range.endInclusive.coerceAtLeast(lower); stops = steps.coerceIn(0, 200)
+        lower = range.start; upper = range.endInclusive.coerceAtLeast(lower); stops = steps.coerceIn(0, cfg.MAX_STOPS)
         gap = if (upper > lower) (minGap / (upper - lower)).coerceIn(0f, 1f) else 0f
         this.reverse = reverse; accent = color; this.dark = dark; reduced = reduce; this.haptics = haptics
         isEnabled = enabled; alpha = if (enabled) 1f else .4f
+        if (appearanceChanged) invalidate()
+        if (reductionChanged) wake()
     }
     fun setValues(a: Float, b: Float?) {
+        val oldRanged = ranged
+        val oldA = target[0]; val oldB = target[1]
         if (active >= 0 && ranged != (b != null)) release(false)
         ranged = b != null
         if (active < 0) {
             target[0] = norm(a).coerceAtMost(if (ranged) 1f - gap else 1f); target[1] = norm(b ?: upper).coerceAtLeast(target[0] + if (ranged) gap else 0f)
-            if (!initialized) { target.copyInto(position); initialized = true }
+            if (!initialized) { target.copyInto(position); initialized = true; wake(); return }
         }
-        wake()
+        if (oldRanged != ranged || oldA != target[0] || oldB != target[1]) wake()
     }
     private fun wake() { invalidate(); if (!running && isAttachedToWindow) { running = true; lastFrame = 0L; postOnAnimation(frame) } }
     private val frame = object : Runnable {
@@ -197,29 +222,40 @@ internal class LiquidSliderView(context: Context) : View(context) {
     }
     internal fun advancePhysics(delta: Float): Boolean {
         val dt = delta.coerceIn(.001f, cfg.MAX_DT)
-            var moving = false
-            repeat(2) {
-                val h = dt / 2f
-                for (i in 0 until if (ranged) 2 else 1) {
-                    val k = if (stops > 0) cfg.STEP_K else cfg.POSITION_K
-                    val damping = if (stops > 0) cfg.STEP_D else cfg.POSITION_D
-                    velocity[i] += ((target[i] - position[i]) * k - damping * velocity[i]) * h
-                    position[i] += velocity[i] * h
-                    position[i] = position[i].coerceIn(if (i == 1 && ranged) position[0] + gap else 0f,
-                        if (i == 0 && ranged) max(0f, position[1] - gap) else 1f)
-                    press[i] += ((if (i == active) 1f else 0f) - press[i]) * (1f - exp(-cfg.PRESS_RATE * h))
-                    bendVelocity[i] += ((cfg.BEND * press[i] - bend[i]) * cfg.BEND_K - cfg.BEND_D * bendVelocity[i]) * h
-                    bend[i] += bendVelocity[i] * h
-                    tickPulse[i] = (tickPulse[i] - h / .33f).coerceAtLeast(0f)
-                    if (reduced) { position[i] = target[i]; velocity[i] = 0f; bend[i] = 0f; bendVelocity[i] = 0f }
-                    moving = moving || abs(target[i] - position[i]) > .0001f || abs(velocity[i]) > .001f ||
-                        abs(press[i] - if (i == active) 1f else 0f) > .002f || abs(bendVelocity[i]) > .02f || abs(bend[i] - cfg.BEND * press[i]) > .02f || tickPulse[i] > 0
-                }
+        val h = dt / 2f
+        val k = if (stops > 0) cfg.STEP_K else cfg.POSITION_K
+        val damping = if (stops > 0) cfg.STEP_D else cfg.POSITION_D
+        val pressGain = 1f - exp(-cfg.PRESS_RATE * h)
+        var moving = false
+        repeat(2) {
+            for (i in 0 until if (ranged) 2 else 1) {
+                velocity[i] += ((target[i] - position[i]) * k - damping * velocity[i]) * h
+                position[i] += velocity[i] * h
+                position[i] = position[i].coerceIn(if (i == 1 && ranged) position[0] + gap else 0f,
+                    if (i == 0 && ranged) max(0f, position[1] - gap) else 1f)
+                press[i] += ((if (i == active) 1f else 0f) - press[i]) * pressGain
+                bendVelocity[i] += ((cfg.BEND * press[i] - bend[i]) * cfg.BEND_K - cfg.BEND_D * bendVelocity[i]) * h
+                bend[i] += bendVelocity[i] * h
+                tickPulse[i] = (tickPulse[i] - h / .33f).coerceAtLeast(0f)
+                if (reduced) { position[i] = target[i]; velocity[i] = 0f; bend[i] = 0f; bendVelocity[i] = 0f }
+                moving = moving || abs(target[i] - position[i]) > .0001f || abs(velocity[i]) > .001f ||
+                    abs(press[i] - if (i == active) 1f else 0f) > .002f || abs(bendVelocity[i]) > .02f || abs(bend[i] - cfg.BEND * press[i]) > .02f || tickPulse[i] > 0
             }
+        }
         return moving
     }
     fun stop() { release(false); removeCallbacks(frame); running = false; buffer?.recycle(); buffer = null; bitmapCanvas = null; active = -1 }
     override fun onDetachedFromWindow() { stop(); super.onDetachedFromWindow() }
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val density = resources.displayMetrics.density
+        if (d != density) {
+            d = density
+            touchSlop = ViewConfiguration.get(context).scaledTouchSlop / d
+            buffer?.recycle(); buffer = null; bitmapCanvas = null
+            release(false); wake()
+        }
+    }
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) { release(false); buffer?.recycle(); buffer = null; bitmapCanvas = null; wake() }
     private fun publish(f: Float) {
         if (active < 0) return
@@ -302,20 +338,27 @@ internal class LiquidSliderView(context: Context) : View(context) {
     private fun y(x: Float): Float {
         var result = cy
         for (i in 0 until if (ranged) 2 else 1) {
-            val v = velocity[i] * trackWidth * if (reverse) -1 else 1
-            val center = px(i) - v * cfg.TAIL
-            result += bend[i] * exp(-((x - center) / (trackWidth * .28f)).pow(2))
+            val distance = (x - tailCenter[i]) / (trackWidth * .28f)
+            result += bend[i] * exp(-(distance * distance))
         }
         return result
     }
     private fun liquidWidth(x: Float): Float {
         var thickness = cfg.TRACK
-        for (i in 0 until if (ranged) 2 else 1) thickness +=
-            (4.5f * (abs(velocity[i] * trackWidth) / 900f).coerceIn(0f, 1f) + 3f * press[i]) * exp(-((x - px(i)) / 34f).pow(2))
+        for (i in 0 until if (ranged) 2 else 1) {
+            val distance = (x - lensPosition[i]) / 34f
+            thickness += thicknessGain[i] * exp(-(distance * distance))
+        }
         return thickness
     }
     /** Build the physical curves once, then replay exactly the same paths through each lens. */
     private fun buildBaseGeometry() {
+        for (i in 0 until if (ranged) 2 else 1) {
+            lensPosition[i] = px(i)
+            lensVelocity[i] = velocity[i] * trackWidth * if (reverse) -1 else 1
+            tailCenter[i] = lensPosition[i] - lensVelocity[i] * cfg.TAIL
+            thicknessGain[i] = 4.5f * (abs(velocity[i] * trackWidth) / 900f).coerceIn(0f, 1f) + 3f * press[i]
+        }
         trackPath.reset()
         for (j in 0..cfg.SAMPLES) {
             val x = inset + trackWidth * j / cfg.SAMPLES
@@ -331,6 +374,14 @@ internal class LiquidSliderView(context: Context) : View(context) {
         }
         for (j in cfg.SAMPLES downTo 0) liquidPath.lineTo(liquidStart + (liquidEnd - liquidStart) * j / cfg.SAMPLES, sampleY[j] + sampleHalfWidth[j])
         liquidPath.close()
+        if (stops > 0) for (j in 0..stops + 1) {
+            val x = inset + trackWidth * j / (stops + 1)
+            var pulse = 0f
+            for (i in 0 until if (ranged) 2 else 1) if (abs(lensPosition[i] - x) < trackWidth / (stops + 1) * .5f) pulse = max(pulse, tickPulse[i])
+            stopX[j] = x; stopY[j] = y(x)
+            stopRadius[j] = 2.4f + if (pulse > 0f) 3f * sin(pulse * PI.toFloat()) else 0f
+            stopColor[j] = if (x in liquidStart..liquidEnd) 0xe6ffffff.toInt() else if (dark) 0x66ffffff else 0x55000000
+        }
     }
     private fun base(c: Canvas) {
         paint.shader = null; paint.style = Paint.Style.STROKE; paint.strokeCap = Paint.Cap.ROUND; paint.strokeJoin = Paint.Join.ROUND
@@ -342,11 +393,8 @@ internal class LiquidSliderView(context: Context) : View(context) {
         c.drawCircle(start, sampleY[0], sampleHalfWidth[0], paint)
         c.drawCircle(end, sampleY[cfg.SAMPLES], sampleHalfWidth[cfg.SAMPLES], paint)
         if (stops > 0) for (j in 0..stops + 1) {
-            val x = inset + trackWidth * j / (stops + 1)
-            paint.color = if (x in start..end) 0xe6ffffff.toInt() else if (dark) 0x66ffffff else 0x55000000
-            var pulse = 0f
-            for (i in 0 until if (ranged) 2 else 1) if (abs(px(i) - x) < trackWidth / (stops + 1) * .5f) pulse = max(pulse, tickPulse[i])
-            c.drawCircle(x, y(x), 2.4f + 3f * sin(pulse * PI.toFloat()), paint)
+            paint.color = stopColor[j]
+            c.drawCircle(stopX[j], stopY[j], stopRadius[j], paint)
         }
     }
     override fun onDraw(canvas: Canvas) {
@@ -362,8 +410,8 @@ internal class LiquidSliderView(context: Context) : View(context) {
         buildBaseGeometry()
         base(c)
         for (i in 0 until if (ranged) 2 else 1) {
-            val p = press[i]; val x = px(i); val centerY = y(x)
-            val v = velocity[i] * trackWidth * if (reverse) -1 else 1
+            val p = press[i]; val x = lensPosition[i]; val centerY = y(x)
+            val v = lensVelocity[i]
             val stretch = (abs(v) / 1400f).coerceIn(0f, .45f)
             val radius = cfg.RADIUS + p * cfg.PRESS_RADIUS
             val rx = radius * (1 + stretch); val ry = radius * (1 - stretch * .5f)
@@ -375,9 +423,15 @@ internal class LiquidSliderView(context: Context) : View(context) {
             c.save(); path.reset(); path.addOval(oval, Path.Direction.CW); c.clipPath(path)
             c.save(); c.scale(cfg.LENS, cfg.LENS, x, centerY); base(c); c.restore()
             paint.style = Paint.Style.FILL
-            paint.shader = RadialGradient(x, centerY + ry, ry * 1.4f, tint(.38f), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+            lensGradientMatrix.setScale(ry * 1.4f, ry * 1.4f)
+            lensGradientMatrix.postTranslate(x, centerY + ry)
+            tintGradient?.setLocalMatrix(lensGradientMatrix)
+            paint.shader = tintGradient
             c.drawOval(oval, paint)
-            paint.shader = RadialGradient(x - rx * .35f, centerY - ry * .5f, rx * .85f, 0xe6ffffff.toInt(), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+            lensGradientMatrix.setScale(rx * .85f, rx * .85f)
+            lensGradientMatrix.postTranslate(x - rx * .35f, centerY - ry * .5f)
+            lightGradient.setLocalMatrix(lensGradientMatrix)
+            paint.shader = lightGradient
             c.drawOval(oval, paint); paint.shader = null; c.restore()
             paint.style = Paint.Style.STROKE; paint.strokeWidth = 1.6f; paint.color = if (dark) 0xb3ffffff.toInt() else 0xf2ffffff.toInt(); c.drawOval(oval, paint)
             oval.inset(-.9f, -.9f); paint.strokeWidth = 1f; paint.color = tint(.45f); c.drawOval(oval, paint)
@@ -387,12 +441,13 @@ internal class LiquidSliderView(context: Context) : View(context) {
             if (p > .005f) {
                 val text = label(value(if (stops > 0) (target[i] * (stops + 1)).roundToInt().toFloat() / (stops + 1) else target[i]))
                 paint.textSize = 12f; paint.typeface = bubbleTypeface
-                val half = min(width / d / 2f, paint.measureText(text) / 2 + 9f)
+                val textWidth = paint.measureText(text)
+                val half = min(width / d / 2f, textWidth / 2 + 9f)
                 val bx = (x - v * .03f).coerceIn(half, max(half, width / d - half))
                 val by = centerY - 42f - 4f * p
                 paint.color = tint(p); c.drawRoundRect(bx - half, by - 12, bx + half, by + 12, 12f, 12f, paint)
                 paint.color = Color.argb((255 * p).toInt(), 255, 255, 255)
-                c.drawText(text, bx - paint.measureText(text) / 2, by - (paint.ascent() + paint.descent()) / 2, paint)
+                c.drawText(text, bx - textWidth / 2, by - (paint.ascent() + paint.descent()) / 2, paint)
             }
         }
         paint.shader = null; paint.color = Color.WHITE

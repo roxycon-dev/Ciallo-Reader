@@ -289,23 +289,41 @@ internal class LiquidSegmentView(context: Context) : View(context) {
     private class Optics {
         private val shader = RuntimeShader(LIQUID_SEGMENT_SHADER)
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.shader = this@Optics.shader }
+        private var width = Float.NaN
+        private var height = Float.NaN
+        private var scale = Float.NaN
+        private var slot = Float.NaN
+        private var palette: Long? = null
+        private var lastSecondary = 0
+        private var lastDark: Boolean? = null
+        private var selection: Boolean? = null
         fun bind(track: Bitmap, glyphs: Bitmap) {
             shader.setInputShader("track", BitmapShader(track, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
             shader.setInputShader("labels", BitmapShader(glyphs, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
         }
         fun draw(c: Canvas, s: LiquidSegmentPhysics, density: Float, accent: Int, ink: Int, secondary: Int, dark: Boolean, selected: Boolean) {
-            shader.setFloatUniform("selectionActive", if (selected) 1f else 0f)
-            shader.setFloatUniform("resolution", s.width, s.height)
-            shader.setFloatUniform("density", density)
-            shader.setFloatUniform("slotWidth", s.slotWidth)
+            if (selection != selected) {
+                shader.setFloatUniform("selectionActive", if (selected) 1f else 0f)
+                selection = selected
+            }
+            if (width != s.width || height != s.height) {
+                shader.setFloatUniform("resolution", s.width, s.height)
+                width = s.width; height = s.height
+            }
+            if (scale != density) { shader.setFloatUniform("density", density); scale = density }
+            if (slot != s.slotWidth) { shader.setFloatUniform("slotWidth", s.slotWidth); slot = s.slotWidth }
             shader.setFloatUniform("leftEdge", s.left.x); shader.setFloatUniform("rightEdge", s.right.x)
             shader.setFloatUniform("velocity", s.velocity); shader.setFloatUniform("wobble", s.wobble.x); shader.setFloatUniform("press", s.press.x)
-            shader.setFloatUniform("accent", Color.red(accent) / 255f, Color.green(accent) / 255f, Color.blue(accent) / 255f)
-            shader.setFloatUniform("ink", Color.red(ink) / 255f, Color.green(ink) / 255f, Color.blue(ink) / 255f)
-            shader.setFloatUniform("glow", (Color.red(accent) * .75f + Color.red(secondary) * .25f) / 255f,
-                (Color.green(accent) * .75f + Color.green(secondary) * .25f) / 255f,
-                (Color.blue(accent) * .75f + Color.blue(secondary) * .25f) / 255f)
-            shader.setFloatUniform("lip", if (dark) .14f else .8f)
+            val paletteKey = (accent.toLong() shl 32) or (ink.toLong() and 0xffffffffL)
+            if (palette != paletteKey || lastSecondary != secondary) {
+                shader.setFloatUniform("accent", Color.red(accent) / 255f, Color.green(accent) / 255f, Color.blue(accent) / 255f)
+                shader.setFloatUniform("ink", Color.red(ink) / 255f, Color.green(ink) / 255f, Color.blue(ink) / 255f)
+                shader.setFloatUniform("glow", (Color.red(accent) * .75f + Color.red(secondary) * .25f) / 255f,
+                    (Color.green(accent) * .75f + Color.green(secondary) * .25f) / 255f,
+                    (Color.blue(accent) * .75f + Color.blue(secondary) * .25f) / 255f)
+                palette = paletteKey; lastSecondary = secondary
+            }
+            if (lastDark != dark) { shader.setFloatUniform("lip", if (dark) .14f else .8f); lastDark = dark }
             s.satellites.forEachIndexed { i, q -> shader.setFloatUniform(SATELLITE_NAMES[i], q.x, q.y, q.r) }
             c.drawRect(0f, 0f, s.width * density, s.height * density, paint)
         }

@@ -154,10 +154,6 @@ fun SettingsTabScreen(
     var pageTurnMode by remember { mutableStateOf(prefs.pageTurnMode) }
     var colorPrimaryIndex by remember(colorPrimaryIndexVal) { mutableStateOf(colorPrimaryIndexVal) }
     var colorSecondaryIndex by remember(colorSecondaryIndexVal) { mutableStateOf(colorSecondaryIndexVal) }
-    var liveButtonTapCount by remember { mutableStateOf(0) }
-    var liveButtonLastTapMs by remember { mutableStateOf(0L) }
-    var showAdultSourceCard by remember { mutableStateOf(false) }
-    var showAdultSources by remember { mutableStateOf(prefs.showAdultSources) }
 
     var splashPosterUri by remember { mutableStateOf(prefs.customSplashPosterUri) }
     var splashPureMode by remember { mutableStateOf(prefs.splashPureMode) }
@@ -268,11 +264,11 @@ fun SettingsTabScreen(
     val settingsListState = rememberLazyListState()
 
     // 排行榜「陈列方式」按钮跳入：动画滚动到神回设置分区。
-    // 神回 item 下标 = 前 14 个固定 item + 条件显示的成人源卡片（1/0）。
+    // 神回 item 下标 = 前 14 个固定 item；成人源已固定启用，不再插入开关卡片。
     // ⚠️ 在神回分区之前增删设置项时，同步更新这里的固定计数。
     LaunchedEffect(focusGodSettings) {
         if (!focusGodSettings) return@LaunchedEffect
-        val godIndex = 1 + 14 + if (showAdultSourceCard) 1 else 0
+        val godIndex = 1 + 14
         settingsListState.animateScrollToItem(godIndex)
     }
     settingsListState.scrollTiltSource()
@@ -649,56 +645,8 @@ LazyColumn(
                                     Spacer(modifier = Modifier.height(10.dp))
                                     AppLiquidButton(
                                         text = "主色按钮实时联动效果",
-                                        onClick = {
-                                            val now = System.currentTimeMillis()
-                                            liveButtonTapCount = if (now - liveButtonLastTapMs < 3000) {
-                                                liveButtonTapCount + 1
-                                            } else {
-                                                1
-                                            }
-                                            liveButtonLastTapMs = now
-                                            if (liveButtonTapCount >= 6) {
-                                                showAdultSourceCard = true
-                                                liveButtonTapCount = 0
-                                            }
-                                        },
+                                        onClick = {},
                                         modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (showAdultSourceCard) {
-                    item {
-                        GlassCard(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Filled.Lock, contentDescription = null, tint = MintPrimary)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("高级内容", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                }
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("带你登大郎~~~", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                                    }
-                                    AppSwitch(
-                                        checked = showAdultSources,
-                                        onCheckedChange = {
-                                            showAdultSources = it
-                                            prefs.showAdultSources = it
-                                            onAdultSourcesChange(it)
-                                            AppToast.makeText(context, if (it) "正在更新成人源…" else "成人源已隐藏", Toast.LENGTH_SHORT).show()
-                                        }
                                     )
                                 }
                             }

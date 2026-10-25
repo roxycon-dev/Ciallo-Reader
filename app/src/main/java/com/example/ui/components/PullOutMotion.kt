@@ -94,8 +94,7 @@ internal val LocalPaperOrigin = compositionLocalOf<PullOutSource?> { null }
 internal val LocalPaperOwner = compositionLocalOf<PaperLifecycle?> { null }
 internal val LocalPaperFullSurface = compositionLocalOf { false }
 
-internal fun android.view.View.paperWindowOffset(): Offset {
-    val screen = IntArray(2); val window = IntArray(2)
+internal fun android.view.View.paperWindowOffset(screen: IntArray = IntArray(2), window: IntArray = IntArray(2)): Offset {
     getLocationOnScreen(screen); getLocationInWindow(window)
     return Offset((screen[0] - window[0]).toFloat(), (screen[1] - window[1]).toFloat())
 }
@@ -118,9 +117,11 @@ internal fun rememberPaperTrigger(): PullOutSource {
 fun Modifier.pullOutAnchor(): Modifier = composed { pullOutAnchor(rememberPaperTrigger()) }
 internal fun Modifier.pullOutAnchor(source: PullOutSource): Modifier = composed {
     val view = LocalView.current
+    val screenLocation = remember(view) { IntArray(2) }
+    val windowLocation = remember(view) { IntArray(2) }
     source.view = WeakReference(view)
     // Geometry only: never record, hide or take ownership of a card's render nodes.
-    onGloballyPositioned { source.bounds = it.boundsInWindow().translate(view.paperWindowOffset()) }
+    onGloballyPositioned { source.bounds = it.boundsInWindow().translate(view.paperWindowOffset(screenLocation, windowLocation)) }
 }
 /** Selection and long presses register at activation, including accessibility and held presses. */
 fun Modifier.pullOutSelectable(selected: Boolean, interactionSource: MutableInteractionSource?, indication: Indication?,
@@ -174,25 +175,36 @@ internal fun rememberPaperLifecycle(state: MutableTransitionState<Boolean>): Pap
 
 /** Exact spring integration retains both displacement and velocity across target changes. */
 internal class PaperSpring {
+    private class Coefficients(k: Float, d: Float) {
+        val halfD = d / 2f
+        val discriminant = halfD * halfD - k
+        val w = sqrt(abs(discriminant))
+        val r1 = -halfD + w
+        val r2 = -halfD - w
+    }
+    private companion object {
+        val open = Coefficients(PullOutConfig.OPEN_K, PullOutConfig.OPEN_D)
+        val close = Coefficients(PullOutConfig.CLOSE_K, PullOutConfig.CLOSE_D)
+        val fallbackOpen = Coefficients(PullOutConfig.FALLBACK_OPEN_K, PullOutConfig.FALLBACK_OPEN_D)
+        val fallbackClose = Coefficients(PullOutConfig.FALLBACK_CLOSE_K, PullOutConfig.FALLBACK_CLOSE_D)
+    }
     var position = 0f
     var velocity = 0f
     fun advance(target: Float, opening: Boolean, seconds: Float, lightweight: Boolean = false): Boolean {
         val dt = seconds.coerceIn(0f, .033f)
-        val k = if (lightweight) { if (opening) PullOutConfig.FALLBACK_OPEN_K else PullOutConfig.FALLBACK_CLOSE_K }
-            else if (opening) PullOutConfig.OPEN_K else PullOutConfig.CLOSE_K
-        val halfD = (if (lightweight) { if (opening) PullOutConfig.FALLBACK_OPEN_D else PullOutConfig.FALLBACK_CLOSE_D }
-            else if (opening) PullOutConfig.OPEN_D else PullOutConfig.CLOSE_D) / 2f
+        val coefficients = if (lightweight) { if (opening) fallbackOpen else fallbackClose } else if (opening) open else close
+        val halfD = coefficients.halfD
         val x = position - target
-        val discriminant = halfD * halfD - k
+        val discriminant = coefficients.discriminant
         val next: Float
         if (discriminant < 0f) {
-            val w = sqrt(-discriminant); val a = x; val b = (velocity + halfD * x) / w
+            val w = coefficients.w; val a = x; val b = (velocity + halfD * x) / w
             val decay = exp(-halfD * dt); val c = cos(w * dt); val sn = sin(w * dt)
             val z = a * c + b * sn
             next = decay * z
             velocity = decay * ((-a * w * sn + b * w * c) - halfD * z)
         } else if (discriminant > .00001f) {
-            val w = sqrt(discriminant); val r1 = -halfD + w; val r2 = -halfD - w
+            val r1 = coefficients.r1; val r2 = coefficients.r2
             val a = (velocity - r2 * x) / (r1 - r2); val b = x - a
             val e1 = exp(r1 * dt); val e2 = exp(r2 * dt)
             next = a * e1 + b * e2; velocity = r1 * a * e1 + r2 * b * e2

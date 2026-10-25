@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.IntSize
 import dev.liquidglass.compose.GlassStyle
 import dev.liquidglass.core.GlassRenderTier
 import dev.liquidglass.core.GlassShapePacker
+import dev.liquidglass.core.GlassUniforms
 import dev.liquidglass.core.PackedGlassShape
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -51,6 +52,33 @@ private const val LAYER_PADDING_PX = 4f
 internal class GlassPainter {
 
     private var runtimeEffect: LiquidGlassRuntimeEffect? = null
+    private var prepCache: BackdropPrepEffectCache? = null
+    private val shapeBuffer = FloatArray(GlassUniforms.MAX_SHAPES * GlassUniforms.SHAPE_FLOATS)
+    private val radiusBuffer = FloatArray(GlassUniforms.MAX_SHAPES)
+    private var uniformShapes: List<PackedGlassShape> = emptyList()
+    private var uniformStyle: GlassStyle? = null
+    private var uniformInflate = Float.NaN
+    private var uniformMerge = Float.NaN
+    private var uniformDensity = Float.NaN
+    private var uniforms: GlassSceneUniforms? = null
+    private val unionPath = Path()
+    private var pathShapes: List<PackedGlassShape> = emptyList()
+    private var rimShapes: List<PackedGlassShape> = emptyList()
+    private var rimStyle: GlassStyle? = null
+    private var rimDensity = Float.NaN
+    private var rims: List<Pair<PackedGlassShape, Brush>> = emptyList()
+    private var recordedProvider: GraphicsLayer? = null
+    private var recordedLayer: GraphicsLayer? = null
+    private var recordedPosition = Offset.Unspecified
+    private var recordedSize = IntSize.Zero
+    private var recordedInflate = Float.NaN
+    private var recordedDensity = Float.NaN
+    private var recordedDirection: androidx.compose.ui.unit.LayoutDirection? = null
+
+    fun detach() {
+        recordedProvider = null
+        recordedLayer = null
+    }
 
     fun drawScene(
         scope: DrawScope,
@@ -75,14 +103,27 @@ internal class GlassPainter {
         )
         if (layerSize.width <= 0 || layerSize.height <= 0) return
 
-        glassLayer.record(
-            density = this,
-            layoutDirection = layoutDirection,
-            size = layerSize,
-        ) {
-            translate(inflate - positionInProvider.x, inflate - positionInProvider.y) {
-                drawLayer(providerLayer)
+        // drawLayer retains a live child RenderNode reference. Its pixels remain dynamic;
+        // only the unchanged projection commands can be replayed during press animation.
+        if (recordedProvider !== providerLayer || recordedLayer !== glassLayer ||
+            recordedPosition != positionInProvider || recordedSize != layerSize ||
+            recordedInflate != inflate || recordedDensity != density || recordedDirection != layoutDirection) {
+            glassLayer.record(
+                density = this,
+                layoutDirection = layoutDirection,
+                size = layerSize,
+            ) {
+                translate(inflate - positionInProvider.x, inflate - positionInProvider.y) {
+                    drawLayer(providerLayer)
+                }
             }
+            recordedProvider = providerLayer
+            recordedLayer = glassLayer
+            recordedPosition = positionInProvider
+            recordedSize = layerSize
+            recordedInflate = inflate
+            recordedDensity = density
+            recordedDirection = layoutDirection
         }
 
         when (tier) {
@@ -116,8 +157,7 @@ internal class GlassPainter {
             pressAmount, pressPoint,
         )
         glassLayer.renderEffect = effect
-            .buildRenderEffect(uniforms, blurPx, style.saturation)
-            .asComposeRenderEffect()
+            .buildComposeEffect(uniforms, blurPx, style.saturation)
         translate(-inflate, -inflate) {
             drawLayer(glassLayer)
         }
@@ -132,7 +172,8 @@ internal class GlassPainter {
     ) {
         if (Build.VERSION.SDK_INT < 31) return
         glassLayer.renderEffect =
-            buildBackdropPrepEffect(blurPx, style.saturation)?.asComposeRenderEffect()
+            (prepCache ?: BackdropPrepEffectCache().also { prepCache = it })
+                .getCompose(blurPx, style.saturation)
         clipPath(buildUnionPath(shapes)) {
             translate(-inflate, -inflate) {
                 drawLayer(glassLayer)
@@ -176,14 +217,26 @@ internal class GlassPainter {
         pressAmount: Float,
         pressPoint: Offset,
     ): GlassSceneUniforms {
-        val inflated = shapes.map {
-            it.copy(centerX = it.centerX + inflate, centerY = it.centerY + inflate)
+        val cached = uniforms
+        if (cached != null && uniformShapes == shapes && uniformStyle == style &&
+            uniformInflate == inflate && uniformMerge == mergeSmoothingPx && uniformDensity == density) {
+            cached.pressAmount = pressAmount
+            cached.pressX = pressPoint.x + inflate
+            cached.pressY = pressPoint.y + inflate
+            return cached
         }
+        uniformShapes = shapes.toList()
+        uniformStyle = style
+        uniformInflate = inflate
+        uniformMerge = mergeSmoothingPx
+        uniformDensity = density
+        GlassShapePacker.packShapesInto(shapes, shapeBuffer, inflate)
+        GlassShapePacker.packCornerRadiiInto(shapes, radiusBuffer)
         val tint = if (style.tint.isSpecified) style.tint.convert(ColorSpaces.Srgb) else null
         val angleRadians = Math.toRadians(style.highlight.lightAngleDegrees.toDouble())
         return GlassSceneUniforms(
-            shapes = GlassShapePacker.packShapes(inflated),
-            cornerRadii = GlassShapePacker.packCornerRadii(inflated),
+            shapes = shapeBuffer,
+            cornerRadii = radiusBuffer,
             mergeSmoothing = mergeSmoothingPx,
             refractionHeightPx = style.refraction.height.toPx(),
             refractionAmountPx = refractionAmountPx,
@@ -200,11 +253,14 @@ internal class GlassPainter {
             pressAmount = pressAmount,
             pressX = pressPoint.x + inflate,
             pressY = pressPoint.y + inflate,
-        )
+        ).also { uniforms = it }
     }
 
     private fun buildUnionPath(shapes: List<PackedGlassShape>): Path {
-        val path = Path()
+        if (pathShapes == shapes) return unionPath
+        pathShapes = shapes.toList()
+        val path = unionPath
+        path.reset()
         for (shape in shapes) {
             path.addRoundRect(
                 RoundRect(
@@ -229,20 +285,28 @@ internal class GlassPainter {
         val highlight = style.highlight
         if (highlight.alpha <= 0f || highlight.width.value <= 0f) return
         val strokeWidth = highlight.width.toPx()
-        val angleRadians = Math.toRadians(highlight.lightAngleDegrees.toDouble())
-        val direction = Offset(cos(angleRadians).toFloat(), sin(angleRadians).toFloat())
-        for (shape in shapes) {
-            val center = Offset(shape.centerX, shape.centerY)
-            val reach = max(shape.halfWidth, shape.halfHeight)
-            val brush = Brush.linearGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = highlight.alpha),
-                    Color.White.copy(alpha = highlight.alpha * 0.08f),
-                    Color.White.copy(alpha = highlight.alpha * 0.55f),
-                ),
-                start = center + direction * reach,
-                end = center - direction * reach,
-            )
+        if (rimShapes != shapes || rimStyle != style || rimDensity != density) {
+            rimShapes = shapes.toList()
+            rimStyle = style
+            rimDensity = density
+            val angleRadians = Math.toRadians(highlight.lightAngleDegrees.toDouble())
+            val direction = Offset(cos(angleRadians).toFloat(), sin(angleRadians).toFloat())
+            rims = shapes.map { shape ->
+                val center = Offset(shape.centerX, shape.centerY)
+                val reach = max(shape.halfWidth, shape.halfHeight)
+                val brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = highlight.alpha),
+                        Color.White.copy(alpha = highlight.alpha * 0.08f),
+                        Color.White.copy(alpha = highlight.alpha * 0.55f),
+                    ),
+                    start = center + direction * reach,
+                    end = center - direction * reach,
+                )
+                shape to brush
+            }
+        }
+        for ((shape, brush) in rims) {
             drawRoundRect(
                 brush = brush,
                 topLeft = Offset(

@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
@@ -389,12 +390,7 @@ fun GlassCard(
 
     // v3 深度线索：按压倾斜时环境光阴影随之抬升/增强 —— 真实 3D 手感的最大来源。
     // 倾角越大（即手指越靠边）卡片"离桌面越高"，投影范围与强度同步增长。
-    val tiltMag = (abs(tiltX) + abs(tiltY)).coerceAtMost(tweaks.tiltMaxDeg * 2f)
-    val pressLift by animateFloatAsState(
-        targetValue = if (isMax && handDown) 12f + tiltMag * 1.2f else 12f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
-        label = "cardPressLift"
-    )
+    // The animated shadow observes tilt inside its own modifier composition below.
 
     val entrance = 1f
 
@@ -527,14 +523,22 @@ fun GlassCard(
                 } else {
                     Modifier
                         // Layer 7A: 宽域环境扩散彩色柔光（Atmospheric Bloom）；极致档更浓
-                        .consistentShadow(
-                            elevation = pressLift.dp,
-                            shape = effectiveShape,
-                            ambientColor = primary.copy(alpha = if (quality == RenderQuality.MAX) 0.16f else 0.10f),
-                            spotColor = primary.copy(
-                                alpha = if (quality == RenderQuality.MAX) (0.20f + 0.10f * tiltMag / 12f).coerceAtMost(0.30f) else 0.14f
+                        .then(Modifier.composed {
+                            val tiltMag = (abs(tiltX) + abs(tiltY)).coerceAtMost(tweaks.tiltMaxDeg * 2f)
+                            val pressLift by animateFloatAsState(
+                                targetValue = if (isMax && handDown) 12f + tiltMag * 1.2f else 12f,
+                                animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
+                                label = "cardPressLift"
                             )
-                        )
+                            Modifier.consistentShadow(
+                                elevation = pressLift.dp,
+                                shape = effectiveShape,
+                                ambientColor = primary.copy(alpha = if (quality == RenderQuality.MAX) 0.16f else 0.10f),
+                                spotColor = primary.copy(
+                                    alpha = if (quality == RenderQuality.MAX) (0.20f + 0.10f * tiltMag / 12f).coerceAtMost(0.30f) else 0.14f
+                                )
+                            )
+                        })
                         // Layer 7B: 近距离接触暗部阴影（Ambient Occlusion）
                         .consistentShadow(
                             elevation = 4.dp,

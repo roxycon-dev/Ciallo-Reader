@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
@@ -62,7 +63,7 @@ fun SquishyToggleSwitch(
     val haptics = LocalHapticFeedback.current
 
     val transition = updateTransition(targetState = isToggled, label = "Switch Transition")
-    val trackColor by transition.animateColor(
+    val trackColor = transition.animateColor(
         transitionSpec = { tween(durationMillis = 250) },
         label = "Track Color"
     ) { checked -> if (checked) color else Color.LightGray }
@@ -147,7 +148,7 @@ fun SquishyToggleSwitch(
                 onValueChange = { flip() }
             )
             .clip(CircleShape)
-            .background(trackColor)
+            .drawWithCache { onDrawBehind { drawRect(trackColor.value) } }
 
             .padding(padding.dp),
         contentAlignment = Alignment.CenterStart
@@ -155,48 +156,39 @@ fun SquishyToggleSwitch(
         Canvas(
             modifier = Modifier
                 .size(circleSize.dp)
-                .graphicsLayer(
-                    scaleX = squishX.value,
-                    scaleY = squishY.value,
-                    shape = CircleShape,
-                    translationX = thumbPosition.value * maxTranslation, // FIXED TRANSLATION
-                    shadowElevation = with(LocalDensity.current) { 10.dp.toPx() } // Outer shadow
-                )
-                .clip(CircleShape)
-
-        ) {
-            val shadowColor = Color.Black.copy(alpha = 0.4f) // 10% opacity
-
-            drawCircle(
-                color = Color.White,
-                style = Fill
-            )
-
-            // Inset Shadow Effect
-            drawIntoCanvas { canvas ->
-                val paint = Paint().apply {
-                    shader = RadialGradientShader(
-                        center = Offset(
-                            size.width / 2,
-                            size.height / 2 - shadowOffset.dp.toPx()
-                        ), // Moves it UP
-                        radius = size.width / 1.2f, // Slightly smaller than full size
-                        colors = listOf(
-                            Color.White, // Fades inward
-                            Color.White,
-                            // Color.White,
-                            shadowColor, // Dark edges (simulating depth)
-                        ),
-                        colorStops = listOf(0f,0.6f,1f), // Gradual transition
-                        tileMode = TileMode.Clamp
-                    )
+                .graphicsLayer {
+                    scaleX = squishX.value
+                    scaleY = squishY.value
+                    shape = CircleShape
+                    translationX = thumbPosition.value * maxTranslation
+                    shadowElevation = 10.dp.toPx()
                 }
-                canvas.drawCircle(
-                    Offset(size.width / 2, size.height / 2),
-                    size.minDimension / 2,
-                    paint
-                )
-            }
-        }
+                .clip(CircleShape)
+                .drawWithCache {
+                    val paint = Paint().apply {
+                        shader = RadialGradientShader(
+                            center = Offset(
+                                size.width / 2,
+                                size.height / 2 - shadowOffset.dp.toPx()
+                            ), // Moves it UP
+                            radius = size.width / 1.2f, // Slightly smaller than full size
+                            colors = listOf(
+                                Color.White, // Fades inward
+                                Color.White,
+                                // Color.White,
+                                Color.Black.copy(alpha = 0.4f), // Dark edges (simulating depth)
+                            ),
+                            colorStops = listOf(0f,0.6f,1f), // Gradual transition
+                            tileMode = TileMode.Clamp
+                        )
+                    }
+                    val center = Offset(size.width / 2, size.height / 2)
+                    val radius = size.minDimension / 2
+                    onDrawBehind {
+                        drawCircle(color = Color.White, style = Fill)
+                        drawIntoCanvas { it.drawCircle(center, radius, paint) }
+                    }
+                }
+        ) { }
     }
 }

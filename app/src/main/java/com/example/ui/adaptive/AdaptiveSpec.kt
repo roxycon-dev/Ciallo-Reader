@@ -98,7 +98,7 @@ fun rememberAdaptiveSizing(): AdaptiveSizing {
     val configuration = LocalConfiguration.current
     val resources = LocalContext.current.resources
     val density = LocalDensity.current.density
-    return remember(configuration) {
+    return remember(configuration, density, resources) {
         fun dimen(@DimenRes id: Int, fallback: Dp): Dp = runCatching {
             Dp(resources.getDimension(id) / density)
         }.getOrDefault(fallback)

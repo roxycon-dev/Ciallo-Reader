@@ -377,9 +377,10 @@ fun Modifier.filmGrain(alpha: Float = 0.04f): Modifier = this.drawWithCache {
         tileModeX = TileMode.Repeated,
         tileModeY = TileMode.Repeated
     )
+    val brush = ShaderBrush(shader)
     onDrawBehind {
         drawRect(
-            brush = ShaderBrush(shader),
+            brush = brush,
             alpha = alpha,
             blendMode = BlendMode.Overlay
         )

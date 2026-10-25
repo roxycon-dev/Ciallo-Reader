@@ -26,12 +26,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -163,7 +165,7 @@ fun AppActionButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    val scale by animateFloatAsState(
+    val scale = animateFloatAsState(
         targetValue = if (isPressed && enabled) 0.96f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -171,24 +173,19 @@ fun AppActionButton(
         ),
         label = "appButtonScale"
     )
-    val shadowElevation by animateDpAsState(
-        targetValue = if (isPressed && enabled) {
-            2.dp
-        } else if (variant == AppButtonVariant.Primary) {
-            16.dp
-        } else {
-            0.dp
-        },
+    // Only Primary draws this shadow. Other variants previously ran an unread spring.
+    val shadowElevation = if (variant == AppButtonVariant.Primary) animateDpAsState(
+        targetValue = if (isPressed && enabled) 2.dp else 16.dp,
         label = "appButtonShadow"
-    )
+    ) else remember { mutableStateOf(0.dp) }
 
-    val shape = RoundedCornerShape(percent = 50)
+    val shape = remember { RoundedCornerShape(percent = 50) }
     val disabledAlpha = 0.4f
 
     val pressModifier = modifier.pullOutAnchor(paperSource)
         .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
+            scaleX = scale.value
+            scaleY = scale.value
             alpha = if (enabled) 1f else disabledAlpha
         }
         .heightIn(min = buttonSize.height)
@@ -198,7 +195,7 @@ fun AppActionButton(
         modifier = when (variant) {
             AppButtonVariant.Primary -> pressModifier
                 .consistentShadow(
-                    elevation = shadowElevation,
+                    elevation = { shadowElevation.value },
                     shape = shape,
                     ambientColor = colors.primary.copy(alpha = 0.35f),
                     spotColor = colors.primary.copy(alpha = 0.35f)
@@ -228,7 +225,7 @@ fun AppActionButton(
                 )
                 .then(
                     if (glass != null) {
-                        Modifier.liquidGlass(glass, primaryGlassStyle(colors))
+                        Modifier.liquidGlass(glass, remember(colors) { primaryGlassStyle(colors) })
                     } else {
                         Modifier
                     }
@@ -244,35 +241,37 @@ fun AppActionButton(
                     shape
                 )
                 .clip(shape)
-                .drawWithContent {
-                    drawContent()
-                    // 顶部内高光细线：胶囊受光的"锋利感"来源
-                    drawLine(
-                        color = Color.White.copy(alpha = 0.45f),
-                        start = Offset(size.width * 0.16f, 1.2f),
-                        end = Offset(size.width * 0.84f, 1.2f),
-                        strokeWidth = 1.2f
+                .drawWithCache {
+                    val glowCenter = Offset(size.width * 0.24f, size.height * 0.12f)
+                    val glowRadius = size.width * 0.55f
+                    val glow = Brush.radialGradient(
+                        listOf(Color.White.copy(alpha = 0.30f), Color.Transparent),
+                        center = glowCenter,
+                        radius = glowRadius.coerceAtLeast(Float.MIN_VALUE)
                     )
-                    // 底部内暗线：接地面的厚度
-                    drawLine(
-                        color = Color.Black.copy(alpha = 0.18f),
-                        start = Offset(size.width * 0.20f, size.height - 1.0f),
-                        end = Offset(size.width * 0.80f, size.height - 1.0f),
-                        strokeWidth = 1.0f
-                    )
-                    // 左上镜面光晕
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            listOf(
-                                Color.White.copy(alpha = 0.30f),
-                                Color.Transparent
-                            ),
-                            center = Offset(size.width * 0.24f, size.height * 0.12f),
-                            radius = size.width * 0.55f
-                        ),
-                        radius = size.width * 0.55f,
-                        center = Offset(size.width * 0.24f, size.height * 0.12f)
-                    )
+                    onDrawWithContent {
+                        drawContent()
+                        // 顶部内高光细线：胶囊受光的"锋利感"来源
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.45f),
+                            start = Offset(size.width * 0.16f, 1.2f),
+                            end = Offset(size.width * 0.84f, 1.2f),
+                            strokeWidth = 1.2f
+                        )
+                        // 底部内暗线：接地面的厚度
+                        drawLine(
+                            color = Color.Black.copy(alpha = 0.18f),
+                            start = Offset(size.width * 0.20f, size.height - 1.0f),
+                            end = Offset(size.width * 0.80f, size.height - 1.0f),
+                            strokeWidth = 1.0f
+                        )
+                        // 左上镜面光晕
+                        drawCircle(
+                            brush = glow,
+                            radius = glowRadius,
+                            center = glowCenter
+                        )
+                    }
                 }
                 .iridescentBorder(
                     shape = shape,

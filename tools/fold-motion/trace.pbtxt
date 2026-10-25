@@ -1,0 +1,19 @@
+buffers { size_kb: 32768 fill_policy: RING_BUFFER }
+duration_ms: 10000
+data_sources {
+  config {
+    name: "linux.ftrace"
+    ftrace_config {
+      ftrace_events: "sched/sched_switch"
+      ftrace_events: "sched/sched_waking"
+      ftrace_events: "power/cpu_frequency"
+      atrace_categories: "gfx"
+      atrace_categories: "view"
+      atrace_categories: "wm"
+      atrace_categories: "dalvik"
+      atrace_apps: "com.aistudio.novelreader.kxmpzq.debug"
+    }
+  }
+}
+data_sources { config { name: "linux.process_stats" process_stats_config { proc_stats_poll_ms: 1000 } } }
+data_sources { config { name: "android.surfaceflinger.frametimeline" } }

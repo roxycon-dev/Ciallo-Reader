@@ -176,7 +176,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     HelpSectionHeader(title = "4. 书源管理")
                     TextDetailCard(
-                        text = "管理书源：可启用或停用来源、导入自定义 JSON 书源、更新 Venera 漫画源，也可删除失效源。开启成人漫画源：进入“设置”标签页，连续点击六次“主色按钮实时联动效果”，显示“高级内容”后打开其中的“带你登大郎~~~”；等待 Venera 源列表更新后，返回书库并在漫画书源选择器中选择对应来源。关闭开关会隐藏成人源。自定义源兼容 Legado 规则与 JSON API。"
+                        text = "管理书源：可启用或停用来源、导入自定义 JSON 书源、更新 Venera 漫画源，也可删除失效源。成人漫画源已固定开启，无需连续点击解锁或打开专用开关；等待 Venera 源列表更新后，返回书库并在漫画书源选择器中选择对应来源。自定义源兼容 Legado 规则与 JSON API。"
                     )
                 }
 
@@ -204,7 +204,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize
 
                     FaqExpandableItem(
                         question = "成人漫画源不显示？",
-                        answer = "进入“设置”标签页，连续点击六次“主色按钮实时联动效果”以显示“高级内容”，再打开其中的“带你登大郎~~~”；等待 Venera 更新源列表后回到书库，在漫画书源选择器中切换到需要的来源。此开关关闭时成人源会隐藏。"
+                        answer = "成人漫画源已固定开启，无需点击解锁或使用开关。请在书源管理中更新 Venera 源列表，更新完成后回到书库，在漫画书源选择器中选择需要的来源。"
                     )
 
                     FaqExpandableItem(

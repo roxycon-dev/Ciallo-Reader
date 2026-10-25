@@ -420,7 +420,6 @@ fun ReaderScreen(
 
     val isScrollMode = pageTurnMode == PageTurnType.SCROLL.id
 
-    var currentSubPageIndex by remember { mutableIntStateOf(0) }
 
     var currentCharOffset by remember { mutableIntStateOf(0) }
 
@@ -1359,7 +1358,7 @@ fun ReaderScreen(
 
             val fontFamilyResolver = LocalFontFamilyResolver.current
 
-            val currentTitleReservePx = remember(currentChapter?.title, textWidthPx, titleStyle, density, fontFamilyResolver) {
+            val currentTitleReservePx = remember(currentChapter?.title, textWidthPx, textHeightPx, titleStyle, density, fontFamilyResolver) {
 
                 measureTitleReservePx(
 
@@ -1404,7 +1403,7 @@ fun ReaderScreen(
 
             val nextChapter = chapters.getOrNull(currentChapterIndex + 1)
 
-            val nextTitleReservePx = remember(nextChapter?.title, textWidthPx, titleStyle, density, fontFamilyResolver) {
+            val nextTitleReservePx = remember(nextChapter?.title, textWidthPx, textHeightPx, titleStyle, density, fontFamilyResolver) {
 
                 measureTitleReservePx(
 
@@ -1464,7 +1463,7 @@ fun ReaderScreen(
 
             val prevChapter = chapters.getOrNull(currentChapterIndex - 1)
 
-            val prevTitleReservePx = remember(prevChapter?.title, textWidthPx, titleStyle, density, fontFamilyResolver) {
+            val prevTitleReservePx = remember(prevChapter?.title, textWidthPx, textHeightPx, titleStyle, density, fontFamilyResolver) {
 
                 measureTitleReservePx(
 
@@ -1522,59 +1521,15 @@ fun ReaderScreen(
 
 
 
-            val activeSubPageIndex = currentSubPageIndex.coerceIn(0, (pagesList.size - 1).coerceAtLeast(0))
-
-
-
-            // Re-anchor subpage index based on currentCharOffset when pagesList recalculates (e.g. screen rotation / layout change)
-
-            LaunchedEffect(pagesList) {
-
-                if (!isScrollMode && pagesList.isNotEmpty()) {
-
-                    var accumulated = 0
-
-                    var targetPageIndex = 0
-
-                    for (index in pagesList.indices) {
-
-                        val pageLen = pagesList[index].length
-
-                        if (accumulated + pageLen > currentCharOffset || index == pagesList.lastIndex) {
-
-                            targetPageIndex = index
-
-                            break
-
-                        }
-
-                        accumulated += pageLen
-
-                    }
-
-                    currentSubPageIndex = targetPageIndex
-
-                }
-
-            }
-
-
+            // A single text anchor owns page selection, including the first resized frame.
+            val pageAnchors = remember(pagesList) { ReaderPageAnchors(pagesList) }
+            val activeSubPageIndex = pageAnchors.pageAt(currentCharOffset)
 
             val updateSubPage = { newIndex: Int ->
 
                 val clamped = newIndex.coerceIn(0, (pagesList.size - 1).coerceAtLeast(0))
 
-                currentSubPageIndex = clamped
-
-                var offset = 0
-
-                for (i in 0 until clamped) {
-
-                    offset += pagesList.getOrNull(i)?.length ?: 0
-
-                }
-
-                currentCharOffset = offset
+                currentCharOffset = pageAnchors.startOf(clamped)
 
             }
 
@@ -1792,7 +1747,6 @@ fun ReaderScreen(
 
                         currentCharOffset = 0
 
-                        currentSubPageIndex = 0
 
                         scope.launch { scrollState.scrollTo(0) }
 
@@ -1828,7 +1782,6 @@ fun ReaderScreen(
 
                         currentCharOffset = Int.MAX_VALUE
 
-                        currentSubPageIndex = 9999
 
                         scope.launch { scrollState.scrollTo(0) }
 

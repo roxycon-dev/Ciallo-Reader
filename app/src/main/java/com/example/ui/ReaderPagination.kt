@@ -2,6 +2,7 @@ package com.example.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -20,6 +21,8 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import com.example.ui.reader.NovelInlineImages
 import com.example.ui.reader.buildAnnotatedWithImages
@@ -105,6 +108,53 @@ private const val PAGINATION_CHUNK_CHARS = 40_000
 /** Chapters up to this size are paginated in one pass and published at once. */
 private const val EAGER_CHAPTER_THRESHOLD = 60_000
 
+/** One chapter, at most one old layout and one pending layout; stale workers cannot publish. */
+internal class ChapterPageBuffer(initialKey: PaginationKey, initialPages: List<String>) {
+    private val lock = Any()
+    private var requestedKey = initialKey
+    var pages: List<String> by mutableStateOf(initialPages)
+        private set
+
+    fun request(key: PaginationKey) = synchronized(lock) { requestedKey = key }
+    fun publish(key: PaginationKey, result: List<String>): Boolean = synchronized(lock) {
+        if (requestedKey != key) return false
+        pages = result
+        true
+    }
+}
+
+internal fun pageIndexAtOffset(pages: List<String>, offset: Int): Int {
+    var accumulated = 0
+    for (index in pages.indices) {
+        accumulated += pages[index].length
+        if (accumulated > offset || index == pages.lastIndex) return index
+    }
+    return 0
+}
+
+/** Prefix offsets are built once per publication; page turns are O(1), re-anchors O(log n). */
+internal class ReaderPageAnchors(pages: List<String>) {
+    private val ends = IntArray(pages.size)
+    init {
+        var offset = 0
+        for (index in pages.indices) {
+            offset += pages[index].length
+            ends[index] = offset
+        }
+    }
+    fun pageAt(offset: Int): Int {
+        if (ends.isEmpty()) return 0
+        var low = 0
+        var high = ends.lastIndex
+        while (low < high) {
+            val middle = (low + high) ushr 1
+            if (ends[middle] > offset) high = middle else low = middle + 1
+        }
+        return low
+    }
+    fun startOf(page: Int): Int = if (page <= 0 || ends.isEmpty()) 0 else ends[(page - 1).coerceAtMost(ends.lastIndex)]
+}
+
 @Composable
 fun rememberChapterPages(
     content: String,
@@ -134,18 +184,14 @@ fun rememberChapterPages(
         titleReservePx = titleReservePx
     )
 
-    var pages by remember(key) {
-        // TODO(size-change 双缓冲)：缓存未命中时先短暂空页再异步补齐；
-        // 真正会走到这里的场景只剩窗口尺寸真实变化（旋转/分屏），可择机
-        // 保留上一尺寸的页面直到新结果就绪，消除单帧空白。
-        mutableStateOf(ReaderPaginationCache.get(key) ?: emptyList())
-    }
+    val cached = remember(key) { ReaderPaginationCache.get(key) }
+    // A different chapter must never inherit the previous chapter's retained text.
+    val buffer = remember(content) { ChapterPageBuffer(key, cached ?: emptyList()) }
+    SideEffect { buffer.request(key) }
 
     LaunchedEffect(key) {
-        if (pages.isNotEmpty()) return@LaunchedEffect
-        val cached = ReaderPaginationCache.get(key)
         if (cached != null) {
-            pages = cached
+            buffer.publish(key, cached)
             return@LaunchedEffect
         }
 
@@ -162,22 +208,27 @@ fun rememberChapterPages(
 
         if (content.length <= EAGER_CHAPTER_THRESHOLD) {
             val computed = withContext(Dispatchers.Default) {
-                paginateChunked(content, params, progressiveSink = null)
+                val computation = currentCoroutineContext()
+                paginateChunked(content, params, progressiveSink = null, cancellationCheck = { computation.ensureActive() })
             }
             ReaderPaginationCache.put(key, computed)
-            pages = computed
+            buffer.publish(key, computed)
         } else {
             // Very large chapters: measure the first chunk right away so the reader gets
             // pages almost instantly, then append the remaining chunks in the background.
             val full = withContext(Dispatchers.Default) {
-                paginateChunked(content, params) { partial -> pages = partial }
+                val computation = currentCoroutineContext()
+                paginateChunked(content, params, progressiveSink = { partial ->
+                    computation.ensureActive()
+                    buffer.publish(key, partial)
+                }, cancellationCheck = { computation.ensureActive() })
             }
             ReaderPaginationCache.put(key, full)
-            pages = full
+            buffer.publish(key, full)
         }
     }
 
-    return pages
+    return cached ?: buffer.pages
 }
 
 private class LayoutParams(
@@ -202,8 +253,10 @@ private class LayoutParams(
 private fun paginateChunked(
     content: String,
     params: LayoutParams,
-    progressiveSink: ((List<String>) -> Unit)?
+    progressiveSink: ((List<String>) -> Unit)?,
+    cancellationCheck: () -> Unit
 ): List<String> {
+    cancellationCheck()
     val chunks = splitChunks(content)
     if (chunks.size <= 1) {
         return paginateChunk(chunks.first(), params, reserveTitle = true)
@@ -211,6 +264,7 @@ private fun paginateChunked(
 
     val allPages = mutableListOf<String>()
     chunks.forEachIndexed { index, chunk ->
+        cancellationCheck()
         val reserveTitle = index == 0
         allPages += paginateChunk(chunk, params, reserveTitle)
         progressiveSink?.invoke(allPages.toList())
