@@ -43,6 +43,7 @@ data class OnboardingPage(
 fun OnboardingScreen(
     onFinished: () -> Unit
 ) {
+    val diagnosticContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
     var currentPage by remember { mutableIntStateOf(0) }
 
     val pages = remember {
@@ -93,7 +94,10 @@ fun OnboardingScreen(
         ) {
             // "Skip" button on top-right
             PullOutTextButton(
-                onClick = onFinished,
+                onClick = {
+                    com.example.data.StartupDiagnostics.breadcrumb(diagnosticContext, "onboarding:skip")
+                    onFinished()
+                },
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(16.dp)
@@ -229,6 +233,8 @@ fun OnboardingScreen(
                 AppActionButton(
                     text = if (currentPage == pages.lastIndex) "立即开启阅读之旅" else "下一步",
                     onClick = {
+                        com.example.data.StartupDiagnostics.breadcrumb(diagnosticContext,
+                            if (currentPage == pages.lastIndex) "onboarding:finish" else "onboarding:next:$currentPage")
                         if (currentPage < pages.lastIndex) {
                             currentPage++
                         } else {

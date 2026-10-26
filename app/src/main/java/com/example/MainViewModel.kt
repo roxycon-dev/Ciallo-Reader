@@ -452,7 +452,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun launchStartupTask(stage: String, task: suspend () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
-            optionalStartupTask({ StartupDiagnostics.record(getApplication(), stage, it) }, task)
+            diagnosedStartupTask(getApplication(), stage, task)
         }
     }
 

@@ -21,8 +21,8 @@ enum class RenderQuality(val id: Int, val label: String) {
     HIGH(2, "高"),
     MAX(3, "极致");
 
-    /** HIGH 及以上才启用实时背景模糊与 backdrop 捕获层。 */
-    val realtimeGlass: Boolean get() = id >= HIGH.id
+    /** 不支持 RenderEffect 的系统直接用磨砂替代样式，也不创建无效的采样层。 */
+    val realtimeGlass: Boolean get() = id >= HIGH.id && supportsRealtimeBlur
 
     /** Paper deformation and liquid control motion are reserved for HIGH and MAX. */
     val enhancedMotion: Boolean get() = id >= HIGH.id

@@ -1,0 +1,18 @@
+gradle.projectsEvaluated {
+    def app = rootProject.project(':app')
+    app.tasks.matching { it.name in ['kspDebugUnitTestKotlin', 'compileDebugUnitTestJavaWithJavac'] }.configureEach { enabled = false }
+    app.tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+        maxParallelForks = 1
+        maxHeapSize = '2048m'
+        filter {
+            includeTestsMatching('com.example.ui.components.HomeEntryCompatibilityTest')
+            includeTestsMatching('com.example.data.HomeRenderRecoveryTest')
+            includeTestsMatching('com.example.data.StartupDiagnosticsTest')
+            includeTestsMatching('com.example.data.StartupDiagnosticsBundleTest')
+            includeTestsMatching('com.example.ui.components.StartupDiagnosticsExportButtonTest')
+            includeTestsMatching('com.example.ui.components.MotionQualityTest')
+            includeTestsMatching('com.example.data.AdultSourceDefaultsTest')
+        }
+        testLogging { exceptionFormat = 'full' }
+    }
+}

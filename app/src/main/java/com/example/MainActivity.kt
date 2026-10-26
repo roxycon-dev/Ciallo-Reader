@@ -155,6 +155,7 @@ class MainActivity : ComponentActivity() {
         // Theme.MyApplication.Splash，底色与开屏页一致，交接无色差）。
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        com.example.data.StartupDiagnostics.breadcrumb(applicationContext, "main:onCreate")
         sharedDetail = com.example.library.SharedWorkLink.parse(intent.data)
         com.example.transfer.TransferManager.sharedUri(intent)?.let { com.example.transfer.TransferManager.get(this).openShared(it) }
         if(intent.getBooleanExtra("open_transfer",false)) com.example.transfer.TransferManager.get(this).show()
@@ -430,6 +431,11 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         val sharedEntry by navController.currentBackStackEntryAsState()
+                        LaunchedEffect(sharedEntry?.destination?.route) {
+                            sharedEntry?.destination?.route?.let {
+                                com.example.data.StartupDiagnostics.breadcrumb(applicationContext, "route:$it")
+                            }
+                        }
                         val sharedSources by libraryViewModel.sourceManager.availableSources.collectAsStateWithLifecycle()
                         val sharedSourcesReady by libraryViewModel.sourcesReady.collectAsStateWithLifecycle()
                         LaunchedEffect(sharedDetail, sharedSources, sharedSourcesReady, sharedEntry) {
@@ -572,6 +578,23 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable("home") { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
+                            // Arm before composing the page, so composition/layout failures are covered too.
+                            val homeEntryToken = remember {
+                                com.example.data.StartupDiagnostics.breadcrumb(applicationContext, "home:compose:start")
+                                com.example.data.HomeRenderRecovery.arm()
+                            }
+                            DisposableEffect(homeEntryToken) {
+                                onDispose { com.example.data.HomeRenderRecovery.disarm(homeEntryToken) }
+                            }
+                            LaunchedEffect(homeEntryToken) {
+                                com.example.data.StartupDiagnostics.breadcrumb(applicationContext, "home:composition:applied")
+                                if (com.example.data.HomeRenderRecovery.consumeNotice(this@MainActivity)) {
+                                    AppToast.makeText(this@MainActivity,
+                                        "上次主页显示异常，已启用极简画质。可在设置中调整画质。", Toast.LENGTH_LONG).show()
+                                }
+                                kotlinx.coroutines.delay(com.example.data.HomeRenderRecovery.ENTRY_WINDOW_MS)
+                                com.example.data.HomeRenderRecovery.disarm(homeEntryToken)
+                            }
                             var discoveredNovel by remember { mutableStateOf<com.example.source.SearchBook?>(null) }
                             com.example.discover.DiscoverNovelDetails(discoveredNovel, libraryViewModel,
                                 onDismiss = { discoveredNovel = null }, onRead = { book ->

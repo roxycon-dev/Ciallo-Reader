@@ -1,0 +1,9 @@
+gradle.projectsEvaluated {
+    def app = rootProject.project(':app')
+    app.tasks.named('compileDebugAndroidTestKotlin').configure {
+        doFirst {
+            setSource([new File(app.projectDir, 'src/androidTest/java/com/example/ui/HomeEntryDeviceTest.kt')])
+        }
+    }
+    app.tasks.matching { it.name == 'kspDebugAndroidTestKotlin' }.configureEach { enabled = false }
+}

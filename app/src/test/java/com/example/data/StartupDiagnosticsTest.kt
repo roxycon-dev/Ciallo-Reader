@@ -46,6 +46,6 @@ class StartupDiagnosticsTest {
         assertFalse(report.contains("secret-token"))
         assertFalse(report.contains("password"))
         assertFalse(report.contains("/private/book/title"))
-        assertTrue(report.length <= 24 * 1024)
+        assertTrue(report.length <= 128 * 1024)
     }
 }

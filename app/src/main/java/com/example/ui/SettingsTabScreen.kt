@@ -1298,30 +1298,7 @@ LazyColumn(
                             Spacer(Modifier.height(12.dp))
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                             Spacer(Modifier.height(12.dp))
-                            PullOutTextButton(onClick = {
-                                scope.launch {
-                                    try {
-                                        val uri = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                            val file = java.io.File(context.cacheDir, "share_temp/startup-diagnostic.txt")
-                                            file.parentFile?.mkdirs()
-                                            file.writeText(com.example.data.StartupDiagnostics.read(context))
-                                            androidx.core.content.FileProvider.getUriForFile(context,
-                                                "${context.packageName}.fileprovider", file)
-                                        }
-                                        val share = android.content.Intent(android.content.Intent.ACTION_SEND)
-                                            .setType("text/plain")
-                                            .putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                                            .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        share.clipData = android.content.ClipData.newRawUri("启动诊断", uri)
-                                        context.startActivity(android.content.Intent.createChooser(share, "导出启动诊断"))
-                                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-                                    catch (_: Exception) {
-                                        AppToast.makeText(context, "无法导出诊断，请稍后重试", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }) { Text("导出启动诊断") }
-                            Text("仅含设备版本和错误堆栈，不含书籍、账号或阅读记录。由你选择是否分享。",
-                                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            com.example.ui.components.StartupDiagnosticsExportButton(Modifier.fillMaxWidth())
                             Spacer(Modifier.height(12.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 AppActionButton("更新目录", onClick = { showReleaseHistory = true },

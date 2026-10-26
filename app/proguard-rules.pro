@@ -48,6 +48,16 @@
 -keep class com.example.ui.comic.MangaJaNaiGpu { *; }
 
 # R8 Optimization & Obfuscation
+# Recovery recognizes renderer frames; preserve names but allow removal/optimization.
+-keepnames class androidx.compose.ui.node.**
+-keepclassmembernames class androidx.compose.ui.node.** { *; }
+-keepnames class androidx.compose.ui.graphics.**
+-keepnames class com.kashif_e.backdrop.**
+-keepnames class dev.liquidglass.**
+-keepnames class com.example.ui.components.GlassCardKt*
+-keepnames class com.example.ui.components.LiquidSegmentView*
+-keepnames class com.example.ui.components.LiquidSliderView*
+-keepnames class com.example.ui.components.PullOutRenderKt*
 -repackageclasses ''
 -allowaccessmodification
 -dontwarn **

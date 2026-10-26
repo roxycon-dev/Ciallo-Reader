@@ -251,17 +251,15 @@ class LibraryViewModel private constructor(
             }
         }
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            fun report(stage: String, failure: Throwable) =
-                com.example.data.StartupDiagnostics.record(application, stage, failure)
             // 第十轮：内置 AniList 多语言标题库导入（幂等，首启一次性；
             // 数据随 APK 分发，用户零拉取、离线可用）
-            com.example.data.optionalStartupTask({ report("bundled-titles", it) }) {
+            com.example.data.diagnosedStartupTask(application, "bundled-titles") {
                 com.example.data.AppDatabase.ensureBundledTitlesImported(application)
             }
-            com.example.data.optionalStartupTask({ report("source-settings", it) }) {
+            com.example.data.diagnosedStartupTask(application, "source-settings") {
                 sourceManager.initialize()
             }
-            com.example.data.optionalStartupTask({ report("source-registration", it) }) {
+            com.example.data.diagnosedStartupTask(application, "source-registration") {
                 sourceManager.registerSource(ZLibrarySource(application))
                 sourceManager.registerSource(com.example.source.impl.AutoNovelSource(application))
                 sourceManager.registerSource(com.example.source.impl.Wenku8LibrarySource(application))
