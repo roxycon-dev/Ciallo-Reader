@@ -39,15 +39,15 @@ class AppUpdatePackageTest {
         shadowOf(context.packageManager).installPackage(installed)
     }
 
-    private fun signing(value: Int) = SigningInfo().apply {
-        shadowOf(this).setSignatures(arrayOf(Signature(byteArrayOf(value.toByte()))))
+    private fun signing(vararg values: Int) = SigningInfo().apply {
+        shadowOf(this).setSignatures(values.map { Signature(byteArrayOf(it.toByte())) }.toTypedArray())
     }
-    private fun fixture(file: File, packageName: String = context.packageName, version: String = "1.2.4", code: Long = 205, signer: Int = 1) {
+    private fun fixture(file: File, packageName: String = context.packageName, version: String = "1.2.4", code: Long = 205, signer: Int = 1, signingIdentity: SigningInfo = signing(signer)) {
         val info = PackageInfo().apply {
             this.packageName = packageName
             versionName = version
             longVersionCode = code
-            signingInfo = signing(signer)
+            signingInfo = signingIdentity
         }
         shadowOf(context.packageManager).setPackageArchiveInfo(file.absolutePath, info)
     }
@@ -73,6 +73,49 @@ class AppUpdatePackageTest {
             try { UpdateApkVerifier(context).verify(file, release); fail("case $case") }
             catch (_: IllegalArgumentException) { }
         }
+    }
+
+    @Test fun multipleSignersRequireTheCompleteUnchangedSet() {
+        val installed = context.packageManager.getPackageInfo(context.packageName, 0).apply {
+            signingInfo = signing(1, 3)
+        }
+        shadowOf(context.packageManager).installPackage(installed)
+        val file = store.newTransferFile().apply { writeText("test APK") }
+        fixture(file, signingIdentity = signing(3, 1))
+        assertEquals(205L, UpdateApkVerifier(context).verify(file, release))
+        fixture(file, signingIdentity = signing(1))
+        try { UpdateApkVerifier(context).verify(file, release); fail("Partial signer set must fail") }
+        catch (_: IllegalArgumentException) { }
+    }
+
+    @Test fun retiredCertificateHistoryCannotAuthorizeAChangedCurrentSigner() {
+        val file = store.newTransferFile().apply { writeText("test APK") }
+        val successor = signing(2).apply {
+            shadowOf(this).setPastSigningCertificates(arrayOf(Signature(byteArrayOf(1)), Signature(byteArrayOf(2))))
+        }
+        fixture(file, signingIdentity = successor)
+        val withDigest = release.copy(apk = asset.copy(sha256 = updateFileSha256(file)))
+        try { UpdateApkVerifier(context).verify(file, withDigest); fail("Retired signing history must not pass") }
+        catch (_: IllegalArgumentException) { }
+    }
+
+    @Test fun emptyInstalledSigningIdentityCannotAuthorizeAnUpdate() {
+        val installed = context.packageManager.getPackageInfo(context.packageName, 0).apply {
+            signingInfo = signing()
+        }
+        shadowOf(context.packageManager).installPackage(installed)
+        val file = store.newTransferFile().apply { writeText("test APK") }
+        fixture(file)
+        try { UpdateApkVerifier(context).verify(file, release); fail("Missing installed signer must fail") }
+        catch (_: IllegalArgumentException) { }
+    }
+
+    @Test fun validSignerCannotAuthorizeAnAssetFromAnotherRepository() {
+        val file = store.newTransferFile().apply { writeText("test APK") }
+        fixture(file)
+        val foreign = release.copy(apk = asset.copy(url = asset.url.replace("roxycon-dev", "attacker")))
+        try { UpdateApkVerifier(context).verify(file, foreign); fail("Foreign asset must fail") }
+        catch (_: IllegalArgumentException) { }
     }
 
     @Test fun invalidArchiveAndChecksumNeverPassVerification() {

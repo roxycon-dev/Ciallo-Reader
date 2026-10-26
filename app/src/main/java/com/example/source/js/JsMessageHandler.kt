@@ -26,8 +26,6 @@ import org.chromium.net.UrlResponseInfo
 import java.net.URL
 import java.nio.charset.Charset
 import java.security.MessageDigest
-import java.security.SecureRandom
-import java.security.cert.X509Certificate
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -39,8 +37,6 @@ import javax.crypto.Cipher
 import javax.crypto.Mac
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
-import javax.net.ssl.SSLContext
-import javax.net.ssl.X509TrustManager
 import kotlin.random.Random
 import org.json.JSONObject
 import org.json.JSONArray
@@ -52,14 +48,15 @@ import org.json.JSONArray
 class JsMessageHandler(
     private val context: Context,
     private val sourceKey: String,
-    private val insecureTls: Boolean = false
+    // Read old source settings without allowing them to disable peer authentication.
+    @Suppress("UNUSED_PARAMETER") insecureTls: Boolean = false
 ) {
     private val dataPrefs = context.getSharedPreferences("js_source_data", Context.MODE_PRIVATE)
     val htmlStore = JsHtmlStore()
 
     @Volatile internal var requestJob: kotlinx.coroutines.Job? = null
     private val settingDefaults = HashMap<String, String>()
-    private val client = buildClient(insecureTls)
+    private val client = buildClient()
     private val publicDirectRoutes = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     /** 命中 JS 源代理路由的 URL 改走 OkHttp（代理在 client 的 ProxySelector 里；Cronet 不支持显式代理）。 */
@@ -218,12 +215,7 @@ class JsMessageHandler(
 
     fun isLoggedIn(): Boolean = dataPrefs.getBoolean("logged_$sourceKey", false)
 
-    private fun buildClient(insecure: Boolean): OkHttpClient {
-        val trustAll = arrayOf<X509TrustManager>(object : X509TrustManager {
-            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-        })
+    private fun buildClient(): OkHttpClient {
         val builder = com.example.source.SharedHttpTransport.builder()
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
@@ -248,18 +240,11 @@ class JsMessageHandler(
             }
         builder.addNetworkInterceptor { chain ->
             val request = chain.request()
-            if (insecure && request.headers.names().any { it.equals("Cookie", true) || it.equals("Authorization", true) })
-                throw java.io.IOException("不安全 TLS 书源不能发送登录凭据，请启用证书验证")
+            requireSecureCredentials(request.url.toString(), request.headers.names())
             chain.proceed(request)
         }
-        if (sourceKey == "aimanhua" && !insecure) {
+        if (sourceKey == "aimanhua") {
             context.assets.open("certificates/isrg-root-x2.pem").use { AimanhuaTls.configure(builder, it) }
-        }
-        if (insecure) {
-            val sslContext = SSLContext.getInstance("TLS")
-            sslContext.init(null, trustAll, SecureRandom())
-            builder.sslSocketFactory(sslContext.socketFactory, trustAll[0])
-            builder.hostnameVerifier { _, _ -> true }
         }
         return builder.build()
     }
@@ -399,7 +384,7 @@ class JsMessageHandler(
         val httpMethod = (msg["http_method"] as? String ?: "GET").uppercase()
         val bytes = msg["bytes"] == true
         return try {
-            if (!insecureTls && MyComicBrowserReader.accepts(sourceKey, httpMethod, url, bytes)) {
+            if (MyComicBrowserReader.accepts(sourceKey, httpMethod, url, bytes)) {
                 val userAgent = context.getSharedPreferences("js_source_website_verification", Context.MODE_PRIVATE)
                     .getString("mycomic_user_agent", null)
                     ?: android.webkit.WebSettings.getDefaultUserAgent(context)
@@ -435,6 +420,7 @@ class JsMessageHandler(
                 .filter { it.isNotBlank() }
                 .joinToString("; ")
             if (mergedCookie.isNotBlank()) effectiveHeaders["Cookie"] = mergedCookie
+            requireSecureCredentials(url, effectiveHeaders.keys)
 
             val declaredContentType = effectiveHeaders.entries
                 .firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }
@@ -461,12 +447,12 @@ class JsMessageHandler(
 
             val publicReadBatch = sourceKey == "ikmmh" && httpMethod == "POST" &&
                 url.toHttpUrl().encodedPath == "/api/comic/read/pics"
-            if ((httpMethod == "GET" && sourceKey in setOf("pufei", "bilimanga", "ikmmh") || publicReadBatch) && !insecureTls) {
+            if (httpMethod == "GET" && sourceKey in setOf("pufei", "bilimanga", "ikmmh") || publicReadBatch) {
                 return handleComicRead(url, effectiveHeaders, bytes, httpMethod, body)
             }
 
             val proxied = useProxyRoute(url)
-            if (!insecureTls && !proxied && !AimanhuaTls.route(sourceKey, url) && !(sourceKey == "jm" && httpMethod == "GET")) {
+            if (!proxied && !AimanhuaTls.route(sourceKey, url) && !(sourceKey == "jm" && httpMethod == "GET")) {
                 // 走 Cronet（Chromium 网络栈）：浏览器级 TLS 指纹，绕过按 Java 客户端封禁的站点
                 var res = cronetRequest(httpMethod, url, effectiveHeaders, bodyBytes,
                     timeoutMs = if (sourceKey == "jm") 10_000 else if (httpMethod == "GET" && !bytes) 20_000 else 60_000)
@@ -694,6 +680,11 @@ class JsMessageHandler(
         val finalUrl: String? = null
     )
 
+    private fun requireSecureCredentials(url: String, headerNames: Iterable<String>) {
+        if (!url.toHttpUrl().isHttps && headerNames.any { it.equals("Cookie", true) || it.equals("Authorization", true) })
+            throw java.io.IOException("非 HTTPS 书源不能发送登录凭据")
+    }
+
     private fun cronetRequest(
         method: String,
         url: String,
@@ -702,6 +693,7 @@ class JsMessageHandler(
         job: kotlinx.coroutines.Job? = requestJob,
         timeoutMs: Long = 60_000
     ): CronetResult {
+        requireSecureCredentials(url, headers.keys)
         val latch = CountDownLatch(1)
         val statusRef = AtomicReference(-1)
         val headersRef = AtomicReference<Map<String, String>>(emptyMap())
@@ -716,6 +708,7 @@ class JsMessageHandler(
                 newLocationUrl: String?
             ) {
                 try {
+                    requireSecureCredentials(newLocationUrl ?: throw java.io.IOException("跳转缺少地址"), headers.keys)
                     request?.followRedirect()
                 } catch (t: Throwable) {
                     Log.e("CronetCB", "onRedirectReceived", t)

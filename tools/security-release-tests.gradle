@@ -1,0 +1,21 @@
+// Focus execution on security regressions; use the debug variant for shared UI test fixtures.
+gradle.projectsEvaluated {
+    def app = rootProject.project(':app')
+    ['Debug', 'Release'].each { variant ->
+        def disabledNames = ["ksp${variant}UnitTestKotlin".toString(), "compile${variant}UnitTestJavaWithJavac".toString()]
+        app.tasks.matching { it.name in disabledNames }
+            .configureEach { enabled = false }
+    }
+    app.tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+        maxParallelForks = 1
+        maxHeapSize = '1024m'
+        filter {
+            includeTestsMatching('com.example.source.SourceTlsVerificationTest')
+            includeTestsMatching('com.example.data.AppUpdatePackageTest')
+            includeTestsMatching('com.example.transfer.PortableArchiveTest')
+            includeTestsMatching('com.example.data.AdultSourceDefaultsTest')
+            includeTestsMatching('com.example.ui.components.MotionQualityTest')
+        }
+        jvmArgs('--add-exports=java.base/sun.nio.ch=ALL-UNNAMED', '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED')
+    }
+}

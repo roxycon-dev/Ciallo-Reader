@@ -4,3 +4,5 @@
 *.so binary
 # Preserve upstream generated-header EOF spacing.
 app/src/main/cpp/vendor/ncnn/** whitespace=-blank-at-eof
+# Package assets verbatim from Git, including upstream scripts and dictionaries.
+app/src/main/assets/** -text

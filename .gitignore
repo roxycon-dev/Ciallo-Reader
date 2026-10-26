@@ -12,6 +12,11 @@ local.properties
 debug.keystore
 *.jks
 *.keystore
+*.p12
+*.pfx
+*.pk8
+*.dpapi
+!app/src/test/resources/tls/localhost-test-only.p12
 __pycache__/
 /.signing/
 /release-signing.properties

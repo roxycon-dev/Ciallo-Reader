@@ -11,7 +11,7 @@ Read local ebooks, novels, and comics in one Android app.
 
 [🌐 Product site](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ Download the latest APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.5.5 release notes](docs/release-1.5.5-2026-10-26.md) ·
+[1.5.6 release notes](docs/release-1.5.6-2026-10-26.md) ·
 [See screenshots](#screenshots) ·
 [Features](#features) ·
 [Report an issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -25,7 +25,9 @@ Read local ebooks, novels, and comics in one Android app.
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
 
-**Algorithm and adaptation validation (unreleased):** Reduces repeated motion work and fixes long-chapter resize anchors, dropped boundary newlines, manga region resolution caching and resource teardown. Existing visuals and quality tiers remain. All 145 JVM checks and 19 Android emulator checks passed; reducing whole-app consumption to 10–20% has not been established. [Validation report](docs/performance-stability-2026-10-26.md).
+**1.5.6 / 248 · Signing migration:** Includes today's motion and Z Fold fixes, source certificate verification, HTTP credential protection, and complete retirement of the exposed release key. The final APK was not listed as risk software in two paired Tencent Mobile Manager tests; the original 1.5.5 control was still flagged. HarmonyOS 3.0 physical-device validation remains unavailable. Android 7+, adult sources enabled by default, and system installation remain. **First export a backup, uninstall the old release, install this release, then import the backup. It cannot update the retired signature in place.** See the [release and migration steps](docs/release-1.5.6-2026-10-26.md), [security record](docs/security-remediation-2026-10-26.md), and [signing notes](docs/app-signing.md).
+
+**Algorithm and adaptation (included in 1.5.6):** Reduces repeated motion work and fixes long-chapter resize anchors, dropped boundary newlines, manga region resolution caching and resource teardown. Existing visuals and quality tiers remain. All 145 JVM checks and 19 Android emulator checks passed; reducing whole-app consumption to 10–20% has not been established. [Validation report](docs/performance-stability-2026-10-26.md).
 
 **1.5.4 / 246** reserves the existing paper deformation, liquid buttons, waterdrop selectors, liquid sliders and squishy switches for High/Max quality. Balanced/Low/Minimal use ordinary transitions and basic controls, preserving values and selected options when quality changes. Adult sources remain enabled by default, the existing update installation flow stays available, and startup exception handling includes local diagnostic export. [Release notes](docs/release-1.5.4-2026-10-26.md).
 

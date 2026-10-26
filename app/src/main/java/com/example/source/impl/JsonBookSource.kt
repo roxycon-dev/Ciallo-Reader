@@ -18,11 +18,7 @@ import org.jsoup.nodes.Element
 import java.io.IOException
 import java.nio.charset.Charset
 import java.net.URLEncoder
-import java.security.SecureRandom
-import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
-import javax.net.ssl.SSLContext
-import javax.net.ssl.X509TrustManager
 
 /**
  * 自定义 JSON 书源实现。
@@ -49,7 +45,8 @@ class JsonBookSource(
     private val searchItemCache = java.util.concurrent.ConcurrentHashMap<String, SearchBook>()
     private val searchRawCache = java.util.concurrent.ConcurrentHashMap<String, JSONObject>()
     private val configuredHost=runCatching { java.net.URI(config.baseUrl.ifBlank { config.search.url }).host?.lowercase() }.getOrNull()
-    private val requestClient: OkHttpClient = (if (config.insecureTls) createInsecureClient() else client).newBuilder()
+    // Legacy insecureTls source settings no longer replace certificate/hostname verification.
+    private val requestClient: OkHttpClient = client.newBuilder()
         .dns(object : okhttp3.Dns {
             override fun lookup(hostname: String): List<java.net.InetAddress> = client.dns.lookup(hostname).also { addresses ->
                 addresses.forEach { com.example.source.SourceNetworkPolicy.checkAddress(hostname,it,configuredHost) }
@@ -58,8 +55,8 @@ class JsonBookSource(
         .addNetworkInterceptor { chain ->
             val request=chain.request()
             com.example.source.SourceNetworkPolicy.check(request.url,configuredHost)
-            if(config.insecureTls && (request.header("Authorization")!=null || request.header("Cookie")!=null))
-                throw java.io.IOException("不安全 TLS 书源不能发送登录凭据，请启用证书验证")
+            if (!request.url.isHttps && request.headers.names().any { it.equals("Authorization", true) || it.equals("Cookie", true) })
+                throw IOException("非 HTTPS 书源不能发送登录凭据")
             chain.proceed(request)
         }.build()
 
@@ -70,22 +67,6 @@ class JsonBookSource(
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .build()
-
-        private fun createInsecureClient(): OkHttpClient {
-            val trustAll = arrayOf<X509TrustManager>(object : X509TrustManager {
-                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-            })
-            val sslContext = SSLContext.getInstance("TLS")
-            sslContext.init(null, trustAll, SecureRandom())
-            return com.example.source.SharedHttpTransport.builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(15, TimeUnit.SECONDS)
-                .sslSocketFactory(sslContext.socketFactory, trustAll[0])
-                .hostnameVerifier { _, _ -> true }
-                .build()
-        }
     }
 
     override val id: String = config.id

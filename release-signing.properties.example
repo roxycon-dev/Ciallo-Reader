@@ -1,6 +1,7 @@
 # 复制为 release-signing.properties（已忽略，切勿提交密钥或密码）。
-# 使用本机已配置的固定密钥，或者从私有备份恢复同一份密钥。
-storeFile=.signing/release.keystore
+# 使用与 signing/release-cert.sha256 匹配的新发布密钥；旧调试签名材料已退役。
+# 私钥和口令只从私有备份或 Secret 管理恢复，不能重新生成后继续同一发布身份。
+storeFile=.signing/release-secure.p12
 storePassword=YOUR_STORE_PASSWORD
-keyAlias=YOUR_EXISTING_KEY_ALIAS
+keyAlias=ciallo-reader-release
 keyPassword=YOUR_KEY_PASSWORD

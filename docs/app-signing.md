@@ -1,34 +1,46 @@
-# 固定签名与覆盖升级
+# 发布签名与旧密钥迁移
 
-正式版应用标识固定为 `com.aistudio.novelreader.kxmpzq`。1.3.8 按用户最终指定的原方式构建，恢复使用已发布 1.3.6 的现有密钥；公开证书指纹为 `d2115e3cc5880b210a120558aaab03eb30ee5de2952a80f3376dda7e45501146`，保存在 `signing/release-cert.sha256`。没有重新生成密钥。后续发布需沿用该私钥并递增 `versionCode`。
+正式版应用标识保持 `com.aistudio.novelreader.kxmpzq`，最低支持 Android 7（API 24）。1.5.6 完全退休暴露的旧发布密钥，使用新的固定发布证书，不携带旧证书轮换链。**首次从旧密钥版本迁移不能覆盖安装：先导出备份，确认备份文件已保存到应用目录外，再卸载旧版、安装新版并导入。后续相同新密钥版本可正常覆盖升级。**
 
-1.3.8 与 1.3.6 签名相同，可按包名、证书和递增编号验证覆盖升级。现有 1.3.7 使用另一证书，不能直接覆盖；从 1.3.7 迁移需先备份数据。历史其他证书签署的版本同样不保证兼容。
+旧证书为 `d2115e3cc5880b210a120558aaab03eb30ee5de2952a80f3376dda7e45501146`。同证书的私钥条目曾存在于公开历史提交的 `debug.keystore` 中，不能继续把它视为仅开发者持有的发布材料。这里记录的是材料暴露，不声称发现恶意签署或证明这就是报毒根因。[公开历史提交](https://github.com/roxycon-dev/Ciallo-Reader/commit/6ecd4ef2e55cf49de810ad156b45cb745f33d313)。
+
+新证书 SHA-256：`3ee5fb4018a00457eb24cbbfc43e78967d24069b760a5d386d6c9454b3770794`。仓库只保存公开证书和固定指纹；新私钥和密码不得入库。后续版本必须沿用新密钥并递增 `versionCode`。
+
+测试过保留旧历史的 v3 轮换方案：系统可以保留数据覆盖安装，但腾讯检测仍把它列为风险软件。因此最终发布不使用这条链，不继续信任旧证书的签名权限、共享 UID 或回退能力；测试用轮换材料不作为发布输入。对照检测及限制见 [安全修复记录](security-remediation-2026-10-26.md)。
+
+1.5.5 的内置更新器会拒绝不同签名的 APK，这是正常安全校验；不能为迁移关闭此校验。第一次迁移请从官方 Release 下载完整安装包，按备份流程处理。不同包名的 probe 版本同样需导出、导入备份。卸载会删除旧应用的私有数据，不能跳过备份确认。
+
+导出时检查所需类别；受保护内容需主动解锁并加入。书源登录凭据、API 密钥及本机隐私 PIN 不随便携备份迁移，导入后按需重新配置。具体操作见 [1.5.6 迁移步骤](release-1.5.6-2026-10-26.md)。
 
 ## 本地构建
 
-本机已将现有密钥固定保存到 `.signing/release.keystore`，配置位于 `release-signing.properties`。两者均不入库；使用现有原密钥，证书及私钥身份未改变。必须将密钥和密码保存在私有备份中，换机器时恢复原文件，不能重新生成密钥或改指纹。
+使用 `release-signing.properties.example` 创建本地配置，或设置 `KEYSTORE_PATH`、`STORE_PASSWORD`、`KEY_ALIAS`、`KEY_PASSWORD` 环境变量（环境变量优先）。密钥必须与新的固定指纹一致。旧本地配置不会自动获得新密钥，不能绕过证书门禁。
 
-其他开发者从 `release-signing.properties.example` 复制配置，填写同一份发布密钥的路径、密码及别名。也可设置 `KEYSTORE_PATH`、`STORE_PASSWORD`、`KEY_ALIAS`、`KEY_PASSWORD` 环境变量，环境变量优先。
+本机新私钥独立存放在工作树外，密码使用当前 Windows 用户的 DPAPI 保护。可使用下面的辅助脚本；两个路径参数均指向私有文件，不应放进仓库。DPAPI 文件只能由所属 Windows 账号解密，跨机器恢复还需由维护者安全备份密钥和密码。
+
+```powershell
+./tools/build-secure-release.ps1 -SigningKeyPath PRIVATE_KEY.p12 -ProtectedPasswordPath PRIVATE_PASSWORD.dpapi
+```
 
 ```shell
 ./gradlew :app:verifyReleaseSigning :app:assembleRelease
 ```
 
-缺少配置、密钥不匹配或密码错误会使发布构建失败，正式版不再回退到临时调试密钥。环境变量指定的密钥路径直接参与签名，不再依赖仓库根的 `my-upload-key.jks` 是否存在。
+缺少配置、密钥不匹配或密码错误会使发布构建失败。使用新密钥生成 v2/v3 签名，不生成旧密钥回退；发布后必须使用官方 apksigner 对最终 APK 验签。`signing/release-cert.sha256` 的固定指纹门禁仍生效。
 
 日常 `assembleDebug` 使用独立包名 `com.aistudio.novelreader.kxmpzq.debug`，名称为「Ciallo Reader · 调试版」，可与正式版并存；其设置和数据独立，不能作为正式版升级包发布。
 
 ## 发布检查
 
-修改 `app/build.gradle.kts` 中的版本名及版本编号；发布前用上一版正式 APK 检查：
+首次 1.5.6 迁移先验证包名、新固定证书和关闭调试：
 
 ```shell
-python tools/verify-apk-upgrade.py --new-apk app/build/outputs/apk/release/app-release.apk --previous-apk PATH_TO_PREVIOUS_RELEASE.apk --build-tools PATH_TO_ANDROID_SDK/build-tools/36.0.0
+python tools/verify-apk-upgrade.py --new-apk app/build/outputs/apk/release/app-release.apk --build-tools PATH_TO_ANDROID_SDK/build-tools/36.1.0
 ```
 
-脚本验证 APK 签名有效、固定证书、正式包名、关闭调试，以及新旧证书一致且版本编号递增。1.3.8 使用已发布 1.3.6 的 APK 作为兼容基线，不把不同签名的 1.3.7 当作可覆盖基线。后续同签名发布应提供上一次正式 APK。
+给这个命令提供旧密钥的 1.5.5 作为 `--previous-apk` 应明确失败，不能把这次迁移记为覆盖升级通过。1.5.6 之后沿用新密钥的发布，应递增版本编号并提供上一版新密钥 APK 作为 `--previous-apk`。除静态检查外，还需实际验证更新安装和数据保留。
 
-自动发布环境也必须从私有 Secrets 恢复同一份密钥并提供上述四个环境变量，然后执行构建及覆盖检查。不能只推送公开指纹就认为 CI 已获得签名能力；私钥不随源码分发。1.3.8 使用本机保存的原密钥构建，公开仓库不上传密钥或密码。1.3.7 的历史签名记录保留在下方。
+自动发布环境必须从私有 Secrets 恢复同一份新密钥并提供上述四个环境变量，然后执行完整构建及相应检查。公开指纹不提供签名能力。以下是历史记录，不应作为继续使用旧密钥的构建指引。
 
 ## 历史验证：1.3.7（2026-10-13）
 

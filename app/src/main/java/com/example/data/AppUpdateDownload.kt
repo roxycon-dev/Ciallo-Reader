@@ -119,16 +119,20 @@ internal fun updateFileSha256(file: File): String {
     return digest.digest().joinToString("") { "%02x".format(it) }
 }
 
-/** A browser fallback remains available if these checks reject a legacy signing key. */
+/** The first move away from the retired key requires the documented backup migration. */
 internal class UpdateApkVerifier(private val context: Context) {
     @Suppress("DEPRECATION")
     fun verify(file: File, release: UpdateRelease): Long {
         require(file.length() in 1..MAX_UPDATE_BYTES) { "安装包为空或过大" }
         val asset = release.apk ?: error("此版本没有可用安装包")
+        require(officialUpdateAsset(release.tag, asset.name, asset.url)) { "安装包地址不属于此版本的官方发布" }
         require(asset.size == null || file.length() == asset.size) { "安装包大小校验失败" }
         if (asset.sha256 != null) require(updateFileSha256(file) == asset.sha256) { "安装包完整性校验失败，请重新下载" }
         val pm = context.packageManager
-        val flags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
+        // Android 9/10 collect archive certificates only when GET_SIGNATURES is
+        // present. Request both flags, then prefer SigningInfo on API 28+.
+        val flags = PackageManager.GET_SIGNATURES or
+            (if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else 0)
         val archive = pm.getPackageArchiveInfo(file.absolutePath, flags) ?: error("下载文件不是有效的 Android 安装包")
         val installed = pm.getPackageInfo(context.packageName, flags)
         require(archive.packageName == context.packageName) { "安装包不属于 Ciallo Reader" }
@@ -137,16 +141,18 @@ internal class UpdateApkVerifier(private val context: Context) {
         require((archive.applicationInfo?.minSdkVersion ?: 24) <= Build.VERSION.SDK_INT) { "新版本不支持当前 Android 系统" }
         val original = signatures(installed)
         require(original.isNotEmpty() && original == signatures(archive)) {
-            "新版本签名与当前应用不一致，无法直接覆盖安装。请先备份数据，再查看发布页的迁移说明"
+            "新版本签名与当前应用不一致，无法直接覆盖安装。请先备份数据，再查看官方发布页的迁移说明"
         }
         return code(archive)
     }
 
     @Suppress("DEPRECATION")
     private fun signatures(info: PackageInfo): Set<String> =
-        (if (Build.VERSION.SDK_INT >= 28) info.signingInfo?.apkContentsSigners else info.signatures)
-            ?.map { MessageDigest.getInstance("SHA-256").digest(it.toByteArray()).joinToString("") { b -> "%02x".format(b) } }
-            ?.toSet().orEmpty()
+        certificateDigests(if (Build.VERSION.SDK_INT >= 28) info.signingInfo?.apkContentsSigners else info.signatures).toSet()
+
+    private fun certificateDigests(certificates: Array<android.content.pm.Signature>?): List<String> =
+        certificates?.map { MessageDigest.getInstance("SHA-256").digest(it.toByteArray())
+            .joinToString("") { b -> "%02x".format(b) } }.orEmpty()
 
     @Suppress("DEPRECATION")
     private fun code(info: PackageInfo): Long = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()

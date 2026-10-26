@@ -82,14 +82,15 @@ android {
   sourceSets.getByName("main").jniLibs.srcDir("src/main/cpp/vendor/ncnn/lib")
   namespace = "com.example"
   compileSdk = 35
+  buildToolsVersion = "36.1.0"
 
   defaultConfig {
-    // Preserve the original release identity and signing certificate for in-place upgrades.
+    // Keep the package name; the exposed old signing identity is fully retired.
     applicationId = "com.aistudio.novelreader.kxmpzq"
     minSdk = 24
     targetSdk = 35
-    versionCode = 247
-    versionName = "1.5.5"
+    versionCode = 248
+    versionName = "1.5.6"
     externalNativeBuild {
       cmake { arguments += "-DANDROID_STL=c++_static" }
     }
@@ -121,6 +122,10 @@ android {
       storePassword = releaseStorePassword
       keyAlias = releaseKeyAlias
       keyPassword = releaseKeyPassword
+      enableV1Signing = false
+      enableV2Signing = true
+      enableV3Signing = true
+      enableV4Signing = false
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")

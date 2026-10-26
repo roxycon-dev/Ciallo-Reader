@@ -11,7 +11,7 @@
 
 [🌐 产品主页](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.5.5 更新说明](docs/release-1.5.5-2026-10-26.md) ·
+[1.5.6 更新说明](docs/release-1.5.6-2026-10-26.md) ·
 [查看截图](#界面预览) ·
 [全部功能](#功能亮点) ·
 [提交问题或建议](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -27,7 +27,9 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 **English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
 
-**算法与适配验证（待发布）**：继续减少动效重复计算，修复长章折叠重分页的换行丢失与暂时跳位、漫画区域清晰度缓存及资源释放。保留现有视觉与画质分档。145 项 JVM 对照与回归、19 项 Android 模拟器回归通过；整款软件降至原占用 10–20% 尚未证实。详见[本轮验证记录](docs/performance-stability-2026-10-26.md)。
+**1.5.6 / 248 · 安全签名迁移**：合入今天的动效和 Z Fold 修复，补齐书源证书校验、HTTP 凭据保护，并完全退休暴露的旧发布密钥。最终 APK 在腾讯手机管家的两次对照复测中未再被列为风险软件，原始 1.5.5 对照仍复现风险；未在 HarmonyOS 3.0 真机验证。保留 Android 7+、成人源默认启用及系统安装功能。**首次迁移须先导出备份，再卸载旧版、安装新版并导入，无法直接覆盖旧签名。** 详见[更新与迁移步骤](docs/release-1.5.6-2026-10-26.md)、[安全验证记录](docs/security-remediation-2026-10-26.md)及[签名说明](docs/app-signing.md)。
+
+**算法与适配（已合入 1.5.6）**：继续减少动效重复计算，修复长章折叠重分页的换行丢失与暂时跳位、漫画区域清晰度缓存及资源释放。保留现有视觉与画质分档。145 项 JVM 对照与回归、19 项 Android 模拟器回归通过；整款软件降至原占用 10–20% 尚未证实。详见[本轮验证记录](docs/performance-stability-2026-10-26.md)。
 
 **1.5.4 / 246**：现有抽纸变形、液态按钮、水滴选择、液态滑条及挤压开关保留在「高／极致」；「均衡／流畅／极简」使用普通过渡和基础控件。切换画质保留当前数值与选项。成人源仍默认启用，原更新安装流程保留，并包含启动异常保护与本地诊断导出。详见 [1.5.4 更新说明](docs/release-1.5.4-2026-10-26.md)。
 
