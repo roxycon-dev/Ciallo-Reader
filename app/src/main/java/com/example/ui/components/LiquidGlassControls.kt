@@ -40,7 +40,7 @@ fun DialogLiquidGlass(
     fillMaxSize: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    if (LocalRenderQuality.current.minimal) {
+    if (!LocalRenderQuality.current.enhancedMotion) {
         CompositionLocalProvider(LocalLiquidGlassState provides null) { content() }
         return
     }

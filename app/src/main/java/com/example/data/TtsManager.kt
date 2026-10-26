@@ -37,6 +37,7 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
         val engine = tts
         ready = status == TextToSpeech.SUCCESS && engine != null
         if (!ready) { _error.value = "朗读引擎初始化失败"; return@post }
+        try {
         val language = engine!!.setLanguage(Locale.CHINESE)
         if (language < 0) { ready = false; _error.value = "请先安装中文朗读语音"; return@post }
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -51,6 +52,11 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
                 if (id == "$generation:$chunkIndex") { _error.value = "朗读失败，请检查系统语音引擎"; pause() }
             } }
         })
+        } catch (failure: Exception) {
+            ready = false
+            _error.value = "朗读引擎初始化失败，请检查系统语音服务"
+            StartupDiagnostics.record(app, "tts-initialization", failure)
+        }
     } }
     fun startReading(content: String, speed: Float = 1f, pitch: Float = 1f) {
         if (!ready) { _error.value = "朗读引擎尚未就绪"; return }

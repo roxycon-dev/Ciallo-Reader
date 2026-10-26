@@ -251,44 +251,52 @@ class LibraryViewModel private constructor(
             }
         }
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            fun report(stage: String, failure: Throwable) =
+                com.example.data.StartupDiagnostics.record(application, stage, failure)
             // 第十轮：内置 AniList 多语言标题库导入（幂等，首启一次性；
             // 数据随 APK 分发，用户零拉取、离线可用）
-            com.example.data.AppDatabase.ensureBundledTitlesImported(application)
-            sourceManager.initialize()
-            sourceManager.registerSource(ZLibrarySource(application))
-            sourceManager.registerSource(com.example.source.impl.AutoNovelSource(application))
-            sourceManager.registerSource(com.example.source.impl.Wenku8LibrarySource(application))
-            sourceManager.registerSource(com.example.source.impl.IxdzsSource(application))
-            com.example.source.impl.PublicNovelSources.all(application).forEach { sourceManager.registerSource(it) }
-            sourceManager.registerSource(MangaDexSource(context = application))
-            // 书阁（po18 系成人小说）：始终注册，不跟随成人源开关
-            sourceManager.registerSource(com.example.source.impl.XbookcnSource(application))
-
-            // 一次性清理上一版内置的社区漫画源（comic_* 自定义书源）
-            if (prefs.hasImportedCommunityComics) {
-                sourceManager.availableSources.value
-                    .filter { it.id.startsWith("comic_") }
-                    .forEach { sourceManager.unregisterSource(it.id) }
-                prefs.hasImportedCommunityComics = false
+            com.example.data.optionalStartupTask({ report("bundled-titles", it) }) {
+                com.example.data.AppDatabase.ensureBundledTitlesImported(application)
             }
+            com.example.data.optionalStartupTask({ report("source-settings", it) }) {
+                sourceManager.initialize()
+            }
+            com.example.data.optionalStartupTask({ report("source-registration", it) }) {
+                sourceManager.registerSource(ZLibrarySource(application))
+                sourceManager.registerSource(com.example.source.impl.AutoNovelSource(application))
+                sourceManager.registerSource(com.example.source.impl.Wenku8LibrarySource(application))
+                sourceManager.registerSource(com.example.source.impl.IxdzsSource(application))
+                com.example.source.impl.PublicNovelSources.all(application).forEach { sourceManager.registerSource(it) }
+                sourceManager.registerSource(MangaDexSource(context = application))
+                // 书阁（po18 系成人小说）：始终注册，不跟随成人源开关
+                sourceManager.registerSource(com.example.source.impl.XbookcnSource(application))
 
-            // Venera 兼容 JS 源：优先本地缓存，无缓存时从远程仓库安装
-            val cachedJsSources = JsSourceRepo.loadCached(application, prefs.showAdultSources)
-            val refreshedJsSources = if (cachedJsSources.isEmpty() ||
-                JsSourceRepo.needsRepair(application, prefs.showAdultSources)
-            ) {
-                JsSourceRepo.install(application, prefs.jsSourceRepoUrl, prefs.showAdultSources)
-            } else emptyList()
-            val jsSources = (cachedJsSources + refreshedJsSources)
-                .associateBy { it.sourceKey }.values.toList()
-            jsSources.forEach { source ->
-                sourceManager.registerSource(source, defaultEnabled = true)
+                // 一次性清理上一版内置的社区漫画源（comic_* 自定义书源）
+                if (prefs.hasImportedCommunityComics) {
+                    sourceManager.availableSources.value
+                        .filter { it.id.startsWith("comic_") }
+                        .forEach { sourceManager.unregisterSource(it.id) }
+                    prefs.hasImportedCommunityComics = false
+                }
+
+                // Venera 兼容 JS 源：优先本地缓存，无缓存时从远程仓库安装
+                val cachedJsSources = JsSourceRepo.loadCached(application, prefs.showAdultSources)
+                val refreshedJsSources = if (cachedJsSources.isEmpty() ||
+                    JsSourceRepo.needsRepair(application, prefs.showAdultSources)
+                ) {
+                    JsSourceRepo.install(application, prefs.jsSourceRepoUrl, prefs.showAdultSources)
+                } else emptyList()
+                val jsSources = (cachedJsSources + refreshedJsSources)
+                    .associateBy { it.sourceKey }.values.toList()
+                jsSources.forEach { source ->
+                    sourceManager.registerSource(source, defaultEnabled = true)
+                }
+                Log.i(
+                    "JsRepo",
+                    "JS sources ready: ${jsSources.size} (${jsSources.joinToString { it.name }})"
+                )
             }
             _sourcesReady.value = true
-            Log.i(
-                "JsRepo",
-                "JS sources ready: ${jsSources.size} (${jsSources.joinToString { it.name }})"
-            )
 
             sourceManager.activeSource.collect { source ->
                 checkSourceLoginStatus()
@@ -998,7 +1006,10 @@ class LibraryViewModel private constructor(
         val source = currentSource.value
         if (source != null) {
             viewModelScope.launch {
-                _isCurrentSourceLoggedIn.value = source.isLoggedIn()
+                val loggedIn = com.example.data.optionalStartupTask({
+                    com.example.data.StartupDiagnostics.record(getApplication(), "source-login-state", it)
+                }) { source.isLoggedIn() } ?: false
+                if (currentSource.value === source) _isCurrentSourceLoggedIn.value = loggedIn
             }
         } else {
             _isCurrentSourceLoggedIn.value = false

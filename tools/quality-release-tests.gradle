@@ -1,0 +1,19 @@
+gradle.projectsEvaluated {
+    def app = rootProject.project(':app')
+    app.tasks.matching { it.name in ['kspDebugUnitTestKotlin', 'compileDebugUnitTestJavaWithJavac', 'kspDebugAndroidTestKotlin'] }
+        .configureEach { enabled = false }
+    app.tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+        maxParallelForks = 1
+        filter {
+            includeTestsMatching('com.example.ui.components.MotionQualityTest')
+            includeTestsMatching('com.example.ui.components.PaperAndSliderTest')
+            includeTestsMatching('com.example.ui.components.LiquidSegmentSelectorTest')
+            includeTestsMatching('com.example.data.AdultSourceDefaultsTest')
+            includeTestsMatching('com.example.data.StartupDiagnosticsTest')
+            includeTestsMatching('com.example.data.AppUpdate*Test')
+            includeTestsMatching('com.example.data.GithubUpdateCheckerTest')
+            includeTestsMatching('com.example.ui.AppUpdateDialogTest')
+        }
+        jvmArgs('--add-exports=java.base/sun.nio.ch=ALL-UNNAMED', '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED')
+    }
+}

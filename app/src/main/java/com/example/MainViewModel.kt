@@ -450,21 +450,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _streakDays = MutableStateFlow(0)
     val streakDays: StateFlow<Int> = _streakDays.asStateFlow()
 
+    private fun launchStartupTask(stage: String, task: suspend () -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            optionalStartupTask({ StartupDiagnostics.record(getApplication(), stage, it) }, task)
+        }
+    }
+
     init {
         com.example.source.zlibrary.network.ZLibraryDns.INSTANCE.watchNetwork(application)
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        launchStartupTask("default-books") {
             repository.checkAndSeedDefaultBooks()
         }
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        launchStartupTask("default-category") {
             // 第七轮第 6.1 条：默认分类幂等种子（迁移兜底；书架始终至少有一个分类）
             repository.ensureDefaultCategory()
         }
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        launchStartupTask("library-maintenance") {
             // 存量超大章节自动拆分（与本地导入书一致，修复旧下载书的打开卡顿/闪退）
             repository.splitOversizedChaptersInLibrary()
             repository.cleanupOrphanFiles()
         }
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        launchStartupTask("reading-streak") {
             val streak = prefs.calculateStreak()
             _streakDays.value = streak
         }

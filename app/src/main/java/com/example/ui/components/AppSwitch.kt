@@ -37,6 +37,10 @@ fun AppSwitch(
         androidx.compose.material3.Checkbox(checked = checked, onCheckedChange = onCheckedChange, modifier = modifier)
         return
     }
+    if (!LocalRenderQuality.current.enhancedMotion) {
+        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onCheckedChange, modifier = modifier)
+        return
+    }
     // 2026-09-21 修复：modifier 此前接收后从未向下传递 —— 调用方传入的尺寸/间距
     // 修饰会被静默丢弃（目前 13 处调用恰好都没传，所以还没暴露，但迟早踩坑）。
     // SquishyToggleSwitch 本身不接受 modifier，用 Box 承接；

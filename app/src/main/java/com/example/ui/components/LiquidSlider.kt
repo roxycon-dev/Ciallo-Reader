@@ -59,6 +59,11 @@ fun LiquidSlider(
     onDraggingChange: ((Boolean) -> Unit)? = null,
     formatLabel: (Float) -> String = { "${it.roundToInt()}" },
 ) {
+    if (!LocalRenderQuality.current.enhancedMotion) {
+        OrdinarySlider(value, onValueChange, modifier, valueRange, steps, enabled, reverse,
+            rangeEnd, minGap, onRangeChange, onValueChangeFinished, onDraggingChange, formatLabel)
+        return
+    }
     val palette = MaterialTheme.colorScheme
     // Reading panels may be dark glass even when the rest of the app uses a light theme.
     val dark = LocalContentColor.current.luminance() > .5f

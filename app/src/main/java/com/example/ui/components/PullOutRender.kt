@@ -32,8 +32,9 @@ internal fun Modifier.paperSurface(life: PaperLifecycle? = LocalPaperOwner.curre
     val screenLocation = remember(view) { IntArray(2) }
     val windowLocation = remember(view) { IntArray(2) }
     val geometry = remember { PaperSurfaceGeometry() }
-    val warp = remember(life.softPaper) {
-        if (life.softPaper && Build.VERSION.SDK_INT >= 33) runCatching { PaperWarpEffect() }
+    val enhancedMotion = LocalRenderQuality.current.enhancedMotion
+    val warp = remember(life.softPaper, enhancedMotion) {
+        if (enhancedMotion && life.softPaper && Build.VERSION.SDK_INT >= 33) runCatching { PaperWarpEffect() }
             .onFailure { if (com.example.BuildConfig.DEBUG) { PaperWarpStats.failures++; android.util.Log.w("PaperWarp", "Shader unavailable", it) } }.getOrNull()
         else null
     }

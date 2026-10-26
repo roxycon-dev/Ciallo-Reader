@@ -59,6 +59,10 @@ internal fun LiquidSegmentedSelector(
     fontSp: Float = 12f,
 ) {
     if (options.isEmpty()) return
+    if (!LocalRenderQuality.current.enhancedMotion) {
+        OrdinarySegmentedSelector(options, selected, onSelect, modifier, height, fontSp)
+        return
+    }
     val colors = MaterialTheme.colorScheme
     val reduceMotion = LocalReduceMotion.current
     val quality = LocalRenderQuality.current

@@ -190,7 +190,10 @@ class MainActivity : ComponentActivity() {
         com.example.data.PreferencesManager(this).migrateCardTweaksDefaultsV2()
         // 冷启动兜底：清空书架分享的"用完即焚"临时文件，防止异常残留堆积
         Thread {
-            com.example.library.BookShareHelper.cleanupTempShareDir(applicationContext)
+            try { com.example.library.BookShareHelper.cleanupTempShareDir(applicationContext) }
+            catch (failure: Exception) {
+                com.example.data.StartupDiagnostics.record(applicationContext, "share-cleanup", failure)
+            }
         }.start()
         // 第十轮：AniList 多语言标题库已改为 APK 内置（assets 预填充，
         // 见 AppDatabase.bundledAniListDb），用户零拉取、离线可用；

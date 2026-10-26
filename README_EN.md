@@ -11,7 +11,7 @@ Read local ebooks, novels, and comics in one Android app.
 
 [🌐 Product site](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ Download the latest APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.5.2 release notes](docs/release-1.5.2-2026-10-26.md) ·
+[1.5.4 release notes](docs/release-1.5.4-2026-10-26.md) ·
 [See screenshots](#screenshots) ·
 [Features](#features) ·
 [Report an issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -24,6 +24,10 @@ Read local ebooks, novels, and comics in one Android app.
 </div>
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
+
+**1.5.4 / 246** reserves the existing paper deformation, liquid buttons, waterdrop selectors, liquid sliders and squishy switches for High/Max quality. Balanced/Low/Minimal use ordinary transitions and basic controls, preserving values and selected options when quality changes. Adult sources remain enabled by default, the existing update installation flow stays available, and startup exception handling includes local diagnostic export. [Release notes](docs/release-1.5.4-2026-10-26.md).
+
+**Upgrading:** This release keeps the verified probe identity `com.roxycon.ciallo.reader.probe` and the fixed signing certificate, allowing an in-place update from the 1.5.3 probe. Its display name is Ciallo Reader again. Users of the old `com.aistudio.novelreader.kxmpzq` package (1.5.2 and earlier) must first export a backup under Settings → Device transfer and backup, install the new app, then import it. The two apps do not share data automatically; verify the migration before removing the old app.
 
 **1.5.2 / 244** keeps the existing visual quality and animation parameters while reducing repeated shadow, glass, and slider work. Resizing and folding retain the current chapter and text anchor. Adult sources are always included; the six-tap unlock and dedicated switch card have been removed, and legacy disabled values no longer hide them. [Release notes](docs/release-1.5.2-2026-10-26.md).
 

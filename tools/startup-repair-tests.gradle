@@ -1,0 +1,20 @@
+// Focused regression suite, independent of the source/network audit fixtures.
+gradle.projectsEvaluated {
+    def app = rootProject.project(':app')
+    app.tasks.named('compileDebugUnitTestKotlin').configure {
+        setSource([new File(app.projectDir, 'src/test/java/com/example/data/StartupDiagnosticsTest.kt')])
+    }
+    app.tasks.named('compileDebugAndroidTestKotlin').configure {
+        setSource([new File(app.projectDir, 'src/androidTest/java/com/example/source/js/StartupSourceDeviceTest.kt')])
+    }
+    app.tasks.matching { it.name in ['kspDebugUnitTestKotlin', 'compileDebugUnitTestJavaWithJavac', 'kspDebugAndroidTestKotlin'] }.configureEach { enabled = false }
+    app.tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+        maxParallelForks = 1
+        filter {
+            includeTestsMatching('com.example.data.StartupDiagnosticsTest')
+            includeTestsMatching('com.example.ui.components.ReleaseCompatibilityTest')
+            includeTestsMatching('com.example.data.AdultSourceDefaultsTest')
+        }
+        jvmArgs('--add-exports=java.base/sun.nio.ch=ALL-UNNAMED', '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED')
+    }
+}

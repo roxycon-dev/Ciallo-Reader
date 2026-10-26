@@ -128,7 +128,7 @@ fun AppActionButton(
 ) {
     val paperSource = rememberPaperTrigger()
     val paperAction = paperClick(onClick, paperSource)
-    if (LocalRenderQuality.current.minimal) {
+    if (!LocalRenderQuality.current.enhancedMotion) {
         val cs = MaterialTheme.colorScheme
         val bg = when (variant) {
             AppButtonVariant.Primary -> cs.primary

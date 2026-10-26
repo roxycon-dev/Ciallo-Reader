@@ -224,7 +224,9 @@ fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: M
     deformContent: Boolean = true, content: @Composable AnimatedVisibilityScope.() -> Unit) {
     val life = rememberPaperLifecycle(visibleState)
     val parentPaper = LocalPaperOwner.current
-    val reduce = com.example.ui.feedback.LocalReduceMotion.current || LocalRenderQuality.current.minimal
+    val quality = LocalRenderQuality.current
+    val reduce = com.example.ui.feedback.LocalReduceMotion.current || quality.minimal
+    val enhancedMotion = quality.enhancedMotion
     val parentOrigin = LocalPaperOrigin.current
     val fullSurface = LocalPaperFullSurface.current
     val dragTarget = if (parentPaper == null) LocalPaperVisibleTarget.current else 1f
@@ -235,7 +237,7 @@ fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: M
     if (target && !life.retained) {
         life.origin = (if (fullSurface && parentPaper == null) parentOrigin ?: PullOutSources.claim()
             else PullOutSources.claim() ?: parentOrigin) ?: PullOutSource().apply { virtual = true }
-        life.softPaper = !reduce && android.os.Build.VERSION.SDK_INT >= 33 && life.origin?.virtual == false &&
+        life.softPaper = enhancedMotion && !reduce && android.os.Build.VERSION.SDK_INT >= 33 && life.origin?.virtual == false &&
             !(initiallyVisible && !life.registered && parentPaper != null && !parentPaper.flat)
         life.allowFullViewport = fullSurface && (parentPaper == null || parentPaper.flat)
         life.retained = true; life.closed = false; life.handingOff = false
@@ -243,7 +245,11 @@ fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: M
             life.spring.position = 1f; life.progress = 1f; life.flat = true; life.inputBlocked = false
         }
     }
-    SideEffect { life.registered = true }
+    SideEffect {
+        life.registered = true
+        // A quality change while a window is open must disable its expensive exit too.
+        if (!enhancedMotion || reduce) life.softPaper = false
+    }
     DisposableEffect(life) { onDispose { life.registered = false } }
     // Preserve existing callers' transition state while our one clock owns retention.
     AnimatedVisibility(visibleState, enter = EnterTransition.None, exit = ExitTransition.None) { }

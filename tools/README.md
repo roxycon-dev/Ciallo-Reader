@@ -6,6 +6,8 @@
 
 代码库维护与本地验证辅助脚本，不进入 Android 运行时。
 
+画质分档与发布回归：`gradlew :app:testDebugUnitTest -I tools/quality-release-tests.gradle`。复用现有滑条、分段选择、更新和成人源用例，并覆盖画质切换、普通控件交互与弹层降档退出。
+
 ## 内容
 - `check-comic-metadata.cjs`
 - `prepare-comic-network-probe.py`

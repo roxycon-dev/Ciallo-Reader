@@ -180,7 +180,7 @@ fun GlassDialogWindowEffect(
     activity: Activity?,
     blurRadiusPx: Float
 ) {
-    if (LocalRenderQuality.current.minimal) return
+    if (!LocalRenderQuality.current.realtimeGlass) return
     val view = LocalView.current
     DisposableEffect(view, activity, blurRadiusPx) {
         val window = (view.parent as? DialogWindowProvider)?.window

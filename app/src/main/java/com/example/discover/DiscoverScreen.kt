@@ -199,7 +199,7 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
     }
     val headerDistance = with(LocalDensity.current) { 150.dp.toPx() }
     val headerFraction = remember(grid, headerDistance) { { if (grid.firstVisibleItemIndex > 0) 1f else (grid.firstVisibleItemScrollOffset / headerDistance).coerceIn(0f, 1f) } }
-    BoxWithConstraints(Modifier.fillMaxSize().testTag("discover_screen").onGloballyPositioned { screenOffset = it.positionInRoot() }) {
+    Box(Modifier.fillMaxSize().testTag("discover_screen").onGloballyPositioned { screenOffset = it.positionInRoot() }) {
         Column(Modifier.fillMaxSize()) {
             CollapsingTabScreenHeader(fractionSource = headerFraction, modifier = Modifier.statusBarsPadding(), title = "发现", subtitle = "DISCOVER",
                 onTitleClick = { scope.launch { if (reduce) grid.scrollToItem(0) else grid.animateScrollToItem(0) } },

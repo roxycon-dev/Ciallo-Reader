@@ -808,7 +808,12 @@ class JsComicSource(
     }
 
     override suspend fun isLoggedIn(): Boolean = withContext(Dispatchers.IO) {
-        runCatching { getEngine().isLoggedIn() }.getOrDefault(false)
+        // Login state is local metadata. Reading it during launch must not load
+        // QuickJS/native libraries or execute a source's initialization script.
+        runCatching {
+            context.getSharedPreferences("js_source_data", Context.MODE_PRIVATE)
+                .getBoolean("logged_$sourceKey", false)
+        }.getOrDefault(false)
     }
 
     override suspend fun getCoverHeaders(url: String): Map<String, String> =

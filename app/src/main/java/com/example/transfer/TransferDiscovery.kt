@@ -107,7 +107,9 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
         }
         if(allowed(context)) {
             if(channel==null) startP2p()
-            channel?.takeIf {serviceRequestReady}?.let { p2p?.discoverServices(it,action("附近发现")) }
+            try {
+                channel?.takeIf {serviceRequestReady}?.let { p2p?.discoverServices(it,action("附近发现")) }
+            } catch (_: SecurityException) { permissionRevoked() }
         }
     }
     @Suppress("DEPRECATION") private fun resolveNext() {
@@ -141,6 +143,12 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
         WifiP2pManager.BUSY -> "附近连接请求被系统拒绝：连接服务正忙。可重新连接"
         else -> "系统未能发起附近连接（错误 $reason）。可重新连接"
     }
+    private fun permissionRevoked(): String {
+        val message = "附近设备权限已被系统撤回，请重新授权；同 Wi-Fi 互传仍可使用"
+        mutableMessage.value = message
+        onP2pError(message)
+        return message
+    }
     private fun startP2p() {
         if(!nearbyReady)return
         if(p2p==null || !context.packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT)) {mutableMessage.value="设备不支持附近直连，可使用同 Wi-Fi 互传";return}
@@ -158,7 +166,7 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
                 p2p.requestConnectionInfo(ch) {info ->
                     val host=info.groupOwnerAddress?.hostAddress
                     if(!info.groupFormed || host==null){callback(null);return@requestConnectionInfo}
-                    p2p.requestGroupInfo(ch) {group ->
+                    try { p2p.requestGroupInfo(ch) {group ->
                         val members=buildSet {group?.owner?.deviceAddress?.let(::add);group?.clientList?.forEach {add(it.deviceAddress)}}
                         val local=runCatching {
                             val owner=java.net.InetAddress.getByName(host)
@@ -167,7 +175,7 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
                                 ?.address?.hostAddress
                         }.getOrNull()
                         callback(NearbyGroup(info.isGroupOwner,host,local,members))
-                    }
+                    } } catch (_: SecurityException) { permissionRevoked(); callback(null) }
                 }
             }
             override fun pauseDiscovery(callback:()->Unit) {
@@ -177,10 +185,10 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
                 })
             }
             override fun connect(address:String,callback:(String?)->Unit) {
-                p2p.connect(ch,WifiP2pConfig().apply {deviceAddress=address;wps.setup=android.net.wifi.WpsInfo.PBC},object:WifiP2pManager.ActionListener {
+                try { p2p.connect(ch,WifiP2pConfig().apply {deviceAddress=address;wps.setup=android.net.wifi.WpsInfo.PBC},object:WifiP2pManager.ActionListener {
                     override fun onSuccess(){callback(null)}
                     override fun onFailure(reason:Int){callback(p2pError(reason))}
-                })
+                }) } catch (_: SecurityException) { callback(permissionRevoked()) }
             }
             override fun removeGroup(callback:(String?)->Unit) {
                 p2p.removeGroup(ch,object:WifiP2pManager.ActionListener {
@@ -241,13 +249,18 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
             override fun onSuccess(){
                 if(token!=serviceEpoch || !nearbyReady || channel!==ch)return
                 serviceRequestReady=true
-                if(scanRequested)p2p.discoverServices(ch,action("附近发现"))
+                if(scanRequested) {
+                    try { p2p.discoverServices(ch,action("附近发现")) }
+                    catch (_: SecurityException) { permissionRevoked() }
+                }
             }
             override fun onFailure(reason:Int){if(token==serviceEpoch)mutableMessage.value=p2pError(reason)}
         })
     }
     private fun advertiseDirect(ch:WifiP2pManager.Channel) {
-        p2p?.addLocalService(ch,WifiP2pDnsSdServiceInfo.newInstance("Ciallo-${id.take(8)}",SERVICE.trimEnd('.'),mapOf("app" to "ciallo","id" to id,"name" to name,"port" to NearbyHandshake.PORT.toString(),"v" to "1","pv" to NearbyHandshake.VERSION.toString())),action("设备广播"))
+        try {
+            p2p?.addLocalService(ch,WifiP2pDnsSdServiceInfo.newInstance("Ciallo-${id.take(8)}",SERVICE.trimEnd('.'),mapOf("app" to "ciallo","id" to id,"name" to name,"port" to NearbyHandshake.PORT.toString(),"v" to "1","pv" to NearbyHandshake.VERSION.toString())),action("设备广播"))
+        } catch (_: SecurityException) { permissionRevoked() }
     }
     fun stop(disconnect:Boolean=false) {
         stopScanning()

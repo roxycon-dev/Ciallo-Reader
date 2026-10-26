@@ -84,11 +84,12 @@ android {
   compileSdk = 35
 
   defaultConfig {
-    applicationId = "com.aistudio.novelreader.kxmpzq"
+    // Keep the identity verified by the user so the successful probe can upgrade in place.
+    applicationId = "com.roxycon.ciallo.reader.probe"
     minSdk = 24
     targetSdk = 35
-    versionCode = 244
-    versionName = "1.5.2"
+    versionCode = 246
+    versionName = "1.5.4"
     externalNativeBuild {
       cmake { arguments += "-DANDROID_STL=c++_static" }
     }
