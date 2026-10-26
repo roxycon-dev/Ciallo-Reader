@@ -58,6 +58,8 @@
 -keepnames class com.example.ui.components.LiquidSegmentView*
 -keepnames class com.example.ui.components.LiquidSliderView*
 -keepnames class com.example.ui.components.PullOutRenderKt*
+# Do not merge/in-line API 33 shader implementation into legacy card classes.
+-keep,allowshrinking class com.example.ui.components.CardDentApi33** { *; }
 -repackageclasses ''
 -allowaccessmodification
 -dontwarn **

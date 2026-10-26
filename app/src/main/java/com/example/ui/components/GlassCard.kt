@@ -1,6 +1,5 @@
 package com.example.ui.components
 
-import android.graphics.RuntimeShader
 import android.os.Build
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.Animatable
@@ -45,7 +44,6 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.rememberGraphicsLayer
@@ -186,15 +184,6 @@ private const val DENT_LIGHT_AGLS = """
         return half4(base.rgb * lit, base.a);
     }
 """
-
-/**
- * 把更新完 uniform 的着色器包装为图层 RenderEffect。
- * 调用点位于 shader 非空分支内（shader 仅在 API 33+ 构造成功时非空）。
- */
-@androidx.annotation.RequiresApi(33)
-private fun dentRenderEffect(shader: RuntimeShader): androidx.compose.ui.graphics.RenderEffect =
-    android.graphics.RenderEffect.createRuntimeShaderEffect(shader, "inputShader")
-        .asComposeRenderEffect()
 
 /**
  * 「卡片圆角」滑条语义 = 全局圆角缩放：
@@ -383,9 +372,7 @@ fun GlassCard(
     // runCatching：个别 OEM ROM 的 SkSL 编译器若拒绝该源码，静默回退到 Canvas 压痕方案，
     // 绝不让着色器构造失败炸掉整棵组合树（启动看门狗也无法救组合期崩溃）
     val indentShader = remember(isMax) {
-        if (isMax && Build.VERSION.SDK_INT >= 33) {
-            runCatching { RuntimeShader(DENT_LIGHT_AGLS) }.getOrNull()
-        } else null
+        if (isMax) createCardDentEffect(DENT_LIGHT_AGLS, LIGHT_DIR_X, LIGHT_DIR_Y, DENT_AMBIENT) else null
     }
 
     // v3 深度线索：按压倾斜时环境光阴影随之抬升/增强 —— 真实 3D 手感的最大来源。
@@ -441,23 +428,17 @@ fun GlassCard(
                     val indentVal = pressAnim.value.coerceIn(0f, 1f)
                     val strengthMult = tweaks.pressStrength.coerceIn(0f, 2f)
                     val shader = indentShader
-                    if (Build.VERSION.SDK_INT >= 33 && shader != null && strengthMult > 0f && indentVal > 0.004f) {
+                    if (shader?.available == true && strengthMult > 0f && indentVal > 0.004f) {
                         val cx = if (pressPos == Offset.Zero) size.width / 2f
                                  else pressPos.x.coerceIn(0f, size.width)
                         val cy = if (pressPos == Offset.Zero) size.height / 2f
                                  else pressPos.y.coerceIn(0f, size.height)
                         val rSafe = tweaks.pressRadius.coerceIn(0.25f, 2.5f)
                         val rPx = min(shortSide * 0.52f * rSafe, shortSide * 0.78f)
-                        shader.setFloatUniform("pressCenter", cx, cy)
-                        shader.setFloatUniform("pressRadius", rPx)
-                        shader.setFloatUniform("pressIntensity", (indentVal * strengthMult).coerceIn(0f, 1f))
                         // 任务书：传原始角度换算弧度即可，法线在 shader 内计算
                         val degToRad = PI_F / 180f
-                        shader.setFloatUniform("cardRotationX", rotationX * degToRad)
-                        shader.setFloatUniform("cardRotationY", rotationY * degToRad)
-                        shader.setFloatUniform("lightDir", LIGHT_DIR_X, LIGHT_DIR_Y)
-                        shader.setFloatUniform("ambientStrength", DENT_AMBIENT)
-                        renderEffect = dentRenderEffect(shader)
+                        renderEffect = shader.effect(cx, cy, rPx, (indentVal * strengthMult).coerceIn(0f, 1f),
+                            rotationX * degToRad, rotationY * degToRad)
                     } else {
                         renderEffect = null
                     }
@@ -663,7 +644,7 @@ fun GlassCard(
                                 //   恒定偏向光源背侧（略向下）与之同向叠加，左右按压天然镜像；
                                 // API<33 回退（任务书指定方案）：无着色器，改用实时倾斜角驱动
                                 //   中心偏移，暗核偏向「沉入侧」，倾斜方向即明暗方向
-                                center = if (indentShader != null) {
+                                center = if (indentShader?.available == true) {
                                     Offset(0f, 0.08f)
                                 } else {
                                     Offset(

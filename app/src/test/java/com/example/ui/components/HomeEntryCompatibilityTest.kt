@@ -18,11 +18,20 @@ import org.junit.Assert.*
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28, 30])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class HomeEntryCompatibilityTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    @Test fun legacyCardEntryDoesNotExposeUnavailablePlatformTypes() {
+        val methods = Class.forName("com.example.ui.components.GlassCardKt").declaredMethods
+        assertTrue(methods.isNotEmpty())
+        assertTrue(methods.none { method -> method.parameterTypes.any { it.name == "android.graphics.RuntimeShader" } })
+        assertNull(createCardDentEffect("unsupported shader", 0f, 0f, 0.8f))
+    }
 
     @Test fun unsupportedSystemsDoNotRecordRealtimeBackdropLayers() {
         assertFalse(RenderQuality.HIGH.realtimeGlass)
@@ -35,6 +44,11 @@ class HomeEntryCompatibilityTest {
         assertTrue(RenderQuality.HIGH.realtimeGlass)
         assertTrue(RenderQuality.MAX.realtimeGlass)
         assertFalse(RenderQuality.MID.realtimeGlass)
+    }
+
+    @Config(sdk = [35])
+    @Test fun rejectedCardShadersFallBackWithoutTerminatingComposition() {
+        assertNull(createCardDentEffect("this is not valid AGSL", 0f, -0.6f, 0.8f))
     }
 
     @OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
