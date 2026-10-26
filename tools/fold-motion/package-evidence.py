@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import zipfile
 import re
+import argparse
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "artifacts/fold-motion"
@@ -34,7 +35,15 @@ def source_snapshot():
 
 
 if __name__ == "__main__":
-    if "--snapshot" in __import__("sys").argv:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--snapshot", action="store_true")
+    parser.add_argument("--output-dir", type=Path, default=OUT)
+    parser.add_argument("--apk", type=Path, help="Local validation APK; does not modify a published release")
+    args = parser.parse_args()
+    OUT = args.output_dir.resolve()
+    OUT.mkdir(parents=True, exist_ok=True)
+    APK = args.apk.resolve() if args.apk else OUT / f"Ciallo-Reader-v{VERSION}.apk"
+    if args.snapshot:
         snapshot = source_snapshot()
         (OUT / "production-snapshot.json").write_text(json.dumps(snapshot, indent=2))
         print(f"Frozen {len(snapshot)} release inputs (excluding Debug, tests and editor metadata)")

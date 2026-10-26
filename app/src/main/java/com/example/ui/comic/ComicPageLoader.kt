@@ -141,6 +141,39 @@ class ComicPageLoader(
         }
     }
     private val regionMutex = kotlinx.coroutines.sync.Mutex()
+    // Requests never wait on Main for a native decode. The final borrower performs
+    // a deferred reset before unlocking, including cancellation/error paths.
+    private val regionLifecycleLock = Any()
+    @Volatile private var regionGeneration = 0L
+    @Volatile private var regionsClosed = false
+    private var pendingDecoderReset = false
+
+    private fun resetRegionDecoders(close: Boolean = false) = synchronized(regionLifecycleLock) {
+        if (close) regionsClosed = true
+        regionGeneration++
+        pendingDecoderReset = true
+        if (regionMutex.tryLock()) {
+            try {
+                decoderPool.evictAll()
+                pendingDecoderReset = false
+            } finally {
+                regionMutex.unlock()
+            }
+        }
+    }
+
+    private fun releaseRegionDecoder() = synchronized(regionLifecycleLock) {
+        try {
+            if (pendingDecoderReset) {
+                decoderPool.evictAll()
+                pendingDecoderReset = false
+            }
+        } finally {
+            // The reset request and final unlock share this monitor. A request
+            // cannot slip between the pending check and unlock and be lost.
+            regionMutex.unlock()
+        }
+    }
 
     /** 预取并发闸门：无界并行时 N 页全尺寸解码+管线峰值内存 = N×数十 MB */
     private val preloadGate = Semaphore(2)
@@ -363,15 +396,8 @@ class ComicPageLoader(
             pinnedBytes = 0L
             windowKeys.clear()
         }
-        // 释放 decoder 池持有的 native 文件句柄（最多 4 个 BitmapRegionDecoder）；
-        // 正被 decodeRegion 持锁时跳过（clearProcessedCache 路径会兜底回收）
-        if (regionMutex.tryLock()) {
-            try {
-                decoderPool.evictAll()
-            } finally {
-                regionMutex.unlock()
-            }
-        }
+        resetRegionDecoders(close = true)
+        regionCache.evictAll()
     }
 
     /**
@@ -638,12 +664,23 @@ class ComicPageLoader(
         targetEdge: Int = decodeMaxEdge,
         cacheTag: String = "",
     ): Bitmap? {
-        if (ref !is ComicPageRef.Local) return null
-        if (rect.width() < 8f || rect.height() < 8f) return null
-        val key = "rgn|${ref.id}|$cacheTag|${rect.left.toInt()},${rect.top.toInt()},${rect.right.toInt()},${rect.bottom.toInt()}"
+        if (ref !is ComicPageRef.Local || regionsClosed || targetEdge <= 0) return null
+        // RectF is mutable. Freeze it before the first suspension so a later
+        // zoom/window update cannot change the region behind this request's key.
+        val requested = RectF(rect)
+        if (!requested.left.isFinite() || !requested.top.isFinite() || !requested.right.isFinite() || !requested.bottom.isFinite() ||
+            requested.width() < 8f || requested.height() < 8f) return null
+        val generation = regionGeneration
+        // Output resolution changes with the window/zoom target. A small tile must
+        // never satisfy a later high-resolution request after unfolding.
+        val key = "rgn|$generation|${ref.id}|$cacheTag|$targetEdge|${requested.left.toRawBits()},${requested.top.toRawBits()},${requested.right.toRawBits()},${requested.bottom.toRawBits()}"
         regionCache.get(key)?.let { return it }
-        return regionMutex.withLock {
-            withContext(Dispatchers.IO) {
+        regionMutex.lock()
+        try {
+            if (regionsClosed || generation != regionGeneration) return null
+            // Concurrent requests may have finished while this caller waited.
+            regionCache.get(key)?.let { return it }
+            return withContext(Dispatchers.IO) {
                 runCatching {
                     val decoder = decoderPool.get(ref.path) ?: run {
                         val d = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -660,7 +697,7 @@ class ComicPageLoader(
                     if (iw <= 0 || ih <= 0) return@withContext null
                     // rect 在 EXIF 归一化坐标系：先映射回文件原始坐标再解码
                     val o = exifOrientationOf(ref.path)
-                    val rawRect = exifRectToRaw(rect, iw, ih, o)
+                    val rawRect = exifRectToRaw(requested, iw, ih, o)
                     // 区域夹取到图像范围内
                     val r = Rect(
                         rawRect.left.toInt().coerceIn(0, iw - 1),
@@ -669,9 +706,8 @@ class ComicPageLoader(
                         rawRect.bottom.toInt().coerceIn(1, ih),
                     )
                     // 采样率：区域长边解码后不超过 targetEdge
-                    val longEdge = maxOf(r.width(), r.height())
-                    var sample = 1
-                    while (longEdge / sample > targetEdge) sample *= 2
+                    if (r.width() <= 0 || r.height() <= 0) return@withContext null
+                    val sample = sampleSizeFor(r.width(), r.height(), targetEdge)
                     val dopts = BitmapFactory.Options().apply {
                         inSampleSize = sample
                         inPreferredConfig = Bitmap.Config.ARGB_8888
@@ -681,10 +717,19 @@ class ComicPageLoader(
                     val bmp = exifDisplayMatrix(o)?.let { m ->
                         runCatching { Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, m, true) }.getOrDefault(raw)
                     } ?: raw
-                    regionCache.put(key, bmp)
-                    bmp
+                    // Both are decoder-owned until publication. The EXIF transform
+                    // may return raw itself, so preserve identity before recycling.
+                    if (bmp !== raw) raw.recycle()
+                    synchronized(regionLifecycleLock) {
+                        if (regionsClosed || generation != regionGeneration) {
+                            bmp.recycle()
+                            null
+                        } else bmp.also { regionCache.put(key, it) }
+                    }
                 }.getOrNull()
             }
+        } finally {
+            releaseRegionDecoder()
         }
     }
 
@@ -1039,8 +1084,9 @@ class ComicPageLoader(
     /** Bound allocation before decoding; shrinking afterwards still allocates the large scan. */
     private fun sampleSizeFor(w: Int, h: Int, maxEdge: Int): Int {
         var sample = 1
-        var long = maxOf(w, h)
-        while (long / sample > maxEdge) sample *= 2
+        val long = maxOf(w, h)
+        val edge = maxEdge.coerceAtLeast(1)
+        while (long / sample > edge && sample <= Int.MAX_VALUE / 2) sample *= 2
         return sample
     }
 
@@ -1055,18 +1101,10 @@ class ComicPageLoader(
         previewCache.evictAll()
         readingPreviews.evictAll()
         previewInputs.evictAll()
-        // regionCache 条目虽含指纹 key，但陈旧 tile 仍占 32MB LRU 空间——一并清空
+        // Invalidate in-flight publication before clearing retained tiles. Native
+        // decoders are released immediately or by the current borrower's finally.
+        resetRegionDecoders()
         regionCache.evictAll()
-        // decoder 池同样回收（evictAll 触发 entryRemoved → recycle）：必须先拿
-        // regionMutex，否则与进行中的 decodeRegion 并发 recycle 正在使用的 decoder
-        // （native use-after-free 崩溃窗口）；拿不到锁就跳过（shutdown 路径兜底）
-        if (regionMutex.tryLock()) {
-            try {
-                decoderPool.evictAll()
-            } finally {
-                regionMutex.unlock()
-            }
-        }
     }
 }
 

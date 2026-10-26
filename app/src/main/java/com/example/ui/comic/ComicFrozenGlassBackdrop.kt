@@ -32,7 +32,8 @@ internal fun rememberComicGlassBackdrop(
     val ordered = if (config.direction == ComicDirection.RTL) slots.reversed() else slots
     val bitmaps = ordered.map { slot -> key(slot.ref.id, slot.half) {
         val state by rememberPageBitmap(loader, slot, config, bookState)
-        (state as? PageBitmapState.Ready)?.bitmap?.asImageBitmap()
+        val bitmap = (state as? PageBitmapState.Ready)?.bitmap
+        remember(bitmap) { bitmap?.asImageBitmap() }
     } }
     val paper = if (config.bgType == ComicBgType.PAPER) remember(config.paperIntensity) {
         ComicReaderBackgrounds.paperTexture(config.paperIntensity)

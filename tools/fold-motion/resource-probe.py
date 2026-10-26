@@ -36,6 +36,9 @@ def main():
     parser.add_argument("--baseline-apk", type=Path)
     parser.add_argument("--optimized-apk", type=Path)
     parser.add_argument("--comparison", default="original-vs-optimized")
+    parser.add_argument("--output-dir", type=Path, help="Separate evidence directory; never overwrite another exercise")
+    parser.add_argument("--expected-avd", help="Check the AVD name before installing test packages")
+    parser.add_argument("--require-read-only", action="store_true", help="Require a matching emulator process launched with -read-only")
     parser.add_argument("--restart-every", type=int, default=0,
                         help="Restart only the task-owned AVD every N pairs, including before the first pair")
     parser.add_argument("--reuse-first-boot", action="store_true",
@@ -45,6 +48,8 @@ def main():
     parser.add_argument("--resume", action="store_true",
                         help="Reuse only complete validated pairs with matching APK hashes and scene")
     args = parser.parse_args()
+    if args.output_dir:
+        OUT = args.output_dir.resolve()
     OUT = OUT / args.build_mode / args.quality.lower() / args.scene
     OUT.mkdir(parents=True, exist_ok=True)
     adb = Path(os.environ["LOCALAPPDATA"]) / "Android/Sdk/platform-tools/adb.exe"
@@ -54,6 +59,19 @@ def main():
         if result.returncode:
             raise RuntimeError(f"adb {tail}: {result.stdout}\n{result.stderr}")
         return result.stdout.strip()
+
+    avd = command("emu", "avd", "name").splitlines()[0]
+    if args.expected_avd and avd != args.expected_avd:
+        raise RuntimeError(f"Unexpected AVD {avd!r}; expected {args.expected_avd!r}")
+    if args.require_read_only:
+        if args.restart_every:
+            raise RuntimeError("Read-only shared AVDs cannot use automatic restart")
+        matches = [p for p in psutil.process_iter(["name", "cmdline"])
+                   if "qemu-system" in (p.info["name"] or "").lower()
+                   and avd in (p.info["cmdline"] or [])
+                   and "-read-only" in (p.info["cmdline"] or [])]
+        if not matches:
+            raise RuntimeError("No matching read-only emulator process; refusing to touch the shared AVD")
 
     rows = []
     def restart_owned_emulator(pair):
@@ -169,6 +187,7 @@ def main():
     command("shell", "am", "force-stop", PACKAGE)
     if not args.trace:
         summary = {"serial": args.serial, "pairs": args.pairs, "apk": identity, "buildMode": args.build_mode, "quality": args.quality, "scene": args.scene, "comparison": args.comparison,
+                   "avd": avd, "readOnlyAvdVerified": args.require_read_only,
                    "restartEveryPairs": args.restart_every,
                    "bootSettleSeconds": 15,
                    "reusedFirstBoot": args.reuse_first_boot,

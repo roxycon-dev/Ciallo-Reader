@@ -1,0 +1,18 @@
+// Test-only frozen pagination comparison; does not affect normal builds.
+gradle.projectsEvaluated {
+    def app = rootProject.project(':app')
+    app.android.sourceSets.test.java.srcDir(rootProject.file('tools/fold-motion/pagination'))
+    app.tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+        filter {
+            includeTestsMatching 'com.example.ui.FoldMotionPaginationParityTest'
+            includeTestsMatching 'com.example.ui.PaginationChunkIntegrityTest'
+            includeTestsMatching 'com.example.ui.ReaderPaginationCacheTest'
+            includeTestsMatching 'com.example.ui.ChapterPageBufferTest'
+            includeTestsMatching 'com.example.data.PaginationImageHeightTest'
+        }
+        maxParallelForks = 1
+        maxHeapSize = '2048m'
+        jvmArgs('--add-exports=java.base/sun.nio.ch=ALL-UNNAMED', '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED')
+        testLogging { exceptionFormat = 'full' }
+    }
+}

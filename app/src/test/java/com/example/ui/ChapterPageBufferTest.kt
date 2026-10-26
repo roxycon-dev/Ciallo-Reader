@@ -23,6 +23,31 @@ class ChapterPageBufferTest {
         assertSame(ready, buffer.pages)
     }
 
+    @Test fun resizeKeepsTheOldReadingAnchorUntilTheFullNewLayoutIsReady() {
+        val narrow = key(360)
+        val wide = key(720)
+        val original = listOf("ab", "cd", "ef")
+        val buffer = ChapterPageBuffer(narrow, original)
+        buffer.request(wide)
+        assertFalse(buffer.publish(wide, listOf("abc"), complete = false))
+        assertSame(original, buffer.pages)
+        assertEquals(2, ReaderPageAnchors(buffer.pages).pageAt(5))
+        val ready = listOf("abc", "def")
+        assertTrue(buffer.publish(wide, ready))
+        assertSame(ready, buffer.pages)
+        assertEquals(1, ReaderPageAnchors(buffer.pages).pageAt(5))
+    }
+
+    @Test fun aNewChapterCanStillPublishProgressivelyAndRejectCancelledLayouts() {
+        val initial = key(360)
+        val buffer = ChapterPageBuffer(initial, emptyList())
+        assertTrue(buffer.publish(initial, listOf("ab"), complete = false))
+        assertTrue(buffer.publish(initial, listOf("ab", "cd"), complete = false))
+        buffer.request(key(720))
+        assertFalse(buffer.publish(initial, listOf("ab", "cd", "ef")))
+        assertEquals(listOf("ab", "cd"), buffer.pages)
+    }
+
     @Test fun returnToAnEarlierSizeAcceptsOnlyItsRequestedLayout() {
         val narrow = key(360); val wide = key(720)
         val buffer = ChapterPageBuffer(narrow, listOf("ab", "cd", "ef"))

@@ -81,10 +81,8 @@ private fun Modifier.frostedGlassFallback(shape: Shape, surfaceColor: Color): Mo
         surfaceColor.copy(alpha = (surfaceColor.alpha + GLASS_FALLBACK_ALPHA_BOOST).coerceAtMost(1f)),
         shape
     )
-    .drawWithContent {
-        // ① 全域介质渐变：左上受光提亮 → 右下轻微压暗，替代真实模糊的漫反射观感
-        drawRect(
-            brush = Brush.linearGradient(
+    .drawWithCache {
+        val medium = Brush.linearGradient(
                 colors = listOf(
                     Color.White.copy(alpha = 0.12f),
                     Color.Transparent,
@@ -92,18 +90,21 @@ private fun Modifier.frostedGlassFallback(shape: Shape, surfaceColor: Color): Mo
                     Color.Black.copy(alpha = 0.05f)
                 )
             )
-        )
-        // ② 顶部受光带：磨砂玻璃上沿的亮边
-        drawRect(
-            brush = Brush.verticalGradient(
+        val topLight = Brush.verticalGradient(
                 colors = listOf(Color.White.copy(alpha = 0.14f), Color.Transparent),
                 startY = 0f,
                 endY = size.height * 0.22f
-            ),
-            topLeft = Offset.Zero,
-            size = Size(size.width, size.height * 0.22f)
-        )
-        drawContent()
+            )
+        val topSize = Size(size.width, size.height * 0.22f)
+        onDrawWithContent {
+            drawRect(brush = medium)
+            drawRect(
+                brush = topLight,
+                topLeft = Offset.Zero,
+                size = topSize
+            )
+            drawContent()
+        }
     }
     .filmGrain(alpha = 0.05f)
 
@@ -138,8 +139,10 @@ fun rememberThemedGlassBackdrop(): Backdrop {
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
     return remember(surface, primary, secondary) {
+        val gradient = themeGradient(primary, secondary)
         CanvasBackdrop {
-            drawThemeGradient(surface, primary, secondary)
+            drawRect(surface)
+            drawRect(gradient)
         }
     }
 }
@@ -151,19 +154,14 @@ fun rememberGlassPanelBackdrop(): Backdrop {
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
     return remember(surface, primary, secondary) {
+        val gradient = Brush.linearGradient(
+            colors = listOf(primary.copy(alpha = 0.06f), Color.Transparent,
+                secondary.copy(alpha = 0.05f), primary.copy(alpha = 0.06f))
+        )
         CanvasBackdrop {
             // 关键：不画不透明底色，让 Dialog 背后被实时模糊的真实内容透过来
             drawRect(androidx.compose.ui.graphics.Color.Transparent)
-            drawRect(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        primary.copy(alpha = 0.06f),
-                        Color.Transparent,
-                        secondary.copy(alpha = 0.05f),
-                        primary.copy(alpha = 0.06f)
-                    )
-                )
-            )
+            drawRect(gradient)
         }
     }
 }
@@ -282,14 +280,10 @@ fun Modifier.liquidGlass(
 )
 
 /** DrawScope 小工具：绘制主题化渐变（供 CanvasBackdrop 使用）。 */
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawThemeGradient(
-    surface: Color,
+private fun themeGradient(
     primary: Color,
     secondary: Color
-) {
-    drawRect(surface)
-    drawRect(
-        brush = Brush.linearGradient(
+): Brush = Brush.linearGradient(
             colors = listOf(
                 primary.copy(alpha = 0.14f),
                 Color.Transparent,
@@ -297,8 +291,6 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawThemeGradient(
                 primary.copy(alpha = 0.12f)
             )
         )
-    )
-}
 
 /**
  * 预烘焙路径的效果链：必须与 [Modifier.liquidGlass] 的实时链逐参数一致，
@@ -398,17 +390,18 @@ fun Modifier.iridescentBorder(
         colors = colors.map { it.copy(alpha = alpha) },
         center = Offset(size.width / 2f, size.height / 2f)
     )
+    val outline = shape.createOutline(size, layoutDirection, this)
+    val stroke = Stroke(width.toPx())
     onDrawBehind {
-        val outline = shape.createOutline(size, layoutDirection, this)
         when (outline) {
             is Outline.Rounded -> drawRoundRect(
                 brush = brush,
                 cornerRadius = outline.roundRect.topLeftCornerRadius,
-                style = Stroke(width.toPx())
+                style = stroke
             )
             is Outline.Rectangle -> drawRect(
                 brush = brush,
-                style = Stroke(width.toPx())
+                style = stroke
             )
             else -> Unit
         }
@@ -434,16 +427,17 @@ fun Modifier.crystalInnerBevel(
         start = Offset(0f, 0f),
         end = Offset(size.width, size.height)
     )
+    val stroke = Stroke(width.toPx())
     onDrawBehind {
         when (outline) {
             is Outline.Rounded -> drawRoundRect(
                 brush = lightBrush,
                 cornerRadius = outline.roundRect.topLeftCornerRadius,
-                style = Stroke(width.toPx())
+                style = stroke
             )
             is Outline.Rectangle -> drawRect(
                 brush = lightBrush,
-                style = Stroke(width.toPx())
+                style = stroke
             )
             else -> Unit
         }
@@ -451,9 +445,8 @@ fun Modifier.crystalInnerBevel(
 }
 
 /** 径向渐变背景遮罩：中心（弹窗位置）亮、四周暗，模拟聚光灯打在立牌上。 */
-fun Modifier.radialGlassScrim(): Modifier = this.drawBehind {
-    drawRect(
-        brush = Brush.radialGradient(
+fun Modifier.radialGlassScrim(): Modifier = this.drawWithCache {
+    val brush = Brush.radialGradient(
             colors = listOf(
                 Color.Black.copy(alpha = 0.25f),
                 Color.Black.copy(alpha = PullOutConfig.SCRIM)
@@ -461,7 +454,7 @@ fun Modifier.radialGlassScrim(): Modifier = this.drawBehind {
             center = Offset(size.width * 0.5f, size.height * 0.78f),
             radius = size.maxDimension * 0.95f
         )
-    )
+    onDrawBehind { drawRect(brush) }
 }
 
 /** 从主题强调色推导虹彩边缘三色（同色系邻近色，不引入无关色相）。 */

@@ -1,6 +1,10 @@
 package com.example.ui
 
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.sp
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -45,5 +49,27 @@ class ReaderPaginationCacheTest {
         assertEquals(size, ReaderPaginationCache.retainedBytes())
         repeat(8) { ReaderPaginationCache.put(key("page$it"), listOf("page$it")) }
         assertNull(ReaderPaginationCache.get(first))
+    }
+    @Test fun allLayoutAttributesAndDensityParticipateButDrawOnlyColorsReusePages() {
+        val resolverToken = Any()
+        val style = TextStyle(fontSize = 24.sp, lineHeight = 32.sp, color = Color.Black)
+        fun environment(value: TextStyle = style, density: Float = 1f, scale: Float = 1f, token: Any = resolverToken) =
+            PaginationLayoutEnvironment(PaginationTextLayout(value), density, scale, token)
+        val original = key("正文").copy(layoutEnvironment = environment())
+        val pages = listOf("正文")
+        ReaderPaginationCache.put(original, pages)
+        assertSame(pages, ReaderPaginationCache.get(original.copy(layoutEnvironment = environment(style.copy(color = Color.Red)))))
+        assertNull(ReaderPaginationCache.get(original.copy(layoutEnvironment = environment(style.copy(letterSpacing = 4.sp)))))
+        assertNull(ReaderPaginationCache.get(original.copy(layoutEnvironment = environment(style.copy(fontWeight = FontWeight.Bold)))))
+        assertNull(ReaderPaginationCache.get(original.copy(layoutEnvironment = environment(density = 2f))))
+        assertNull(ReaderPaginationCache.get(original.copy(layoutEnvironment = environment(scale = 1.5f))))
+        assertNull(ReaderPaginationCache.get(original.copy(layoutEnvironment = environment(token = Any()))))
+    }
+
+    @Test fun resolverIdentityTokensRemainStableWithoutSharingAcrossResolvers() {
+        val first = Any()
+        val second = Any()
+        assertSame(PaginationFontEnvironments.tokenFor(first), PaginationFontEnvironments.tokenFor(first))
+        assertNotSame(PaginationFontEnvironments.tokenFor(first), PaginationFontEnvironments.tokenFor(second))
     }
 }

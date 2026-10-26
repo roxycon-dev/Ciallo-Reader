@@ -80,52 +80,10 @@ fun Modifier.shadowGlow(
     // RoundedCornerShape（原实现每帧分配，属于纯浪费）。
     val trailShape = remember(borderRadius) { RoundedCornerShape(borderRadius) }
 
-    return this.drawBehind {
-        val spreadPx = spread.toPx()
-        val breathingValue = breathingPx.value
-        val totalBlurRadiusPx = (blurRadius.toPx() + breathingValue).coerceAtLeast(0f)
+    return cachedShadowGlow(color, 1f, false, borderRadius, blurRadius, offsetX, offsetY, spread,
+        parallaxState, breathingPx, enableGlowTrail, trailShape, glowTrailProgress,
+        glowTrailLengthDegrees, glowTrailWidth, glowTrailBlurRadius, glowTrailAlpha)
 
-        val baseOffsetXPx = offsetX.toPx()
-        val baseOffsetYPx = offsetY.toPx()
-        val shadowBorderRadiusPx = borderRadius.toPx()
-
-        val dynamicOffsetXPx = parallaxState?.value?.first ?: 0f
-        val dynamicOffsetYPx = parallaxState?.value?.second ?: 0f
-
-        val totalOffsetXPx = baseOffsetXPx + dynamicOffsetXPx
-        val totalOffsetYPx = baseOffsetYPx + dynamicOffsetYPx
-
-        val left = -spreadPx + totalOffsetXPx
-        val top = -spreadPx + totalOffsetYPx
-        val right = size.width + spreadPx + totalOffsetXPx
-        val bottom = size.height + spreadPx + totalOffsetYPx
-
-        drawDeterministicGlowRoundRect(
-            left = left,
-            top = top,
-            right = right,
-            bottom = bottom,
-            cornerRadiusPx = shadowBorderRadiusPx,
-            color = color,
-            sigmaPx = blurRadiusToSigma(totalBlurRadiusPx),
-            dx = 0f,
-            dy = 0f,
-            alpha = 1f,
-            bucket = ShadowCacheBucket.ANIMATED,
-        )
-
-        if (enableGlowTrail) {
-            drawGlowTrailAlongShape(
-                shape = trailShape,
-                progress = glowTrailProgress.value,
-                trailFraction = glowTrailLengthDegrees / 360f,
-                color = color,
-                strokeWidthPx = glowTrailWidth.toPx(),
-                blurRadiusPx = glowTrailBlurRadius.toPx(),
-                alpha = glowTrailAlpha
-            )
-        }
-    }
 }
 
 /**
@@ -183,52 +141,46 @@ fun Modifier.shadowGlow(
 
     val trailShape = remember(borderRadius) { RoundedCornerShape(borderRadius) }
 
-    return this.drawBehind {
-        if (gradientColors.isEmpty() || alpha == 0f) return@drawBehind
-        val spreadPx = spread.toPx()
-        val totalBlurRadiusPx = (blurRadius.toPx() + breathingPx.value).coerceAtLeast(0f)
+    return cachedShadowGlow(gradientColors.firstOrNull() ?: Color.Transparent, alpha, gradientColors.isEmpty(),
+        borderRadius, blurRadius, offsetX, offsetY, spread, parallaxState, breathingPx,
+        enableGlowTrail, trailShape, glowTrailProgress, glowTrailLengthDegrees,
+        glowTrailWidth, glowTrailBlurRadius, glowTrailAlpha)
 
-        val baseOffsetXPx = offsetX.toPx()
-        val baseOffsetYPx = offsetY.toPx()
-        val shadowBorderRadiusPx = borderRadius.toPx()
+}
 
-        val dynamicOffsetXPx = parallaxState?.value?.first ?: 0f
-        val dynamicOffsetYPx = parallaxState?.value?.second ?: 0f
-
-        val totalOffsetXPx = baseOffsetXPx + dynamicOffsetXPx
-        val totalOffsetYPx = baseOffsetYPx + dynamicOffsetYPx
-
-        val left = -spreadPx + totalOffsetXPx
-        val top = -spreadPx + totalOffsetYPx
-        val right = size.width + spreadPx + totalOffsetXPx
-        val bottom = size.height + spreadPx + totalOffsetYPx
-
-        val tint = gradientColors.first()
-        drawDeterministicGlowRoundRect(
-            left = left,
-            top = top,
-            right = right,
-            bottom = bottom,
-            cornerRadiusPx = shadowBorderRadiusPx,
-            color = tint,
-            sigmaPx = blurRadiusToSigma(totalBlurRadiusPx),
-            dx = 0f,
-            dy = 0f,
-            alpha = alpha,
-            bucket = ShadowCacheBucket.ANIMATED,
-        )
-
-        if (enableGlowTrail) {
-            drawGlowTrailAlongShape(
-                shape = trailShape,
-                progress = glowTrailProgress.value,
-                trailFraction = glowTrailLengthDegrees / 360f,
-                color = tint,
-                strokeWidthPx = glowTrailWidth.toPx(),
-                blurRadiusPx = glowTrailBlurRadius.toPx(),
-                alpha = glowTrailAlpha
-            )
-        }
+private fun Modifier.cachedShadowGlow(
+    color: Color,
+    alpha: Float,
+    empty: Boolean,
+    borderRadius: Dp,
+    blurRadius: Dp,
+    offsetX: Dp,
+    offsetY: Dp,
+    spread: Dp,
+    parallax: androidx.compose.runtime.State<Pair<Float, Float>>?,
+    breathing: androidx.compose.runtime.State<Float>,
+    trailEnabled: Boolean,
+    trailShape: Shape,
+    trailProgress: androidx.compose.runtime.State<Float>,
+    trailLengthDegrees: Float,
+    trailWidth: Dp,
+    trailBlurRadius: Dp,
+    trailAlpha: Float,
+): Modifier = drawWithCache {
+    if (empty || alpha == 0f) return@drawWithCache onDrawBehind { }
+    val glow = RoundRectGlowDrawCache(size.width, size.height, spread.toPx(), offsetX.toPx(), offsetY.toPx(),
+        borderRadius.toPx(), color, alpha)
+    val baseBlurRadius = blurRadius.toPx()
+    val strokeWidth = trailWidth.toPx()
+    val trail = if (trailEnabled && strokeWidth > 0f && trailAlpha > 0f) GlowTrailDrawCache(
+        trailShape.createOutline(size, layoutDirection, this), strokeWidth, trailBlurRadius.toPx() * .577f,
+        trailAlpha, trailLengthDegrees / 360f,
+    ) else null
+    onDrawBehind {
+        val totalBlurRadius = (baseBlurRadius + breathing.value).coerceAtLeast(0f)
+        glow.draw(this, parallax?.value?.first ?: 0f, parallax?.value?.second ?: 0f,
+            blurRadiusToSigma(totalBlurRadius))
+        trail?.draw(this, trailProgress.value, color)
     }
 }
 

@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -579,7 +580,7 @@ internal class ComicHarismController(private val loader: ComicPageLoader? = null
             if (field != value) lastAppliedRects = null
             field = value
         }
-    var density = 1f
+    @Volatile var density = 1f
 
     /** 双页书脊模式（第 12 条）：每 harism 页 = 单张漫画页，步进 2 */
     @Volatile
@@ -866,7 +867,14 @@ internal class ComicHarismController(private val loader: ComicPageLoader? = null
         // harism 折叠几何将背面纹理水平镜像显示（v.mPosX 取负）——预镜像一次，
         // 翻页过程中背面页码/内容正向可读（"清晰看到即将出现的那一页"）
         val m = android.graphics.Matrix().apply { setScale(-1f, 1f) }
-        return Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+        return try {
+            val mirrored = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+            if (mirrored !== bmp) bmp.recycle()
+            mirrored
+        } catch (error: Throwable) {
+            bmp.recycle()
+            throw error
+        }
     }
 
     /**
@@ -926,13 +934,22 @@ internal class ComicHarismController(private val loader: ComicPageLoader? = null
         if (front != null) {
             // 1/6 降采样再放大 = 轻模糊（透纸的柔化观感），避免逐像素高斯开销
             val small = Bitmap.createScaledBitmap(front, max(2, bw / 6), max(2, bh / 6), true)
-            val soft = Bitmap.createScaledBitmap(small, bw, bh, true)
-            val paint = Paint().apply {
-                isFilterBitmap = true
-                alpha = (0.20f * 255).toInt()   // 20%：透过纸张隐约可见
-                isDither = true
+            var soft: Bitmap? = null
+            try {
+                val softened = Bitmap.createScaledBitmap(small, bw, bh, true)
+                soft = softened
+                val paint = Paint().apply {
+                    isFilterBitmap = true
+                    alpha = (0.20f * 255).toInt()   // 20%：透过纸张隐约可见
+                    isDither = true
+                }
+                canvas.drawBitmap(softened, 0f, 0f, paint)
+            } finally {
+                // Software Canvas consumes these pixels synchronously. They are
+                // private intermediates, never loader/source or published textures.
+                if (soft !== small && soft !== front) soft?.recycle()
+                if (small !== front) small.recycle()
             }
-            canvas.drawBitmap(soft, 0f, 0f, paint)
         }
         return bmp
     }
@@ -1229,6 +1246,23 @@ private fun pagePaperInt(config: ComicReaderConfig): Int = when (config.bgType) 
     else -> 0xFF1D1D21.toInt()
 }
 
+/** Exact inputs shared by page geometry and texture composition. */
+internal data class CurlLayoutInputs(
+    val fit: ComicFit,
+    val customFitBase: ComicFit,
+    val customFitScale: Float,
+    val doubleAlign: ComicDoubleAlign,
+    val doubleGapDp: Float,
+    val doubleShiftXDp: Float,
+    val doubleShiftYDp: Float,
+    val density: Float,
+)
+
+internal fun curlLayoutInputs(config: ComicReaderConfig, density: Float) = CurlLayoutInputs(
+    config.fit, config.customFitBase, config.customFitScale,
+    config.doubleAlign, config.doubleGapDp, config.doubleShiftXDp, config.doubleShiftYDp, density,
+)
+
 /**
  * harism GL 卷页阅读器（CURL 模式新本体）。对外签名与旧 ComicCurlReader 一致，
  * 由 ComicPagedReader 在 pageAnim == CURL 时调用。
@@ -1252,6 +1286,9 @@ internal fun ComicHarismCurlReader(
 ) {
     val rtl = config.direction == ComicDirection.RTL
     val n = layout.spreadCount
+    val density = LocalDensity.current.density
+    val layoutInputs = remember(config, density) { curlLayoutInputs(config, density) }
+    val pipelineFingerprint = remember(config) { config.imagePipelineFingerprint() }
     // 第 12 条：双页模式 = 书脊翻页模型（每 harism 页一张漫画页，步进 2）；
     // 单页/其余模式 = 整 spread 纹理（步进 1，原 harism 行为）
     val twoPageMode = config.mode == ComicMode.DOUBLE
@@ -1284,7 +1321,8 @@ internal fun ComicHarismCurlReader(
 
     /* ── 布局/配置变化：更新 controller 并标脏（重载由预加载 effect 完成后触发，
           避免用旧/空缓存立即重建纹理导致"配置变更后当前页空白直至翻页"） ── */
-    LaunchedEffect(layout, config.imagePipelineFingerprint(), config.fit, config.doubleAlign, config.doubleGapDp, config.bgType, config.mode, config.direction) {
+    LaunchedEffect(layout, pipelineFingerprint, layoutInputs, config.bgType, config.mode, config.direction) {
+        controller.density = density
         controller.layout = layout
         controller.config = config
         controller.reversed = rtl
@@ -1413,8 +1451,8 @@ internal fun ComicHarismCurlReader(
     // 漫画翻译（第十五轮）：烘焙代数入键——译文位图替换后重推纹理
     val translationEpoch = LocalComicTranslationEpoch.current
     LaunchedEffect(
-        currentSpread, layout, config.imagePipelineFingerprint(), bookState,
-        config.fit, config.doubleAlign, config.doubleGapDp, config.bgType,
+        currentSpread, layout, pipelineFingerprint, bookState,
+        layoutInputs, config.bgType,
         config.direction, config.mode, translationEpoch, pageRetry,
     ) {
         controller.bookState = bookState
@@ -1547,7 +1585,7 @@ internal fun ComicHarismCurlReader(
             factory = { ctx ->
                 ComicCurlView(ctx, translucent = true).apply {
                     controller.view = this
-                    controller.density = resources.displayMetrics.density
+                    controller.density = density
                     controller.layout = layout
                     controller.config = latestConfig
                     controller.bookState = bookState

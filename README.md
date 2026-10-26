@@ -27,6 +27,8 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 **English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
 
+**算法与适配验证（待发布）**：继续减少动效重复计算，修复长章折叠重分页的换行丢失与暂时跳位、漫画区域清晰度缓存及资源释放。保留现有视觉与画质分档。145 项 JVM 对照与回归、19 项 Android 模拟器回归通过；整款软件降至原占用 10–20% 尚未证实。详见[本轮验证记录](docs/performance-stability-2026-10-26.md)。
+
 **1.5.4 / 246**：现有抽纸变形、液态按钮、水滴选择、液态滑条及挤压开关保留在「高／极致」；「均衡／流畅／极简」使用普通过渡和基础控件。切换画质保留当前数值与选项。成人源仍默认启用，原更新安装流程保留，并包含启动异常保护与本地诊断导出。详见 [1.5.4 更新说明](docs/release-1.5.4-2026-10-26.md)。
 
 **1.5.5 / 247 · 覆盖升级修正**：恢复原正式版包名 `com.aistudio.novelreader.kxmpzq`，继续使用原固定签名；1.5.2 等同包名、同签名正式版可以直接覆盖升级并保留数据。保留 1.5.4 的动效分档和启动修复。已安装 `com.roxycon.ciallo.reader.probe` 包名的 1.5.3 对照包或 1.5.4 用户，需先在「设置 → 设备互传与备份」导出，再安装本版并导入；两个包名的数据不会自动互通。详见 [1.5.5 更新说明](docs/release-1.5.5-2026-10-26.md)。本次未进行报毒复测。

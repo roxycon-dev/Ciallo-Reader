@@ -500,25 +500,50 @@ private fun boxBlurThreePass(alpha: IntArray, w: Int, h: Int, radius: Int, n: In
     }
 }
 
-/** 水平方向盒式模糊（滑动窗口，边缘 clamp 复制，避免边框变暗）。 */
-private fun boxBlurHorizontal(src: IntArray, dst: IntArray, w: Int, h: Int, r: Int) {
-    val div = 2 * r + 1
-    val inv = 1f / div
+/** Horizontal running window, with the same replicated edges and Float rounding. */
+internal fun boxBlurHorizontal(src: IntArray, dst: IntArray, w: Int, h: Int, r: Int) {
+    val inv = 1f / (2 * r + 1)
     val last = w - 1
+    val addEnd = maxOf(0, last - r)
+    val leadingEnd = minOf(r, w)
     for (y in 0 until h) {
         val base = y * w
-        // 右端：x + r + 1 ≥ w 后统一取 last；左端：x - r < 0 期间取 0。
-        // 用「越界前 / 全越界后」两段循环替代逐像素 coerceIn，数学结果完全一致。
-        var sum = 0
-        for (i in -r..r) {
-            sum += src[base + if (i < 0) 0 else if (i > last) last else i]
+        val first = src[base]
+        val final = src[base + last]
+        // Replace repeated edge additions with exact integer multiplication. The
+        // accumulator stays an Int; the output conversion is deliberately unchanged.
+        var sum = first * (r + 1)
+        for (i in 1..minOf(r, last)) sum += src[base + i]
+        if (r > last) sum += final * (r - last)
+        var x = 0
+        if (r < addEnd) {
+            while (x < r) {
+                dst[base + x] = ((sum * inv) + .5f).toInt()
+                sum += src[base + x + r + 1] - first
+                x++
+            }
+            while (x < addEnd) {
+                dst[base + x] = ((sum * inv) + .5f).toInt()
+                sum += src[base + x + r + 1] - src[base + x - r]
+                x++
+            }
+        } else {
+            // A narrow mask can reach the right edge before leaving the left one.
+            while (x < addEnd) {
+                dst[base + x] = ((sum * inv) + .5f).toInt()
+                sum += src[base + x + r + 1] - first
+                x++
+            }
+            while (x < leadingEnd) {
+                dst[base + x] = ((sum * inv) + .5f).toInt()
+                sum += final - first
+                x++
+            }
         }
-        for (x in 0 until w) {
-            dst[base + x] = ((sum * inv) + 0.5f).toInt()
-            val addIdx = x + r + 1
-            val subIdx = x - r
-            sum += (if (addIdx > last) src[base + last] else src[base + addIdx]) -
-                (if (subIdx < 0) src[base] else src[base + subIdx])
+        while (x < w) {
+            dst[base + x] = ((sum * inv) + .5f).toInt()
+            sum += final - src[base + x - r]
+            x++
         }
     }
 }

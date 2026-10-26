@@ -139,6 +139,9 @@ internal class LiquidSliderView(context: Context) : View(context) {
     private var tintGradient: RadialGradient? = null
     private val lightGradient = RadialGradient(0f, 0f, 1f, 0xe6ffffff.toInt(), Color.TRANSPARENT, Shader.TileMode.CLAMP)
     private val bubbleTypeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    private val bubbleText = arrayOfNulls<String>(2)
+    private val bubbleTextWidth = FloatArray(2)
+    private var bubbleTextBaseline = Float.NaN
     private val bitmapDestination = Rect()
     private var bitmapCanvas: Canvas? = null
     private var liquidStart = 0f
@@ -181,9 +184,16 @@ internal class LiquidSliderView(context: Context) : View(context) {
     var finished: () -> Unit = {}
     var draggingChanged: (Boolean) -> Unit = {}
     var label: (Float) -> String = { it.toString() }
-    private val inset get() = min(26f, width / d / 3f)
-    private val trackWidth get() = (width / d - inset * 2).coerceAtLeast(1f)
-    private val cy get() = min(68f, height / d - 25f)
+    private var widthDp = 0f
+    private var inset = 0f
+    private var trackWidth = 1f
+    private var cy = -25f
+    private fun updateGeometry(w: Int = width, h: Int = height) {
+        widthDp = w / d
+        inset = min(26f, widthDp / 3f)
+        trackWidth = (widthDp - inset * 2).coerceAtLeast(1f)
+        cy = min(68f, h / d - 25f)
+    }
     private fun px(i: Int) = inset + (if (reverse) 1f - position[i] else position[i]) * trackWidth
     private fun norm(v: Float) = if (upper > lower && v.isFinite()) ((v - lower) / (upper - lower)).coerceIn(0f, 1f) else 0f
     private fun value(f: Float) = lower + f * (upper - lower)
@@ -214,9 +224,16 @@ internal class LiquidSliderView(context: Context) : View(context) {
         }
         if (oldRanged != ranged || oldA != target[0] || oldB != target[1]) wake()
     }
-    private fun wake() { invalidate(); if (!running && isAttachedToWindow) { running = true; lastFrame = 0L; postOnAnimation(frame) } }
+    private fun wake() {
+        invalidate()
+        if (!running && isAttachedToWindow && isShown && windowVisibility == VISIBLE) {
+            running = true; lastFrame = 0L; postOnAnimation(frame)
+        }
+    }
+    private fun pauseFrames() { removeCallbacks(frame); running = false; lastFrame = 0L }
     private val frame = object : Runnable {
         override fun run() {
+            if (!isAttachedToWindow || !isShown || windowVisibility != VISIBLE) { pauseFrames(); return }
             val now = System.nanoTime()
             val dt = if (lastFrame == 0L) 1f / 120 else ((now - lastFrame) / 1e9f).coerceIn(.001f, cfg.MAX_DT)
             lastFrame = now
@@ -249,7 +266,12 @@ internal class LiquidSliderView(context: Context) : View(context) {
         }
         return moving
     }
-    fun stop() { release(false); removeCallbacks(frame); running = false; buffer?.recycle(); buffer = null; bitmapCanvas = null; active = -1 }
+    fun stop() { release(false); pauseFrames(); buffer?.recycle(); buffer = null; bitmapCanvas = null; active = -1 }
+    override fun onAttachedToWindow() { super.onAttachedToWindow(); wake() }
+    override fun onVisibilityAggregated(isVisible: Boolean) {
+        super.onVisibilityAggregated(isVisible)
+        if (isVisible) wake() else { release(false); pauseFrames() }
+    }
     override fun onDetachedFromWindow() { stop(); super.onDetachedFromWindow() }
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
@@ -257,11 +279,15 @@ internal class LiquidSliderView(context: Context) : View(context) {
         if (d != density) {
             d = density
             touchSlop = ViewConfiguration.get(context).scaledTouchSlop / d
+            updateGeometry()
             buffer?.recycle(); buffer = null; bitmapCanvas = null
             release(false); wake()
         }
     }
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) { release(false); buffer?.recycle(); buffer = null; bitmapCanvas = null; wake() }
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        updateGeometry(w, h)
+        release(false); buffer?.recycle(); buffer = null; bitmapCanvas = null; wake()
+    }
     private fun publish(f: Float) {
         if (active < 0) return
         val bounded = f.coerceIn(if (active == 1) target[0] + gap else 0f, if (active == 0 && ranged) target[1] - gap else 1f)
@@ -446,13 +472,18 @@ internal class LiquidSliderView(context: Context) : View(context) {
             if (p > .005f) {
                 val text = label(value(if (stops > 0) (target[i] * (stops + 1)).roundToInt().toFloat() / (stops + 1) else target[i]))
                 paint.textSize = 12f; paint.typeface = bubbleTypeface
-                val textWidth = paint.measureText(text)
-                val half = min(width / d / 2f, textWidth / 2 + 9f)
-                val bx = (x - v * .03f).coerceIn(half, max(half, width / d - half))
+                if (bubbleText[i] != text) {
+                    bubbleText[i] = text
+                    bubbleTextWidth[i] = paint.measureText(text)
+                }
+                if (bubbleTextBaseline.isNaN()) bubbleTextBaseline = (paint.ascent() + paint.descent()) / 2f
+                val textWidth = bubbleTextWidth[i]
+                val half = min(widthDp / 2f, textWidth / 2 + 9f)
+                val bx = (x - v * .03f).coerceIn(half, max(half, widthDp - half))
                 val by = centerY - 42f - 4f * p
                 paint.color = tint(p); c.drawRoundRect(bx - half, by - 12, bx + half, by + 12, 12f, 12f, paint)
                 paint.color = Color.argb((255 * p).toInt(), 255, 255, 255)
-                c.drawText(text, bx - textWidth / 2, by - (paint.ascent() + paint.descent()) / 2, paint)
+                c.drawText(text, bx - textWidth / 2, by - bubbleTextBaseline, paint)
             }
         }
         paint.shader = null; paint.color = Color.WHITE

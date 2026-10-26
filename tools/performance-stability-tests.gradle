@@ -1,0 +1,45 @@
+// Focused visual, numerical, lifecycle and resize regressions. No product build changes.
+// Generate fixtures with tools/verify-fold-motion.py prepare and
+// tools/fold-motion/prepare-glow-parity.py first.
+gradle.projectsEvaluated {
+    def app = rootProject.project(':app')
+    app.android.sourceSets.test.java.srcDir(rootProject.file('artifacts/fold-motion/parity-src'))
+    app.android.sourceSets.test.java.srcDir(rootProject.file('tools/fold-motion/parity'))
+    app.android.sourceSets.test.java.srcDir(rootProject.file('tools/fold-motion/pagination'))
+    app.android.sourceSets.test.java.srcDir(rootProject.file('artifacts/motion-round2/glow-parity-src'))
+    app.tasks.matching { it.name in ['kspDebugUnitTestKotlin', 'compileDebugUnitTestJavaWithJavac'] }
+        .configureEach { enabled = false }
+    app.tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+        maxParallelForks = 1
+        maxHeapSize = '2048m'
+        filter {
+            includeTestsMatching('com.example.ui.FoldMotion*')
+            includeTestsMatching('com.example.ui.ReaderPagination*')
+            includeTestsMatching('com.example.ui.PaginationChunkIntegrityTest')
+            includeTestsMatching('com.example.ui.ChapterPageBufferTest')
+            includeTestsMatching('com.example.ui.ReaderTypography125Test')
+            includeTestsMatching('com.example.ui.ReaderProgressEffectTest')
+            includeTestsMatching('com.example.ui.ReaderGlassPolishTest')
+            includeTestsMatching('com.example.ui.components.PaperAndSliderTest')
+            includeTestsMatching('com.example.ui.components.LiquidSliderLifecycleTest')
+            includeTestsMatching('com.example.ui.components.ScrollTiltSchedulingTest')
+            includeTestsMatching('com.example.ui.components.GlassDecorationCacheTest')
+            includeTestsMatching('com.example.ui.components.LiquidSegment*Test')
+            includeTestsMatching('com.example.ui.components.MotionQualityTest')
+            includeTestsMatching('com.example.ui.components.LiquidGlassShaderCompileTest')
+            includeTestsMatching('com.example.ui.comic.ComicRegionLifecycleTest')
+            includeTestsMatching('com.example.ui.comic.ComicCurlDeviceAdaptationTest')
+            includeTestsMatching('com.example.ui.comic.ComicImagePipelineTest')
+            includeTestsMatching('com.example.ui.comic.ComicLoadingReliabilityTest')
+            includeTestsMatching('com.example.ui.comic.ComicHarismCurlTest')
+            includeTestsMatching('com.example.ui.comic.ComicChromePerformanceTest')
+            includeTestsMatching('com.example.data.AdultSourceDefaultsTest')
+            includeTestsMatching('com.example.data.PaginationImageHeightTest')
+            includeTestsMatching('me.trishiraj.shadowglow.Shadow*Test')
+            excludeTestsMatching('*sliderCpuTenAlternatingPairs')
+            excludeTestsMatching('*tenAlternatingCpuPairs')
+        }
+        jvmArgs('--add-exports=java.base/sun.nio.ch=ALL-UNNAMED', '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED')
+        testLogging { exceptionFormat = 'full' }
+    }
+}

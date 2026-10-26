@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.channels.Channel
 import kotlin.math.abs
 import kotlin.math.exp
 
@@ -32,6 +33,7 @@ class ScrollTiltController {
 
     internal var targetDeg = 0f
     internal var lastEmitNanos = 0L
+    private val motionRequests = Channel<Unit>(Channel.CONFLATED)
 
     /** 滚动信号源每帧上报像素速度（px/ms，向下滚动为正） */
     internal fun submitVelocity(pxPerMs: Float) {
@@ -40,6 +42,7 @@ class ScrollTiltController {
             .coerceIn(-SCROLL_TILT_MAX_DEG, SCROLL_TILT_MAX_DEG)
         targetDeg = target
         lastEmitNanos = System.nanoTime()
+        motionRequests.trySend(Unit)
     }
 
     private fun velocityToDeg(v: Float): Float =
@@ -54,6 +57,38 @@ class ScrollTiltController {
         targetDeg = 0f
         lastEmitNanos = 0L
         tiltDeg.floatValue = 0f
+        motionRequests.tryReceive()
+    }
+
+    /** Suspend without requesting frames after the original settling rule reaches zero. */
+    internal suspend fun runFrames() {
+        while (true) {
+            motionRequests.receive()
+            var lastNanos = 0L
+            do {
+                // Requests arriving during motion are already represented by targetDeg.
+                motionRequests.tryReceive()
+                val moving = withFrameNanos { now ->
+                    val dtMs = if (lastNanos == 0L) 16.7f
+                        else ((now - lastNanos) / 1_000_000f).coerceAtLeast(1f)
+                    lastNanos = now
+                    advance(now, dtMs)
+                }
+            } while (moving)
+        }
+    }
+
+    internal fun advance(nowNanos: Long, dtMs: Float): Boolean {
+        val idle = isIdle(nowNanos)
+        if (idle) targetDeg = 0f
+        val target = targetDeg
+        val current = tiltDeg.floatValue
+        val tau = if (idle) RELEASE_TAU_MS else FOLLOW_TAU_MS
+        val k = 1f - exp(-dtMs / tau)
+        var next = current + (target - current) * k
+        if (target == 0f && abs(next) < 0.02f) next = 0f
+        if (next != current) tiltDeg.floatValue = next
+        return !idle || next != 0f
     }
 
     companion object {
@@ -78,31 +113,13 @@ val LocalScrollTilt = staticCompositionLocalOf { ScrollTiltController() }
 
 /**
  * 应用根挂载一次：每帧驱动「指数趋近 + 闲置衰减」。
- * 手写逐帧趋近而非 Animatable：单实例零协程开销，且目标突变（滚动启停）时无弹簧重启毛刺。
- * 仅 MAX 画质档挂载（滚动倾斜是 MAX 卡片特效；低档不再有常驻帧循环，保住「流畅」档省电）。
+ * 活动期间保留原有指数趋近与收敛规则；静止后挂起，收到滚动信号后在下一帧恢复。
+ * 仅 MAX 画质档挂载（滚动倾斜是 MAX 卡片特效）。
  */
 @Composable
 fun ScrollTiltHost(controller: ScrollTiltController = LocalScrollTilt.current) {
     LaunchedEffect(controller) {
-        var lastNanos = 0L
-        while (true) {
-            withFrameNanos { now ->
-                val dtMs = if (lastNanos == 0L) 16.7f
-                           else ((now - lastNanos) / 1_000_000f).coerceAtLeast(1f)
-                lastNanos = now
-                val idle = controller.isIdle(now)
-                if (idle) controller.targetDeg = 0f
-                val target = controller.targetDeg
-                val current = controller.tiltDeg.floatValue
-                // 非对称手感：滚动中短 τ 快速跟随；停止后长 τ 极软缓慢回正（无过冲）
-                val tau = if (idle) RELEASE_TAU_MS else FOLLOW_TAU_MS
-                val k = 1f - exp(-dtMs / tau)
-                var next = current + (target - current) * k
-                // 完全归零后停写，避免长期驻留时每帧无效失效
-                if (target == 0f && abs(next) < 0.02f) next = 0f
-                if (next != current) controller.tiltDeg.floatValue = next
-            }
-        }
+        controller.runFrames()
     }
 }
 

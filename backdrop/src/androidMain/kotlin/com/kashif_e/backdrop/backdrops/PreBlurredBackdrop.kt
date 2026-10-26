@@ -31,6 +31,9 @@ import com.kashif_e.backdrop.Backdrop
 import com.kashif_e.backdrop.BackdropEffectScope
 import com.kashif_e.backdrop.BackdropEffectScopeImpl
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * 性能优化（视觉零变化）：静态背景的"整屏只模糊一次"方案。
@@ -122,9 +125,15 @@ class PreBlurredBackdrop internal constructor(
             }
             workLayer.renderEffect = scope.renderEffect?.asComposeRenderEffect()
             val bmp = workLayer.toImageBitmap()
+            currentCoroutineContext().ensureActive()
             if (bmp.width <= 0 || bmp.height <= 0) return false
+            // A fold/resize can invalidate coordinates while GPU readback is suspended.
+            val current = source.layerCoordinates
+            if (current !== srcCoords || !srcCoords.isAttached || srcCoords.size != IntSize(w, h)) return false
             bitmap = bmp
             return true
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {
             return false
         } finally {
@@ -158,8 +167,11 @@ private suspend fun verifySnapshotEffects(layer: GraphicsLayer, density: Density
             .createBlurEffect(16f, 16f, android.graphics.Shader.TileMode.DECAL)
             .asComposeRenderEffect()
         val bmp = layer.toImageBitmap()
+        currentCoroutineContext().ensureActive()
         val pm = bmp.toPixelMap()
         pm[2, 2].alpha > 0.05f
+    } catch (cancelled: CancellationException) {
+        throw cancelled
     } catch (_: Exception) {
         false
     } finally {
@@ -184,7 +196,7 @@ fun rememberPreBlurredBackdrop(
     val backdrop = remember(source) { PreBlurredBackdrop(source) }
     val workLayer = rememberGraphicsLayer()
     val density = LocalDensity.current
-    LaunchedEffect(buildKey, effects, density) {
+    LaunchedEffect(backdrop, workLayer, buildKey, effects, density) {
         backdrop.bitmap = null // 立即回退实时路径，避免过渡期间显示旧背景
         if (settleDelayMs > 0) delay(settleDelayMs)
         backdrop.bake(workLayer, density, effects)

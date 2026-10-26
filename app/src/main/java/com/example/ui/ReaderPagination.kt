@@ -10,23 +10,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.text.Paragraph
-import androidx.compose.ui.text.Placeholder
-import androidx.compose.ui.text.PlaceholderVerticalAlign
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.ParagraphIntrinsics
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import com.example.ui.reader.NovelInlineImages
-import com.example.ui.reader.buildAnnotatedWithImages
 import com.example.ui.theme.AppFonts
+import java.lang.ref.WeakReference
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
@@ -77,8 +71,52 @@ data class PaginationKey(
     val lineHeightPx: Float,
     val fontFamily: FontFamily,
     val includeFontPadding: Boolean,
-    val titleReservePx: Int
+    val titleReservePx: Int,
+    // Opaque, optional environment retains source compatibility with existing cache callers.
+    val layoutEnvironment: Any? = null
 )
+
+/** Draw-only color/shadow changes must not discard useful text layout work. */
+internal class PaginationTextLayout(private val style: TextStyle) {
+    override fun equals(other: Any?): Boolean = other is PaginationTextLayout &&
+        style.hasSameLayoutAffectingAttributes(other.style)
+
+    override fun hashCode(): Int {
+        // A layout-only subset is sufficient for hashing; equals checks every layout field.
+        var result = style.fontSize.hashCode()
+        result = 31 * result + style.lineHeight.hashCode()
+        result = 31 * result + (style.fontFamily?.hashCode() ?: 0)
+        result = 31 * result + (style.fontWeight?.hashCode() ?: 0)
+        result = 31 * result + style.letterSpacing.hashCode()
+        return result
+    }
+}
+
+internal data class PaginationLayoutEnvironment(
+    val textLayout: PaginationTextLayout,
+    val density: Float,
+    val fontScale: Float,
+    val fontResolverToken: Any
+)
+
+/** Stable identity without making cache entries retain an Activity's font resolver. */
+internal object PaginationFontEnvironments {
+    private class Entry(val resolver: WeakReference<Any>, val token: Any)
+    private val entries = ArrayList<Entry>()
+
+    @Synchronized fun tokenFor(resolver: Any): Any {
+        val iterator = entries.iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            val retained = entry.resolver.get()
+            if (retained == null) iterator.remove()
+            else if (retained === resolver) return entry.token
+        }
+        // Identity metadata is bounded too; eviction causes only a future cache miss.
+        if (entries.size >= 64) entries.removeAt(0)
+        return Any().also { entries.add(Entry(WeakReference(resolver), it)) }
+    }
+}
 
 /** Vertical padding applied by RenderSinglePage around the page content (12dp x 2). */
 internal const val PAGE_VERTICAL_PADDING_DP = 12
@@ -112,13 +150,18 @@ private const val EAGER_CHAPTER_THRESHOLD = 60_000
 internal class ChapterPageBuffer(initialKey: PaginationKey, initialPages: List<String>) {
     private val lock = Any()
     private var requestedKey = initialKey
+    private var displayedKey = initialKey
     var pages: List<String> by mutableStateOf(initialPages)
         private set
 
     fun request(key: PaginationKey) = synchronized(lock) { requestedKey = key }
-    fun publish(key: PaginationKey, result: List<String>): Boolean = synchronized(lock) {
+    fun publish(key: PaginationKey, result: List<String>, complete: Boolean = true): Boolean = synchronized(lock) {
         if (requestedKey != key) return false
+        // A partial resized layout may not yet contain the reader's current character anchor.
+        // Keep the old layout until the complete replacement covers the entire chapter.
+        if (!complete && displayedKey != key && pages.isNotEmpty()) return false
         pages = result
+        displayedKey = key
         true
     }
 }
@@ -173,6 +216,12 @@ fun rememberChapterPages(
     val fontSizePx = with(density) { bodyStyle.fontSize.toPx() }.coerceAtLeast(8f)
     // 缓存必须使用实际行高；小于 1.2 倍字号的不同设置也会产生不同排版。
     val lineHeightPx = with(density) { bodyStyle.lineHeight.toPx() }
+    val environment = remember(bodyStyle, density, fontFamilyResolver) {
+        PaginationLayoutEnvironment(
+            PaginationTextLayout(bodyStyle), density.density, density.fontScale,
+            PaginationFontEnvironments.tokenFor(fontFamilyResolver)
+        )
+    }
     val key = PaginationKey(
         content = content,
         widthPx = widthPx,
@@ -181,7 +230,8 @@ fun rememberChapterPages(
         lineHeightPx = lineHeightPx,
         fontFamily = bodyStyle.fontFamily ?: AppFonts.Default,
         includeFontPadding = false,
-        titleReservePx = titleReservePx
+        titleReservePx = titleReservePx,
+        layoutEnvironment = environment
     )
 
     val cached = remember(key) { ReaderPaginationCache.get(key) }
@@ -220,7 +270,7 @@ fun rememberChapterPages(
                 val computation = currentCoroutineContext()
                 paginateChunked(content, params, progressiveSink = { partial ->
                     computation.ensureActive()
-                    buffer.publish(key, partial)
+                    buffer.publish(key, partial, complete = false)
                 }, cancellationCheck = { computation.ensureActive() })
             }
             ReaderPaginationCache.put(key, full)
@@ -247,8 +297,8 @@ private class LayoutParams(
  * each chunk with a real [Paragraph] layout, appending pages so the concatenation is
  * byte-for-byte identical to [content].
  *
- * When [progressiveSink] is provided it is invoked after every chunk with the pages
- * computed so far; the final returned list contains every page.
+ * When [progressiveSink] is provided it receives intermediate chunks. The caller publishes
+ * the returned complete list once, without copying and publishing the last chunk twice.
  */
 private fun paginateChunked(
     content: String,
@@ -257,40 +307,144 @@ private fun paginateChunked(
     cancellationCheck: () -> Unit
 ): List<String> {
     cancellationCheck()
-    val chunks = splitChunks(content)
-    if (chunks.size <= 1) {
-        return paginateChunk(chunks.first(), params, reserveTitle = true)
-    }
-
     val allPages = mutableListOf<String>()
-    chunks.forEachIndexed { index, chunk ->
+    for (range in paginationChunkRanges(content, cancellationCheck = cancellationCheck)) {
         cancellationCheck()
-        val reserveTitle = index == 0
-        allPages += paginateChunk(chunk, params, reserveTitle)
-        progressiveSink?.invoke(allPages.toList())
+        val chunk = content.substring(range.first, range.last + 1)
+        allPages += paginateChunk(chunk, params, reserveTitle = range.first == 0, cancellationCheck = cancellationCheck)
+        // The original <=40k path returned directly; it does not need a duplicate snapshot.
+        if (range.last < content.lastIndex) progressiveSink?.invoke(allPages.toList())
     }
     return allPages
 }
 
-/** Splits text into chunks of at most [PAGINATION_CHUNK_CHARS], preferring '\n' cuts. */
-private fun splitChunks(content: String, maxChars: Int = PAGINATION_CHUNK_CHARS): List<String> {
-    if (content.length <= maxChars) return listOf(content)
-    val chunks = mutableListOf<String>()
+/**
+ * Lazy ranges avoid retaining a second copy of the entire chapter before measurement.
+ * Newline cuts include the newline; hard cuts keep UTF-16 pairs, CRLF and image tokens
+ * whole so concatenated pages retain the original text and reading offsets.
+ */
+internal fun paginationChunkRanges(
+    content: String,
+    maxChars: Int = PAGINATION_CHUNK_CHARS,
+    cancellationCheck: () -> Unit = {}
+): Sequence<IntRange> = sequence {
+    require(maxChars > 0)
+    cancellationCheck()
+    val tokens = if (NovelInlineImages.hasImages(content)) {
+        paginationImageTokenRanges(content, cancellationCheck).iterator()
+    } else null
+    var token = if (tokens?.hasNext() == true) tokens.next() else null
     var start = 0
     while (start < content.length) {
-        val end = minOf(content.length, start + maxChars)
+        cancellationCheck()
+        var end = start + minOf(content.length - start, maxChars)
         if (end < content.length) {
-            val newline = content.lastIndexOf('\n', end)
-            if (newline > start + maxChars / 2) {
-                chunks.add(content.substring(start, newline))
-                start = newline + 1
-                continue
+            // Search only this chunk's latter half, never rescan earlier chapter text.
+            val earliestNewline = start + maxChars / 2
+            var newline = end
+            while (newline >= earliestNewline && content[newline] != '\n') {
+                if ((newline and 1023) == 0) cancellationCheck()
+                newline--
+            }
+            if (newline >= earliestNewline) end = newline + 1
+            while (token != null && token.last < start) {
+                token = if (tokens?.hasNext() == true) tokens.next() else null
+            }
+            while (token != null && token.first < end) {
+                if (token.last >= end) {
+                    end = if (token.first > start) token.first else token.last + 1
+                    break
+                }
+                token = if (tokens?.hasNext() == true) tokens.next() else null
+            }
+            if (end < content.length && end > start &&
+                ((content[end - 1].isHighSurrogate() && content[end].isLowSurrogate()) ||
+                    (content[end - 1] == '\r' && content[end] == '\n'))
+            ) {
+                end = if (end - 1 > start) end - 1 else end + 1
             }
         }
-        chunks.add(content.substring(start, end))
+        yield(start until end)
         start = end
     }
-    return chunks
+}
+
+/**
+ * Linear equivalent of TOKEN_REGEX for chunk-boundary protection only. A failed path
+ * candidate and prefixes nested in that path share the same first delimiter and failure;
+ * resume at that failure instead of backtracking over the same long malformed path.
+ * The image parsing/rendering protocol continues to use NovelInlineImages.TOKEN_REGEX.
+ */
+internal fun paginationImageTokenRanges(
+    content: String,
+    cancellationCheck: () -> Unit = {}
+): Sequence<IntRange> = sequence {
+    var search = 0
+    while (search <= content.length - 5) {
+        cancellationCheck()
+        var start = search
+        while (start <= content.length - 5 && !content.regionMatches(start, "[IMG:", 0, 5)) {
+            if ((start and 1023) == 0) cancellationCheck()
+            start++
+        }
+        if (start > content.length - 5) break
+        var cursor = start + 5
+        val pathStart = cursor
+        while (cursor < content.length && content[cursor] != '|' && content[cursor] != ']') {
+            if ((cursor and 1023) == 0) cancellationCheck()
+            cursor++
+        }
+        if (cursor == content.length) break
+        if (cursor == pathStart || content[cursor] != '|') {
+            search = cursor
+            continue
+        }
+        cursor++
+        val widthStart = cursor
+        while (cursor < content.length && content[cursor] in '0'..'9') {
+            if ((cursor and 1023) == 0) cancellationCheck()
+            cursor++
+        }
+        if (cursor == content.length) break
+        if (cursor == widthStart || content[cursor] != '|') {
+            search = cursor
+            continue
+        }
+        cursor++
+        val heightStart = cursor
+        while (cursor < content.length && content[cursor] in '0'..'9') {
+            if ((cursor and 1023) == 0) cancellationCheck()
+            cursor++
+        }
+        if (cursor == content.length) break
+        if (cursor == heightStart || content[cursor] != ']') {
+            search = cursor
+            continue
+        }
+        yield(start..cursor)
+        search = cursor + 1
+    }
+}
+
+/** Primitive line metadata: the source text already owns every character. */
+private class PaginationItems(initialCapacity: Int) {
+    private var ends = IntArray(initialCapacity)
+    private var heights = FloatArray(initialCapacity)
+    var size = 0
+        private set
+
+    fun add(end: Int, height: Float) {
+        if (size == ends.size) {
+            ends = ends.copyOf(size * 2)
+            heights = heights.copyOf(size * 2)
+        }
+        ends[size] = end
+        heights[size] = height
+        size++
+    }
+
+    fun endAt(index: Int): Int = ends[index]
+    fun heightAt(index: Int): Float = heights[index]
 }
 
 /**
@@ -307,19 +461,20 @@ private fun splitChunks(content: String, maxChars: Int = PAGINATION_CHUNK_CHARS)
 private fun paginateChunk(
     chunk: String,
     params: LayoutParams,
-    reserveTitle: Boolean
+    reserveTitle: Boolean,
+    cancellationCheck: () -> Unit
 ): List<String> {
-    // ── 原子项序列：文本行（Paragraph 真实排版）与图片块（按长宽高占空间） ──
-    data class Item(val text: String, val heightPx: Float)
-
-    val items = mutableListOf<Item>()
+    // Keep exact source boundaries instead of allocating an Item and substring per line.
+    val items = PaginationItems((chunk.length / 32 + 1).coerceIn(1, 128))
+    var blockStart = 0
     NovelInlineImages.splitIntoBlocks(chunk, params.widthPx.toFloat(), params.pageHeightPx.toFloat())
         .forEach { block ->
+            cancellationCheck()
             when (block) {
                 is NovelInlineImages.InlineBlock.Image -> {
                     // 图片块：高度 = displaySize 收敛值（不超过页高），整块不可分割
                     val h = block.heightPx.coerceAtMost(params.pageHeightPx.toFloat()).coerceAtLeast(1f)
-                    items.add(Item(block.raw, h))
+                    items.add(blockStart + block.raw.length, h)
                 }
                 is NovelInlineImages.InlineBlock.Text -> {
                     if (block.text.isEmpty()) return@forEach
@@ -327,36 +482,33 @@ private fun paginateChunk(
                     val paragraph = buildParagraph(block.text, params)
                     val lineCount = paragraph.lineCount
                     if (lineCount == 0) {
-                        items.add(Item(block.text, 1f))
+                        items.add(blockStart + block.text.length, 1f)
+                        blockStart += block.raw.length
                         return@forEach
                     }
                     for (i in 0 until lineCount) {
+                        if ((i and 127) == 0) cancellationCheck()
                         val lineH = (paragraph.getLineBottom(i) - paragraph.getLineTop(i)).coerceAtLeast(1f)
                         val start = paragraph.getLineStart(i)
                         val end = paragraph.getLineEnd(i)
                         // 末尾换行会产生没有字符的空行，其高度由页级复测计入。
                         if (start == end) continue
-                        items.add(Item(block.text.substring(start, end), lineH))
+                        items.add(blockStart + end, lineH)
                     }
                 }
             }
+            blockStart += block.raw.length
         }
 
-    if (items.isEmpty()) return if (chunk.isEmpty()) emptyList() else listOf(chunk)
+    if (items.size == 0) return if (chunk.isEmpty()) emptyList() else listOf(chunk)
 
     // 行高只用于估算断点。小行距下，整章的中间行成为独立页的首尾行时，
     // Paragraph 会补足字形边界；末尾换行也会多出一行，必须按页重新测量。
-    val endOffsets = IntArray(items.size)
-    var offset = 0
-    items.forEachIndexed { index, item ->
-        offset += item.text.length
-        endOffsets[index] = offset
-    }
-
     val pages = mutableListOf<String>()
     var startItem = 0
     var startChar = 0
     while (startItem < items.size) {
+        cancellationCheck()
         // 标题预留必须用于首页所有行，不能只在追加第一项时生效。
         val pageHeight = if (reserveTitle && pages.isEmpty()) {
             params.firstPageHeightPx.toFloat()
@@ -367,15 +519,18 @@ private fun paginateChunk(
         var endItem = startItem
         var estimatedHeight = 0f
         while (endItem < items.size) {
-            val nextHeight = estimatedHeight + items[endItem].heightPx
+            val nextHeight = estimatedHeight + items.heightAt(endItem)
             if (endItem > startItem && nextHeight > pageHeight) break
             estimatedHeight = nextHeight
             endItem++
         }
 
-        fun fits(end: Int): Boolean = measurePageHeightPx(
-            chunk.substring(startChar, endOffsets[end - 1]), params
-        ) <= pageHeight
+        fun fits(end: Int): Boolean {
+            cancellationCheck()
+            return measurePageHeightPx(
+                chunk.substring(startChar, items.endAt(end - 1)), params
+            ) <= pageHeight
+        }
 
         if (endItem > startItem + 1 && !fits(endItem)) {
             // 在真实行/图边界二分回退，避免每加一行都排版整页。
@@ -389,7 +544,7 @@ private fun paginateChunk(
             endItem = low
         }
 
-        val endChar = endOffsets[endItem - 1]
+        val endChar = items.endAt(endItem - 1)
         pages.add(chunk.substring(startChar, endChar))
         startChar = endChar
         startItem = endItem
@@ -413,36 +568,16 @@ private fun measurePageHeightPx(text: String, params: LayoutParams): Float =
  * same TextStyle (fontFamily / fontSize / lineHeight / includeFontPadding), same width
  * and same density.
  *
- * 章节文本含 [IMG:...] 内嵌图片占位符时，用 AnnotatedString + inlineContent 让
- * 分页测量计入图片实际占位高度（图片尺寸推导与渲染侧 NovelInlineImages 一致）。
+ * Image tokens have already been split into independently sized blocks by both callers.
  */
 private fun buildParagraph(text: String, params: LayoutParams): Paragraph {
-    val maxImageHeightPx = params.pageHeightPx.toFloat()
-    // 与渲染端同源：相邻 token 强制断行，否则两个整页高占位同行叠绘
-    val text = NovelInlineImages.normalizeTokenBreaks(text)
-    // 内嵌图片占位符（1.7 API）：占位范围标记正文中的 [IMG:...] 文本区域，
-    // 测量时该区域按给定宽高参与排版（与渲染侧 NovelInlineImages 同一套推导）
-    val placeholderRanges = mutableListOf<AnnotatedString.Range<Placeholder>>()
-    if (NovelInlineImages.hasImages(text)) {
-        val spPerPx = 1f / (params.density.density * params.density.fontScale).coerceAtLeast(0.01f)
-        NovelInlineImages.TOKEN_REGEX.findAll(text).forEach { m ->
-            val w = m.groupValues[2].toIntOrNull()?.coerceAtLeast(1) ?: 1
-            val h = m.groupValues[3].toIntOrNull()?.coerceAtLeast(1) ?: 1
-            val (dw, dh) = NovelInlineImages.displaySize(w, h, params.widthPx.toFloat(), maxImageHeightPx)
-            placeholderRanges.add(
-                AnnotatedString.Range(
-                    item = Placeholder((dw * spPerPx).sp, (dh * spPerPx).sp, PlaceholderVerticalAlign.TextCenter),
-                    start = m.range.first,
-                    end = m.range.last + 1
-                )
-            )
-        }
-    }
+    // Both callers already split valid image tokens into independent image blocks.
+    // Literal malformed markers remain ordinary text, with unchanged UTF-16 offsets.
     val intrinsics = ParagraphIntrinsics(
         text = text,
         style = params.bodyStyle,
         spanStyles = emptyList(),
-        placeholders = placeholderRanges,
+        placeholders = emptyList(),
         density = params.density,
         fontFamilyResolver = params.fontFamilyResolver
     )
