@@ -177,7 +177,11 @@ class JsComicSource(
     }
 
     private suspend fun applyVerifiedUserAgent(runtime: JsSourceEngine, userAgent: String) {
-        if (sourceKey != "mycomic" || userAgent.isBlank()) return
+        if (sourceKey !in setOf("mycomic", "bilimanga") || userAgent.isBlank()) return
+        if (sourceKey == "bilimanga") {
+            runtime.call("src.headers['User-Agent'] = ${q(userAgent)}; src.searchGuardsReadyAt = 0")
+            return
+        }
         runtime.call("""
             (()=>{
                 if (typeof headers !== 'undefined') {
@@ -235,7 +239,7 @@ class JsComicSource(
                 val browserAgent = if (sourceKey == "mycomic") {
                     verificationPrefs.getString("${sourceKey}_user_agent", null)
                         ?: android.webkit.WebSettings.getDefaultUserAgent(context)
-                } else null
+                } else if (sourceKey == "bilimanga") verificationPrefs.getString("${sourceKey}_user_agent", null) else null
                 browserAgent?.let { userAgent ->
                     applyVerifiedUserAgent(runtime, userAgent)
                 }
@@ -685,6 +689,7 @@ class JsComicSource(
     override suspend fun login(credential: LoginCredential): SourceResult<Boolean> =
         withContext(Dispatchers.IO) {
             try {
+                if (sourceKey == "bilimanga") return@withContext verifyWebsite()
                 if (sourceKey == "mycomic") {
                     var supplied = credential.cookie.orEmpty().trim()
                     if (supplied.isBlank()) {
@@ -755,6 +760,7 @@ class JsComicSource(
         val url = when (sourceKey) {
             "mycomic" -> "https://mycomic.com/cn/comics?sort=-id"
             "nhentai" -> "https://nhentai.net/"
+            "bilimanga" -> "https://www.bilimanga.net/"
             else -> return SourceResult.Error(SourceException.Unknown("该源不支持此验证入口"))
         }
         return try {
@@ -763,7 +769,7 @@ class JsComicSource(
             val verified = awaitWebsiteVerification(url, userAgent)
             if (!verified) SourceResult.Error(SourceException.Unknown("站点验证尚未完成"))
             else {
-                if (sourceKey == "mycomic") {
+                if (sourceKey in setOf("mycomic", "bilimanga")) {
                     applyVerifiedUserAgent(runtime, userAgent)
                     verificationPrefs.edit().putString("${sourceKey}_user_agent", userAgent).apply()
                 }

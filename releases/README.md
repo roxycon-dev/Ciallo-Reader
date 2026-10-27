@@ -2,6 +2,10 @@
 
 本地 APK 不纳入 Git，正式包与校验文件上传 GitHub Release。
 
+**1.5.9 / 251**：[GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.9) · [下载 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.9/Ciallo-Reader-v1.5.9.apk) · [SHA256SUMS](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.9/SHA256SUMS.txt) · [发布说明](../docs/release-1.5.9-2026-10-28.md)。
+
+修复哔哩与 19 漫画连接、整章下载中断，补齐共享图片 HTTP 凭据保护。两个报告源共 73 页主机下载与离线解码通过。固定签名；系统报毒是否消除尚未确认，未运行模拟器或新查杀测试。
+
 **1.5.8 / 250**：[GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.8) · [下载 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.8/Ciallo-Reader-v1.5.8.apk) · [SHA256SUMS](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.8/SHA256SUMS.txt) · [发布说明](../docs/release-1.5.8-2026-10-27.md)。
 
 修复紳士漫畫、19 漫画、爱漫画的搜索与图片线路。三个源的 91 页完成全新整章下载和离线解码。沿用 1.5.6 起的新签名。需要账号或网站验证的源保留原提示，未计作本轮通过。

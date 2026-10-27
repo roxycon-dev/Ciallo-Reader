@@ -40,6 +40,15 @@ internal object SharedHttpTransport {
     fun builder():okhttp3.OkHttpClient.Builder=okhttp3.OkHttpClient.Builder()
         .connectionPool(pool)
         .dispatcher(dispatcher)
+        // Runs after cookie/application interceptors and on every redirect hop.
+        .addNetworkInterceptor { chain ->
+            val request = chain.request()
+            if (!request.url.isHttps && listOf("Cookie", "Authorization", "Proxy-Authorization")
+                    .any { !request.header(it).isNullOrBlank() }) {
+                throw java.io.IOException("非 HTTPS 图片或书源地址不能携带登录凭据")
+            }
+            chain.proceed(request)
+        }
         // Let OkHttp negotiate/decode gzip. Script-supplied br/zstd prevented its
         // transparent decoding and exposed compressed bytes to text/JSON parsers.
         .addInterceptor { chain ->

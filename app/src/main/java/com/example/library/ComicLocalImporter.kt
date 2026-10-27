@@ -27,6 +27,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
+import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.Request
 import okhttp3.Response
 import java.io.File
@@ -159,7 +160,6 @@ object ComicLocalImporter {
                     requestBuilder.header("Accept", "image/webp,image/jpeg,image/png,*/*;q=0.8")
                 }
                 val cookie = JsCookieJar.cookieHeader(context, fetchUrl)
-                    .ifBlank { JsCookieJar.cookieHeader(context, url) }
                 if (cookie.isNotBlank() &&
                     fetchHeaders.keys.none { it.equals("Cookie", ignoreCase = true) }
                 ) {
@@ -172,7 +172,7 @@ object ComicLocalImporter {
                 // 跨章节全局页并发上限：总网络压力 ≤4
                 globalPageSemaphore.acquire()
                 try {
-                fetchWithRetry(context, request).use { response ->
+                fetchWithRetry(client(context), request).use { response ->
                     if (!response.isSuccessful) {
                         throw IOException("图片下载失败 HTTP ${response.code} (${url.take(80)})")
                     }
@@ -328,13 +328,20 @@ object ComicLocalImporter {
         options.outWidth > 0 && options.outHeight > 0
     } catch (_: Exception) { false }
 
-    private suspend fun fetchWithRetry(context: Context, request: Request): Response {
+    internal suspend fun fetchWithRetry(client: OkHttpClient, request: Request): Response {
         var lastError: IOException? = null
         repeat(3) { attempt ->
             try {
-                val response = client(context).newCall(request).executeCancellable()
+                val response = client.newCall(request).executeCancellable()
                 if (response.code !in 500..599 && response.code != 429 || attempt == 2) {
-                    return response
+                    if (!response.isSuccessful) return response
+                    // Keep truncated/timeout body reads inside the retry, before writing a page.
+                    try {
+                        val type = response.body?.contentType()
+                        val bytes = response.body?.byteStream()?.use { it.readImportBytes(32 * 1024 * 1024) }
+                            ?: throw IOException("图片响应为空")
+                        return response.newBuilder().body(bytes.toResponseBody(type)).build()
+                    } catch (e: Exception) { response.close(); throw e }
                 }
                 val rateLimited = response.code == 429
                 val retryAfter = response.header("Retry-After")?.toLongOrNull()

@@ -10,7 +10,7 @@ class BiliManga extends ComicSource {
 
     key = "bilimanga"
 
-    version = "1.1.5"
+    version = "1.1.6"
 
     minAppVersion = "1.6.0"
 
@@ -26,13 +26,14 @@ class BiliManga extends ComicSource {
     }
 
     readerHeaders() {
-        return Object.assign({}, this.headers, {
-            "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36"
-        });
+        return Object.assign({}, this.headers);
     }
+
+    verificationError() { return new Error("哔哩漫画访问受限（HTTP 403），请在书源管理中打开该源的「验证」后重试"); }
 
     async page(url, headers) {
         const res = await Network.get(url, headers || this.headers);
+        if (res.status === 403) throw this.verificationError();
         if (res.status !== 200) throw new Error("哔哩页面返回 " + res.status);
         if (typeof res.body !== "string" || !res.body.trim()) throw new Error("哔哩页面返回空响应，请重试");
         return res;
@@ -60,6 +61,7 @@ class BiliManga extends ComicSource {
                 Network.get(`${this.baseUrl}/search.html?search_guard=css`, this.headers),
                 Network.get(`${this.baseUrl}/search.html?search_guard=js`, this.headers)
             ]);
+            if (cssRes.status === 403 || jsRes.status === 403) throw this.verificationError();
             if (cssRes.status !== 200 || jsRes.status !== 200) throw "搜索凭证请求失败，请稍后重试";
             if (typeof jsRes.body !== "string" || !jsRes.body.trim()) throw new Error("哔哩搜索凭证返回空响应，请重试");
             const m = jsRes.body.match(/cookie="(.*?)";/);
@@ -80,6 +82,7 @@ class BiliManga extends ComicSource {
         // The ticket is consumed by each search. Only the CSS/JS guards may be reused.
         const redeemed = await Network.get(`${this.baseUrl}/search.html?search_guard=redeem`,
             Object.assign({}, this.headers, { "Cache-Control": "no-cache" }));
+        if (redeemed.status === 403) throw this.verificationError();
         const after = (await Network.getCookies(this.baseUrl) || []).map(c => c.name);
         if (redeemed.status !== 200 || !this.hasCookie(after, "jieqiSearchTicket")) {
             throw "獲取搜索憑證失敗，請稍後重試";
@@ -88,15 +91,19 @@ class BiliManga extends ComicSource {
 
     search = {
         load: async (keyword, options, page) => {
-            await this.ensureSearchTicket();
-            const cookie = await this.cookieHeader();
-            const res = await Network.get(
-                `${this.baseUrl}/search/${encodeURIComponent(keyword)}_${page}.html`,
-                Object.assign({}, this.headers, cookie ? { Cookie: cookie } : {})
-            );
-            if (res.status !== 200) throw `搜索失败: ${res.status}`;
-            if (typeof res.body !== "string" || !res.body.length) throw "搜索响应为空，请稍后重试";
-            return this.parseSearch(res, page);
+            for (let attempt = 0; attempt < 2; attempt++) {
+                await this.ensureSearchTicket();
+                const cookie = await this.cookieHeader();
+                const res = await Network.get(
+                    `${this.baseUrl}/search/${encodeURIComponent(keyword)}_${page}.html`,
+                    Object.assign({}, this.headers, cookie ? { Cookie: cookie } : {})
+                );
+                if (res.status === 403 && attempt === 0) { this.searchGuardsReadyAt = 0; continue; }
+                if (res.status === 403) throw "哔哩漫画访问受限（HTTP 403），请在书源管理中打开该源的「验证」后重试";
+                if (res.status !== 200) throw `搜索失败: ${res.status}`;
+                if (typeof res.body !== "string" || !res.body.length) throw "搜索响应为空，请稍后重试";
+                return this.parseSearch(res, page);
+            }
         }
     }
 
@@ -114,10 +121,7 @@ class BiliManga extends ComicSource {
         return this.browsePath(`/top/${order}/${page}.html`,page,[]);
     }
     async browsePath(path, page, categoryTags) {
-        // The public catalogue has a desktop DOM; keep its browser identity consistent.
-        const response = await this.page(this.baseUrl + path, Object.assign({}, this.headers, {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-        }));
+        const response = await this.page(this.baseUrl + path, this.headers);
         const doc = new HtmlDocument(response.body);
         try {
             const comics = [];

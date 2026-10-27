@@ -412,13 +412,13 @@ class JsMessageHandler(
             }
             // 合并脚本显式 Cookie 与本地 CookieJar：之前直接覆盖会把脚本里
             // 的 cookie（如 ehentai 的 nw=1）丢掉，导致站点响应异常/挂起。
+            requireSecureCredentials(url, effectiveHeaders.keys)
             val scriptCookie = sourceHeaders?.entries
                 ?.firstOrNull { it.key.toString().equals("Cookie", ignoreCase = true) }
                 ?.value?.toString()?.trim()
             val jarCookie = getCookiesFor(url).trim()
-            val mergedCookie = listOfNotNull(scriptCookie, jarCookie)
-                .filter { it.isNotBlank() }
-                .joinToString("; ")
+            val mergedCookie = JsCookieJar.mergeHeaders(scriptCookie, jarCookie)
+            effectiveHeaders.keys.filter { it.equals("Cookie", true) }.forEach { effectiveHeaders.remove(it) }
             if (mergedCookie.isNotBlank()) effectiveHeaders["Cookie"] = mergedCookie
             requireSecureCredentials(url, effectiveHeaders.keys)
 
@@ -579,15 +579,18 @@ class JsMessageHandler(
         // These public sources work directly while some system proxy routes
         // return empty HTML or truncate the response. Consume the direct reply
         // completely before falling back to the configured proxy/Chromium.
-        val scopedDirectFirst = sourceKey in setOf("wnacg", "nineteen", "aimanhua")
+        val scopedDirectFirst = sourceKey in setOf("wnacg", "nineteen", "aimanhua", "bilimanga")
         val publicMirror = sourceKey == "pufei" && host in setOf("www.guoman.net", "m.guoman.net") ||
             sourceKey == "ikmmh" && host == "ymcdnyfqdapp.ikmmh.com"
         val directMirrorRetry = httpFirst && publicMirror
         val preferDirect = publicMirror && (publicDirectRoutes[host] ?: 0L) > android.os.SystemClock.elapsedRealtime()
         // Bili's search ticket redemption deliberately returns an empty 200 response.
         val allowEmpty = sourceKey == "bilimanga" && url.toHttpUrl().queryParameter("search_guard") == "redeem"
+        // Leave time for the alternate 19 Manga origin within aggregate search's 60 s budget.
+        val routeTimeoutSeconds = if (sourceKey == "nineteen") 8L else 18L
         var requestUrl = url
         var lastError = "源站连接失败"
+        var verificationRequired = false
         val requestHeaders = LinkedHashMap(headers)
         for (attempt in 0..(if (scopedDirectFirst) 2 else 1)) {
             requestJob?.ensureActive()
@@ -610,8 +613,8 @@ class JsMessageHandler(
             }
             val response = try {
                 if (http) {
-                    val boundedClient = client.newBuilder().connectTimeout(8, TimeUnit.SECONDS)
-                        .readTimeout(12, TimeUnit.SECONDS).callTimeout(18, TimeUnit.SECONDS)
+                    val boundedClient = client.newBuilder().connectTimeout(minOf(8L, routeTimeoutSeconds), TimeUnit.SECONDS)
+                        .readTimeout(minOf(12L, routeTimeoutSeconds), TimeUnit.SECONDS).callTimeout(routeTimeoutSeconds, TimeUnit.SECONDS)
                         .apply {
                             if (directMirror) proxy(java.net.Proxy.NO_PROXY)
                             if (scopedDirectFirst) protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
@@ -628,13 +631,14 @@ class JsMessageHandler(
                     }
                 } else {
                     val payload = body?.let { requestBody -> okio.Buffer().also { requestBody.writeTo(it) }.readByteArray() }
-                    var result = cronetRequest(method, requestUrl, requestHeaders, payload, timeoutMs = 15_000)
+                    val timeoutMs = minOf(15_000L, routeTimeoutSeconds * 1000)
+                    var result = cronetRequest(method, requestUrl, requestHeaders, payload, timeoutMs = timeoutMs)
                     if (result.error == null && CfWebViewSolver.isChallengeResponse(result.status, result.headers)) {
                         val solved = CfWebViewSolver.solveAndSync(context, requestUrl,
                             requestHeaders.entries.firstOrNull { it.key.equals("User-Agent", true) }?.value.orEmpty(), requestHeaders)
                         if (solved) {
                             getCookiesFor(requestUrl).takeIf(String::isNotBlank)?.let { requestHeaders["Cookie"] = it }
-                            result = cronetRequest(method, requestUrl, requestHeaders, payload, timeoutMs = 15_000)
+                            result = cronetRequest(method, requestUrl, requestHeaders, payload, timeoutMs = timeoutMs)
                         }
                     }
                     result
@@ -649,6 +653,7 @@ class JsMessageHandler(
             val retryable = response.error != null || empty || pageProblem != null || response.status == 403 ||
                 response.status == 429 || response.status >= 500
             if (retryable) {
+                if (sourceKey == "bilimanga" && response.status == 403) verificationRequired = true
                 if (directMirror) publicDirectRoutes.remove(host)
                 lastError = when {
                     pageProblem != null -> pageProblem
@@ -674,6 +679,8 @@ class JsMessageHandler(
                     if (bytes) Base64.encodeToString(body, Base64.NO_WRAP) else decodeComicText(body, response.headers)).toString()
         }
         JsSourceProxy.forgetRoute(url)
+        if (verificationRequired) return JSONObject().put("status", 403).put("url", url)
+            .put("headers", JSONObject()).put("body", "").toString()
         return JSONObject().put("error", "$lastError，请重试").toString()
     }
 
@@ -690,7 +697,9 @@ class JsMessageHandler(
     )
 
     private fun requireSecureCredentials(url: String, headerNames: Iterable<String>) {
-        if (!url.toHttpUrl().isHttps && headerNames.any { it.equals("Cookie", true) || it.equals("Authorization", true) })
+        if (!url.toHttpUrl().isHttps && headerNames.any {
+                it.equals("Cookie", true) || it.equals("Authorization", true) || it.equals("Proxy-Authorization", true)
+            })
             throw java.io.IOException("非 HTTPS 书源不能发送登录凭据")
     }
 

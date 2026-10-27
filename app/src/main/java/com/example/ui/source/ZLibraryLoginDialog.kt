@@ -74,6 +74,7 @@ fun ZLibraryLoginDialog(
     val registrationUrl by com.example.ui.components.rememberAsyncState<String?>(null, source) {
         value = kotlinx.coroutines.withTimeoutOrNull(5_000) { source.getRegistrationUrl() }
     }
+    val websiteVerification = source.id in setOf("js_mycomic", "js_bilimanga")
     val isJsSource = source.id.startsWith("js_")
     val supportsCookieLogin = !isJsSource || source.id == "js_mycomic"
     var loginModeTab by remember(source.id) { mutableStateOf(if (source.id == "js_mycomic") 1 else 0) } // 0: 账号密码, 1: Cookie
@@ -166,7 +167,7 @@ fun ZLibraryLoginDialog(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = if (source.id == "js_mycomic") "验证 ${source.name}" else if (isJsSource) "登录 ${source.name}" else "登录 Z-Library",
+                            text = if (websiteVerification) "验证 ${source.name}" else if (isJsSource) "登录 ${source.name}" else "登录 Z-Library",
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp,
                             color = MaterialTheme.colorScheme.onSurface
@@ -179,7 +180,7 @@ fun ZLibraryLoginDialog(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    if (supportsCookieLogin && source.id != "js_mycomic") {
+                    if (supportsCookieLogin && !websiteVerification) {
                         com.example.ui.components.SegmentedPillSelector(
                             options = listOf(0 to "账号密码", 1 to if (source.id == "js_mycomic") "cf_clearance" else "粘贴 Cookie"),
                             selected = loginModeTab,
@@ -198,7 +199,7 @@ fun ZLibraryLoginDialog(
                         focusedLeadingIconColor = MaterialTheme.colorScheme.secondary
                     )
 
-                    if (source.id == "js_mycomic") {
+                    if (websiteVerification) {
                         Text("点击下方按钮，在应用内完成站点验证。验证成功后会自动返回，浏览凭据由应用保存。",
                             fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else if (loginModeTab == 0) {
@@ -250,7 +251,7 @@ fun ZLibraryLoginDialog(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     AppLiquidButton(
-                        text = if (source.id == "js_mycomic") { if (isLoading) "等待站点验证" else "打开站点验证" } else if (isLoading) "登录中" else "确认登录",
+                        text = if (websiteVerification) { if (isLoading) "等待站点验证" else "打开站点验证" } else if (isLoading) "登录中" else "确认登录",
                         enabled = !isLoading,
                         onClick = {
                             scope.launch {
@@ -267,7 +268,7 @@ fun ZLibraryLoginDialog(
                                 }
                                 when (val result = source.login(credential)) {
                                     is SourceResult.Success -> {
-                                        AppToast.makeText(context, if (source.id == "js_mycomic") "验证成功" else "登录成功", Toast.LENGTH_SHORT).show()
+                                        AppToast.makeText(context, if (websiteVerification) "验证成功" else "登录成功", Toast.LENGTH_SHORT).show()
                                         onSuccess()
                                         onDismiss()
                                     }

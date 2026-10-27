@@ -32,6 +32,76 @@ import javax.net.ssl.X509TrustManager
 @Config(sdk = [35])
 @ConscryptMode(ConscryptMode.Mode.OFF)
 class SourceTlsVerificationTest {
+    @Test fun `chapter download retries a truncated body before returning a page`() = kotlinx.coroutines.runBlocking {
+        ServerSocket(0, 2, InetAddress.getByName("127.0.0.1")).use { server ->
+            server.soTimeout = 5_000
+            val replies = FutureTask {
+                repeat(2) { index ->
+                    server.accept().use { socket ->
+                        socket.soTimeout = 5_000
+                        val reader = socket.inputStream.bufferedReader()
+                        check(reader.readLine() != null)
+                        while (!reader.readLine().isNullOrEmpty()) { }
+                        val body = if (index == 0) "pa" else "page!"
+                        socket.outputStream.write(("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\n" + body).toByteArray())
+                        socket.outputStream.flush()
+                    }
+                }
+                2
+            }
+            Thread(replies, "truncated-image-fixture").apply { isDaemon = true; start() }
+            val client = SharedHttpTransport.builder().proxy(Proxy.NO_PROXY).retryOnConnectionFailure(false).build()
+            val request = Request.Builder().url("http://127.0.0.1:${server.localPort}/page.jpg").build()
+            com.example.library.ComicLocalImporter.fetchWithRetry(client, request).use {
+                assertEquals("page!", it.body?.string())
+            }
+            assertEquals(2, replies.get(6, TimeUnit.SECONDS))
+        }
+    }
+    @Test fun `shared image transport rejects plaintext credentials including redirects`() {
+        for (header in listOf("Cookie", "Authorization", "Proxy-Authorization")) PlainPeer().use { peer ->
+            assertThrows(IOException::class.java) {
+                SharedHttpTransport.builder().proxy(Proxy.NO_PROXY).build().newCall(
+                    Request.Builder().url(peer.url()).header(header, "test-fixture").build()).execute().close()
+            }
+            assertEquals(0, peer.requests())
+        }
+        PlainPeer().use { plaintext ->
+            TlsPeer(redirectTo = plaintext.url()).use { tls ->
+                val client = SharedHttpTransport.builder().proxy(Proxy.NO_PROXY)
+                    .sslSocketFactory(tls.clientContext.socketFactory, tls.trustManager).build()
+                assertThrows(IOException::class.java) {
+                    client.newCall(Request.Builder().url(tls.url()).header("Cookie", "test-fixture").build()).execute().close()
+                }
+                assertEquals(1, tls.requests())
+                assertEquals(0, plaintext.requests())
+            }
+        }
+    }
+
+    @Test fun `shared image transport preserves anonymous HTTP and verified HTTPS sessions`() {
+        PlainPeer().use { peer ->
+            SharedHttpTransport.builder().proxy(Proxy.NO_PROXY).build().newCall(Request.Builder().url(peer.url()).build())
+                .execute().use { assertEquals("http-ok", it.body?.string()) }
+            assertEquals(1, peer.requests())
+        }
+        TlsPeer().use { peer ->
+            val client = SharedHttpTransport.builder().proxy(Proxy.NO_PROXY)
+                .sslSocketFactory(peer.clientContext.socketFactory, peer.trustManager).build()
+            client.newCall(Request.Builder().url(peer.url()).header("Cookie", "test-fixture").build())
+                .execute().use { assertEquals("tls-ok", it.body?.string()) }
+            assertEquals(1, peer.requests())
+        }
+    }
+
+    @Test fun `cookie merge deduplicates names without truncating values`() {
+        assertEquals("ticket=a=b; CSS=stored; css=explicit", com.example.source.js.JsCookieJar.mergeHeaders(
+            "ticket=a=b; css=explicit", "ticket=old; CSS=stored"))
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        com.example.source.js.JsCookieJar.saveCookiePairs(context, "fixture.test", listOf("session=fixture"))
+        assertEquals("", com.example.source.js.JsCookieJar.cookieHeader(context, "http://fixture.test/"))
+        assertEquals("session=fixture", com.example.source.js.JsCookieJar.cookieHeader(context, "https://fixture.test/"))
+    }
     private enum class Bridge { JSON, JAVASCRIPT }
 
     @Test fun `legacy insecure source settings cannot trust a self signed server`() {
@@ -112,7 +182,7 @@ class SourceTlsVerificationTest {
 
     @Test fun `script messages reject HTTP credentials before selecting a native transport`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        for (legacyFlag in listOf(false, true)) for (header in listOf("Authorization", "Cookie")) {
+        for (legacyFlag in listOf(false, true)) for (header in listOf("Authorization", "Cookie", "Proxy-Authorization")) {
             val result = JsMessageHandler(context, "tls_test", insecureTls = legacyFlag).handle(mapOf(
                 "method" to "http", "url" to "http://127.0.0.1:1/not-contacted",
                 "headers" to mapOf(header to "test-fixture")))

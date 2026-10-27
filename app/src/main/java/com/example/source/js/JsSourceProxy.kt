@@ -96,7 +96,9 @@ object JsSourceProxy {
         builder.interceptors().add(0, Interceptor { chain ->
                 val request = chain.request()
                 if (request.method != "GET") return@Interceptor chain.proceed(request)
-                val publicImageDirectFirst = request.url.host == "manga.iqtao.cn"
+                val publicImageDirectFirst = request.url.host in setOf("manga.iqtao.cn", "i.motiezw.com") ||
+                    request.url.host == "baozi.caiji2029.com" &&
+                    request.header("Referer")?.startsWith("https://m.sxchex.com/") == true
                 fun completeImage(response: okhttp3.Response): okhttp3.Response {
                     if (!publicImageDirectFirst) return response
                     try {
@@ -187,11 +189,11 @@ object JsSourceProxy {
                             request
                         }
                         Log.i("JsSourceProxy", "cloudflare solved, retry ${request.url.host}")
-                        return@Interceptor chain.proceed(retry)
+                        return@Interceptor completeImage(chain.proceed(retry))
                     }
                     Log.w("JsSourceProxy", "cloudflare solve failed for ${request.url.host}; fallback to proxy route")
                     // 未解出：继续走原有的代理回退
-                    return@Interceptor throughProxy()
+                    return@Interceptor throughProxy()?.let(::completeImage)
                         ?: throw IOException("Cloudflare 盾自动验证失败（${request.url.host}）")
                 }
                 if (direct.code != 403 && direct.code != 429 && direct.code < 500) {

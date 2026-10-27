@@ -2,7 +2,7 @@
 class Nineteen extends ComicSource {
     name = "19漫画";
     key = "nineteen";
-    version = "1.1.0";
+    version = "1.1.1";
     minAppVersion = "1.6.0";
     url = "https://m.sxchex.com";
     baseUrl = "https://m.sxchex.com";
@@ -11,6 +11,7 @@ class Nineteen extends ComicSource {
         "Accept": "text/html,application/json;q=0.9,*/*;q=0.8"
     };
     catalogs = {};
+    readOrigin = "https://m.sxchex.com";
 
     abs(raw) {
         const value = String(raw || "").trim();
@@ -27,13 +28,21 @@ class Nineteen extends ComicSource {
 
     async page(path) {
         if (!path.startsWith("/") || path.startsWith("//")) throw new Error("19漫画请求地址无效");
-        const response = await Network.get(this.baseUrl + path, this.headers);
-        if (response.status !== 200 || !response.body || !String(response.body).trim())
-            throw new Error("19漫画页面请求失败：HTTP " + response.status);
-        const body = String(response.body);
-        if (path.startsWith("/api/")) JSON.parse(body);
-        else if (!/\bMcpath\s*=/.test(body)) throw new Error("19漫画返回了无效页面");
-        return body;
+        const origins = [...new Set([this.readOrigin, this.baseUrl, "https://www.sxchex.com"])];
+        let lastError;
+        for (const origin of origins) {
+            try {
+                const response = await Network.get(origin + path, this.headers);
+                if (response.status !== 200 || !response.body || !String(response.body).trim())
+                    throw new Error("19漫画页面请求失败：HTTP " + response.status);
+                const body = String(response.body);
+                if (path.startsWith("/api/")) JSON.parse(body);
+                else if (!/\bMcpath\s*=/.test(body)) throw new Error("19漫画返回了无效页面");
+                this.readOrigin = origin;
+                return body;
+            } catch (error) { lastError = error; }
+        }
+        throw new Error("19漫画两个站点线路均不可用：" + String(lastError));
     }
 
     parseCards(html, page) {

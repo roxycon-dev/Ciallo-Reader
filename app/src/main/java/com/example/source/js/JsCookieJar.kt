@@ -24,8 +24,16 @@ object JsCookieJar {
 
     private fun metadata(raw: String?) = try { JSONObject(raw ?: "{}") } catch (_: Exception) { JSONObject() }
 
+    /** Cookie names are case-sensitive; explicit source values override matching jar pairs. */
+    internal fun mergeHeaders(explicit: String?, stored: String?): String {
+        val merged = pairs(stored.orEmpty())
+        pairs(explicit.orEmpty()).forEach { (name, pair) -> merged[name] = pair }
+        return merged.values.joinToString("; ")
+    }
+
     fun cookieHeader(context: Context, url: String): String = synchronized(lock) {
         val parsed = url.toHttpUrlOrNull() ?: return@synchronized ""
+        if (!parsed.isHttps) return@synchronized ""
         val prefs = preferences(context)
         val now = System.currentTimeMillis()
         val baseDomain = parsed.topPrivateDomain() ?: parsed.host
