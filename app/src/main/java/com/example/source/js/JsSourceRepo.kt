@@ -71,7 +71,7 @@ object JsSourceRepo {
     }
 
     /** 本地补丁版本：升级后尝试更新源脚本，失败时仍可使用旧缓存。 */
-    private const val PATCH_VERSION = 48
+    private const val PATCH_VERSION = 50
     // Raw cache format stays stable when compatibility patches change.
     private const val RAW_CACHE_PREFIX = "// EASYREADER_RAW_SOURCE_V28\n"
 
@@ -177,6 +177,7 @@ object JsSourceRepo {
                 val metas = parseIndex(index.readText())
                     .filter { includeAdult || !it.adult }
                 val loaded = metas.mapNotNull { meta ->
+                  try {
                     val file = File(dir(context), meta.fileName)
                     if (!file.exists() || file.length()>512*1024) return@mapNotNull null
                     val body = file.readText()
@@ -192,6 +193,10 @@ object JsSourceRepo {
                         // 旧版缓存已存放补丁后的脚本；新版有标记，才在内存里补丁。
                         script = if (body.startsWith(RAW_CACHE_PREFIX)) {
                             patchScript(meta.key, body.removePrefix(RAW_CACHE_PREFIX))
+                        } else if (meta.key in setOf("copy_manga", "copy_manga_multi_accounts")) {
+                            // Older caches already contain protocol patches; only add the
+                            // idempotent initialization fix without rewriting them again.
+                            patchDiscoverSource(meta.key, patchCopyInit(body))
                         } else if (meta.key in setOf("wnacg", "mxs", "jm")) {
                             // These repairs are idempotent and also migrate pre-raw-cache scripts.
                             patchScript(meta.key, body)
@@ -199,10 +204,17 @@ object JsSourceRepo {
                         insecureTls = meta.insecure,
                         loginRequired = meta.key in LOGIN_KEYS
                     )
+                  } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    Log.w("JsRepo", "failed to load cached source: ${meta.key}", e)
+                    null
+                  }
                 }
                 // 本地内置源不受成人开关影响；即便远端缓存为空也始终可用
                 loaded + loadLocalExtras(context)
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Log.w("JsRepo", "failed to load cached source index", e)
                 loadLocalExtras(context)
             }
         }
@@ -795,6 +807,29 @@ function __cialloChapterJson(doc, html) {
         else -> script
     }
 
+    private fun patchCopyInit(script: String): String {
+        val start = script.indexOf("init() {")
+        if (start < 0) return script
+        val end = Regex("""(?m)^    \}""").find(script, start)?.range?.last?.plus(1) ?: return script
+        val init = script.substring(start, end)
+            // QuickJS can surface rejected background jobs even if a handler is
+            // attached. Do not start optional network refreshes during bootstrap;
+            // failed searches refresh the app API explicitly before retrying.
+            .replace(Regex("""this\.refresh(?:Search|App)Api\(\)(?:\.catch\(\(\) => \{\}\))?;?"""), "void 0")
+        return script.replaceRange(start, end, init)
+    }
+
+    private fun patchWnacgInit(script: String): String = script.replace(
+        "if (this.loadSetting('refreshDomainsOnStart')) await this.refreshDomains(false)",
+        """
+        // A usable configured comic origin does not depend on the publisher page.
+        // Manual domain refresh remains available when the selected origin changes.
+        let originReady = false;
+        try { originReady = /^https:\/\//.test(this.baseUrl); } catch (_) {}
+        if (!originReady && this.loadSetting('refreshDomainsOnStart')) await this.refreshDomains(false)
+        """.trimIndent()
+    )
+
     private fun patchScript(key: String, script: String): String = patchDiscoverSource(key, when (key) {
         // 漫蛙吧 API 域名迁移（mwuu.cc 301 → manwaxu.cc），2026-09-26 实测
         "manwaba" -> script.replace("https://mwuu.cc", "https://manwaxu.cc")
@@ -1013,7 +1048,7 @@ function __cialloChapterJson(doc, html) {
             p
         }
         "wnacg" -> {
-            var patched = script.replace(
+            var patched = patchWnacgInit(script).replace(
             Regex(
                 """let title = document\.querySelector\("div\.userwrap > h2"\)\.text\s*""" +
                     """let cover = document\.querySelector\("div\.userwrap > div\.asTB > div\.asTBcell\.uwthumb > img"\)\.attributes\["src"\]\s*""" +
@@ -1292,8 +1327,10 @@ function __cialloChapterJson(doc, html) {
         // 拷贝漫画：动态 API 域名没有真正持久化（脚本里写 this.settings 不走 loadSetting），
         // 导致一直用默认域名 api.copy2000.online，它一抽风就全挂。
         // 这里把网络2接口返回的可用域名 saveData 持久化，并加入候选域名 + 失败自动刷新重试。
-        "copy_manga" -> {
-            var patched = script
+        "copy_manga", "copy_manga_multi_accounts" -> {
+            // Both upstream variants launch refreshes without awaiting them,
+            // allowing a background failure to poison an unrelated search.
+            var patched = patchCopyInit(script)
             // 1) apiUrl getter：优先使用已持久化的动态域名
             val apiStart = patched.indexOf("get apiUrl() {")
             if (apiStart >= 0) {

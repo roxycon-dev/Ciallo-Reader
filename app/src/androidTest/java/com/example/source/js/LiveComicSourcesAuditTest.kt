@@ -41,6 +41,13 @@ class LiveComicSourcesAuditTest {
         val imageSamples = InstrumentationRegistry.getArguments().getString("imageSamples")?.toIntOrNull()?.coerceIn(1, 24) ?: 1
         val freshMycomicSession = requestedKeys == setOf("mycomic") &&
             InstrumentationRegistry.getArguments().getString("freshSession") == "true"
+        val freshBilimangaSession = requestedKeys == setOf("bilimanga") &&
+            InstrumentationRegistry.getArguments().getString("freshSession") == "true"
+        if (freshBilimangaSession) {
+            // Explicit opt-in on the disposable audit device; leave all other sites intact.
+            JsCookieJar.clear(context, "bilimanga.net")
+            JsCookieJar.clear(context, "www.bilimanga.net")
+        }
         if (freshMycomicSession) {
             // Explicit live diagnostic on the disposable device: keep all other accounts.
             JsCookieJar.clear(context, "mycomic.com")
@@ -90,7 +97,9 @@ class LiveComicSourcesAuditTest {
         sources.map { source -> async(Dispatchers.IO) { gate.withPermit {
             val key = (source as? JsComicSource)?.sourceKey ?: source.id
             val row = JSONObject().put("key", key).put("name", source.name)
+                .put("systemProxyConfigured", com.example.source.zlibrary.network.SystemProxyResolver.resolve(context) != null)
             if (key == "mycomic" && freshMycomicSession) row.put("freshSession", true)
+            if (key == "bilimanga" && freshBilimangaSession) row.put("freshSession", true)
             val started = SystemClock.elapsedRealtime()
             Log.i("SourceAudit", "START $key")
             suspend fun <T> stage(name: String, timeoutMs: Long = 45_000, block: suspend () -> T): T {
@@ -183,6 +192,7 @@ class LiveComicSourcesAuditTest {
                             val chapters = stage("chapters") { value(source.getChapters(book.id)) }
                             attempts.put(JSONObject().put("count", chapters.size))
                             chapter = if (key == "pufei" && auditQuery.isEmpty()) chapters.lastOrNull { it.title == "456" && !it.external }
+                                else if (key in setOf("mxs", "hot_manga")) chapters.lastOrNull { !it.external }
                                 else chapters.firstOrNull { !it.external }
                             val candidateChapter = chapter
                             if (candidateChapter != null) {
@@ -257,22 +267,20 @@ class LiveComicSourcesAuditTest {
                         row.put("cachedErrorImageWidth", recovered.width).put("cachedErrorImageHeight", recovered.height)
                     }
                     if (download && visibleSamples > 0) {
+                        // Use a new download identity for every audit, including sources
+                        // whose IDs are not URLs, so a prior run cannot satisfy this one.
                         val book = requireNotNull(selectedBook).let {
-                            // A fragment keeps the public comic URL valid while giving this
-                            // owned audit a separate download identity and empty directory.
-                            if (key == "pufei" && InstrumentationRegistry.getArguments().getString("freshDownload") == "true") {
-                                row.put("freshDownload", true)
-                                it.copy(id = it.id + "#audit-" + java.util.UUID.randomUUID())
-                            } else it
+                            row.put("freshDownload", true)
+                            it.copy(id = it.id + "#audit-" + java.util.UUID.randomUUID())
                         }
-                        stage("download", 180_000) {
+                        stage("download", 600_000) {
                             val application = context.applicationContext as android.app.Application
                             val database = AppDatabase.getDatabase(context)
                             val id = ComicDownloadManager.taskId(book, readableChapter.id)
                             val previousTask = ComicDownloadManager.tasks.value[id]
                             ComicDownloadManager.start(application, database, book, readableChapter, source)
                             val terminal = try {
-                                withTimeout(175_000) {
+                                withTimeout(595_000) {
                                     ComicDownloadManager.tasks.first { tasks ->
                                         tasks[id] !== previousTask &&
                                             tasks[id]?.status in setOf(ComicDownloadStatus.SUCCESS, ComicDownloadStatus.FAILED)
@@ -290,12 +298,16 @@ class LiveComicSourcesAuditTest {
                                 ?: error("Completed download was not registered in bookshelf")
                             val localPages = database.bookDao().getChaptersListForBook(localBook.id)
                             assertEquals(pages.size, localPages.size)
-                            localPages.forEach { page ->
+                            localPages.forEachIndexed { index, page ->
                                 val file = File(page.content)
-                                assertTrue("Missing local page", file.isFile && file.length() > 0)
-                                val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                                android.graphics.BitmapFactory.decodeFile(file.absolutePath, bounds)
-                                assertTrue("Invalid downloaded image", bounds.outWidth > 0 && bounds.outHeight > 0)
+                                assertTrue("Missing local page ${index + 1}", file.isFile && file.length() > 0)
+                                // Bounds alone can succeed for damaged image payloads. Actually
+                                // decode every downloaded page, sampling to limit peak memory.
+                                val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = 8 }
+                                val decoded = android.graphics.BitmapFactory.decodeFile(file.absolutePath, options)
+                                assertTrue("Cannot decode downloaded page ${index + 1}",
+                                    decoded != null && decoded.width > 0 && decoded.height > 0)
+                                decoded?.recycle()
                             }
                             // Local references use the offline reader and cannot issue an HTTP request.
                             val offlineLoader = ComicPageLoader(context)
@@ -346,6 +358,15 @@ class LiveComicSourcesAuditTest {
         record(JSONObject().put("summary", true).put("remoteExpected", expected.size)
             .put("installedJs", installed.size).put("attempted", sources.size))
         // Completion of the audit is separate from availability of the individual websites.
-        assertEquals(expected.size + 4, byKey.size + expected.count { it.key !in byKey })
+        assertTrue("No requested sources were available for the audit", sources.isNotEmpty())
+        if (requestedKeys.isNotEmpty()) {
+            assertTrue("Some requested sources were unavailable: ${requestedKeys - sources.map { (it as? JsComicSource)?.sourceKey ?: it.id }.toSet()}",
+                requestedKeys.all { key -> sources.any { ((it as? JsComicSource)?.sourceKey ?: it.id) == key } })
+        }
+        if (InstrumentationRegistry.getArguments().getString("requirePass") == "true") {
+            val failures = report.readLines().filter(String::isNotBlank).map(::JSONObject)
+                .filter { it.has("key") && it.optString("status") != "download_and_offline_ok" }
+            assertTrue("Full source verification failed: ${failures.joinToString { it.toString() }}", failures.isEmpty())
+        }
     }
 }

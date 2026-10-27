@@ -440,7 +440,11 @@ class LibraryViewModel private constructor(
     private var aggregateSearchJob: Job? = null
     private var singleSearchJob: Job? = null
     private val aggregateSearchSlots = Semaphore(4)
-    private val comicAggregateSearch = ComicAggregateSearch(searches = sourceSearches, onDispatched = ::recordKeywordDispatch)
+    // JS sources can perform several network requests, including transport fallback.
+    // A 20-second aggregate deadline cut those searches off before their own timeouts.
+    private val comicAggregateSearch = ComicAggregateSearch(
+        searches = sourceSearches, requestTimeoutMs = 60_000L, onDispatched = ::recordKeywordDispatch,
+    )
     private var searchRequestSeq = 0L
 
     // Local keyword mappings are emitted first; structured online names supplement later.
@@ -1058,9 +1062,7 @@ class LibraryViewModel private constructor(
                 if (requestSeq == searchRequestSeq) {
                     collected.clear()
                     collected.addAll(group.books)
-                    if (group.error != null && firstError == null) {
-                        firstError = group.failure ?: SourceException.NetworkError(group.error)
-                    }
+                    firstError = group.error?.let { group.failure ?: SourceException.NetworkError(it) }
                     if (group.books.isNotEmpty()) {
                         _uiState.value = LibraryUiState.SearchResults(group.books, loading = group.loading)
                     }

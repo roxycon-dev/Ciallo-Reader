@@ -126,11 +126,13 @@ object ComicLocalImporter {
                 var fetchHeaders = headers[url].orEmpty()
                 if (resolveImage != null) {
                     val resolved = resolveImage(url)
-                    if (!resolved.isNullOrBlank() && resolved != url) {
+                    if (!resolved.isNullOrBlank()) {
                         fetchUrl = resolved
-                        fetchHeaders = fetchHeaders + resolveHeaders?.invoke(resolved).orEmpty()
                     }
                 }
+                // The reader merges resolved headers even if the resolver returns
+                // the original URL (or no replacement). Keep downloads aligned.
+                fetchHeaders = fetchHeaders + resolveHeaders?.invoke(fetchUrl).orEmpty()
                 val rawExt = fetchUrl.substringAfterLast('.', "").substringBefore('?').lowercase()
                 val ext = if (rawExt.length in 3..4 && rawExt.all { it.isLetterOrDigit() }) rawExt else "jpg"
                 val pageFile = File(chapterDir, String.format("img_%04d.%s", index + 1, ext))
@@ -139,6 +141,8 @@ object ComicLocalImporter {
                     if (srcFile.exists() && hasImageBounds(srcFile)) {
                         require(srcFile.length() <= 32L * 1024 * 1024) { "图片过大" }
                         srcFile.copyTo(pageFile, overwrite = true)
+                        existingPageFiles[filePrefix.removeSuffix(".")].orEmpty()
+                            .filter { it != pageFile }.forEach { check(it.delete() || !it.exists()) { "旧图片清理失败" } }
                         stamp.writeText(identity)
                         reportPageDone()
                         return pageFile
@@ -217,6 +221,11 @@ object ComicLocalImporter {
                     require(chapterDir.usableSpace > bytes.size.toLong() + 16L * 1024 * 1024) { "磁盘空间不足" }
                     part.outputStream().use { output -> output.write(bytes) }
                     check(part.renameTo(pageFile)) { "图片保存失败" }
+                    // A changed image URL may also change the extension. Remove
+                    // the old page before stamping the new identity so a later
+                    // resume cannot select the obsolete file for this page.
+                    existingPageFiles[filePrefix.removeSuffix(".")].orEmpty()
+                        .filter { it != pageFile }.forEach { check(it.delete() || !it.exists()) { "旧图片清理失败" } }
                     stamp.writeText(identity)
                 }
                 } finally {
@@ -233,6 +242,9 @@ object ComicLocalImporter {
                 } catch (e: CancellationException) {
                     throw e
                 } catch (t: Throwable) {
+                    val status = Regex("\\bHTTP (\\d{3})\\b").find(t.message.orEmpty())?.groupValues?.get(1)
+                    Log.w(TAG, "page ${index + 1} failed: ${t.javaClass.simpleName}" +
+                        (status?.let { " HTTP $it" } ?: ""))
                     Result.failure(t)
                 }
                 var results = imageUrls.indices.map { index ->

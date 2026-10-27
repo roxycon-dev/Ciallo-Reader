@@ -16,6 +16,8 @@ import java.util.concurrent.atomic.AtomicReference
 import okhttp3.ResponseBody
 import okio.ForwardingSource
 import okio.buffer
+import com.example.data.readImportBytes
+import okhttp3.ResponseBody.Companion.toResponseBody
 
 /**
  * 漫画源代理路由。JS 请求优先用 Cronet；需要 OkHttp 时按系统代理转发。
@@ -94,6 +96,19 @@ object JsSourceProxy {
         builder.interceptors().add(0, Interceptor { chain ->
                 val request = chain.request()
                 if (request.method != "GET") return@Interceptor chain.proceed(request)
+                val publicImageDirectFirst = request.url.host == "manga.iqtao.cn"
+                fun completeImage(response: okhttp3.Response): okhttp3.Response {
+                    if (!publicImageDirectFirst) return response
+                    try {
+                        val body = response.body ?: return response
+                        val type = body.contentType()
+                        // A 200 from the proxy may contain a broken gzip stream.
+                        // Keep body failures inside route selection, with the same
+                        // per-image limit and cancellation hook as the downloader.
+                        val bytes = body.byteStream().use { it.readImportBytes(32 * 1024 * 1024) }
+                        return response.newBuilder().body(bytes.toResponseBody(type)).build()
+                    } catch (e: Exception) { response.close(); throw e }
+                }
                 fun throughProxy(): okhttp3.Response? {
                     val proxy = cachedSystemProxy(context) ?: return null
                     val client = proxyClient.get()?.takeIf { it.first == proxy }?.second
@@ -127,7 +142,7 @@ object JsSourceProxy {
                 // interceptor's fallback path, wasting every retry on the same direct route.
                 val localHost = request.url.host == "localhost" || request.url.host == "::1" ||
                     request.url.host.startsWith("127.")
-                if (!localHost && cachedSystemProxy(context) != null) {
+                if (!publicImageDirectFirst && !localHost && cachedSystemProxy(context) != null) {
                     val response = try { throughProxy() } catch (e: IOException) {
                         if (chain.call().isCanceled()) throw e
                         forgetRoute(request.url.toString())
@@ -142,9 +157,9 @@ object JsSourceProxy {
                     return@Interceptor response
                 }
                 val direct = try {
-                    chain.proceed(request)
+                    completeImage(chain.proceed(request))
                 } catch (e: IOException) {
-                    return@Interceptor throughProxy() ?: throw e
+                    return@Interceptor throughProxy()?.let(::completeImage) ?: throw e
                 }
                 // Cloudflare 挑战：无头 WebView 过盾一次，带上新 Cookie 重试（Mihon 同款方案）
                 if ((direct.code == 403 || direct.code == 503 || direct.code == 429) &&
@@ -185,7 +200,7 @@ object JsSourceProxy {
                     direct
                 } else {
                     direct.close()
-                    throughProxy() ?: throw IOException("system proxy disappeared")
+                    throughProxy()?.let(::completeImage) ?: throw IOException("system proxy disappeared")
                 }
             })
         return builder.build()

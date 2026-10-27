@@ -11,7 +11,7 @@ Read local ebooks, novels, and comics in one Android app.
 
 [🌐 Product site](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ Download the latest APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.5.7 release notes](docs/release-1.5.7-2026-10-26.md) ·
+[1.5.8 release notes](docs/release-1.5.8-2026-10-27.md) ·
 [See screenshots](#screenshots) ·
 [Features](#features) ·
 [Report an issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -24,6 +24,8 @@ Read local ebooks, novels, and comics in one Android app.
 </div>
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
+
+**1.5.8 / 250 · Comic search and image recovery:** Repairs WNACG, 19 Manhua and AiManhua empty responses, corrupted images and download failures on some proxy routes. Public requests try a complete direct response before fallback; WNACG no longer waits for the publisher page when its configured origin is usable. The three sources passed real search, online reading, fresh chapter download and offline decoding for 22, 24 and 45 pages respectively. Uses the fixed release certificate and upgrades 1.5.6/1.5.7 in place. [Release notes](docs/release-1.5.8-2026-10-27.md) · [Verification](docs/comic-source-repair-2026-10-27.md).
 
 **1.5.7 / 249 · Startup compatibility and diagnostics:** Repairs legacy-system home rendering paths, avoids unused backdrop capture where realtime blur is unsupported, and adds recovery after early home rendering failures. Settings → About now has a visible diagnostic export button without the old small print. Reports include operation stages, exception chains, threads, device environment, crash history and available system exit information. **Existing permissions and transfer, background download and text-to-speech capabilities are retained.** Uses the same fixed signing certificate as 1.5.6 and upgrades that version in place; retired-signature releases still require backup and migration. HarmonyOS 3.0 physical-device verification and a new antivirus retest remain unavailable. [Release notes](docs/release-1.5.7-2026-10-26.md).
 

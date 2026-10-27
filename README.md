@@ -11,7 +11,7 @@
 
 [🌐 产品主页](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.5.7 更新说明](docs/release-1.5.7-2026-10-26.md) ·
+[1.5.8 更新说明](docs/release-1.5.8-2026-10-27.md) ·
 [查看截图](#界面预览) ·
 [全部功能](#功能亮点) ·
 [提交问题或建议](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -26,6 +26,8 @@
 Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电子书阅读器**。你可以导入本地书籍，也可以通过内置或自定义书源搜索内容、下载到书架，再使用可调排版、翻页和阅读进度继续阅读。
 
 **English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
+
+**1.5.8 / 250 · 漫画源搜索与读图修复**：修复紳士漫畫、19 漫画和爱漫画在部分代理线路下的空响应、图片损坏及下载失败。三个源的公开请求优先读取完整直连响应，再按需回退；紳士漫畫已有可用域名时不再等待发布页刷新。爱漫画《泛而不精的我被逐出了勇者队伍》45 页、19 漫画 24 页、紳士漫畫 22 页均完成搜索、在线读取、全新整章下载与离线解码。沿用当前固定签名，可覆盖 1.5.6、1.5.7。详见 [1.5.8 更新说明](docs/release-1.5.8-2026-10-27.md)与[验收记录](docs/comic-source-repair-2026-10-27.md)。
 
 **1.5.7 / 249 · 启动兼容与完整诊断**：修正旧系统进入主页时的渲染兼容路径，避免在不支持实时模糊的系统上开启无效采样，并增加主页渲染异常后的恢复机制。「设置 → 关于」的诊断导出改为明确按钮，移除下方小字；日志补全操作阶段、异常链、线程、设备环境、历史崩溃与系统退出线索。**保留现有权限及互传、后台下载、朗读等功能，不以删权限替代闪退修复。** 沿用 1.5.6 的新固定签名，可直接覆盖 1.5.6；旧签名版本仍须先备份再迁移。未在 HarmonyOS 3.0 原机验证，也未对本版进行新的查杀复测。详见 [1.5.7 更新说明](docs/release-1.5.7-2026-10-26.md)。
 

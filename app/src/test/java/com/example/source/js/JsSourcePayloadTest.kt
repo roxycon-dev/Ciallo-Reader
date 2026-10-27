@@ -2,6 +2,9 @@ package com.example.source.js
 
 import com.example.source.SourceException
 import com.example.source.parser.JsonPathResolver
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
@@ -12,6 +15,25 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class JsSourcePayloadTest {
+    @Test fun `one unreadable cached script does not hide other sources`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val dir = java.io.File(context.filesDir, "js_sources").apply { mkdirs() }
+        java.io.File(dir, "broken.js").mkdirs()
+        java.io.File(dir, "healthy.js").writeText("// EASYREADER_RAW_SOURCE_V28\nclass Fixture extends ComicSource {}\n" + " ".repeat(1024))
+        java.io.File(dir, "index.json").writeText("""[{"key":"broken","fileName":"broken.js"},{"key":"healthy","fileName":"healthy.js"}]""")
+        val loaded = JsSourceRepo.loadCached(context, true)
+        assertTrue(loaded.any { it.sourceKey == "healthy" })
+        assertFalse(loaded.any { it.sourceKey == "broken" })
+    }
+    @Test fun `copy source bootstrap avoids background network jobs in old and new scripts`() {
+        val patch = JsSourceRepo::class.java.getDeclaredMethod("patchCopyInit", String::class.java).apply { isAccessible = true }
+        val script = "    init() {\r\n this.refreshSearchApi();\r\n this.refreshAppApi()\r\n    }\r\ncallback() { this.refreshAppApi(); }"
+        val result = patch.invoke(JsSourceRepo, script) as String
+        assertFalse(result.contains("this.refreshSearchApi()"))
+        assertTrue(result.contains("callback() { this.refreshAppApi(); }"))
+        assertEquals(2, Regex("void 0").findAll(result).count())
+        assertEquals(result, patch.invoke(JsSourceRepo, result))
+    }
     @Test fun `JM upgrades old patched caches without depending on method indentation`() {
         val patch = JsSourceRepo::class.java.getDeclaredMethod("patchScript", String::class.java, String::class.java).apply { isAccessible = true }
         val source = """

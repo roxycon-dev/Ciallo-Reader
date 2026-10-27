@@ -447,7 +447,7 @@ class JsMessageHandler(
 
             val publicReadBatch = sourceKey == "ikmmh" && httpMethod == "POST" &&
                 url.toHttpUrl().encodedPath == "/api/comic/read/pics"
-            if (httpMethod == "GET" && sourceKey in setOf("pufei", "bilimanga", "ikmmh") || publicReadBatch) {
+            if (httpMethod == "GET" && sourceKey in setOf("pufei", "bilimanga", "ikmmh", "wnacg", "nineteen", "aimanhua") || publicReadBatch) {
                 return handleComicRead(url, effectiveHeaders, bytes, httpMethod, body)
             }
 
@@ -576,6 +576,10 @@ class JsMessageHandler(
         // endpoints can work directly while the configured proxy closes TLS.
         // Retry the same HTTPS endpoint, keeping certificate checks and cancellation.
         val host = url.toHttpUrl().host
+        // These public sources work directly while some system proxy routes
+        // return empty HTML or truncate the response. Consume the direct reply
+        // completely before falling back to the configured proxy/Chromium.
+        val scopedDirectFirst = sourceKey in setOf("wnacg", "nineteen", "aimanhua")
         val publicMirror = sourceKey == "pufei" && host in setOf("www.guoman.net", "m.guoman.net") ||
             sourceKey == "ikmmh" && host == "ymcdnyfqdapp.ikmmh.com"
         val directMirrorRetry = httpFirst && publicMirror
@@ -585,10 +589,12 @@ class JsMessageHandler(
         var requestUrl = url
         var lastError = "源站连接失败"
         val requestHeaders = LinkedHashMap(headers)
-        for (attempt in 0..1) {
+        for (attempt in 0..(if (scopedDirectFirst) 2 else 1)) {
             requestJob?.ensureActive()
-            val directMirror = if (preferDirect) attempt == 0 else attempt == 1 && directMirrorRetry
-            val http = directMirror || if (preferDirect) true else if (attempt == 0) httpFirst else !httpFirst
+            val directMirror = if (scopedDirectFirst) attempt == 0
+                else if (preferDirect) attempt == 0 else attempt == 1 && directMirrorRetry
+            val http = if (scopedDirectFirst) attempt < 2
+                else directMirror || if (preferDirect) true else if (attempt == 0) httpFirst else !httpFirst
             if (attempt != 0) {
                 requestHeaders["Cache-Control"] = "no-cache"
                 requestHeaders["Pragma"] = "no-cache"
@@ -606,7 +612,10 @@ class JsMessageHandler(
                 if (http) {
                     val boundedClient = client.newBuilder().connectTimeout(8, TimeUnit.SECONDS)
                         .readTimeout(12, TimeUnit.SECONDS).callTimeout(18, TimeUnit.SECONDS)
-                        .apply { if (directMirror) proxy(java.net.Proxy.NO_PROXY) }.build()
+                        .apply {
+                            if (directMirror) proxy(java.net.Proxy.NO_PROXY)
+                            if (scopedDirectFirst) protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
+                        }.build()
                     boundedClient.newCall(Request.Builder().url(requestUrl).method(method, body).apply {
                         requestHeaders.forEach { (key, value) -> header(key, value) }
                     }.build()).executeWithCancellation(requestJob).use { result ->

@@ -19,6 +19,15 @@ import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class ReportedComicSearchDeviceTest {
+    @Test fun copyInitPatchUsesAndroidRegexAndPreservesIndependentRefresh() {
+        val patch = JsSourceRepo::class.java.getDeclaredMethod("patchCopyInit", String::class.java).apply { isAccessible = true }
+        val source = "    init() {\r\n this.author_path_word_dict = {};\r\n this.refreshSearchApi();\r\n this.refreshAppApi();\r\n    }\r\ncallback() { this.refreshAppApi(); }"
+        val result = patch.invoke(JsSourceRepo, source) as String
+        assertTrue(result.contains("this.author_path_word_dict = {}"))
+        assertFalse(result.contains("this.refreshSearchApi()"))
+        assertTrue(result.contains("callback() { this.refreshAppApi(); }"))
+        assertEquals(result, patch.invoke(JsSourceRepo, result))
+    }
     @Test fun denseGlobalRegexPreservesCapturesAndExplicitLastIndex() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val runtime = context.assets.open("venera/_venera_.js").bufferedReader().use { it.readText() }

@@ -34,13 +34,17 @@ class AiManhuaDeviceTest {
 
     @Test fun imageListExcludesAdsAndRejectsIncompleteChapters() = runBlocking {
         val engine = engine()
-        val html = """<img data-src="https://ads.invalid/ad.jpg"><ul id="comicContain"><li><img data-src="//i3.wp.com/example.com/a.jpg@1080w.avif"></li><li><img data-src="//images.example.com/b.jpg"></li></ul>"""
+        val html = """<img data-src="https://ads.invalid/ad.jpg"><ul id="comicContain"><li><img data-src="//i3.wp.com/manga.iqtao.cn/a.jpg@1080w.avif"></li><li><img data-src="//images.example.com/b.jpg"></li></ul>"""
         val reply = JSONObject(engine.call("src.parseImages(${JSONObject.quote(html)},2)")!!)
         assertTrue(reply.toString(), reply.getBoolean("ok"))
         val images = reply.getJSONObject("data").getJSONArray("images")
         assertEquals(2, images.length())
-        assertEquals("https://i3.wp.com/example.com/a.jpg@1080w.avif?w=1080", images.getString(0))
+        assertEquals("http://manga.iqtao.cn/a.jpg@1080w.avif", images.getString(0))
         assertEquals("https://images.example.com/b.jpg", images.getString(1))
+        val cached = JSONObject(engine.call("src.comic.onImageLoad('https://i3.wp.com/manga.iqtao.cn/a.jpg@1080w.avif?w=1080')")!!)
+        assertEquals("http://manga.iqtao.cn/a.jpg@1080w.avif", cached.getJSONObject("data").getString("url"))
+        val unrelated = JSONObject(engine.call("src.comic.onImageLoad('https://images.example.com/b.jpg?w=1080')")!!)
+        assertEquals("https://images.example.com/b.jpg?w=1080", unrelated.getJSONObject("data").getString("url"))
         val incomplete = JSONObject(engine.call("src.parseImages(${JSONObject.quote(html)},3)")!!)
         assertFalse(incomplete.toString(), incomplete.getBoolean("ok"))
         assertTrue(incomplete.getString("error").contains("2/3"))

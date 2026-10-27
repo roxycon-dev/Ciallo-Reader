@@ -262,7 +262,7 @@ class JsComicSource(
         // These adapters already retry a complete GET through the other transport.
         if (sourceKey in setOf("pufei", "bilimanga")) return result
         val err = result?.optString("error", "") ?: ""
-        val retryable = (sourceKey == "copy_manga" && result?.optBoolean("ok") == false) ||
+        val retryable = (sourceKey in setOf("copy_manga", "copy_manga_multi_accounts") && result?.optBoolean("ok") == false) ||
             err.contains("timeout", ignoreCase = true) ||
             err.contains("timed out", ignoreCase = true) ||
             err.contains("ERR_CONNECTION", ignoreCase = true) ||
@@ -273,7 +273,7 @@ class JsComicSource(
             err.contains("connect", ignoreCase = true)
         if (retryable) {
             kotlinx.coroutines.delay(900)
-            if (sourceKey == "copy_manga") {
+            if (sourceKey in setOf("copy_manga", "copy_manga_multi_accounts")) {
                 runCatching { callJs("src.refreshAppApi ? src.refreshAppApi() : null") }
             }
             result = callJs(jsCall)
