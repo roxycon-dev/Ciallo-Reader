@@ -272,6 +272,7 @@ class DownloadManager(private val context: Context) {
                     val downloadsDir = File(context.filesDir, "downloads")
                     File(downloadsDir, "${finalFile.nameWithoutExtension}.tmp").delete()
                     File(downloadsDir, "${finalFile.nameWithoutExtension}.resume").delete()
+                    GuestNovelCheckpoint.clear(finalFile)
                     finalFile.delete()
                     taskDao.deleteTaskById(bookId)
                     secrets.remove("download:$bookId")
@@ -309,6 +310,7 @@ class DownloadManager(private val context: Context) {
 
         val workRequest = OneTimeWorkRequestBuilder<DownloadWorker>()
             .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, java.util.concurrent.TimeUnit.SECONDS)
             .setInputData(inputData)
             .build()
 

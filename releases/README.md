@@ -2,6 +2,10 @@
 
 本地 APK 不纳入 Git，正式包与校验文件上传 GitHub Release。
 
+**1.5.10 / 252**：[GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.10) · [下载 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.10/Ciallo-Reader-v1.5.10.apk) · [SHA256SUMS](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.10/SHA256SUMS.txt) · [发布说明](../docs/release-1.5.10-2026-10-29.md)。
+
+公开小说下载持久保存已完成章节和插图，修复网络切换后的从头下载；后台恢复及手动暂停保留断点。21 项相关回归通过，沿用当前固定签名，可覆盖 1.5.6–1.5.9。真机切换网络与源站速度未实测。
+
 **1.5.9 / 251**：[GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.9) · [下载 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.9/Ciallo-Reader-v1.5.9.apk) · [SHA256SUMS](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.9/SHA256SUMS.txt) · [发布说明](../docs/release-1.5.9-2026-10-28.md)。
 
 修复哔哩与 19 漫画连接、整章下载中断，补齐共享图片 HTTP 凭据保护。两个报告源共 73 页主机下载与离线解码通过。固定签名；系统报毒是否消除尚未确认，未运行模拟器或新查杀测试。

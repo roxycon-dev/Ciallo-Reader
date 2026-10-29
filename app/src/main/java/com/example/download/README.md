@@ -17,6 +17,7 @@
 - `DownloadTransferPolicy.kt`
 - `DownloadWorker.kt`
 - `GuestNovelEpub.kt`：逐章生成含插图的 EPUB，任一章失败不入库
+- `GuestNovelCheckpoint.kt`：保存已完成章节及插图，网络切换或暂停后复用；目录变化时废弃旧断点，完成入库或取消任务后清理
 - `GuestNovelIntegrity.kt`：公开小说的文件 CRC、正文/插图引用、编码及可检测缺章检查
 - `NovelDownloadStore.kt`
 - 其余 2 项按名称和同层模块组织。

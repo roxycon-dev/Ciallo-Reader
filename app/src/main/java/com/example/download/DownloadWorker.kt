@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import androidx.work.WorkInfo
 import com.example.data.AppDatabase
 import com.example.data.BookRepository
 import com.example.source.executeCancellable
@@ -36,6 +37,14 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
         private val slots = Semaphore(2)
         private val taskLocks = Array(32) { kotlinx.coroutines.sync.Mutex() }
         private const val CHANNEL = "book_downloads"
+
+        internal fun shouldRetryPublicNovel(sourceId: String, error: Exception, attempt: Int): Boolean {
+            if (sourceId !in com.example.source.impl.PublicNovelSources.ids || attempt >= 5) return false
+            if (error.message?.contains("ENOSPC", true) == true) return false
+            return error is java.io.IOException && error !is java.io.FileNotFoundException ||
+                error is com.example.source.SourceException.NetworkError &&
+                (error.cause is java.io.IOException || Regex("HTTP (?:408|429|5[0-9]{2})\\b").containsMatchIn(error.message.orEmpty()))
+        }
 
         internal suspend fun <T> withTaskLock(taskId: String, block: suspend () -> T): T {
             val lock = taskLocks[(taskId.hashCode() and Int.MAX_VALUE) % taskLocks.size]
@@ -101,7 +110,8 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
             setForeground(getForegroundInfo())
             slots.withPermit {
                 currentCoroutineContext().ensureActive()
-                dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), total, null)
+                dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING,
+                    if (task.sourceId in com.example.source.impl.PublicNovelSources.ids) maxOf(temp.length(), task.downloadedBytes) else temp.length(), total, null)
                 // Failed imports can be retried from the completed file without consuming another download.
                 val metadata = runCatching { JSONObject(resume.readText()) }.getOrNull()
                 var guestIntegrityChecked = false
@@ -290,34 +300,29 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                             downloadedBytes = file.length(), totalBytes = file.length()))
                     }
                     secrets.remove("download:$taskId")
+                    GuestNovelCheckpoint.clear(temp)
                     DownloadProgressBroadcaster.updateState(taskId, DownloadState.Success(file.absolutePath))
                 }
                 Result.success()
             }
         } catch (e: CancellationException) {
-            withContext(NonCancellable) {
-                // Explicit cancel deleted the row; never recreate or rebroadcast it.
-                val latest = dao.getTaskById(taskId)
-                if (latest != null && latest.status in setOf(DownloadStatus.DOWNLOADING, DownloadStatus.PAUSED)) {
-                    dao.updateProgressAndStatus(taskId, DownloadStatus.PAUSED, temp.length(), total, null)
-                    DownloadProgressBroadcaster.updateState(taskId, DownloadState.Paused(temp.length(), total))
-                }
-            }
+            recordInterruption(taskId, temp, total)
             throw e
         } catch (e: Exception) {
             // Cancelling a blocking socket can throw IOException before the next suspension.
             // Preserve the resumable file and record PAUSED before any cancellable DAO read.
             if (!currentCoroutineContext().isActive) {
-                withContext(NonCancellable) {
-                    val latest = dao.getTaskById(taskId)
-                    if (latest != null && latest.status in setOf(DownloadStatus.DOWNLOADING, DownloadStatus.PAUSED)) {
-                        dao.updateProgressAndStatus(taskId, DownloadStatus.PAUSED, temp.length(), total, null)
-                        DownloadProgressBroadcaster.updateState(taskId, DownloadState.Paused(temp.length(), total))
-                    }
-                }
+                recordInterruption(taskId, temp, total)
                 currentCoroutineContext().ensureActive()
             }
             val message = if (e.message?.contains("ENOSPC", true) == true) "存储空间不足，请清理后重试" else e.message ?: "下载或入库失败"
+            if (shouldRetryPublicNovel(task.sourceId, e, runAttemptCount)) {
+                val latest = dao.getTaskById(taskId) ?: return@withContext Result.success()
+                dao.updateProgressAndStatus(taskId, DownloadStatus.PENDING,
+                    maxOf(temp.length(), latest.downloadedBytes), total, "网络暂时中断，将从已保存章节继续下载")
+                DownloadProgressBroadcaster.updateState(taskId, DownloadState.Pending)
+                return@withContext Result.retry()
+            }
             // A task may outlive its signed CDN URL. Refresh its authorization and
             // mirror together instead of endlessly resuming the same stale URL.
             if (task.sourceId == "zlibrary" && recoveries < 2 &&
@@ -366,6 +371,20 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                 DownloadProgressBroadcaster.updateState(taskId, DownloadState.Error(message))
             }
             Result.failure()
+        }
+    }
+
+    private suspend fun recordInterruption(taskId: String, temp: File, total: Long) = withContext(NonCancellable) {
+        val dao = AppDatabase.getDatabase(context).downloadTaskDao()
+        // Explicit cancel may have deleted the row; never recreate it.
+        val latest = dao.getTaskById(taskId)
+        if (latest != null && latest.status in setOf(DownloadStatus.DOWNLOADING, DownloadStatus.PAUSED)) {
+            val bytes = if (latest.sourceId in com.example.source.impl.PublicNovelSources.ids)
+                maxOf(temp.length(), latest.downloadedBytes) else temp.length()
+            val waitingForNetwork = stopReason == WorkInfo.STOP_REASON_CONSTRAINT_CONNECTIVITY
+            dao.updateProgressAndStatus(taskId, if (waitingForNetwork) DownloadStatus.PENDING else DownloadStatus.PAUSED, bytes, total, null)
+            DownloadProgressBroadcaster.updateState(taskId,
+                if (waitingForNetwork) DownloadState.Pending else DownloadState.Paused(bytes, total))
         }
     }
 

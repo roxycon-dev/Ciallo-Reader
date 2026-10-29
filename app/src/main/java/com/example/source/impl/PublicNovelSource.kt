@@ -124,6 +124,7 @@ class PublicNovelSource(
         try { SourceResult.Success(block()) }
         catch (e: CancellationException) { throw e }
         catch (e: SourceException) { SourceResult.Error(e) }
+        catch (e: java.io.IOException) { SourceResult.Error(SourceException.NetworkError(e.message ?: "$name 网络中断", e)) }
         catch (e: Exception) { SourceResult.Error(SourceException.ParseError(e.message ?: "$name 读取失败")) }
     }
     private fun meta(doc: Document, key: String) = doc.selectFirst("meta[property='$key']")?.attr("content").orEmpty()

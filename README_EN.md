@@ -11,7 +11,7 @@ Read local ebooks, novels, and comics in one Android app.
 
 [🌐 Product site](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ Download the latest APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.5.9 release notes](docs/release-1.5.9-2026-10-28.md) ·
+[1.5.10 release notes](docs/release-1.5.10-2026-10-29.md) ·
 [See screenshots](#screenshots) ·
 [Features](#features) ·
 [Report an issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -24,6 +24,8 @@ Read local ebooks, novels, and comics in one Android app.
 </div>
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
+
+**1.5.10 / 252 · Resumable novel downloads:** Public novel EPUB downloads, including Fanqie, now preserve completed chapters and illustrations across network changes and manual pauses. Temporary network failures retry with bounded backoff. Canceling removes checkpoints; changed catalogues and incomplete content still fail integrity checks. Keeps the signing certificate used since 1.5.6 for in-place upgrades from 1.5.6–1.5.9. All 21 related regression tests passed; physical-device network switching and source throughput have not been measured. [Release notes](docs/release-1.5.10-2026-10-29.md).
 
 **1.5.9 / 251 · Bili and 19 Manga connections and security hardening:** Deduplicates Bili cookies, renews expired search tickets and adds visible website verification. 19 Manga gains a same-site fallback host. Chapter downloads retry truncated response bodies. Shared image transport blocks credentials over plaintext HTTP, including redirects, while retaining the fixed release certificate. **System antivirus classification remains unconfirmed; no emulator or new antivirus test was run, as requested.** Host checks passed for 46 Bili pages and 27 19 Manga pages, including saved-file offline decoding. Previously verified sources are not repeated. [Release notes](docs/release-1.5.9-2026-10-28.md).
 

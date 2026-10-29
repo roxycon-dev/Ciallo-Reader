@@ -36,6 +36,9 @@ internal object GuestNovelEpub {
         val book = value(source.getDetail(id))
         val toc = value(source.getChapters(id))
         require(toc.isNotEmpty()) { "源站目录为空" }
+        val checkpoint = GuestNovelCheckpoint(target, source.id, downloadUrl, toc)
+        val restored = checkpoint.completedChapters.coerceAtMost(toc.size)
+        progress(restored, toc.size)
         val records = JSONArray()
         val assets = linkedMapOf<String, Pair<String, String>>()
         val imageRecords = JSONArray()
@@ -52,29 +55,33 @@ internal object GuestNovelEpub {
                 text("META-INF/container.xml", """<?xml version="1.0" encoding="utf-8"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>""")
                 for ((index, chapter) in toc.withIndex()) {
                     currentCoroutineContext().ensureActive()
-                    val parts = source.chapterParts(chapter.id)
+                    val cached = checkpoint.chapter(index)
+                    val parts = cached ?: source.chapterParts(chapter.id)
                     val body = StringBuilder()
                     for (part in parts) when (part) {
                         is NovelPart.Text -> body.append("<p>").append(xml(part.value)).append("</p>")
                         is NovelPart.Image -> {
                             val asset = assets[part.url] ?: run {
-                                val imageUrl = part.url.toHttpUrl()
-                                require(imageUrl.username.isEmpty() && imageUrl.password.isEmpty()) { "插图地址异常" }
-                                val req = Request.Builder().url(imageUrl).header("Referer", chapter.id)
-                                    .header("User-Agent", "Mozilla/5.0").build()
-                                source.http.newCall(req).executeCancellable().use { response ->
-                                    require(response.isSuccessful) { "插图下载失败（HTTP ${response.code}），未生成缺图电子书" }
-                                    val bytes = response.body?.byteStream()?.use { it.readImportBytes(16 * 1024 * 1024) } ?: error("插图为空")
-                                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
-                                    require(options.outWidth > 0 && options.outHeight > 0) { "插图损坏，未生成缺图电子书" }
-                                    val mime = options.outMimeType ?: error("插图格式无法识别")
-                                    val extension = when (mime) { "image/jpeg" -> "jpg"; "image/png" -> "png"; "image/gif" -> "gif"; "image/webp" -> "webp"; else -> error("插图格式不受支持") }
-                                    val path = "Images/${assets.size}.$extension"
-                                    entry("OEBPS/$path", bytes)
-                                    imageRecords.put(JSONObject().put("url", part.url).put("path", path).put("sha256", hash(bytes)))
-                                    (path to mime).also { assets[part.url] = it }
+                                val image = checkpoint.image(part.url) ?: run {
+                                    val imageUrl = part.url.toHttpUrl()
+                                    require(imageUrl.username.isEmpty() && imageUrl.password.isEmpty()) { "插图地址异常" }
+                                    val req = Request.Builder().url(imageUrl).header("Referer", chapter.id)
+                                        .header("User-Agent", "Mozilla/5.0").build()
+                                    source.http.newCall(req).executeCancellable().use { response ->
+                                        if (!response.isSuccessful) throw com.example.source.SourceException.NetworkError("插图下载失败（HTTP ${response.code}）")
+                                        val bytes = response.body?.byteStream()?.use { it.readImportBytes(16 * 1024 * 1024) } ?: error("插图为空")
+                                        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+                                        require(options.outWidth > 0 && options.outHeight > 0) { "插图损坏，未生成缺图电子书" }
+                                        val mime = options.outMimeType ?: error("插图格式无法识别")
+                                        val extension = when (mime) { "image/jpeg" -> "jpg"; "image/png" -> "png"; "image/gif" -> "gif"; "image/webp" -> "webp"; else -> error("插图格式不受支持") }
+                                        GuestNovelCheckpoint.Image(bytes, mime, extension).also { checkpoint.saveImage(part.url, it) }
+                                    }
                                 }
+                                val path = "Images/${assets.size}.${image.extension}"
+                                entry("OEBPS/$path", image.bytes)
+                                imageRecords.put(JSONObject().put("url", part.url).put("path", path).put("sha256", hash(image.bytes)))
+                                (path to image.mime).also { assets[part.url] = it }
                             }
                             body.append("<p><img src=\"").append(xml(asset.first)).append("\" alt=\"插图\"/></p>")
                         }
@@ -84,8 +91,10 @@ internal object GuestNovelEpub {
                     records.put(JSONObject().put("url", chapter.id).put("title", chapter.title)
                         .put("textSha256", hash(plain.toByteArray(Charsets.UTF_8))).put("characters", plain.length)
                         .put("paragraphs", parts.count { it is NovelPart.Text }).put("images", parts.count { it is NovelPart.Image }))
-                    progress(index + 1, toc.size)
-                    delay(200) // A sequential guest download never floods the source with chapter requests.
+                    if (cached == null) checkpoint.saveChapter(index, parts)
+                    progress(maxOf(restored, index + 1), toc.size)
+                    // Repacking verified local chapters needs no network throttle.
+                    if (cached == null) delay(200)
                 }
                 val latest = value(source.getChapters(id))
                 require(toc.map { it.id to it.title } == latest.map { it.id to it.title }) { "下载期间源站目录变化，请重试；未导入旧目录的残缺书籍" }

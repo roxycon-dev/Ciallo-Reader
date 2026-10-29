@@ -213,4 +213,25 @@ class BackendDownloadWorkerTest {
         assertEquals(1, requests.get())
         assertEquals(0, db.bookDao().getBooksCount())
     }
+
+    @Test fun networkConstraintStopLeavesTaskRunnableAndTheNextWorkerContinues() = runBlocking {
+        val task = task()
+        val running = worker(task)
+        stall = CountDownLatch(1)
+        body = ("第一章 网络切换\n" + "可离线阅读的中文正文。".repeat(12_000)).toByteArray()
+        try {
+            val job = launch(Dispatchers.IO) { running.doWork() }
+            val temp = File(File(task.filePath).parentFile, "${File(task.filePath).nameWithoutExtension}.tmp")
+            withTimeout(15_000) { while (temp.length() == 0L) delay(10) }
+            running.stop(WorkInfo.STOP_REASON_CONSTRAINT_CONNECTIVITY)
+            withTimeout(5_000) { job.cancelAndJoin() }
+            assertEquals(DownloadStatus.PENDING, db.downloadTaskDao().getTaskById(task.id)!!.status)
+            assertTrue(DownloadProgressBroadcaster.getState(task.id) is DownloadState.Pending)
+            stall!!.countDown()
+            stall = null
+            assertEquals(ListenableWorker.Result.success(), worker(task).doWork())
+            assertEquals(DownloadStatus.COMPLETED, db.downloadTaskDao().getTaskById(task.id)!!.status)
+            assertArrayEquals(body, File(task.filePath).readBytes())
+        } finally { stall?.countDown() }
+    }
 }
