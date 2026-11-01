@@ -216,12 +216,24 @@ On Windows, use gradlew.bat :app:assembleDebug. For bugs and feature requests, o
 
 ## Contributors and thanks
 
-Many changes in this project come from issues: bug reports, new sources, and reports about layout or compatibility problems. Thanks to the people below.
+Many changes in this project come from issues: bug reports, new sources, and reports about layout or compatibility problems. Below are the people who filed them, with their issue numbers.
 
 <table>
   <tr>
-    <td align="center" width="130">
-      <a href="https://github.com/WyhtheStainless"><img src="https://github.com/WyhtheStainless.png" width="72" height="72" alt="WyhtheStainless avatar" /><br /><sub><b>WyhtheStainless</b></sub></a>
+    <td align="center" width="112">
+      <a href="https://github.com/mahaix"><img src="https://github.com/mahaix.png" width="64" height="64" alt="mahaix avatar" /><br /><sub><b>mahaix</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/1">#1</a></sub>
+    </td>
+    <td align="center" width="112">
+      <a href="https://github.com/metahuman1016"><img src="https://github.com/metahuman1016.png" width="64" height="64" alt="metahuman1016 avatar" /><br /><sub><b>metahuman1016</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/2">#2</a></sub>
+    </td>
+    <td align="center" width="112">
+      <a href="https://github.com/Wyingzik"><img src="https://github.com/Wyingzik.png" width="64" height="64" alt="Wyingzik avatar" /><br /><sub><b>Wyingzik</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/3">#3</a></sub>
+    </td>
+    <td align="center" width="112">
+      <a href="https://github.com/Lancher2048"><img src="https://github.com/Lancher2048.png" width="64" height="64" alt="Lancher2048 avatar" /><br /><sub><b>Lancher2048</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/4">#4</a></sub>
+    </td>
+    <td align="center" width="112">
+      <a href="https://github.com/Yang-p-c"><img src="https://github.com/Yang-p-c.png" width="64" height="64" alt="Yang-p-c avatar" /><br /><sub><b>Yang-p-c</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/5">#5</a></sub>
     </td>
   </tr>
 </table>

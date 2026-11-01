@@ -244,12 +244,24 @@ Windows 可使用 gradlew.bat :app:assembleDebug。遇到问题或想提出功�
 
 ## 贡献者与致谢
 
-项目里的不少改动都来自 Issues：报告故障、补充书源、指出排版与兼容性问题。感谢下面这些反馈者。
+项目里的不少改动来自 Issues：报告故障、补充书源、指出排版与兼容性问题。下面是反馈过问题的用户，编号对应各自提出的 issue。
 
 <table>
   <tr>
-    <td align="center" width="130">
-      <a href="https://github.com/WyhtheStainless"><img src="https://github.com/WyhtheStainless.png" width="72" height="72" alt="WyhtheStainless 的头像" /><br /><sub><b>WyhtheStainless</b></sub></a>
+    <td align="center" width="112">
+      <a href="https://github.com/mahaix"><img src="https://github.com/mahaix.png" width="64" height="64" alt="mahaix 的头像" /><br /><sub><b>mahaix</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/1">#1</a></sub>
+    </td>
+    <td align="center" width="112">
+      <a href="https://github.com/metahuman1016"><img src="https://github.com/metahuman1016.png" width="64" height="64" alt="metahuman1016 的头像" /><br /><sub><b>metahuman1016</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/2">#2</a></sub>
+    </td>
+    <td align="center" width="112">
+      <a href="https://github.com/Wyingzik"><img src="https://github.com/Wyingzik.png" width="64" height="64" alt="Wyingzik 的头像" /><br /><sub><b>Wyingzik</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/3">#3</a></sub>
+    </td>
+    <td align="center" width="112">
+      <a href="https://github.com/Lancher2048"><img src="https://github.com/Lancher2048.png" width="64" height="64" alt="Lancher2048 的头像" /><br /><sub><b>Lancher2048</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/4">#4</a></sub>
+    </td>
+    <td align="center" width="112">
+      <a href="https://github.com/Yang-p-c"><img src="https://github.com/Yang-p-c.png" width="64" height="64" alt="Yang-p-c 的头像" /><br /><sub><b>Yang-p-c</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/5">#5</a></sub>
     </td>
   </tr>
 </table>
