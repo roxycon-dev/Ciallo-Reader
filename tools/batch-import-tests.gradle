@@ -1,0 +1,12 @@
+gradle.projectsEvaluated {
+    def app = rootProject.project(':app')
+    app.tasks.matching { it.name in ['kspDebugUnitTestKotlin', 'compileDebugUnitTestJavaWithJavac'] }.configureEach { enabled = false }
+    app.tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+        maxParallelForks = 1
+        filter {
+            includeTestsMatching('com.example.data.BookImportBatchTest')
+            includeTestsMatching('com.example.data.BackendImportSafetyTest')
+        }
+        jvmArgs('--add-exports=java.base/sun.nio.ch=ALL-UNNAMED', '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED')
+    }
+}

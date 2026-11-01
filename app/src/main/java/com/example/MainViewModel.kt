@@ -735,30 +735,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun importBook(uri: Uri, fileName: String, category: String = DEFAULT_CATEGORY) {
+    private val _importProgress = MutableStateFlow<BookImportProgress?>(null)
+    val importProgress: StateFlow<BookImportProgress?> = _importProgress
+
+    private val _importReport = MutableStateFlow<BookImportReport?>(null)
+    val importReport: StateFlow<BookImportReport?> = _importReport
+    fun clearImportReport() { _importReport.value = null }
+
+    fun importBooks(uris: List<Uri>, category: String = DEFAULT_CATEGORY) {
+        if (uris.isEmpty() || _importProgress.value != null) return
+        val files = uris.distinct()
+        _importProgress.value = BookImportProgress(0, files.size, "准备导入")
         viewModelScope.launch {
             try {
-                android.util.Log.d("BookImport", "[MainViewModel] Starting import: $fileName, category: $category")
-                val result = repository.importBookFromUri(uri, fileName)
-                result.onSuccess { book ->
-                    // 第七轮第 6.1/6.2 条：书籍单一归属真实分类；旧聚合词归一为"默认"
-                    val normalizedCategory = if (category == "全部" || category == "未分类") DEFAULT_CATEGORY else category
-                    val finalBook = if (normalizedCategory != book.category) {
-                        val updated = book.copy(category = normalizedCategory)
-                        database.bookDao().updateBook(updated)
-                        updated
-                    } else {
-                        book
+                val normalizedCategory = if (category == "全部" || category == "未分类") DEFAULT_CATEGORY else category
+                val report = withContext(Dispatchers.IO) {
+                    importBookBatch(files, onProgress = { _importProgress.value = it }) { uri, reportName ->
+                        val resolver = getApplication<Application>().contentResolver
+                        var name = uri.lastPathSegment?.substringAfterLast('/') ?: "book.txt"
+                        resolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                            val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            if (cursor.moveToFirst() && index >= 0) name = cursor.getString(index) ?: name
+                        }
+                        reportName(name)
+                        val book = repository.importBookFromUri(uri, name).getOrThrow()
+                        if (normalizedCategory != book.category) {
+                            database.bookDao().updateBook(book.copy(category = normalizedCategory))
+                        }
                     }
-                    android.util.Log.d("BookImport", "[MainViewModel] Import success: ${finalBook.title}")
-                    _importStatusMessage.value = "《${finalBook.title}》 导入成功"
-                }.onFailure {
-                    android.util.Log.e("BookImport", "[MainViewModel] Import failure", it)
-                    _importStatusMessage.value = "导入失败: ${it.localizedMessage ?: "未知错误"}"
                 }
-            } catch (t: Throwable) {
-                android.util.Log.e("BookImport", "[MainViewModel] Uncaught exception in import coroutine", t)
-                _importStatusMessage.value = "导入出错: ${t.localizedMessage ?: "发生未知异常"}"
+                if (files.size > 1) _importReport.value = report
+                else _importStatusMessage.value = report.message()
+            } finally {
+                _importProgress.value = null
             }
         }
     }

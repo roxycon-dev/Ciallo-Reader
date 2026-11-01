@@ -483,36 +483,41 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    var selectedCategoryForImport by remember { mutableStateOf("全部") }
+                    var selectedCategoryForImport by rememberSaveable { mutableStateOf("全部") }
 
-                    val fileLauncher = rememberLauncherForActivityResult(
-                        contract = ActivityResultContracts.GetContent()
-                    ) { uri: Uri? ->
-                        uri?.let {
-                            try {
-                                contentResolver.takePersistableUriPermission(
-                                    it,
-                                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                                )
-                            } catch (e: Exception) { e.printStackTrace() }
-
-                            var fileName = "book.txt"
-                            try {
-                                contentResolver.query(it, null, null, null, null)?.use { cursor ->
-                                    val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                                    if (cursor.moveToFirst() && nameIndex >= 0) {
-                                        fileName = cursor.getString(nameIndex) ?: "book.txt"
-                                    }
+                    val importProgress by viewModel.importProgress.collectAsStateWithLifecycle()
+                    importProgress?.let { progress ->
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = {},
+                            title = { androidx.compose.material3.Text("正在导入书籍 ${progress.completed}/${progress.total}") },
+                            text = {
+                                androidx.compose.foundation.layout.Column {
+                                    androidx.compose.material3.LinearProgressIndicator(
+                                        progress = { progress.completed.toFloat() / progress.total.coerceAtLeast(1) }
+                                    )
+                                    androidx.compose.material3.Text(progress.fileName, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                                 }
-                            } catch (e: Throwable) {
-                                e.printStackTrace()
+                            },
+                            confirmButton = {}
+                        )
+                    }
+                    val importReport by viewModel.importReport.collectAsStateWithLifecycle()
+                    importReport?.let { report ->
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = viewModel::clearImportReport,
+                            title = { androidx.compose.material3.Text("导入结果") },
+                            text = { androidx.compose.material3.Text(report.message()) },
+                            confirmButton = {
+                                androidx.compose.material3.TextButton(onClick = viewModel::clearImportReport) {
+                                    androidx.compose.material3.Text("完成")
+                                }
                             }
-                            if (fileName == "book.txt") {
-                                fileName = it.lastPathSegment?.substringAfterLast('/') ?: "book.txt"
-                            }
-                            android.util.Log.d("BookImport", "[MainActivity] File selected: $fileName, uri: $it, category: $selectedCategoryForImport")
-                            viewModel.importBook(it, fileName, selectedCategoryForImport)
-                        }
+                        )
+                    }
+                    val fileLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.OpenMultipleDocuments()
+                    ) { uris ->
+                        viewModel.importBooks(uris, selectedCategoryForImport)
                     }
 
                     var selectedTab by rememberSaveable { mutableIntStateOf(2) }
@@ -796,7 +801,7 @@ class MainActivity : ComponentActivity() {
                                                     },
                                                     onImportLocalBook = {
                                                         selectedCategoryForImport = "全部"
-                                                        fileLauncher.launch("*/*")
+                                                        fileLauncher.launch(arrayOf("*/*"))
                                                     },
                                                     /* 搜索结果卡片上的 ♡：直接收进「我喜欢的」 */
                                                     favoriteKeys = favoriteKeys,
@@ -843,7 +848,7 @@ class MainActivity : ComponentActivity() {
                                                 },
                                                 onImportClick = { category ->
                                                     selectedCategoryForImport = category
-                                                    fileLauncher.launch("*/*")
+                                                    fileLauncher.launch(arrayOf("*/*"))
                                                 },
                                                 onAddCategory = { name ->
                                                     viewModel.addCategory(name)
@@ -1388,7 +1393,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenSourceManagement = { navController.openPaperPage("source_management") },
                                 onImportLocalBook = {
                                     selectedCategoryForImport = "全部"
-                                    fileLauncher.launch("*/*")
+                                    fileLauncher.launch(arrayOf("*/*"))
                                 },
                                 favoriteKeys = favoriteKeys,
                                 onToggleFavorite = { book, next -> viewModel.toggleFavorite(book, next) },

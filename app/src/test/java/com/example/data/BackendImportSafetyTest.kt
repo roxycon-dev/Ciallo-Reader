@@ -23,6 +23,32 @@ import java.util.zip.ZipOutputStream
 class BackendImportSafetyTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    @Test fun batchImportsValidBooksAroundBrokenEpubIntoSelectedCategory() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
+        val files = listOf(
+            File(context.cacheDir, "batch-one.txt").apply { writeText("第一章 开始\n第一本正文") },
+            File(context.cacheDir, "batch-broken.epub").apply { writeText("not a zip") },
+            File(context.cacheDir, "batch-two.txt").apply { writeText("第一章 开始\n第二本正文") }
+        )
+        try {
+            val repository = BookRepository(context, db.bookDao(), db)
+            val result = importBookBatch(files, {}) { file, name ->
+                name(file.name)
+                val book = repository.importBookFromUri(Uri.fromFile(file), file.name).getOrThrow()
+                db.bookDao().updateBook(book.copy(category = "批量测试"))
+            }
+            assertEquals(2, result.succeeded)
+            assertEquals(1, result.failed)
+            assertEquals(2, db.bookDao().getBooksCount())
+            for (file in listOf(files[0], files[2])) {
+                val book = db.bookDao().getBookByFilePath(Uri.fromFile(file).toString())!!
+                assertEquals("批量测试", book.category)
+                assertTrue(db.bookDao().getChaptersListForBook(book.id).isNotEmpty())
+            }
+            assertTrue(result.failures.single().contains("batch-broken.epub"))
+        } finally { db.close(); files.forEach { it.delete() } }
+    }
+
     @Test fun rejectsZipSlipWithBothPathSeparators() {
         val root = File(context.cacheDir, "safe-root")
         for (name in listOf("../outside.jpg", "..\\outside.jpg", "/outside.jpg", "C:/outside.jpg")) {
