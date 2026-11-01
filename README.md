@@ -242,16 +242,12 @@ Windows 可使用 gradlew.bat :app:assembleDebug。遇到问题或想提出功�
 - [v1.3.6 发布说明与验证记录](docs/release-1.3.6-2026-10-12.md)
 - [第三方组件与模型许可说明](docs/vendor-licenses/README.md)
 
-## 贡献者
+## 贡献者与致谢
+
+项目里的不少改动都来自 Issues：报告故障、补充书源、指出排版与兼容性问题。感谢下面这些反馈者。
 
 <table>
   <tr>
-    <td align="center" width="130">
-      <a href="https://github.com/roxycon-dev"><img src="https://github.com/roxycon-dev.png" width="72" height="72" alt="Roxycon 的头像" /><br /><sub><b>Roxycon</b></sub></a>
-    </td>
-    <td align="center" width="130">
-      <a href="https://github.com/jtr12345"><img src="https://github.com/jtr12345.png" width="72" height="72" alt="jtr12345 的头像" /><br /><sub><b>jtr12345</b></sub></a>
-    </td>
     <td align="center" width="130">
       <a href="https://github.com/WyhtheStainless"><img src="https://github.com/WyhtheStainless.png" width="72" height="72" alt="WyhtheStainless 的头像" /><br /><sub><b>WyhtheStainless</b></sub></a>
     </td>

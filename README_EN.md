@@ -214,16 +214,12 @@ On Windows, use gradlew.bat :app:assembleDebug. For bugs and feature requests, o
 - [v1.3.6 release notes and verification](docs/release-1.3.6-2026-10-12.md)
 - [Third-party component and model licenses](docs/vendor-licenses/README.md)
 
-## Contributors
+## Contributors and thanks
+
+Many changes in this project come from issues: bug reports, new sources, and reports about layout or compatibility problems. Thanks to the people below.
 
 <table>
   <tr>
-    <td align="center" width="130">
-      <a href="https://github.com/roxycon-dev"><img src="https://github.com/roxycon-dev.png" width="72" height="72" alt="Roxycon avatar" /><br /><sub><b>Roxycon</b></sub></a>
-    </td>
-    <td align="center" width="130">
-      <a href="https://github.com/jtr12345"><img src="https://github.com/jtr12345.png" width="72" height="72" alt="jtr12345 avatar" /><br /><sub><b>jtr12345</b></sub></a>
-    </td>
     <td align="center" width="130">
       <a href="https://github.com/WyhtheStainless"><img src="https://github.com/WyhtheStainless.png" width="72" height="72" alt="WyhtheStainless avatar" /><br /><sub><b>WyhtheStainless</b></sub></a>
     </td>
