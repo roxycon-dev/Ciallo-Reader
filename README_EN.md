@@ -216,14 +216,18 @@ On Windows, use gradlew.bat :app:assembleDebug. For bugs and feature requests, o
 
 ## Contributors
 
-Thanks to everyone who has helped this project. If you reported a bug, shared a source, suggested a feature, or sent code, say so in an issue and we will add you here.
-
 <table>
-<tr>
-<td align="center" width="110">
-<a href="https://github.com/WyhtheStainless"><img src="https://github.com/WyhtheStainless.png" width="72" height="72" alt="WyhtheStainless avatar" /><br /><sub><b>WyhtheStainless</b></sub></a>
-</td>
-</tr>
+  <tr>
+    <td align="center" width="130">
+      <a href="https://github.com/roxycon-dev"><img src="https://github.com/roxycon-dev.png" width="72" height="72" alt="Roxycon avatar" /><br /><sub><b>Roxycon</b></sub></a>
+    </td>
+    <td align="center" width="130">
+      <a href="https://github.com/jtr12345"><img src="https://github.com/jtr12345.png" width="72" height="72" alt="jtr12345 avatar" /><br /><sub><b>jtr12345</b></sub></a>
+    </td>
+    <td align="center" width="130">
+      <a href="https://github.com/WyhtheStainless"><img src="https://github.com/WyhtheStainless.png" width="72" height="72" alt="WyhtheStainless avatar" /><br /><sub><b>WyhtheStainless</b></sub></a>
+    </td>
+  </tr>
 </table>
 
 ## Content sources and license
