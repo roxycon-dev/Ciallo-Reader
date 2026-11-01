@@ -242,6 +242,18 @@ Windows 可使用 gradlew.bat :app:assembleDebug。遇到问题或想提出功�
 - [v1.3.6 发布说明与验证记录](docs/release-1.3.6-2026-10-12.md)
 - [第三方组件与模型许可说明](docs/vendor-licenses/README.md)
 
+## 贡献者与致谢
+
+感谢为本项目提供帮助的人。无论是提交问题、提供书源、给出建议还是直接提交代码，都欢迎在 Issue 里说明，我们会把你列在这里。
+
+<table>
+<tr>
+<td align="center" width="110">
+<a href="https://github.com/WyhtheStainless"><img src="https://github.com/WyhtheStainless.png" width="72" height="72" alt="WyhtheStainless 的头像" /><br /><sub><b>WyhtheStainless</b></sub></a>
+</td>
+</tr>
+</table>
+
 ## 内容来源与许可
 
 Ciallo Reader 是阅读与书库管理工具，在线书源和翻译服务由第三方提供，其内容、可用性及服务条款由对应提供方决定。请遵守所在地法律、来源站点规则及作品版权要求。

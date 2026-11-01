@@ -214,6 +214,18 @@ On Windows, use gradlew.bat :app:assembleDebug. For bugs and feature requests, o
 - [v1.3.6 release notes and verification](docs/release-1.3.6-2026-10-12.md)
 - [Third-party component and model licenses](docs/vendor-licenses/README.md)
 
+## Contributors
+
+Thanks to everyone who has helped this project. If you reported a bug, shared a source, suggested a feature, or sent code, say so in an issue and we will add you here.
+
+<table>
+<tr>
+<td align="center" width="110">
+<a href="https://github.com/WyhtheStainless"><img src="https://github.com/WyhtheStainless.png" width="72" height="72" alt="WyhtheStainless avatar" /><br /><sub><b>WyhtheStainless</b></sub></a>
+</td>
+</tr>
+</table>
+
 ## Content sources and license
 
 Ciallo Reader is a reading and library-management app. Online sources and translation services are provided by third parties; their content, availability, and terms are controlled by those providers. Please follow local laws, source-site rules, and copyright requirements.
