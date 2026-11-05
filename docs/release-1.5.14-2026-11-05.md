@@ -27,3 +27,5 @@
 正式包：1.5.14 / 256，ARM64，29312108 B，SHA-256 `912baf6fce761df7c19336597c848a454f34e910527c1659bb3b15235feac684`。沿用现有新签名，与官方 1.5.13 的覆盖升级条件、ZIP CRC、16 KiB 对齐均通过；738 个生产输入与冻结清单一致。
 
 最终收紧徽标底色后，46 项 JVM 检查及 3 项下载入口/共用控件设备复查再次通过；1、12、99+ 原生截图逐张核对。
+
+发布于北京时间 2026-11-06：[GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.14)，代码 `bf678f5ae363e948e9dc4c7e47d7a94c7fff79b0`。两个附件服务端摘要已核对；公开 APK 重新下载 HTTP 200，字节数与 SHA-256 匹配。

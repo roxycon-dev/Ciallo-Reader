@@ -44,5 +44,29 @@
     "abis": [
       "arm64-v8a"
     ]
-  }
+  },
+  "githubPublication": {
+    "releaseUrl": "https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.14",
+    "releaseId": 435418596,
+    "tag": "v1.5.14",
+    "commit": "bf678f5ae363e948e9dc4c7e47d7a94c7fff79b0",
+    "latestVerified": true,
+    "draft": false,
+    "assets": [
+      {
+        "name": "Ciallo-Reader-v1.5.14.apk",
+        "bytes": 29312108,
+        "digest": "sha256:912baf6fce761df7c19336597c848a454f34e910527c1659bb3b15235feac684",
+        "url": "https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.14/Ciallo-Reader-v1.5.14.apk"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "bytes": 93,
+        "digest": "sha256:7638c40a556889e3aa6960f8e709c7bf94ad5325cb6f20f140c71a542c2ee08e",
+        "url": "https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.14/SHA256SUMS.txt"
+      }
+    ]
+  },
+  "publicDownload": "HTTP 200, byte count and SHA-256 match",
+  "publicationDateAsiaShanghai": "2026-11-06"
 }
