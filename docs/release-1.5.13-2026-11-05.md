@@ -38,3 +38,5 @@
 APK：**29,306,016 B**
 
 SHA-256：`7571f9d87188775f2380ec69bab8b0a0fa5b6f54a135462fcfa211074b243717`
+
+[下载 GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.13) · 发布代码 `ed77644b`，公开 APK 下载与服务端摘要均已核对匹配。
