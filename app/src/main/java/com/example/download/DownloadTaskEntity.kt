@@ -26,5 +26,6 @@ data class DownloadTaskEntity(
     val totalBytes: Long = 0L,
     val filePath: String,
     val errorMessage: String? = null,
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    @androidx.room.ColumnInfo(defaultValue = "0") val progress: Float = 0f
 )

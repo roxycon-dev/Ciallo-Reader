@@ -925,7 +925,7 @@ class LibraryViewModel private constructor(
                 "SmokeTest",
                 "  fetch ${url.take(90)} -> HTTP 200, ${raw.size} bytes, type=${response.header("Content-Type")}"
             )
-            var bytes = ImageBytes.normalizeImage(raw, response.header("Content-Encoding"))
+            var bytes = ImageBytes.normalizeImage(raw, response.header("Content-Encoding"), response.request.url.toString())
             val magicAfter = bytes.take(12).joinToString(" ") { "%02X".format(it) }
             Log.i("SmokeTest", "  after normalize: ${bytes.size} bytes, magic=$magicAfter")
             if (ImageBytes.isAvif(bytes) && !ImageBytes.decodeOk(bytes)) {
@@ -940,7 +940,7 @@ class LibraryViewModel private constructor(
                             if (r2.isSuccessful) {
                                 val b2 = r2.body?.bytes()
                                 if (b2 != null) {
-                                    val p2 = ImageBytes.normalizeImage(b2, r2.header("Content-Encoding"))
+                                    val p2 = ImageBytes.normalizeImage(b2, r2.header("Content-Encoding"), r2.request.url.toString())
                                     if (!ImageBytes.isAvif(p2) && ImageBytes.decodeOk(p2)) {
                                         Log.i("SmokeTest", "  webp fallback OK: $candidate")
                                         bytes = p2
@@ -1027,22 +1027,25 @@ class LibraryViewModel private constructor(
     val preparingDownloads = preparations.asStateFlow()
     private val downloadScope get() = sharedLibrary?.viewModelScope ?: viewModelScope
 
+    // One eagerly shared ledger prevents a cold sheet from anchoring on comics
+    // before Room's novel records arrive, and avoids duplicate Room observers.
+    val allDownloadTasks: StateFlow<List<DownloadTaskEntity>> = sharedLibrary?.allDownloadTasks
+        ?: downloadManager.allTasksFlow.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val downloadStates: StateFlow<Map<String, DownloadState>> = kotlinx.coroutines.flow.combine(
-        downloadManager.downloadStates, downloadManager.allTasksFlow, preparations
+        downloadManager.downloadStates, allDownloadTasks, preparations
     ) { states, tasks, preparing ->
         tasks.associate { task ->
             DownloadManager.taskId(task.sourceId, DownloadManager.originalBookId(task.id, task.sourceId)) to
-                (states[task.id] ?: when (task.status) {
+                (states[task.id]?.takeIf { task.status == com.example.download.DownloadStatus.DOWNLOADING && it is DownloadState.Downloading } ?: when (task.status) {
                     com.example.download.DownloadStatus.COMPLETED -> DownloadState.Success(task.filePath)
                     com.example.download.DownloadStatus.DOWNLOADING -> DownloadState.Downloading(task.downloadedBytes, task.totalBytes,
-                        if (task.totalBytes > 0) (task.downloadedBytes.toFloat() / task.totalBytes).coerceIn(0f, 1f) else 0f)
+                        task.progress)
                     com.example.download.DownloadStatus.PAUSED -> DownloadState.Paused(task.downloadedBytes, task.totalBytes)
                     com.example.download.DownloadStatus.FAILED -> DownloadState.Error(task.errorMessage ?: "下载失败")
                     else -> DownloadState.Pending
                 })
         } + preparing.mapValues { it.value.state }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
-    val allDownloadTasks: Flow<List<DownloadTaskEntity>> = downloadManager.allTasksFlow
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
     val errorMessage = MutableStateFlow<String?>(null)
 
     fun search(keyword: String, forceKeywordRefresh: Boolean = false) {

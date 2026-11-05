@@ -150,6 +150,8 @@ fun AcrylicBottomOverlay(
     shape: Shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
     dismissOnBackgroundClick: Boolean = true,
     fitAvailableHeight: Boolean = false,
+    decoratePanel: Boolean = true,
+    uniformScrim: Boolean = false,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
 ) {
     val activity = LocalContext.current as? Activity
@@ -170,7 +172,7 @@ fun AcrylicBottomOverlay(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .then(if (LocalRenderQuality.current.minimal) Modifier.background(Color.Black.copy(alpha = PullOutConfig.SCRIM)) else Modifier.radialGlassScrim())
+                            .then(if (uniformScrim || LocalRenderQuality.current.minimal) Modifier.background(Color.Black.copy(alpha = PullOutConfig.SCRIM)) else Modifier.radialGlassScrim())
                             .pullOutClickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -185,7 +187,7 @@ fun AcrylicBottomOverlay(
                         .adaptiveSheetWidth()
                         .then(if (fitAvailableHeight) Modifier.height(sheetHeight) else Modifier)
                         .pointerInput(Unit) { detectTapGestures(onTap = {}) }
-                        .acrylicPanel(shape = shape, surfaceAlpha = 0.40f)
+                        .then(if (decoratePanel) Modifier.acrylicPanel(shape = shape, surfaceAlpha = 0.40f) else Modifier)
                         .then(if (fitAvailableHeight) Modifier else Modifier.navigationBarsPadding())
                 ) {
                     content()

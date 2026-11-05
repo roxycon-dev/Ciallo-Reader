@@ -234,4 +234,14 @@ class BackendDownloadWorkerTest {
             assertArrayEquals(body, File(task.filePath).readBytes())
         } finally { stall?.countDown() }
     }
+    @Test fun chapterProgressIsDurableAndTerminalProgressRemainsComplete() = runBlocking {
+        val t=task()
+        db.downloadTaskDao().updateProgressAndStatus(t.id,DownloadStatus.DOWNLOADING,0,0,null,progress=.72f)
+        assertEquals(.72f,db.downloadTaskDao().getTaskById(t.id)!!.progress)
+        db.downloadTaskDao().updateProgressAndStatus(t.id,DownloadStatus.PAUSED,0,0,null)
+        assertEquals(.72f,db.downloadTaskDao().getTaskById(t.id)!!.progress)
+        db.downloadTaskDao().updateProgressAndStatus(t.id,DownloadStatus.COMPLETED,123,123,null)
+        assertEquals(1f,db.downloadTaskDao().getTaskById(t.id)!!.progress)
+    }
+
 }

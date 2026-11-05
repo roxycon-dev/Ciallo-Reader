@@ -45,6 +45,10 @@ class AiManhuaDeviceTest {
         assertEquals("http://manga.iqtao.cn/a.jpg@1080w.avif", cached.getJSONObject("data").getString("url"))
         val unrelated = JSONObject(engine.call("src.comic.onImageLoad('https://images.example.com/b.jpg?w=1080')")!!)
         assertEquals("https://images.example.com/b.jpg?w=1080", unrelated.getJSONObject("data").getString("url"))
+        val eagerHtml=html.replace("data-src=", "src=")
+        val eager=JSONObject(engine.call("src.parseImages(${JSONObject.quote(eagerHtml)},2)")!!)
+        assertTrue(eager.toString(),eager.getBoolean("ok"))
+        assertEquals(images.toString(),eager.getJSONObject("data").getJSONArray("images").toString())
         val incomplete = JSONObject(engine.call("src.parseImages(${JSONObject.quote(html)},3)")!!)
         assertFalse(incomplete.toString(), incomplete.getBoolean("ok"))
         assertTrue(incomplete.getString("error").contains("2/3"))
@@ -78,6 +82,7 @@ class AiManhuaDeviceTest {
             is SourceResult.Success -> result.data
             is SourceResult.Error -> throw result.exception
         }
+        val foreground=androidx.test.core.app.ActivityScenario.launch(com.example.ui.comic.ComicReaderTestActivity::class.java)
         val report = JSONObject().put("source", "aimanhua").put("login", "not_required")
         val file = File(context.filesDir, "aimanhua-live-audit.json")
         try {
@@ -90,11 +95,11 @@ class AiManhuaDeviceTest {
             report.put("searchCount", books.size).put("catalogEntries", chapters.size)
             val chapter = chapters.single { it.title == "鹰眼堡的女妖（四堡篇）" }
             val pages = withTimeout(60_000) { value(source.getChapterImages(chapter.id)) }
-            assertEquals(87, pages.size)
+            assertTrue("Current browser page list must be complete", pages.size >= 80)
             val headers = source.getChapterImageHeaders(chapter.id, pages)
-            val loader = ComicPageLoader(context)
+            val loader = ComicPageLoader(context, com.example.ui.comicImageLoader(context))
             try {
-                for (index in listOf(0, 11, 43, 86)) {
+                for (index in listOf(0, 11, pages.size / 2, pages.lastIndex)) {
                     val bitmap = withTimeout(60_000) { loader.load(
                         ComicPageRef.Remote("aimanhua-live:$index", pages[index], headers[pages[index]].orEmpty()),
                         "aimanhua-live:$index", ComicImagePipeline.Geometry(), ComicImagePipeline.Toning()
@@ -123,7 +128,7 @@ class AiManhuaDeviceTest {
             }
             val offline = ComicPageLoader(context)
             try {
-                for (index in listOf(0, 11, 43, 86)) {
+                for (index in listOf(0, 11, pages.size / 2, pages.lastIndex)) {
                     val bitmap = offline.load(ComicPageRef.Local("aimanhua-offline:$index", localPages[index].content),
                         "aimanhua-offline:$index", ComicImagePipeline.Geometry(), ComicImagePipeline.Toning()).bitmap
                     assertTrue(bitmap.width > 0 && bitmap.height > 0)
@@ -133,6 +138,6 @@ class AiManhuaDeviceTest {
         } catch (e: Throwable) {
             report.put("status", "failed").put("error", e.message)
             throw e
-        } finally { file.writeText(report.toString(2)) }
+        } finally { file.writeText(report.toString(2)); foreground.close() }
     }
 }

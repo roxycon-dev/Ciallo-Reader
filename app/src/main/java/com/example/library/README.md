@@ -14,8 +14,8 @@
 - `ComicDownloadManager.kt`
 - `ComicDownloadWorker.kt`
 - `ComicLocalImporter.kt`
-- `DownloadGlassCard.kt`：保留旧卡片调用兼容
-- `NovelDownloadPanel.kt`：整本下载持久任务列表、准备/失败反馈和文件明细
+- `DownloadGlassCard.kt`：已删除，统一使用下载中心
+- `NovelDownloadPanel.kt`：统一下载中心，小说/漫画懒加载任务列表、持久进度和逐次删除确认
 - `FormatPickerDialog.kt`
 - `GenericCoverLoader.kt`
 - `ImageBytes.kt`

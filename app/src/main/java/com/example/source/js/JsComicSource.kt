@@ -488,6 +488,10 @@ class JsComicSource(
                 val rawUrls = JsSourcePayload.images(obj.optJSONObject("data"))
                 if (rawUrls.isEmpty()) {
                     SourceResult.Error(SourceException.ParseError("该章节没有可读取的图片"))
+                } else if (sourceKey == "hitomi") {
+                    // The adapter's onImageLoad only adds this constant Referer.
+                    // Avoid entering/gc'ing a JS runtime for every page of a large gallery.
+                    SourceResult.Success(rawUrls)
                 } else if (sourceKey == "ehentai") {
                     // e-hentai 返回的是“图片页 URL”，真正的图片在阅读/下载时懒加载，
                     // 避免一次性逐页请求（大画廊会等几十秒）
@@ -533,6 +537,7 @@ class JsComicSource(
         urls: List<String>
     ): Map<String, Map<String, String>> {
         val result = HashMap<String, Map<String, String>>()
+        if (sourceKey == "hitomi") return urls.associateWith { mapOf("Referer" to "https://hitomi.la/") }
         if (sourceKey == "ehentai") {
             urls.forEach { url ->
                 result[url] = mapOf("Referer" to "https://e-hentai.org/")

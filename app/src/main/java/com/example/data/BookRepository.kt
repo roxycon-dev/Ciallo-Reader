@@ -639,7 +639,7 @@ class BookRepository(
             bookDao.deleteBookmarksForBook(book.id)
             bookDao.deleteHighlightsForBook(book.id)
             bookDao.deleteChaptersForBook(book.id)
-            tasks.forEach { db.downloadTaskDao().deleteTaskById(it.id) }
+            // Download history is retained independently of shelf files.
             bookDao.deleteBook(book)
         }
         withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
@@ -735,7 +735,7 @@ class BookRepository(
             File(if(uri.scheme=="file") uri.path ?: raw else raw).canonicalPath
         }.getOrDefault(raw)
         val owned=books.map { path(it.filePath) }.toSet()
-        com.example.library.ComicDownloadManager.initialize(context)
+        com.example.library.ComicDownloadManager.awaitInitialized(context)
         val comicDirs=com.example.library.ComicDownloadManager.tasks.value.keys.map {
             com.example.library.ComicDownloadManager.directory(context,it).canonicalPath
         }.toSet()

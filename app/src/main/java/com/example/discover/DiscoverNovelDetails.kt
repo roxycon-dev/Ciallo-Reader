@@ -12,7 +12,7 @@ import kotlinx.coroutines.CancellationException
 
 @Composable
 internal fun DiscoverNovelDetails(book: SearchBook?, model: LibraryViewModel,
-    onDismiss: () -> Unit, onRead: (com.example.data.Book) -> Unit) {
+    onDismiss: () -> Unit, onRead: (com.example.data.Book) -> Unit, onOpenDownloads: () -> Unit = {}) {
     if (book == null) return
     val context = LocalContext.current
     var detail by remember(book.sourceId, book.id) { mutableStateOf(book) }
@@ -36,7 +36,7 @@ internal fun DiscoverNovelDetails(book: SearchBook?, model: LibraryViewModel,
     LaunchedEffect(book.sourceId, book.id, state is DownloadState.Success) { local = model.localNovel(book) }
     NovelDetailSheet(detail, sources.firstOrNull { it.id == book.sourceId }?.name.orEmpty(),
         coil.Coil.imageLoader(context), loading, error, state, hasLocal = local != null,
-        onDismiss = onDismiss, onDownload = { model.startDownload(detail, detail.format) },
+        onDismiss = onDismiss, onDownload = { model.startDownload(detail, detail.format); onDismiss(); onOpenDownloads() },
         onRead = { local?.let(onRead) },
-        onPause = { model.pauseDownload(task) }, onResume = { model.resumeDownload(task) }, onCancel = { model.cancelDownload(task) })
+        onPause = { model.pauseDownload(task) }, onResume = { model.resumeDownload(task) }, onCancel = { onDismiss(); onOpenDownloads() })
 }

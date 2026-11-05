@@ -520,6 +520,13 @@ class MainActivity : ComponentActivity() {
                         viewModel.importBooks(uris, selectedCategoryForImport)
                     }
 
+                    var showDownloadCenter by rememberSaveable { mutableStateOf(false) }
+                    if (showDownloadCenter) {
+                        com.example.ui.components.AcrylicBottomOverlay(onDismissRequest={showDownloadCenter=false}, decoratePanel=false, uniformScrim=true) {
+                            val close=com.example.ui.components.LocalOverlayClose.current
+                            com.example.library.DownloadCenter(libraryViewModel) { close {} }
+                        }
+                    }
                     var selectedTab by rememberSaveable { mutableIntStateOf(2) }
                     var discoverRefreshRequest by rememberSaveable { mutableIntStateOf(0) }
                     var lastDiscoverTap by remember { mutableLongStateOf(0L) }
@@ -602,6 +609,7 @@ class MainActivity : ComponentActivity() {
                             }
                             var discoveredNovel by remember { mutableStateOf<com.example.source.SearchBook?>(null) }
                             com.example.discover.DiscoverNovelDetails(discoveredNovel, libraryViewModel,
+                                onOpenDownloads = { showDownloadCenter=true },
                                 onDismiss = { discoveredNovel = null }, onRead = { book ->
                                     viewModel.selectBook(book); navController.openPaperPage("reader")
                                 })
@@ -792,6 +800,7 @@ class MainActivity : ComponentActivity() {
                                         tabSaveableState.SaveableStateProvider(tab) {
                                         when (tab) {
                                                 0 -> com.example.library.LibraryScreen(
+                                                    onOpenDownloads = { showDownloadCenter = true },
                                                     viewModel = libraryViewModel,
                                                     onBookImported = { 
                                                         selectedTab = 2
@@ -818,6 +827,7 @@ class MainActivity : ComponentActivity() {
                                             1 -> {
                                                 val readingTitles by viewModel.readingTitles.collectAsStateWithLifecycle()
                                                 com.example.discover.DiscoverScreen(
+                                                downloadEntry = { com.example.library.DownloadCenterEntry(libraryViewModel) { showDownloadCenter=true } },
                                                 readingTitles = readingTitles,
                                                 manager = libraryViewModel.sourceManager,
                                                 refreshRequest = discoverRefreshRequest,
@@ -1388,6 +1398,7 @@ class MainActivity : ComponentActivity() {
                             val sessionId = entry.arguments?.getString(LIBRARY_SESSION_ARGUMENT)
                             val favoriteKeys by viewModel.favoriteKeys.collectAsStateWithLifecycle()
                             com.example.library.LibraryScreen(
+                                                    onOpenDownloads = { showDownloadCenter = true },
                                 viewModel = searchViewModel,
                                 onBookImported = { selectedTab = 2 },
                                 onOpenSourceManagement = { navController.openPaperPage("source_management") },

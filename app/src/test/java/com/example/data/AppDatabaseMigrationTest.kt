@@ -24,8 +24,8 @@ class AppDatabaseMigrationTest {
             seed.bookDao().insertBookWithChapters(Book(title="升级前的书",filePath="",totalChapters=1),listOf(Chapter(bookId=0,chapterOrder=0,title="第一章",content="保留正文")))
             val sql=seed.openHelper.writableDatabase
             sql.execSQL("DROP TABLE transfer_identities");sql.execSQL("DROP TABLE transfer_receipts")
-            sql.execSQL("DROP INDEX index_chapters_bookId_chapterOrder");sql.version=12;seed.close()
-            val upgraded=Room.databaseBuilder(context,AppDatabase::class.java,name).addMigrations(AppDatabase.MIGRATION_12_13)
+            sql.execSQL("DROP INDEX index_chapters_bookId_chapterOrder");restoreDownloadTableV13(sql);sql.version=12;seed.close()
+            val upgraded=Room.databaseBuilder(context,AppDatabase::class.java,name).addMigrations(AppDatabase.MIGRATION_12_13, AppDatabase.MIGRATION_13_14)
                 .setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE).allowMainThreadQueries().build()
             try {
                 val book=upgraded.bookDao().getAllBooksSync().single()
@@ -71,12 +71,13 @@ class AppDatabaseMigrationTest {
                     "ON comic_chapter_read (sourceId, comicId)"
             )
             sql.execSQL("DROP TABLE god_moments")
+            restoreDownloadTableV13(sql)
             sql.version = 11
             seed.close()
 
             val upgraded = Room.databaseBuilder(context, AppDatabase::class.java, name)
                 .setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE)
-                .addMigrations(AppDatabase.MIGRATION_11_12, AppDatabase.MIGRATION_12_13)
+                .addMigrations(AppDatabase.MIGRATION_11_12, AppDatabase.MIGRATION_12_13, AppDatabase.MIGRATION_13_14)
                 .allowMainThreadQueries()
                 .build()
             try {
@@ -96,4 +97,30 @@ class AppDatabaseMigrationTest {
             context.deleteDatabase(name)
         }
     }
+    private fun restoreDownloadTableV13(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `download_tasks_v13` (`id` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT NOT NULL, `coverUrl` TEXT, `downloadUrl` TEXT NOT NULL, `format` TEXT NOT NULL, `status` TEXT NOT NULL, `downloadedBytes` INTEGER NOT NULL, `totalBytes` INTEGER NOT NULL, `filePath` TEXT NOT NULL, `errorMessage` TEXT, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))""")
+        db.execSQL("INSERT INTO download_tasks_v13 (`id`,`sourceId`,`title`,`author`,`coverUrl`,`downloadUrl`,`format`,`status`,`downloadedBytes`,`totalBytes`,`filePath`,`errorMessage`,`updatedAt`) SELECT `id`,`sourceId`,`title`,`author`,`coverUrl`,`downloadUrl`,`format`,`status`,`downloadedBytes`,`totalBytes`,`filePath`,`errorMessage`,`updatedAt` FROM download_tasks")
+        db.execSQL("DROP TABLE download_tasks")
+        db.execSQL("ALTER TABLE download_tasks_v13 RENAME TO download_tasks")
+    }
+
+    @Test fun versionThirteenRestoresByteProgressAndRetainsCompletedHistory() = runBlocking {
+        val context=ApplicationProvider.getApplicationContext<Context>()
+        val name="migration-13-14-${System.nanoTime()}.db"
+        try {
+            val seed=Room.databaseBuilder(context,AppDatabase::class.java,name).allowMainThreadQueries().build()
+            val dao=seed.downloadTaskDao()
+            dao.insertOrUpdate(com.example.download.DownloadTaskEntity("active","fixture","进度","",null,"url","txt",com.example.download.DownloadStatus.PAUSED,50,100,"/file"))
+            dao.insertOrUpdate(com.example.download.DownloadTaskEntity("done","fixture","完成","",null,"url","txt",com.example.download.DownloadStatus.COMPLETED,100,100,"/done"))
+            val sql=seed.openHelper.writableDatabase
+            restoreDownloadTableV13(sql);sql.version=13;seed.close()
+            val upgraded=Room.databaseBuilder(context,AppDatabase::class.java,name).addMigrations(AppDatabase.MIGRATION_13_14).allowMainThreadQueries().build()
+            try {
+                assertEquals(.5f,upgraded.downloadTaskDao().getTaskById("active")!!.progress)
+                assertEquals(1f,upgraded.downloadTaskDao().getTaskById("done")!!.progress)
+                assertEquals(com.example.download.DownloadStatus.COMPLETED,upgraded.downloadTaskDao().getTaskById("done")!!.status)
+            } finally { upgraded.close() }
+        } finally { context.deleteDatabase(name) }
+    }
+
 }

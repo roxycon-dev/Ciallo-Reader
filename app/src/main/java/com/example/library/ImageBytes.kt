@@ -15,6 +15,8 @@ import java.util.zip.GZIPInputStream
  */
 object ImageBytes {
 
+    internal fun isIqtaoImageHost(host: String): Boolean = host=="webimg.iqtao.cn" || host=="f2.kkmh.com"
+
     private val normalizationLock=Any()
     private val expandedLimit: Long get() = minOf(32L*1024*1024,Runtime.getRuntime().maxMemory()/12)
     private val GZIP_MAGIC = byteArrayOf(0x1F.toByte(), 0x8B.toByte())
@@ -45,12 +47,19 @@ object ImageBytes {
     }
 
     /** 图片字节统一归一化：gzip 解压 + AVIF 转 PNG（BitmapFactory 在部分设备不支持 AVIF）。 */
-    fun normalizeImage(bytes: ByteArray, contentEncoding: String? = null): ByteArray = synchronized(normalizationLock) {
+    fun normalizeImage(bytes: ByteArray, contentEncoding: String? = null, sourceUrl: String? = null): ByteArray = synchronized(normalizationLock) {
         require(bytes.size<=32L*1024*1024) { "图片文件过大" }
         var result = if (contentEncoding?.contains("br", ignoreCase = true) == true) {
             brotliDecompress(bytes) ?: bytes
         } else {
             gunzipIfNeeded(bytes)
+        }
+        // Public reader's byte envelope (XOR_KEY=0xAB, SHIFT_VALUE=47).
+        // Scope it to the reader image origins and verify the decoded image signature.
+        val host=sourceUrl?.let { runCatching { java.net.URI(it).host }.getOrNull() }
+        if(host != null && isIqtaoImageHost(host) && MhttuImageDecryptor.imageExtension(result)==null) {
+            val decoded=ByteArray(result.size) { index -> (((result[index].toInt() and 255)-47) and 255 xor 171).toByte() }
+            if(MhttuImageDecryptor.imageExtension(decoded)!=null && decodeOk(decoded)) result=decoded
         }
         if (isAvif(result)) {
             result = try {

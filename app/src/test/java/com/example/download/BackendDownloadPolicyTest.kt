@@ -47,4 +47,12 @@ class BackendDownloadPolicyTest {
             assertFalse(DownloadFileValidator.validateFileIntegrity(file, "txt").valid)
         } finally { file.delete() }
     }
+    @Test fun backgroundStartRestrictionHasAShortActionableMessage() {
+        val failure=java.util.concurrent.ExecutionException(RuntimeException("startForegroundService() not allowed due to mAllowStartForeground false"))
+        assertTrue(DownloadWorker.foregroundStartRestricted(failure))
+        assertEquals("后台启动受限，请重试",DownloadWorker.failureMessage(failure))
+        assertFalse(DownloadWorker.foregroundStartRestricted(java.io.IOException("timeout")))
+        assertEquals("连接中断，请重试",DownloadWorker.failureMessage(java.io.IOException("timeout")))
+    }
+
 }

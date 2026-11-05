@@ -70,13 +70,14 @@ import kotlin.math.abs
 @Composable
 fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favoriteKeys: Set<String>,
     onFollow: (SearchBook, Boolean) -> Unit, onOpen: (SearchBook) -> Unit,
-    onLatest: (SearchBook) -> Unit, onSourceManagement: () -> Unit, readingTitles: Set<String> = emptySet(), refreshRequest: Int = 0) {
+    onLatest: (SearchBook) -> Unit, onSourceManagement: () -> Unit, readingTitles: Set<String> = emptySet(), refreshRequest: Int = 0, downloadEntry: @Composable () -> Unit = {}) {
     var partition by rememberSaveable { mutableStateOf(DiscoverPartition.COMIC) }
     val holder = rememberSaveableStateHolder()
     holder.SaveableStateProvider(partition.name) {
         DiscoverPartitionContent(manager, favorites, favoriteKeys, onFollow, onOpen, onLatest,
-            onSourceManagement, readingTitles, refreshRequest, partition, { partition = it })
+            onSourceManagement, readingTitles, refreshRequest, partition, { partition = it }, downloadEntry)
     }
+
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -84,7 +85,7 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
 private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<FavoriteItem>, favoriteKeys: Set<String>,
     onFollow: (SearchBook, Boolean) -> Unit, onOpen: (SearchBook) -> Unit,
     onLatest: (SearchBook) -> Unit, onSourceManagement: () -> Unit, readingTitles: Set<String>, refreshRequest: Int,
-    partition: DiscoverPartition, onPartition: (DiscoverPartition) -> Unit) {
+    partition: DiscoverPartition, onPartition: (DiscoverPartition) -> Unit, downloadEntry: @Composable () -> Unit) {
     val (store, revision) = rememberDiscoverStore(partition)
     val model: DiscoverViewModel = viewModel(key = "discover_${partition.name}", factory = remember(manager, store) {
         object : ViewModelProvider.Factory {
@@ -204,7 +205,10 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
             CollapsingTabScreenHeader(fractionSource = headerFraction, modifier = Modifier.statusBarsPadding(), title = "发现", subtitle = "DISCOVER",
                 onTitleClick = { scope.launch { if (reduce) grid.scrollToItem(0) else grid.animateScrollToItem(0) } },
                 titleColor = glassTitleColor(), trailing = {
-                    PullOutIconButton(onClick = { showSettings = true }) { Icon(Icons.Outlined.Tune, "发现设置") }
+                    Row {
+                        downloadEntry()
+                        PullOutIconButton(onClick = { showSettings = true }) { Icon(Icons.Outlined.Tune, "发现设置") }
+                    }
                 })
             PullToRefreshBox(isRefreshing = state.loading && state.entries.isNotEmpty(), onRefresh = { light(); model.refresh() }, modifier = Modifier.weight(1f),
                 ) {

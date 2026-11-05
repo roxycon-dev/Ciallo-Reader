@@ -97,7 +97,13 @@ class LiveComicSourcesAuditTest {
         sources.map { source -> async(Dispatchers.IO) { gate.withPermit {
             val key = (source as? JsComicSource)?.sourceKey ?: source.id
             val row = JSONObject().put("key", key).put("name", source.name)
-                .put("systemProxyConfigured", com.example.source.zlibrary.network.SystemProxyResolver.resolve(context) != null)
+            if (InstrumentationRegistry.getArguments().getString("skipAuth") == "true" &&
+                (source.requiresLogin || key in setOf("picacg", "mycomic"))) {
+                record(row.put("status","skipped_auth").put("stage","login_or_browser_verification"))
+                return@withPermit
+            }
+
+            row.put("systemProxyConfigured", com.example.source.zlibrary.network.SystemProxyResolver.resolve(context) != null)
             if (key == "mycomic" && freshMycomicSession) row.put("freshSession", true)
             if (key == "bilimanga" && freshBilimangaSession) row.put("freshSession", true)
             val started = SystemClock.elapsedRealtime()

@@ -11,7 +11,7 @@
 
 [🌐 产品主页](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.5.11 更新说明](docs/release-1.5.11-2026-11-01.md) ·
+[1.5.12 更新说明](docs/release-1.5.12-2026-11-05.md) ·
 [查看截图](#界面预览) ·
 [全部功能](#功能亮点) ·
 [提交问题或建议](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -27,7 +27,7 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 **English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
 
-**1.5.11 / 253 · 本地书籍批量导入**：书架「导入新书」支持在系统文件选择器中一次多选；逐本显示进度，导入到当前分类。单本失败继续其余书籍，结束后汇总成功／失败及错误详情。沿用现有解析与安全校验、固定发布签名。详见 [1.5.11 更新说明](docs/release-1.5.11-2026-11-01.md)。
+**1.5.12 / 254 · 统一下载中心**：书库与发现打开同一下载中心，小说与漫画采用紧凑毛玻璃列表，周围压暗并模糊。右侧单一下载图标显示任务数量与进度，暂停、失败和完成状态清晰可见。任务及进度持久保存，完成记录由用户确认后删除，删除记录保留已入书架的书籍。EPUB 分批入库，减少导入峰值内存，传输完成后明确显示校验与入库状态。详见 [更新说明](docs/release-1.5.12-2026-11-05.md)。
 
 **1.5.10 / 252 · 小说下载断点续传**：修复番茄等公开小说逐章下载在 Wi-Fi／移动网络切换后从头下载的问题。已完成章节与插图保存为可校验断点，网络恢复或手动继续时复用；暂停保留、取消清理。短暂网络故障有限重试，目录变化与残缺正文继续严格校验。沿用 1.5.6 起的固定签名，可覆盖升级 1.5.6–1.5.9。21 项相关回归通过；真机网络切换与源站速度未实测。详见 [1.5.10 更新说明](docs/release-1.5.10-2026-10-29.md)。
 

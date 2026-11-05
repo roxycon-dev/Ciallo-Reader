@@ -177,7 +177,7 @@ object ComicLocalImporter {
                         throw IOException("图片下载失败 HTTP ${response.code} (${url.take(80)})")
                     }
                     val raw = response.body?.byteStream()?.use { it.readImportBytes(32 * 1024 * 1024) } ?: throw IOException("图片响应为空")
-                    var bytes = ImageBytes.normalizeImage(raw, response.header("Content-Encoding"))
+                    var bytes = ImageBytes.normalizeImage(raw, response.header("Content-Encoding"), response.request.url.toString())
                     if (ImageBytes.isAvif(bytes) && !ImageBytes.decodeOk(bytes)) {
                         for (candidate in ImageBytes.webpVariants(fetchUrl)) {
                             try {
@@ -190,7 +190,7 @@ object ComicLocalImporter {
                                     if (r2.isSuccessful) {
                                         val b2 = r2.body?.byteStream()?.use { it.readImportBytes(32 * 1024 * 1024) }
                                         if (b2 != null) {
-                                            val p2 = ImageBytes.normalizeImage(b2, r2.header("Content-Encoding"))
+                                            val p2 = ImageBytes.normalizeImage(b2, r2.header("Content-Encoding"), r2.request.url.toString())
                                             if (!ImageBytes.isAvif(p2) && ImageBytes.decodeOk(p2)) {
                                                 bytes = p2
                                                 return@use

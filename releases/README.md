@@ -1,5 +1,9 @@
 # releases
 
+**1.5.12 / 254**：[GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.12) · [下载 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.12/Ciallo-Reader-v1.5.12.apk) · [发布说明](../docs/release-1.5.12-2026-11-05.md)。
+
+统一下载中心和持久进度；记录逐次确认删除、保留书架文件；EPUB 分批入库及临时文件清理。沿用 1.5.6 起的固定签名，版本编号递增。具体测试与书源范围见发行说明。
+
 本地 APK 不纳入 Git，正式包与校验文件上传 GitHub Release。
 
 **1.5.10 / 252**：[GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.10) · [下载 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.10/Ciallo-Reader-v1.5.10.apk) · [SHA256SUMS](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.10/SHA256SUMS.txt) · [发布说明](../docs/release-1.5.10-2026-10-29.md)。

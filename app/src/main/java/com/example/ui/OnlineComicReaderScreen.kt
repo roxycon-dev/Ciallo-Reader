@@ -353,6 +353,7 @@ internal fun buildComicImageLoader(context: android.content.Context): ImageLoade
             val previewStarted = System.nanoTime()
             val streamPreview = chain.request().tag(ComicStreamPreview::class.java)?.takeIf {
                 !MhttuImageDecryptor.isEncryptedHost(finalResponse.request.url.host) &&
+                    !ImageBytes.isIqtaoImageHost(finalResponse.request.url.host) &&
                     !JsImageProcessor.hasTransform(progressUrl) &&
                     !JsImageProcessor.hasTransform(finalResponse.request.url.toString())
             }
@@ -375,14 +376,14 @@ internal fun buildComicImageLoader(context: android.content.Context): ImageLoade
             ComicTransfers.update(progressUrl, buffer.size, total)
             val raw = buffer.readByteArray()
             val host = response.request.url.host
-            var processed = ImageBytes.normalizeImage(raw, finalResponse.header("Content-Encoding"))
+            var processed = ImageBytes.normalizeImage(raw, finalResponse.header("Content-Encoding"), finalResponse.request.url.toString())
             // 平台解不了 AVIF 时，自动尝试 hitomi 类 CDN 的 webp 变体
             if (ImageBytes.isAvif(processed) && !ImageBytes.decodeOk(processed)) {
                 for (candidate in ImageBytes.webpVariants(response.request.url.toString())) {
                     try {
                         val p2 = chain.proceed(response.request.newBuilder().url(candidate).build()).use { r2 ->
                             if (!r2.isSuccessful) null else r2.body?.bytes()?.let { b2 ->
-                                ImageBytes.normalizeImage(b2, r2.header("Content-Encoding"))
+                                ImageBytes.normalizeImage(b2, r2.header("Content-Encoding"), r2.request.url.toString())
                             }
                         } ?: continue
                         if (!ImageBytes.isAvif(p2) && ImageBytes.decodeOk(p2)) {

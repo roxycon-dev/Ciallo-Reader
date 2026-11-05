@@ -42,7 +42,7 @@ class NovelDownloadPanelDeviceTest {
             NovelDownloadPanel(tasks, emptyMap(), tasks.associate { it.id to DownloadState.Success(it.filePath) }, {}, {}, {}, {}, {})
         } }
         compose.onNodeWithText("下载任务").assertIsDisplayed()
-        compose.onAllNodesWithText("已完成 · 已存入书架")[0].assertIsDisplayed()
+        compose.onAllNodesWithText("已完成")[0].assertIsDisplayed()
         val image = compose.onRoot().captureToImage().asAndroidBitmap()
         File(compose.activity.filesDir, "zlibrary-actual-downloads.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
@@ -61,7 +61,7 @@ class NovelDownloadPanelDeviceTest {
         } }
         compose.onNodeWithText("下载中 · 40%").assertIsDisplayed()
         compose.onNodeWithText("2.0 MB / 5.0 MB").assertIsDisplayed()
-        compose.onNodeWithText("重新获取并重试").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("重新获取并重试").assertIsDisplayed()
         val image = compose.onRoot().captureToImage().asAndroidBitmap()
         File(compose.activity.filesDir, "zlibrary-download-panel.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }

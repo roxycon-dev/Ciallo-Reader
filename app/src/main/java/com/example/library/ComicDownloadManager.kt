@@ -3,6 +3,9 @@ package com.example.library
 import android.app.Application
 import android.content.Context
 import androidx.work.*
+import androidx.room.withTransaction
+import com.example.download.DownloadTaskEntity
+import com.example.download.DownloadStatus
 import com.example.data.AppDatabase
 import com.example.download.DownloadWorker
 import com.example.source.*
@@ -38,12 +41,16 @@ object ComicDownloadManager {
         val hash = java.security.MessageDigest.getInstance("SHA-256").digest(id.toByteArray()).joinToString("") { "%02x".format(it) }
         return File(context.filesDir, "comics_$hash")
     }
-    fun initialize(context: Context) { load(context.applicationContext) }
+    fun initialize(context: Context) { scope.launch { load(context.applicationContext) } }
+    internal suspend fun awaitInitialized(context: Context) = withContext(Dispatchers.IO) { load(context.applicationContext) }
     private fun load(context: Context) = synchronized(stateLock) {
         if (app != null) return@synchronized
-        app = context
         val f = android.util.AtomicFile(File(context.filesDir, "comic_download_tasks.json"))
         val restored = runCatching {
+            val rows = runBlocking(Dispatchers.IO) { AppDatabase.getDatabase(context).downloadTaskDao().getAllTasksSync().filter { it.format == "comic" } }
+            if (rows.isNotEmpty()) {
+                return@runCatching rows.associate { row -> row.id to decode(JSONObject(row.downloadUrl)) }
+            }
             if (!f.baseFile.exists()) emptyMap() else {
                 require(f.baseFile.length() <= 4 * 1024 * 1024)
                 val a = JSONArray(f.openRead().bufferedReader().use { it.readText() })
@@ -58,8 +65,11 @@ object ComicDownloadManager {
                         ComicDownloadStatus.valueOf(o.getString("status")),o.optDouble("progress",0.0).toFloat().takeIf { it.isFinite() }?.coerceIn(0f,1f) ?: 0f,o.optString("error").takeIf { it.isNotBlank() })
                 }
             }
-        }.getOrElse { _message.value = "下载任务记录损坏，请重新添加任务"; emptyMap() }
+        }.getOrElse { _message.value = "下载任务记录读取失败，原记录已保留"; throw it }
+        app = context
         _tasks.value = restored
+        persist()
+        if (f.baseFile.exists()) f.delete()
         scope.launch { operations.withLock {
             val work = WorkManager.getInstance(context)
             for ((id, task) in restored) {
@@ -82,11 +92,38 @@ object ComicDownloadManager {
                 .put("chapter",JSONObject().put("id",t.chapter.id).put("title",t.chapter.title).put("volume",t.chapter.volume ?: "").put("order",t.chapter.order))
                 .put("status",t.status.name).put("progress",t.progress).put("error",t.error ?: ""))
         }
-        val atomic = android.util.AtomicFile(File(context.filesDir,"comic_download_tasks.json"))
-        val out = atomic.startWrite()
-        try { out.write(a.toString().toByteArray()); atomic.finishWrite(out) }
-        catch(e:Exception) { atomic.failWrite(out); throw e }
+        // All callers run on IO. The write commits before a worker reports success.
+        runBlocking(Dispatchers.IO) {
+            val db = AppDatabase.getDatabase(context)
+            db.withTransaction {
+                val dao = db.downloadTaskDao()
+                val ids = _tasks.value.keys
+                val saved=dao.getAllTasksSync().filter { it.format == "comic" }.associateBy { it.id }
+                saved.values.filter { it.id !in ids }.forEach { dao.deleteTaskById(it.id) }
+                _tasks.value.forEach { (id, t) ->
+                    val status = when (t.status) {
+                        ComicDownloadStatus.DOWNLOADING -> DownloadStatus.DOWNLOADING
+                        ComicDownloadStatus.PAUSED -> DownloadStatus.PAUSED
+                        ComicDownloadStatus.FAILED -> DownloadStatus.FAILED
+                        ComicDownloadStatus.SUCCESS -> DownloadStatus.COMPLETED
+                    }
+                    val descriptor = a.getJSONObject(_tasks.value.keys.indexOf(id)).toString()
+                    val row=DownloadTaskEntity(id, t.book.sourceId, t.book.title, t.book.author,
+                        t.book.cover, descriptor, "comic", status, 0, 0,
+                        directory(context,id).absolutePath, t.error, progress=t.progress)
+                    if(saved[id]?.copy(updatedAt=row.updatedAt) != row) dao.insertOrUpdate(row)
+                }
+            }
+        }
     }
+    private fun decode(o: JSONObject): ComicDownloadTask {
+        val b=o.getJSONObject("book"); val c=o.getJSONObject("chapter")
+        return ComicDownloadTask(c.getString("id"), SearchBook(id=b.getString("id"),sourceId=b.getString("sourceId"),title=b.getString("title"),
+            author=b.optString("author"),cover=b.optString("cover").takeIf { it.isNotBlank() },format=b.optString("format","comic")),
+            ComicChapter(c.getString("id"),c.getString("title"),c.optString("volume").takeIf { it.isNotBlank() },c.optDouble("order",0.0).toFloat()),
+            ComicDownloadStatus.valueOf(o.getString("status")),o.optDouble("progress",0.0).toFloat(),o.optString("error").takeIf { it.isNotBlank() })
+    }
+
     internal fun task(context: Context,id:String): ComicDownloadTask? { load(context); return _tasks.value[id] }
     internal fun update(id:String, immediate:Boolean=true, transform:(ComicDownloadTask)->ComicDownloadTask) = synchronized(stateLock) {
         val old = _tasks.value[id] ?: return@synchronized
@@ -96,8 +133,8 @@ object ComicDownloadManager {
         if (immediate || now - (lastSave[id] ?: 0) >= 2000) { persist(); lastSave[id]=now }
     }
     fun start(app: Application,database:AppDatabase,book:SearchBook,chapter:ComicChapter,source:ComicSource) {
-        load(app); sources[book.sourceId]=source
-        scope.launch { operations.withLock {
+        sources[book.sourceId]=source
+        scope.launch { load(app); operations.withLock {
             val id=taskId(book,chapter.id)
             val work=WorkManager.getInstance(app)
             if (work.getWorkInfosForUniqueWork(workName(id)).get().any { !it.state.isFinished }) return@withLock
@@ -114,7 +151,7 @@ object ComicDownloadManager {
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()).build()
         work.enqueueUniqueWork(workName(id), ExistingWorkPolicy.KEEP, request).result.get()
     }
-    private fun resolve(chapterId:String, book:SearchBook?):String? = book?.let { taskId(it,chapterId) }
+    private fun resolve(chapterId:String, book:SearchBook?):String? = chapterId.takeIf { it in _tasks.value } ?: book?.let { taskId(it,chapterId) }
         ?: _tasks.value.entries.singleOrNull { it.value.chapterId==chapterId }?.key
     fun pause(chapterId:String,book:SearchBook?=null) { scope.launch { operations.withLock {
         val id=resolve(chapterId,book) ?: return@withLock
@@ -163,10 +200,10 @@ object ComicDownloadManager {
         load(context)
         val ids=_tasks.value.keys.filter { directory(context,it).canonicalPath==path }
         for(id in ids) {
-            pauseState(id)
+            if (_tasks.value[id]?.status == ComicDownloadStatus.DOWNLOADING) pauseState(id)
             WorkManager.getInstance(context).cancelUniqueWork(workName(id)).result.get()
             DownloadWorker.withTaskLock(id) { }
-            synchronized(stateLock) { _tasks.value=_tasks.value-id; persist() }
+            // Removing shelf content does not remove the download history.
         }
     }
     fun clearMessage() { _message.value=null }

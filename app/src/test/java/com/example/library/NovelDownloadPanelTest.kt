@@ -20,8 +20,8 @@ class NovelDownloadPanelTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun unknownLengthDoesNotClaimZeroPercent() {
-        assertEquals("下载中 · 总大小未知", downloadStatusLabel(DownloadState.Downloading(1024, -1, 0f)))
-        assertEquals("校验文件并存入书架…", downloadStatusLabel(DownloadState.Downloading(1024, 1024, 1f)))
+        assertEquals("下载中", downloadStatusLabel(DownloadState.Downloading(1024, -1, 0f)))
+        assertEquals("校验入库…", downloadStatusLabel(DownloadState.Downloading(1024, 1024, 1f)))
     }
 
     @Test fun restoredTasksAndPreTransferFailureRemainVisibleAndRetryable() {
@@ -37,9 +37,36 @@ class NovelDownloadPanelTest {
         } }
         compose.onNodeWithText("准备阶段失败").assertIsDisplayed()
         compose.onNodeWithText("节点不可用，请重试").assertIsDisplayed()
-        compose.onNodeWithText("重新获取并重试").performClick()
+        compose.onNodeWithContentDescription("重新获取并重试").performClick()
         assertEquals(failed, retried)
         compose.onNodeWithText("已恢复的下载").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("下载中 · 50%").performScrollTo().assertIsDisplayed()
     }
+    @Test fun completedHistoryRequiresConfirmationOnEveryDeletion() {
+        val task=DownloadTaskEntity("done","fixture","已完成的书","作者",null,"https://example.com/book","epub",DownloadStatus.COMPLETED,filePath="/book.epub",progress=1f)
+        var deleted=0
+        compose.setContent { MaterialTheme {
+            NovelDownloadPanel(listOf(task),emptyMap(),emptyMap(),{},{},{deleted++},{},{})
+        } }
+        compose.onNodeWithText("已完成").assertIsDisplayed()
+        compose.onNodeWithContentDescription("删除记录").performClick()
+        assertEquals(0,deleted)
+        compose.onNodeWithText("取消").performClick()
+        assertEquals(0,deleted)
+        compose.onNodeWithContentDescription("删除记录").performClick()
+        compose.onNodeWithText("删除记录？").assertIsDisplayed()
+        compose.onNodeWithText("删除",useUnmergedTree=true).performClick()
+        assertEquals(1,deleted)
+        compose.onNodeWithContentDescription("删除记录").performClick()
+        compose.onNodeWithText("删除记录？").assertIsDisplayed()
+        assertEquals(1,deleted)
+    }
+
+    @Test fun chapterProgressRestoresWithoutAnInMemoryBroadcaster() {
+        val task=DownloadTaskEntity("chapter-progress","fixture","断点任务","作者",null,"https://example.com/book","epub",DownloadStatus.DOWNLOADING,
+            filePath="/book.epub",progress=.63f)
+        compose.setContent { MaterialTheme { NovelDownloadPanel(listOf(task),emptyMap(),emptyMap(),{},{},{},{},{}) } }
+        compose.onNodeWithText("下载中 · 63%").assertIsDisplayed()
+    }
+
 }

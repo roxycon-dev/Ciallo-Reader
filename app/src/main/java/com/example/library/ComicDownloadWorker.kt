@@ -54,8 +54,8 @@ class ComicDownloadWorker(context:Context,params:WorkerParameters):CoroutineWork
                 ComicDownloadManager.update(key) { it.copy(status=ComicDownloadStatus.PAUSED) }
                 throw e
             } catch(e:Exception) {
-                ComicDownloadManager.update(key) { it.copy(status=ComicDownloadStatus.FAILED,error=e.message ?: "章节下载失败") }
-                ComicDownloadManager.message("下载失败：${e.message ?: "章节下载失败"}")
+                ComicDownloadManager.update(key) { it.copy(status=if(DownloadWorker.foregroundStartRestricted(e)) ComicDownloadStatus.PAUSED else ComicDownloadStatus.FAILED,error=DownloadWorker.failureMessage(e)) }
+                ComicDownloadManager.message(DownloadWorker.failureMessage(e))
                 Result.failure()
             }
         }

@@ -122,41 +122,15 @@ object EpubParser {
                 val cleanText = extractCleanTextFromHtml(withImages)
 
                 if (cleanText.isNotBlank()) {
-                    chapters.add(
-                        Chapter(
-                            bookId = bookId,
-                            chapterOrder = chapterOrder++,
-                            title = chapterTitle,
-                            content = cleanText
-                        )
-                    )
-                }
-            }
-
-            // 拆分超大章节：与本地文本导入一致，避免打开大书时整章加载导致卡顿/闪退
-            val splitChapters = mutableListOf<Chapter>()
-            var splitOrder = 0
-            for (ch in chapters) {
-                if (ch.content.length <= MAX_CHAPTER_LENGTH) {
-                    splitChapters.add(ch.copy(chapterOrder = splitOrder++))
-                } else {
-                    val parts = ch.content.let { splitChapterText(it) }
-                    parts.forEachIndexed { index, part ->
-                        splitChapters.add(
-                            Chapter(
-                                bookId = ch.bookId,
-                                chapterOrder = splitOrder++,
-                                title = if (index == 0) ch.title else "${ch.title} (续${index + 1})",
-                                content = part
-                            )
-                        )
+                    splitChapterText(cleanText).forEachIndexed { index, part ->
+                        chapters.add(Chapter(bookId=bookId, chapterOrder=chapterOrder++,
+                            title=if(index==0) chapterTitle else "$chapterTitle (续${index+1})", content=part))
+                        if(chapters.size>=32) { bookDao.insertChapters(chapters); chapters.clear() }
                     }
                 }
             }
-            chapters.clear()
-            chapters.addAll(splitChapters)
 
-            if (chapters.isEmpty()) {
+            if (chapterOrder == 0) {
                 tempDir.deleteRecursively()
                 File(context.filesDir, "epub_images/$bookId").deleteRecursively()
                 if (targetBookId == null) bookDao.deleteBook(initialBook.copy(id = bookId))
@@ -303,12 +277,12 @@ object EpubParser {
             val finalBook = initialBook.copy(
                 id = bookId,
                 coverUri = coverUri,
-                totalChapters = chapters.size
+                totalChapters = chapterOrder
             )
             bookDao.updateBook(finalBook)
             Log.d(TAG, "[COVER] 写入数据库结果: 成功")
 
-            Log.d(TAG, "[EpubParser] Successfully imported EPUB book '${finalBook.title}' with ${chapters.size} chapters.")
+            Log.d(TAG, "[EpubParser] Successfully imported EPUB book '${finalBook.title}' with $chapterOrder chapters.")
             tempDir.deleteRecursively()
             Result.success(finalBook)
         } catch (t: Throwable) {
@@ -316,6 +290,9 @@ object EpubParser {
             Log.e(TAG, "[EpubParser] Error during EPUB import", t)
             tempDir.deleteRecursively()
             Result.failure(Exception(t.localizedMessage ?: "EPUB 解析失败"))
+        } finally {
+            // Cancellation during parsing must not retain the expanded archive.
+            tempDir.deleteRecursively()
         }
     }
 
@@ -769,6 +746,7 @@ object EpubParser {
         copied: MutableMap<String, String>
     ): String? {
         val src = rawSrc.trim()
+        copied[src]?.let { return it }
         if (src.isBlank()) { Log.d(TAG, "[IMG] null: blank src"); return null }
 
         val bytes: ByteArray
@@ -788,6 +766,12 @@ object EpubParser {
             }
             val ext = srcFile.extension.lowercase()
             if (ext !in supportedImageExtensions) { Log.d(TAG, "[IMG] null: ext '$ext' unsupported"); return null }
+            val bounds = imageBounds(srcFile)
+            if(bounds.outWidth<=0 || bounds.outHeight<=0) return null
+            if(bookUri.startsWith("file:")) {
+                val entry=srcFile.relativeTo(root).invariantSeparatorsPath
+                return "[IMG:epzip:$bookUri!$entry|${bounds.outWidth}|${bounds.outHeight}]".also { copied[src]=it }
+            }
             bytes = srcFile.readBytes()
             // zip 内条目 = 临时解压文件相对解压根目录的路径（unzipEpub 按 entry.name 落盘，两者一致）
             epzipEntry = runCatching {

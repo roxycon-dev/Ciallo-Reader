@@ -38,6 +38,25 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
         private val taskLocks = Array(32) { kotlinx.coroutines.sync.Mutex() }
         private const val CHANNEL = "book_downloads"
 
+        internal fun foregroundStartRestricted(error: Throwable): Boolean =
+            generateSequence(error) { it.cause }.take(8).any {
+                it.javaClass.simpleName.contains("ForegroundServiceStartNotAllowed") ||
+                    it.message.orEmpty().contains("startForegroundService() not allowed",true)
+            }
+
+        internal fun failureMessage(message: String): String = when {
+            message.contains("startForegroundService() not allowed",true) || message.contains("ForegroundServiceStartNotAllowed") -> "后台启动受限，请重试"
+            message.contains("ENOSPC",true) -> "存储空间不足"
+            else -> message.lineSequence().firstOrNull()?.take(120)?.ifBlank { null } ?: "下载失败，请重试"
+        }
+
+        internal fun failureMessage(error: Throwable): String = when {
+            foregroundStartRestricted(error) -> "后台启动受限，请重试"
+            error.message.orEmpty().contains("ENOSPC",true) -> "存储空间不足"
+            error is java.io.IOException -> "连接中断，请重试"
+            else -> failureMessage(error.message.orEmpty())
+        }
+
         internal fun shouldRetryPublicNovel(sourceId: String, error: Exception, attempt: Int): Boolean {
             if (sourceId !in com.example.source.impl.PublicNovelSources.ids || attempt >= 5) return false
             if (error.message?.contains("ENOSPC", true) == true) return false
@@ -123,7 +142,7 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                             currentCoroutineContext().ensureActive()
                             DownloadProgressBroadcaster.updateState(taskId,
                                 DownloadState.Downloading(temp.length(), 0L, completed.toFloat() / count))
-                            dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), 0L, null)
+                            dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), 0L, null, progress=completed.toFloat()/count)
                         }
                         resume.writeText(JSONObject().put("url", task.downloadUrl).put("complete", false).toString())
                     } else if (task.sourceId == com.example.source.impl.XbookcnSource.SOURCE_ID) {
@@ -135,7 +154,7 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                             currentCoroutineContext().ensureActive()
                             DownloadProgressBroadcaster.updateState(taskId,
                                 DownloadState.Downloading(temp.length(), 0L, completed.toFloat() / count))
-                            dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), 0L, null)
+                            dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), 0L, null, progress=completed.toFloat()/count)
                         }
                         resume.writeText(JSONObject().put("url", task.downloadUrl).put("complete", false).toString())
                     } else {
@@ -168,6 +187,8 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                                 android.util.Log.d("ZLibTransfer", "HTTP ${response.code} host=${response.request.url.host} type=${response.header("Content-Type")}")
                             // A 416 is not proof of file completeness. Restart safely once.
                             if (response.code == 416 && offset > 0 && !rangeRestarted) return@withResponse true
+                            if (response.code in setOf(408,429,500,502,503,504))
+                                throw java.io.IOException("网络暂时不可用（HTTP ${response.code}）")
                             require(response.isSuccessful) { when (response.code) {
                                 401, 403 -> if (com.example.source.WholeBookNovelSources.contains(task.sourceId))
                                     "源站拒绝免登录下载，请稍后重试或换源（HTTP ${response.code}）"
@@ -225,7 +246,7 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                                     }
                                 }
                                 out.flush()
-                                require(total <= 0 || downloaded == total) { "文件下载不完整，请恢复下载" }
+                                if(total>0 && downloaded!=total) throw java.io.EOFException("文件下载不完整，将尝试续传")
                             }
                             false
                         }
@@ -245,6 +266,9 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                         }
                     }
                     }
+                    // EOF is a distinct phase; it is not a transfer stuck at 99%.
+                    dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), temp.length(), null, progress=1f)
+                    DownloadProgressBroadcaster.updateState(taskId, DownloadState.Downloading(temp.length(),temp.length(),1f))
                     val integrity = DownloadFileValidator.validateFileIntegrity(temp, format)
                     require(integrity.valid) { integrity.htmlErrorHint ?: "下载文件格式校验失败" }
                     val actualFormat = integrity.actualFormat ?: format
@@ -254,7 +278,7 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                     check(!actualFile.exists() || actualFile.delete()) { "无法替换旧下载文件" }
                     check(temp.renameTo(actualFile)) { "无法保存下载文件" }
                     dao.insertOrUpdate(task.copy(status = DownloadStatus.DOWNLOADING, format = actualFormat,
-                        filePath = actualFile.absolutePath, downloadedBytes = actualFile.length(), totalBytes = actualFile.length()))
+                        filePath = actualFile.absolutePath, downloadedBytes = actualFile.length(), totalBytes = actualFile.length(), progress=1f))
                     val completeMetadata = runCatching { JSONObject(resume.readText()) }.getOrDefault(JSONObject())
                     resume.writeText(completeMetadata.put("complete", true).toString())
                 }
@@ -297,7 +321,7 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                     if (novel != null) novelStore.imported(taskId)
                     db.withTransaction {
                         dao.insertOrUpdate(latest.copy(status = DownloadStatus.COMPLETED, errorMessage = null,
-                            downloadedBytes = file.length(), totalBytes = file.length()))
+                            downloadedBytes = file.length(), totalBytes = file.length(), progress=1f))
                     }
                     secrets.remove("download:$taskId")
                     GuestNovelCheckpoint.clear(temp)
@@ -315,8 +339,18 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                 recordInterruption(taskId, temp, total)
                 currentCoroutineContext().ensureActive()
             }
-            val message = if (e.message?.contains("ENOSPC", true) == true) "存储空间不足，请清理后重试" else e.message ?: "下载或入库失败"
-            if (shouldRetryPublicNovel(task.sourceId, e, runAttemptCount)) {
+            val message = failureMessage(e)
+            if(foregroundStartRestricted(e)) {
+                val latest=dao.getTaskById(taskId) ?: return@withContext Result.success()
+                val retry=runAttemptCount<5
+                dao.updateProgressAndStatus(taskId,if(retry) DownloadStatus.PENDING else DownloadStatus.PAUSED,
+                    maxOf(temp.length(),latest.downloadedBytes),total,message)
+                DownloadProgressBroadcaster.updateState(taskId,if(retry) DownloadState.Pending else DownloadState.Paused(latest.downloadedBytes,total))
+                return@withContext if(retry) Result.retry() else Result.failure()
+            }
+            if (shouldRetryPublicNovel(task.sourceId, e, runAttemptCount) ||
+                (task.sourceId != "zlibrary" && runAttemptCount < 5 && e is java.io.IOException &&
+                    e !is java.io.FileNotFoundException && e.message?.contains("ENOSPC",true)!=true)) {
                 val latest = dao.getTaskById(taskId) ?: return@withContext Result.success()
                 dao.updateProgressAndStatus(taskId, DownloadStatus.PENDING,
                     maxOf(temp.length(), latest.downloadedBytes), total, "网络暂时中断，将从已保存章节继续下载")
@@ -327,7 +361,7 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
             // mirror together instead of endlessly resuming the same stale URL.
             if (task.sourceId == "zlibrary" && recoveries < 2 &&
                 (e is java.io.IOException || e is IllegalArgumentException || e is IllegalStateException) &&
-                com.example.source.zlibrary.shouldRetryZLibraryDownload(message)) {
+                com.example.source.zlibrary.shouldRetryZLibraryDownload(e.message ?: message)) {
                 val secrets = com.example.data.EncryptedSecretStore(applicationContext)
                 val previous = runCatching { JSONObject(secrets.read("download:$taskId").orEmpty()) }.getOrNull()
                 val failed = previous?.optString("Referer")?.let { runCatching { it.toHttpUrl().host }.getOrNull() }
