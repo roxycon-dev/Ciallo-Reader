@@ -2,11 +2,11 @@
 
 > 本文档的目标：让一个**对项目一无所知的 AI / 开发者**，不联网、不翻源码，只读本文档即可快速掌握整个项目的结构、每个文件的作用、以及每个模块用到的核心算法，从而能快速上手改代码、修 bug、加功能。
 >
-> **校准基准**：2026-11-05 · 1.5.12 / 254，发布代码提交 65d27be1；验证、工作树与发布回执见第 89 章。
-> `app` 模块：**439 个生产 Kotlin 文件**（另有 4 个 Java 文件）；JVM 测试 **208 文件 / 1235 项定义**；设备测试 **72 文件 / 246 项定义**。定义数不等于执行数；本轮性能专项见第 88 章；1.4.14 的快速输入回归见第 81 章；历史指定小说下载、图片解码及阅读器验收见第 75 章。
+> **校准基准**：2026-11-05 · 1.5.13 / 255 抽纸计时与背景过渡工作区；基于 2bdfef6f，最终验证与发布见第 90 章。
+> `app` 模块：**440 个生产 Kotlin 文件**（另有 4 个 Java 文件）；JVM 测试 **209 文件 / 1242 项定义**；设备测试 **72 文件 / 247 项定义**。定义数不等于执行数；本轮性能专项见第 90 章；1.4.14 的快速输入回归见第 81 章；历史指定小说下载、图片解码及阅读器验收见第 75 章。
 >
 > **覆盖度声明**：第 4 章逐包逐文件覆盖了 `app`、`backdrop`、`liquidglass-core`、`liquidglass-compose`
-> 四个模块源码目录共 **789 个 Kotlin / Java 文件**（含测试与 4 个 vendored `.java`）；现有文件名已全部补录，完整清单与新增记录见 4.8–4.33。反向检查保留五条明确标注已删除的历史文件；覆盖统计为 2026-11-05 工作区快照。
+> 四个模块源码目录共 **792 个 Kotlin / Java 文件**（含测试与 4 个 vendored `.java`）；现有文件名已全部补录，完整清单与新增记录见 4.8–4.34。反向检查保留五条明确标注已删除的历史文件；覆盖统计为 2026-11-05 工作区快照。
 
 ***
 
@@ -57,7 +57,7 @@ python novel-reader/.workbuddy/stale_check.py
 
 | 项目 | 内容 |
 | --- | --- |
-| 当前版本 | **1.5.12 / 254**；本轮验证及发布见第 89 章 |
+| 当前版本 | **1.5.13 / 255**；本轮验证及发布见第 90 章 |
 | applicationId | `com.aistudio.novelreader.kxmpzq` |
 | 最低系统 | Android 7.0（API 24）；compileSdk / targetSdk = 35 |
 | 技术栈 | Kotlin + Compose M3 + Room + WorkManager + OkHttp + Jsoup + Coil + QuickJS（quickjs-kt）+ **ONNX Runtime**（漫画 OCR / 画质增强 CPU 推理）+ **Cronet**（JS 源网络）+ Brotli + core-splashscreen |
@@ -1337,9 +1337,9 @@ python novel-reader/.workbuddy/stale_check.py
 | `TouchZoneGestures.kt` | 112 | 锁定 DOWN 区域、原生 PAGE 拖动交接、快速距离、多指取消、长按及缩放让位；`app/src/main/java/com/example/ui/reader/TouchZoneGestures.kt` |
 | `TouchZoneEditor.kt` | 373 | 小说 / 漫画公共矩形编辑器、四角缩放、范围端点、动态虚线 / 模拟手指与物理 dp 校准；`app/src/main/java/com/example/ui/reader/TouchZoneEditor.kt` |
 | `LiquidSlider.kt` | 494 | 公共 Android Canvas 透镜滑动条；96 点轨道、双子步弹簧、分档磁吸、范围间距、静止停绘；`app/src/main/java/com/example/ui/components/LiquidSlider.kt` |
-| `PullOutMotion.kt` | 307 | 来源几何、冻结交接入口与上级返回位置；近临界展开 / 独立关闭弹簧；同一物理时钟控制保留与关闭；`app/src/main/java/com/example/ui/components/PullOutMotion.kt` |
-| `PullOutRender.kt` | 227 | 实时 StablePaperSurface：128 前向点→64 行逆向表，AGSL 单次内容采样；完整页面显式启用，透明全屏包装器仍排除；`app/src/main/java/com/example/ui/components/PullOutRender.kt` |
-| `PullOutHosts.kt` | 506 | 弹窗 / 菜单 / 底部面板、paperOpen 向前交接与 pullOutPage 完整页面公共宿主；原窗口销毁后从冻结按钮位置展开，页面背景独立采样；`app/src/main/java/com/example/ui/components/PullOutHosts.kt` |
+| `PullOutMotion.kt` | 315 | 来源几何、冻结交接入口与上级返回位置；近临界展开 / 独立关闭弹簧；同一物理时钟控制保留与关闭；`app/src/main/java/com/example/ui/components/PullOutMotion.kt` |
+| `PullOutRender.kt` | 238 | 实时 StablePaperSurface：128 前向点→64 行逆向表，AGSL 单次内容采样；完整页面显式启用，透明全屏包装器仍排除；`app/src/main/java/com/example/ui/components/PullOutRender.kt` |
+| `PullOutHosts.kt` | 511 | 弹窗 / 菜单 / 底部面板、paperOpen 向前交接与 pullOutPage 完整页面公共宿主；原窗口销毁后从冻结按钮位置展开，页面背景独立采样；`app/src/main/java/com/example/ui/components/PullOutHosts.kt` |
 | `PullOutButtons.kt` | 63 | 保持 Material 交互语义的按钮代理；自动注册纸面来源与动作关闭适配；`app/src/main/java/com/example/ui/components/PullOutButtons.kt` |
 | `TouchZoneSystemTest.kt` | 135 | 持久化、旧配置回退、重叠分区、触发距离、多指与漫画方向回归；`app/src/test/java/com/example/ui/TouchZoneSystemTest.kt` |
 | `PaperAndSliderTest.kt` | 241 | 21 项：解析弹簧平稳落定 / 反转、来源冻结与返回、逆向行表及滑条既有触摸 / 范围 / 分档约束；`app/src/test/java/com/example/ui/components/PaperAndSliderTest.kt` |
@@ -1356,7 +1356,7 @@ python novel-reader/.workbuddy/stale_check.py
 | `GuestNovelTransportTest.kt` | 27 | 并行书源修复任务：访客源传输测试（已合入 1.4.11）；`app/src/test/java/com/example/source/impl/GuestNovelTransportTest.kt` |
 | `NovelRepairDeviceTest.kt` | 65 | 并行书源修复任务：书源设备验收（已合入 1.4.11）；`app/src/androidTest/java/com/example/source/NovelRepairDeviceTest.kt` |
 
-| `PaperPolishDeviceTest.kt` | 481 | 10 项定义；本轮选 5 项：原地交接 / 真实管理与去重 / 缓存两层 / 小说底部物理安全区 / 2 倍字体；未重跑无关历史 5 项；`app/src/androidTest/java/com/example/ui/PaperPolishDeviceTest.kt` |
+| `PaperPolishDeviceTest.kt` | 524 | 10 项定义；本轮选 5 项：原地交接 / 真实管理与去重 / 缓存两层 / 小说底部物理安全区 / 2 倍字体；未重跑无关历史 5 项；`app/src/androidTest/java/com/example/ui/PaperPolishDeviceTest.kt` |
 
 | `PaperSnapshotCapture.kt`（已删除，1.4.14） | — | 删除额外 HardwareRenderer / ImageReader、离屏目标池、像素打包；历史记录见第 80 章 |
 
@@ -1429,7 +1429,7 @@ python novel-reader/.workbuddy/stale_check.py
 | `app/src/test/java/com/example/ui/components/GlassDecorationCacheTest.kt` | 140 | 回归检查 |
 | `app/src/test/java/com/example/ui/components/HomeEntryCompatibilityTest.kt` | 87 | 回归检查 |
 | `app/src/test/java/com/example/ui/components/LiquidSliderLifecycleTest.kt` | 37 | 回归检查 |
-| `app/src/test/java/com/example/ui/components/MotionQualityTest.kt` | 132 | 回归检查 |
+| `app/src/test/java/com/example/ui/components/MotionQualityTest.kt` | 174 | 回归检查 |
 | `app/src/test/java/com/example/ui/components/ScrollTiltSchedulingTest.kt` | 84 | 回归检查 |
 | `app/src/test/java/com/example/ui/components/StartupDiagnosticsExportButtonTest.kt` | 53 | 回归检查 |
 | `app/src/main/java/me/trishiraj/shadowglow/GlowDrawCache.kt` | 99 | 远端既有实现，随本轮统一保留 |
@@ -1465,6 +1465,16 @@ python novel-reader/.workbuddy/stale_check.py
 
 
 
+
+### 4.34 2026-11-05 抽纸过渡与资源复用
+
+| 文件 | 行数 | 作用 |
+| --- | --- | --- |
+| `app/src/main/java/com/example/ui/components/WindowBackdrop.kt` | 118 | 窗口级渐变模糊/压暗、多 owner 最大半径、整数步进与有界效果缓存 |
+| `app/src/test/java/com/example/ui/components/PaperMotionTimingTest.kt` | 91 | 8–120 Hz/长帧计时、发布版形变参考和 CPU 微基准 |
+| `app/src/debug/java/com/example/ui/perf/PaperMotionProbeActivity.kt` | 122 | 真实原生窗口受控掉帧计时，仅 debug，未进入正式 APK |
+| `app/src/test/resources/paper-warp-1.5.12.csv` | 84 | 发布版 84 个状态的亚像素形变参考 |
+
 ## 5. 关键算法清单汇总
 
 - 1.4.12：HardwarePaperSurface 按行计算昂贵函数、复用顶点与颜色数组，原生硬件 drawBitmapMesh 直接提交缓存纹理；弹簧按实际帧时推进，单一生命周期驱动绘制、遮罩与关闭动作。fastPageCommit 仅在速度模长 ≥850dp/s 且配置了距离时按二维位移覆写完成判定，慢速保持原生。
@@ -1477,6 +1487,7 @@ python novel-reader/.workbuddy/stale_check.py
 
 | 算法 | 所在文件 | 一句话说明 |
 | --- | --- | --- |
+| 抽纸真实时间与背景复用 | `PullOutMotion.kt` / `WindowBackdrop.kt` / `PullOutRender.kt` | 解析弹簧一次消费实际 dt；窗口级同曲线驱动背景，owner 最大半径、有界整数缓存、固定三角项复用，不降低网格精度 |
 | 平板热路径去重与缓存预算 | `ReaderChapterWindow.kt` / `ReaderProgressEffect.kt` / `AppDatabase.kt` / `ReaderPagination.kt` | 只加载新入窗章；快变偏移在组合外观察；数据库返回计数 / 标题；分页同时受条目与字节预算约束 |
 | Z-Library 下载容灾 | `ZLibrarySource.kt` / `ZLibraryEndpointProvider.kt` / `DownloadWorker.kt` | 保留搜索卡下载链接和实际来源；数字书号直接提取 API key；直连阶段先于系统代理。失败节点排除并冷却，持久保存成功节点；跨节点重新按书名/作者/格式唯一匹配，额度/频率/存储错误终止；文件仍须完整性校验与入库成功。 |
 | 下载任务可见性 | `LibraryViewModel.kt` / `NovelDownloadPanel.kt` / `LibraryScreen.kt` | 准备阶段与持久 Room 任务合并，右侧单一图标与任务数/进度环，切页后不丢历史；失败不伪报空列表，未知大小不伪报 0%。 |
@@ -1733,6 +1744,8 @@ adb logcat -b crash
 - **改提示文案**：统一走 `AppToast`（不要再用 `Toast.makeText`）；错误语义用 `AppSnackKind.ERROR`，其余中性。
 
 ### 6.4 工程约定与已知陷阱（**改代码前必读**）
+
+- 抽纸解析弹簧不得再把真实 dt 截成 33 ms：解析解为 O(1)，无需分步补算；截断会令掉帧变成额外慢放。模糊/原生 dim/Compose 遮罩必须使用窗口生命周期；子窗口只释放自身 owner，不能清父窗口。窗口属性只初始化一次，不能在每次内容重组时归零 dim。形变参考 fixture 固定为 1.5.12，改数学实现必须保持亚像素一致，不能用降网格/画质掩盖卡顿。
 
 - 下载完成历史属于下载中心，不随书架删除而删除。记录右侧叉号必须每次确认；只删除记录时保留已入架文件。
 - 漫画初始化异步后，清理目录前必须 awaitInitialized；不得用尚未恢复的空集合判断孤儿文件。
@@ -4977,3 +4990,27 @@ Commit `8d6e3847b1a8fd53df9adbee0ded4f89701bdc4e`；Release 413307957：https://
 第 89 章最终界面回执：SwiftShader 模拟器宿主 QEMU 再次访问异常退出，Windows Application Error 1000 / 0xc0000005 已核对；未计为应用成功。保留数据冷启动并改用本机 NVIDIA host 渲染，跨书库/发现的同一入口与毛玻璃面板检查 6.755 秒通过，两张最终截图已核查背景压暗、模糊、简短行文及持久完成记录。
 
 第 89 章发布回执：发布代码提交 65d27be136f08e209c36b95e9116722a7db88b77 已推送 origin/main，标签 v1.5.12；GitHub Release https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.12 已公开并核对为 latest。APK 29306412 B，服务端 digest 与本地 SHA-256 cb20c2e65b35c5e118114be5744d012dc4e64c62dba659a1025adf3fab50af34 一致；公开下载 HTTP 200，重新下载的字节数与摘要同样匹配。README、CHANGELOG、数据库 schema、逐源审计摘要与指导文件随源码提交。最终工作树为同级 novel-reader-unified，原目录已有草稿保留。
+
+## 90. 第九十六轮执行（2026-11-05：保持抽纸外观，优化计时、背景过渡与资源，1.5.13）
+
+### 已落地
+
+- 保留前端布局、主题、画质档位、抽纸收颈/弯曲、64 行逆表、128 前向分段、单内容采样 shader 和弹簧参数。解析弹簧使用真实帧间隔，一次求值，不截断时间、不循环追帧，反向仍保留位置和速度。
+- 新 WindowBackdrop.kt 隔离原生窗口职责；窗口级 LocalPaperBackdropOwner 驱动模糊、原生压暗和 Compose 遮罩的同一端点平滑曲线，关闭前自然退净。多个窗口取最大有效半径，子窗口退出不清父窗口。
+- 模糊按半物理像素去重，整数缓存至多 128 个 RenderEffect；owner 复用原生字段，减少逐帧 Float 装箱更新。窗口布局/动画/dim 初始化不再随每次重组重复写入。固定 flutter/shade 三角项和行分数复用，循环不变量外提。
+- 版本 1.5.13 / 255；README 中英文、CHANGELOG、组件 README 和发行说明同步。最终测试与签名发布回执在本章末补录。
+
+### 未做
+
+- 未改 GPU shader、网格精度、弹簧参数或自动调低画质，未用普通缩放替换已有抽纸。后台新驱动仅属 debug，不进入正式 APK。
+- 无低端实体手机连接。模拟器人为主线程阻塞仅验证失帧条件下的计时，不能宣称所有手机达到苹果、60 FPS 或 120 FPS；CPU 微基准不等同整机性能收益。
+
+### 踩到的坑
+
+- 原 dt 在调用点与解析求值器内各截断一次，必须同时移除；只修一处仍会丢弃经过时间。
+- 父窗口全模糊时，子窗口渐变半径不能简单覆盖为零；最大有效 owner 半径保持父窗口。观察 progress 用 snapshotFlow，不能把每帧进度读到内容组合中。
+- 三项初始设备失败来自测试假设：窗口尚未就绪即推进虚拟时钟、触点落进系统状态栏、缓存大时样本不在首屏。改为等待实际状态、点击安全边角、滚动到目标样本；未修改产品逻辑来迎合用例，后续整套通过。
+
+第 90 章验证：3 套件 / 32 项 JVM 检查、16 项真实窗口回归均通过，失败/错误/跳过为 0，UI gate 沿用基线通过。原版 GPU shader 与弹簧配置逐字一致；84 个形变参考状态误差小于 0.01px。60ms 主线程受控阻塞下，关闭中位数 1873→1002ms，最后 5% 进度中位数 915→142ms；正常关闭 799→819ms，维持原节奏。单次 CPU 形变微基准 7619→5559ns，不是整机性能百分比。约 2KiB 固定行表与 128 项有界模糊缓存避免无限增长；完整条件和保留范围见 docs/release-1.5.13-2026-11-05.md。
+
+第 90 章正式包校验：1.5.13 / 255，ARM64，29306016 B，SHA-256 7571f9d87188775f2380ec69bab8b0a0fa5b6f54a135462fcfa211074b243717。沿用现有新签名，与官方 1.5.12 覆盖升级条件、ZIP CRC、16 KiB 对齐通过；735 个生产输入与冻结清单一致。发布回执随后追加。

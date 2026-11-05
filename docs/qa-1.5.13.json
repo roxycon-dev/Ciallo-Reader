@@ -1,0 +1,87 @@
+{
+  "frameStallMs": 60,
+  "environment": "Android 15 API35 x86_64 emulator, NVIDIA host renderer; optional debug main-thread stalls, not a physical low-end phone",
+  "warmupCyclesExcluded": 1,
+  "measuredCyclesPerCase": 3,
+  "runs": [
+    {
+      "blockMs": 0,
+      "baseline": {
+        "medianOpenMs": 1026,
+        "medianCloseMs": 799,
+        "medianTailBelow5PercentMs": 350,
+        "rootDrawRecords": 1
+      },
+      "optimized": {
+        "medianOpenMs": 1060,
+        "medianCloseMs": 819,
+        "medianTailBelow5PercentMs": 339,
+        "rootDrawRecords": 1
+      }
+    },
+    {
+      "blockMs": 60,
+      "baseline": {
+        "medianOpenMs": 2156,
+        "medianCloseMs": 1873,
+        "medianTailBelow5PercentMs": 915,
+        "rootDrawRecords": 1
+      },
+      "optimized": {
+        "medianOpenMs": 1314,
+        "medianCloseMs": 1002,
+        "medianTailBelow5PercentMs": 142,
+        "rootDrawRecords": 1
+      }
+    }
+  ],
+  "geometry": {
+    "baseline": {
+      "iterationsPerRound": 5000,
+      "medianNanosPerUpdate": 7619.08,
+      "checksum": 18079.389
+    },
+    "optimized": {
+      "iterationsPerRound": 5000,
+      "medianNanosPerUpdate": 5558.6398,
+      "checksum": 18079.389
+    }
+  },
+  "shapeReference": {
+    "cases": 84,
+    "maximumAllowedPixelError": 0.01,
+    "referenceVersion": "1.5.12",
+    "rows": 64,
+    "forwardPoints": 129
+  },
+  "jvm": {
+    "tests": 32,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 3
+  },
+  "device": {
+    "tests": 16,
+    "failures": 0,
+    "scope": [
+      "PaperPolishDeviceTest",
+      "UnifiedPaperPageDeviceTest",
+      "UnifiedDownloadEntryDeviceTest"
+    ]
+  },
+  "unchanged": [
+    "Paper spring tuning",
+    "AGSL shader and 64-row lookup",
+    "128 forward segments",
+    "Quality settings",
+    "Product layouts and fonts"
+  ],
+  "resources": {
+    "blurCacheCapacity": 128,
+    "radiusStepPhysicalPixels": 0.5,
+    "ownerValues": "reused integer-step entries",
+    "staticWarpTableBytesPerSurface": 2064,
+    "perFrameContentRecomposition": false
+  }
+}

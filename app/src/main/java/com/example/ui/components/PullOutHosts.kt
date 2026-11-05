@@ -211,11 +211,12 @@ internal fun PullOutPageContent(onDismiss: () -> Unit, content: @Composable (clo
     DisablePlatformWindowMotion(fullPage = true, lightSystemBars = MaterialTheme.colorScheme.background.luminance() > .5f); WindowPaperFinalizer(state)
     BackHandler { close {} }
     CompositionLocalProvider(LocalOverlayClose provides close, LocalPaperHandoff provides forward,
-        LocalPaperOrigin provides origin, LocalPaperOwner provides null, LocalPaperFullSurface provides true) {
+        LocalPaperOrigin provides origin, LocalPaperOwner provides null, LocalPaperFullSurface provides true,
+        LocalPaperBackdropOwner provides rememberPaperLifecycle(state)) {
         DialogLiquidGlass {
             val life = rememberPaperLifecycle(state)
             Box(Modifier.fillMaxSize()) {
-                Box(Modifier.fillMaxSize().graphicsLayer { alpha = life.progress.coerceIn(0f, 1f) }
+                Box(Modifier.fillMaxSize().graphicsLayer { alpha = paperBackdropProgress(life.progress) }
                     .background(Color.Black.copy(alpha = PullOutConfig.SCRIM)).clickable { /* modal boundary */ })
                 PullOutVisibility(state, Modifier.fillMaxSize()) {
                     PaperPageBackground { content { close {} } }
@@ -273,10 +274,12 @@ fun PullOutDialog(
     val inheritedOrigin = LocalPaperOrigin.current
     val origin = remember { PullOutSources.claim() ?: inheritedOrigin?.returnSource() }
     if (!animateContent) {
+        val backdropLife = lifecycleState?.let { rememberPaperLifecycle(it) }
         androidx.compose.ui.window.Dialog(onDismissRequest = onDismissRequest, properties = properties) {
             DisablePlatformWindowMotion(fillWindow = !properties.usePlatformDefaultWidth); WindowPaperFinalizer(lifecycleState)
             CompositionLocalProvider(LocalPaperOrigin provides origin, LocalPaperOwner provides null,
-                LocalPaperHandoff provides null, LocalPaperFullSurface provides false) {
+                LocalPaperHandoff provides null, LocalPaperFullSurface provides false,
+                LocalPaperBackdropOwner provides backdropLife) {
                 DialogLiquidGlass(fillMaxSize = false) { content() }
             }
         }
@@ -290,11 +293,12 @@ fun PullOutDialog(
         securePolicy = properties.securePolicy, usePlatformDefaultWidth = false,
         decorFitsSystemWindows = properties.decorFitsSystemWindows)) {
         DisablePlatformWindowMotion(); WindowPaperFinalizer(state)
-        CompositionLocalProvider(LocalOverlayClose provides close, LocalPaperHandoff provides forward, LocalPaperOrigin provides origin, LocalPaperOwner provides null, LocalPaperFullSurface provides false) {
+        CompositionLocalProvider(LocalOverlayClose provides close, LocalPaperHandoff provides forward, LocalPaperOrigin provides origin, LocalPaperOwner provides null, LocalPaperFullSurface provides false,
+            LocalPaperBackdropOwner provides rememberPaperLifecycle(state)) {
             DialogLiquidGlass(fillMaxSize = false) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 val life = rememberPaperLifecycle(state)
-                Box(Modifier.fillMaxSize().graphicsLayer { alpha = life.progress.coerceIn(0f, 1f) }
+                Box(Modifier.fillMaxSize().graphicsLayer { alpha = paperBackdropProgress(life.progress) }
                     .background(Color.Black.copy(alpha = PullOutConfig.SCRIM))
                     .clickable { if (properties.dismissOnClickOutside) close {} })
                 Box(Modifier.fillMaxSize().safeDrawingPadding().imePadding(), contentAlignment = Alignment.Center) {
@@ -311,7 +315,7 @@ fun PullOutDialog(
 @Composable
 private fun DisablePlatformWindowMotion(fullPage: Boolean = false, lightSystemBars: Boolean = false, fillWindow: Boolean = true) {
     val view = LocalView.current
-    SideEffect {
+    DisposableEffect(view, fullPage, lightSystemBars, fillWindow) {
         (view.parent as? DialogWindowProvider)?.window?.let { window ->
             window.setWindowAnimations(0)
             window.setDimAmount(0f)
@@ -337,6 +341,7 @@ private fun DisablePlatformWindowMotion(fullPage: Boolean = false, lightSystemBa
                 }
             }
         }
+        onDispose { }
     }
 }
 
@@ -371,7 +376,7 @@ fun PullOutBottomSheet(
         CompositionLocalProvider(LocalOverlayClose provides close, LocalPaperHandoff provides forward, LocalPaperSheetDrag provides headerDrag) {
             BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val life = rememberPaperLifecycle(state)
-                Box(Modifier.fillMaxSize().graphicsLayer { alpha = life.progress.coerceIn(0f, 1f) }.background(scrimColor)
+                Box(Modifier.fillMaxSize().graphicsLayer { alpha = paperBackdropProgress(life.progress) }.background(scrimColor)
                     .clickable { close {} })
                 CompositionLocalProvider(LocalPaperVisibleTarget provides dragTarget) {
                 PullOutVisibility(state, Modifier.align(Alignment.BottomCenter)) {
@@ -438,7 +443,7 @@ fun PullOutDropdownMenu(
                 val topMargin = maxOf(margin, WindowInsets.statusBars.getTop(density))
                 val bounds = source?.bounds?.translate(-menuView.paperWindowOffset())
                 val life = rememberPaperLifecycle(state)
-                Box(Modifier.fillMaxSize().graphicsLayer { alpha = life.progress.coerceIn(0f, 1f) }
+                Box(Modifier.fillMaxSize().graphicsLayer { alpha = paperBackdropProgress(life.progress) }
                     .background(Color.Black.copy(alpha = PullOutConfig.SCRIM)).clickable { close {} })
                 PullOutVisibility(state, Modifier.offset {
                     val x = ((bounds?.right?.toInt() ?: screenWidth / 2) - menuSize.width + with(density) { offset.x.roundToPx() })

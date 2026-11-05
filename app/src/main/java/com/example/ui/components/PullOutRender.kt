@@ -100,6 +100,10 @@ private class PaperSurfaceGeometry {
  */
 internal class PaperWarpGeometry {
     private val count = PullOutConfig.WARP_FORWARD_ROWS
+    private val rowFractions = FloatArray(count + 1) { it.toFloat() / count }
+    private val flutterSines = FloatArray(count + 1) { sin(rowFractions[it] * 4f) }
+    private val flutterCosines = FloatArray(count + 1) { cos(rowFractions[it] * 4f) }
+    private val shadeWave = FloatArray(count + 1) { 1f + sin(rowFractions[it] * 9f) }
     private val y = FloatArray(count + 1)
     private val center = FloatArray(count + 1)
     private val halfWidth = FloatArray(count + 1)
@@ -124,21 +128,28 @@ internal class PaperWarpGeometry {
         val y0 = source.center.y + (slit / height - .5f) * source.height * (1f - q) + (slit - source.center.y) * q
         val cx = source.center.x + (width / 2f - source.center.x) * q
         val neckWave = (1f - PullOutConfig.WARP_NECK) * wave.coerceAtLeast(0f).pow(.7f)
+        val flutterPhaseSin = sin(q * 5f)
+        val flutterPhaseCos = cos(q * 5f)
+        val sourceWidth = source.width
+        val sourceHeightFraction = source.height / height
+        val decayLength = PullOutConfig.WARP_DECAY_DP * density
+        val unfoldLength = PullOutConfig.WARP_UNFOLD_DP * density
+        val shadeStrength = PullOutConfig.WARP_SHADE * (1f - q) * wave
         var left = Float.POSITIVE_INFINITY; var right = Float.NEGATIVE_INFINITY
         for (i in 0..count) {
-            val v = i.toFloat() / count
-            val delta = v * height - slit
-            val released = softplus(abs(delta) - lock) - base
-            val mapped = released + (abs(delta) - released) * source.height / height
+            val delta = rowFractions[i] * height - slit
+            val distance = abs(delta)
+            val released = softplus(distance - lock) - base
+            val mapped = released + (distance - released) * sourceHeightFraction
             val free = (released / far).coerceIn(0f, 1f)
-            val neck = 1f - neckWave * exp(-abs(mapped) / (PullOutConfig.WARP_DECAY_DP * density))
-            val unfold = q + (1f - q) * (1f - exp(-released / (PullOutConfig.WARP_UNFOLD_DP * density)))
-            val w = source.width + (width - source.width) * unfold
+            val neck = 1f - neckWave * exp(-abs(mapped) / decayLength)
+            val unfold = q + (1f - q) * (1f - exp(-released / unfoldLength))
+            val w = sourceWidth + (width - sourceWidth) * unfold
             center[i] = cx + density * wave * (PullOutConfig.WARP_BEND_DP * free * free +
-                PullOutConfig.WARP_FLUTTER_DP * free * sin(v * 4f + q * 5f))
+                PullOutConfig.WARP_FLUTTER_DP * free * (flutterSines[i] * flutterPhaseCos + flutterCosines[i] * flutterPhaseSin))
             halfWidth[i] = w * neck * .5f
             y[i] = y0 + delta.sign * mapped
-            shade[i] = 1f - PullOutConfig.WARP_SHADE * (1f - q) * wave * (1f - free) * (1f + sin(v * 9f))
+            shade[i] = 1f - shadeStrength * (1f - free) * shadeWave[i]
             left = min(left, center[i] - halfWidth[i]); right = max(right, center[i] + halfWidth[i])
         }
         // Endpoint identity is exact, including external triggers and rectangular panels.

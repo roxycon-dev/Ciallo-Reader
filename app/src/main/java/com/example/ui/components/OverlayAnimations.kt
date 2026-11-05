@@ -24,10 +24,10 @@ fun BottomSheetEntrance(modifier: Modifier = Modifier, durationMillis: Int = 260
 fun ScrimEntrance(modifier: Modifier = Modifier, durationMillis: Int = 220,
     visibility: MutableTransitionState<Boolean>? = null, content: @Composable () -> Unit) {
     val shared = visibility ?: LocalPaperVisibility.current
-    if (shared != null) {
-        val life = rememberPaperLifecycle(shared)
-        if (shared.targetState || life.retained || !life.closed) {
-            Box(modifier.graphicsLayer { alpha = life.progress.coerceIn(0f, 1f) }) { content() }
+    val life = if (shared != null) rememberPaperLifecycle(shared) else LocalPaperBackdropOwner.current
+    if (life != null) {
+        if (shared?.targetState == true || life.retained || !life.closed) {
+            Box(modifier.graphicsLayer { alpha = paperBackdropProgress(life.progress) }) { content() }
         }
     } else {
         val state = remember { MutableTransitionState(false).apply { targetState = true } }

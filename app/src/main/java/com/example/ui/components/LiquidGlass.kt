@@ -1,13 +1,10 @@
 package com.example.ui.components
 
-import android.app.Activity
 import android.graphics.Bitmap
-import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
@@ -29,10 +26,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogWindowProvider
 import com.kashif_e.backdrop.Backdrop
 import com.kashif_e.backdrop.BackdropEffectScope
 import com.kashif_e.backdrop.backdrops.CanvasBackdrop
@@ -163,65 +158,6 @@ fun rememberGlassPanelBackdrop(): Backdrop {
             drawRect(androidx.compose.ui.graphics.Color.Transparent)
             drawRect(gradient)
         }
-    }
-}
-
-/**
- * 玻璃弹窗窗口辅助：
- * 1) 把 Dialog 窗口背景设为透明（否则盖住背后内容）；
- * 2) 对宿主 Activity 的 decorView 施加实时 RenderEffect 模糊——
- *    这是真正实时的背景模糊，后台滚动/动画都会跟着虚化。
- * 弹窗关闭时自动清除模糊。
- */
-@Composable
-fun GlassDialogWindowEffect(
-    activity: Activity?,
-    blurRadiusPx: Float
-) {
-    if (!LocalRenderQuality.current.realtimeGlass) return
-    val view = LocalView.current
-    DisposableEffect(view, activity, blurRadiusPx) {
-        val window = (view.parent as? DialogWindowProvider)?.window
-        window?.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
-        // 去掉 Dialog 默认的重度变暗，只留轻量压暗让玻璃面板突出
-        window?.setDimAmount(0.12f)
-
-        val decorView = activity?.window?.decorView
-        if (decorView != null && supportsRealtimeBlur) {
-            GlassWindowBlur.acquire(decorView, window ?: view, blurRadiusPx)
-        } else if (decorView != null) {
-            // ── 跨机型降级（API < 31 无 RenderEffect）──────────────────
-            // 宿主窗口无法实时模糊，弹窗背后的内容会以清晰原样透出，
-            // 玻璃面板不再有「磨砂」层次。把窗口变暗量从轻压 0.12 提高
-            // 到 0.42，用「暗化 + 弹窗本体加厚基底」近似毛玻璃层次，
-            // 观感是明显的磨砂弹窗而不是透明的清晰玻璃。
-            window?.setDimAmount(0.42f)
-        }
-        onDispose {
-            if (android.os.Build.VERSION.SDK_INT >= 31 && decorView != null) GlassWindowBlur.release(decorView, window ?: view)
-        }
-    }
-}
-
-/** Multiple dialog windows share one activity blur; closing a child must not clear its parent. */
-internal object GlassWindowBlur {
-    private val owners = java.util.WeakHashMap<android.view.View, LinkedHashMap<Any, Float>>()
-    @androidx.annotation.RequiresApi(31)
-    fun acquire(view: android.view.View, owner: Any, radius: Float) {
-        val entries = owners.getOrPut(view) { linkedMapOf() }
-        entries[owner] = radius
-        apply(view, entries.values.last())
-    }
-    @androidx.annotation.RequiresApi(31)
-    fun release(view: android.view.View, owner: Any) {
-        val entries = owners[view] ?: return
-        entries.remove(owner)
-        if (entries.isEmpty()) { owners.remove(view); view.setRenderEffect(null) }
-        else apply(view, entries.values.last())
-    }
-    @androidx.annotation.RequiresApi(31)
-    private fun apply(view: android.view.View, radius: Float) {
-        view.setRenderEffect(android.graphics.RenderEffect.createBlurEffect(radius, radius, android.graphics.Shader.TileMode.CLAMP))
     }
 }
 

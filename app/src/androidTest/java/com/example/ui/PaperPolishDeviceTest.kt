@@ -14,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
@@ -169,9 +170,16 @@ class PaperPolishDeviceTest {
         compose.mainClock.autoAdvance = false
         compose.onNodeWithText("手册入口").performTouchInput { click(center) }
         compose.mainClock.advanceTimeBy(64)
-        compose.onNode(isRoot() and hasAnyDescendant(hasText("书库使用手册"))).performTouchInput { click(Offset(8f, 8f)) }
+        val topInset=androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
+            ?.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())?.top ?: 0
+        // The status bar isn't app input. The far-right safe corner is outside both
+        // the folded trigger and the expanded sheet throughout the opening.
+        compose.onNode(isRoot() and hasAnyDescendant(hasText("书库使用手册"))).performTouchInput {
+            click(Offset(width-8f,topInset+8f))
+        }
         compose.mainClock.advanceTimeBy(1200); compose.mainClock.autoAdvance = true
-        compose.waitUntil(5000) { page == 0 }
+        try { compose.waitUntil(5000) { page == 0 } }
+        catch(error:Throwable) { println(compose.onAllNodes(isRoot()).printToString());shot("manual-early-failure");throw error }
         compose.onNodeWithText("手册入口").performTouchInput { click(center) }
         compose.waitForIdle()
         compose.onAllNodesWithContentDescription("关闭帮助").assertCountEquals(1)
@@ -372,6 +380,9 @@ class PaperPolishDeviceTest {
         compose.mainClock.advanceTimeBy(1600); compose.mainClock.autoAdvance = true
         compose.waitForIdle()
         assertTrue(PaperWarpStats.frames > beforeDetail)
+        compose.waitUntil(15000) { compose.onAllNodesWithText("扫描中…").fetchSemanticsNodes().isEmpty() }
+        // Earlier source audits leave a large cache; the fixture needn't be in the first viewport.
+        compose.onAllNodes(hasScrollToIndexAction()).onLast().performScrollToNode(hasText("paper-transition-probe"))
         compose.onNode(hasContentDescription("关闭") and hasAnyAncestor(
             hasAnyDescendant(hasText("paper-transition-probe")))).performClick()
         compose.waitUntil(8000) {
@@ -478,4 +489,36 @@ class PaperPolishDeviceTest {
 
     }
 
+
+    @Test fun nativeBackdropFadesBeforeThePaperHostIsDisposed() {
+        var open by mutableStateOf(false);var life:PaperLifecycle?=null
+        compose.setContent { MyApplicationTheme {
+            Column(Modifier.fillMaxSize().background(Color(0xff426c58)).padding(20.dp)) {
+                PullOutButton({open=true}) { Text("渐变测试入口") }
+                repeat(12) { Text("保持原有文字和玻璃外观 $it") }
+            }
+            if(open) AcrylicDialog({open=false},title={life=LocalPaperOwner.current;Text("渐变测试窗口")},
+                text={Text("模糊与压暗跟随纸面关闭")},confirmButton={PullOutTextButton({}) {Text("渐变关闭")}})
+        } }
+        compose.mainClock.autoAdvance=false
+        compose.onNodeWithText("渐变测试入口").performClick()
+        compose.waitUntil(8000) { compose.mainClock.advanceTimeByFrame();life?.flat==true }
+        compose.mainClock.advanceTimeByFrame()
+        val decor=compose.activity.window.decorView
+        var peak=0f
+        compose.runOnIdle { assertTrue(life!!.flat);peak=GlassWindowBlur.radius(decor);assertTrue(peak>0f) }
+        compose.onNodeWithText("渐变关闭").performClick()
+        compose.mainClock.advanceTimeBy(144)
+        compose.onNodeWithText("渐变测试窗口").assertExists()
+        compose.runOnIdle {
+            assertTrue(life!!.progress in 0f..1f && life!!.retained)
+            assertTrue("Blur must already be fading while the host exists",GlassWindowBlur.radius(decor) in .1f..peak-.1f)
+        }
+        compose.mainClock.advanceTimeBy(400)
+        compose.runOnIdle { assertTrue(life!!.retained);assertEquals(0f,GlassWindowBlur.radius(decor),0f) }
+        compose.mainClock.advanceTimeBy(800)
+        compose.onNodeWithText("渐变测试窗口").assertDoesNotExist()
+        compose.runOnIdle { assertFalse(open);assertEquals(0f,GlassWindowBlur.radius(decor),0f) }
+        compose.mainClock.autoAdvance=true
+    }
 }
