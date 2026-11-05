@@ -31,3 +31,5 @@ EPUB 正文按 32 章批次写入，包内插图读取尺寸后保留原压缩�
 APK：**29,306,412 B**
 
 SHA-256：`cb20c2e65b35c5e118114be5744d012dc4e64c62dba659a1025adf3fab50af34`
+
+[下载 GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.12) · 发布代码 `65d27be1`。公开下载与 GitHub 资产摘要均已回查匹配。
