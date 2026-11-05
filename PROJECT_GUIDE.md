@@ -2,11 +2,11 @@
 
 > 本文档的目标：让一个**对项目一无所知的 AI / 开发者**，不联网、不翻源码，只读本文档即可快速掌握整个项目的结构、每个文件的作用、以及每个模块用到的核心算法，从而能快速上手改代码、修 bug、加功能。
 >
-> **校准基准**：2026-11-05 · 1.5.13 / 255，发布代码 ed77644b；性能条件、验证与发布回执见第 90 章。
-> `app` 模块：**440 个生产 Kotlin 文件**（另有 4 个 Java 文件）；JVM 测试 **209 文件 / 1242 项定义**；设备测试 **72 文件 / 247 项定义**。定义数不等于执行数；本轮性能专项见第 90 章；1.4.14 的快速输入回归见第 81 章；历史指定小说下载、图片解码及阅读器验收见第 75 章。
+> **校准基准**：2026-11-05 · 1.5.14 / 256 统一状态反馈工作区；基于 9b6461ab，验证及发布见第 91 章。
+> `app` 模块：**443 个生产 Kotlin 文件**（另有 4 个 Java 文件）；JVM 测试 **212 文件 / 1257 项定义**；设备测试 **74 文件 / 249 项定义**。定义数不等于执行数；本轮性能专项见第 90 章；1.4.14 的快速输入回归见第 81 章；历史指定小说下载、图片解码及阅读器验收见第 75 章。
 >
 > **覆盖度声明**：第 4 章逐包逐文件覆盖了 `app`、`backdrop`、`liquidglass-core`、`liquidglass-compose`
-> 四个模块源码目录共 **792 个 Kotlin / Java 文件**（含测试与 4 个 vendored `.java`）；现有文件名已全部补录，完整清单与新增记录见 4.8–4.34。反向检查保留五条明确标注已删除的历史文件；覆盖统计为 2026-11-05 工作区快照。
+> 四个模块源码目录共 **800 个 Kotlin / Java 文件**（含测试与 4 个 vendored `.java`）；现有文件名已全部补录，完整清单与新增记录见 4.8–4.35。反向检查保留六条明确标注已删除的历史文件；覆盖统计为 2026-11-05 工作区快照。
 
 ***
 
@@ -57,14 +57,14 @@ python novel-reader/.workbuddy/stale_check.py
 
 | 项目 | 内容 |
 | --- | --- |
-| 当前版本 | **1.5.13 / 255**；本轮验证及发布见第 90 章 |
+| 当前版本 | **1.5.14 / 256**；本轮验证及发布见第 91 章 |
 | applicationId | `com.aistudio.novelreader.kxmpzq` |
 | 最低系统 | Android 7.0（API 24）；compileSdk / targetSdk = 35 |
 | 技术栈 | Kotlin + Compose M3 + Room + WorkManager + OkHttp + Jsoup + Coil + QuickJS（quickjs-kt）+ **ONNX Runtime**（漫画 OCR / 画质增强 CPU 推理）+ **Cronet**（JS 源网络）+ Brotli + core-splashscreen |
 | 架构 | MVVM + StateFlow + Repository；单 Activity + Navigation Compose |
 | 构建 | Gradle Kotlin DSL，4 模块工程 |
-| APK | 已发布 1.3.8 回执见第 64 章；1.3.9 正式包及升级检查通过，发布回执见第 66 章 |
-| 测试 | 187 个 JVM 文件 / 1133 项定义；58 个设备文件 / 222 项定义；本轮 119 项定点回归通过，未宣称全量通过，见第 88 章 |
+| APK | 当前 1.5.14 / 256；签名、升级与发布回执见第 91 章 |
+| 测试 | 212 个 JVM 文件 / 1257 项定义；74 个设备文件 / 249 项定义；本轮 46 项 JVM、18 项设备定点回归通过，见第 91 章 |
 
 **已移除的依赖**（历史文档里还写着，注意别再用）：`moshi-kotlin`（连 `kotlin-reflect`，序列化点改 `org.json` 手写）、`flexible-bottomsheet-material3`（从未使用）、ML Kit（国内设备无 GMS，在线兜底改自定义 AI 接口 / 在线翻译）。
 
@@ -278,7 +278,7 @@ python novel-reader/.workbuddy/stale_check.py
 | `LibraryScreen.kt`（3100 行） | 书库页（**最大 UI 文件**） | `LibraryCollapsingHeader`、`UnifiedSearchField`、`SearchHistoryPanel` + `HistoryChips`/`HistoryChip`、`SourcePickerSheet`（书源选择 + 聚合选项 + `AggregateJumpSheet` 速跳）、`LibraryBookCard`、`StaggeredComicCard`（瀑布流）、`ComicDownloadGlassCard` / `ComicDownloadTaskRow`、`LibraryWelcomeScreen`、`SearchResultFavoriteButton`、`AggregateSourceHeader` / `AggregateSourceError`、`rememberCoverHeaders`；聚合已有书卡立即显示，后台补别名不再用骨架遮挡，速跳计数与显示同步；独立标签搜索页提供 `onBack` 按钮，输入与滚动位置使用导航记录下的 `rememberSaveable`；并行封面转场见 4.20 |
 | `LibraryViewModel.kt`（1355 行） | 书库 ViewModel | 漫画 / 小说聚合和单源共用分批关键词扩展；原词先发、搜索用词 StateFlow、独立在线补词开关；漫画 8 路 / 小说 4 路，Z-Library 聚合保留 55 秒预算，单源沿用传输层超时；章节、图片、下载及搜索历史功能保留；新增共享服务的导航级构造入口，各搜索层隔离搜索 / 选源 / 作品状态，根实例负责一次性服务初始化；关键词仓库、下载管理与全局偏好共享 |
 | `ComicAggregateSearch.kt`（137 行） | 聚合 / 单源搜索调度 | 原词先排队；有界源内队列重放本地与在线新增查询，同源串行、全轮最多 6 词；逐批显示、仅同源 ID 去重；保留类型化登录 / 网络错误 |
-| `KeywordSearchPreview.kt`（178 行） | 多语言用词可视反馈 | 书源管理同款 GlassKitCard / 名称标签 / 来源及提交状态；提供者失败原因与手动重新查词；生产 Lazy 列表 / 瀑布流条目随结果滚走；展开可复制；两项开关自适应文字高度 |
+| `KeywordSearchPreview.kt`（177 行） | 多语言用词可视反馈 | 书源管理同款 GlassKitCard / 名称标签 / 来源及提交状态；提供者失败原因与手动重新查词；生产 Lazy 列表 / 瀑布流条目随结果滚走；展开可复制；两项开关自适应文字高度 |
 | `SourceSearchCoordinator.kt`（50 行） | 同源搜索协调 | 源内互斥，完成后 1.1 秒间隔；60 秒正结果缓存（每源最多 8 个关键词），源实例更换失效；空结果与错误不缓存，冷却不占跨站 8 路槽位 |
 | `ReadingRecordMetadata.kt`（50 行） | 阅读目的地快照 | 记录原源 ID、资源 ID、封面和作者；按阅读记录 ID 保存，删除本地书后仍保留可用的在线目的地；旧缓存解码核对完整标题 |
 | `ReadingRecordResolver.kt`（81 行） | 阅读明细解析 | 本地书 / 原阅读快照 / 唯一同名收藏立即发布；旧记录才并行补搜，3 个标题 / 4 个请求，严格归一化全标题匹配，首命中取消其余请求 |
@@ -459,7 +459,7 @@ python novel-reader/.workbuddy/stale_check.py
 | `ReaderPagination.kt`（588 行） | **文字分页引擎** | 逐行估算后按独立页真实块高度复测，空间不足沿原有行/图片边界二分回退；见下方算法 |
 | `ComicReaderScreen.kt`（143 行） | 本地漫画阅读入口 | 委托 `ui/comic/ComicReaderCore` |
 | `OnlineComicReaderScreen.kt`（434 行） | 在线漫画阅读页 | `warmUpComicConnection` / `warmComicPage` 预热、`buildComicImageLoader`、统一引擎 |
-| `ComicChaptersScreen.kt`（1572 行） | 漫画章节页 | `ordered` 章节序、`newIds` 更新标记、`ChapterActionSheet`、`DownloadProgressOverlay`、`ComicHeader` |
+| `ComicChaptersScreen.kt`（1547 行） | 漫画章节页 | `ordered` 章节序、`newIds` 更新标记、`ChapterActionSheet`、`DownloadProgressOverlay`、`ComicHeader` |
 | `StatisticsScreen.kt`（835 行） | 阅读统计 | 周/月/年总览（`PeriodOverviewCard`）、`MiniStatCard`、`DayDetailSheet`、`mergeDuplicateReadingRecords`。**已修：本周无记录时把历史总时长塞进"今天"的凭空造数 bug** |
 | `SettingsTabScreen.kt`（1527 行） | 设置页 | 主题/护眼/方向/背景/字体/画质/触觉/隐私/存储/关于；`SettingsSectionHeader` / `CardTweakSlider` |
 | `AppUpdateDialog.kt`（191 行） | 全局更新弹窗与系统回调 | 确认、进度、取消 / 收起、授权 / 导出 / 浏览器兜底；根 Host 按 RESUMED 触发安装，系统结果不作为升级成功依据 |
@@ -484,7 +484,7 @@ python novel-reader/.workbuddy/stale_check.py
 | 文件 | 作用 | 关键算法 |
 | --- | --- | --- |
 | `PageTurnContainer.kt`（1203 行） | 翻页容器主实现 | `PageTurnType` 枚举；覆盖/平移/渐变/滚动四种布局（`CoverPageTurnLayout` / `SlidePageTurnLayout` / `FadePageTurnLayout`）+ `Simulate3DCurlLayout`；`CurlFlapBackside`（镜像翻页背面，`mirrorAngleDeg`）、`shadowStripPath`、下拉书签 |
-| `PageCurlReaderContainer.kt`（406 行） | 仿真卷页容器 | 集成 `eu.wewox.pagecurl`；纸色来自 `PaperPalette`（由阅读主题推导，不是写死米黄）；`backPageContentAlpha` 控制背面内容占比 |
+| `PageCurlReaderContainer.kt`（405 行） | 仿真卷页容器 | 集成 `eu.wewox.pagecurl`；纸色来自 `PaperPalette`（由阅读主题推导，不是写死米黄）；`backPageContentAlpha` 控制背面内容占比 |
 | `PageScrubber.kt`（561 行） | **串珠快速翻页** | 长按 1s 唤出圆柱式页面环，`PaperFlipPlayer`（SoundPool 翻书声），拖动跟手 + 松手磁吸 + 甩动按力度连翻 |
 | `PaperPalette.kt`（93 行） | 纸色推导 | 由阅读主题背景色推导 face / edgeHighlight / edgeStroke / `isDark` |
 
@@ -499,7 +499,7 @@ python novel-reader/.workbuddy/stale_check.py
 | `ComicPageLoader.kt`（1116 行） | 页面加载器 | 解码限幅、processed/preview/thumb/region 多级 LRU、`pinIfWindowed` 窗口钉住、`preloadWindow`（仅 Wi-Fi 开关）、`ComicProcessedDiskCache` 落盘、`exifOrientationOf`（EXIF 方向）、**`decodeRemote` 必须 `.allowHardware(false)`**（Coil 默认产出 HARDWARE 位图，喂 CURL 软件画布 `drawBitmap` 抛 IAE，曾导致"翻页不推进 + 整屏白"） |
 | `ComicPageLayout.kt`（255 行） | 布局引擎 | `ComicSpread` / `ComicSlot` / `ComicSplitHalf`；`ComicScrollStrategy`（条漫 = 用户间距 + 可关磁吸；无缝 = 0 间距 + 自由滚动；两者均跟随像素进度）；`verticalPreloadIndices`（两种列表均提前 4 页） |
 | `ComicZoomGesture.kt`（848 行） | 缩放手势 | `ComicZoomState`（三档双击、`stepScales`、橡皮筋 `rubberPan`、`fling` + `settle`）、`ComicGestureCallbacks`（点击分区/长按/捏合/边缘返回/缩放态边缘滑） |
-| `ComicReaderChrome.kt`（836 行） | 阅读 UI 框架 | `ComicTopBar` / `ComicBottomBar` / `ChapterNavButton` / `ComicThumbPreview`；纵向滑条、百分比与像素定位共用滚动指标，含阅读进度语义；缩略图气泡跟随实际滑条落点；阅读玻璃由采样背景与 ReadingGlassStyle 提供；所有模式直接以当前页像素提供玻璃背景，不保留活动阅读 RenderNode 引用（见 4.20） |
+| `ComicReaderChrome.kt`（846 行） | 阅读 UI 框架 | `ComicTopBar` / `ComicBottomBar` / `ChapterNavButton` / `ComicThumbPreview`；纵向滑条、百分比与像素定位共用滚动指标，含阅读进度语义；缩略图气泡跟随实际滑条落点；阅读玻璃由采样背景与 ReadingGlassStyle 提供；所有模式直接以当前页像素提供玻璃背景，不保留活动阅读 RenderNode 引用（见 4.20） |
 | `ComicReaderSheets.kt`（2081 行） | 设置面板 | 七 Tab（翻页/显示/图像/翻译/主题/自动/手势）+ 目录页 + 预设页 + **手动裁边编辑器**（`CropCanvas`，`rememberUpdatedState` 修四边互覆） |
 | `ComicReaderBackground.kt`（164 行） | 背景 | 纯色 / `paperTexture` 程序化纸纹 / 沉浸动态主色（挂钟驱动逐帧插值，模拟器假 vsync 会让时间基准 tween 跳终值） |
 | `ComicSceneEngine.kt`（274 行） | 氛围音 | `ComicAmbientAudio`：CC0 分层 MediaPlayer 循环 + 等功率交叉淡化；无素材时 `Synth` 合成兜底（Rain/Ocean/Campfire/Night/Breeze） |
@@ -535,8 +535,8 @@ python novel-reader/.workbuddy/stale_check.py
 | `GlassCard.kt`（35 行） | **玻璃卡片（第一套玻璃）** | 3D 倾斜（按压跷跷板 + 滚动惯性摆动）、AGSL 法线光照压痕（`buildIndentUnitPath` + `dentRenderEffect`）、`GlassDecoKey` 装饰缓存键、`lightPathLayer` / `edgeLayer` 装饰预录（每卡 ~6 批绘制命令压到 1 批）、内容包独立 RenderNode |
 | `LiquidGlass.kt`（244 行） | 液态玻璃基础 | `supportsRealtimeBlur`（API≥31）、`frostedGlassFallback()`、`rememberScreenGlassBackdrop` / `rememberThemedGlassBackdrop` / `rememberGlassPanelBackdrop`、`rememberIridescentColors` / `rememberCrystalPrismColors`、`createGrainBitmap` 噪点 |
 | `GlassKit.kt` | — 见 4.7.5（在 `ui/glasskit/`） | |
-| `AppBottomTabBar.kt`（542 行） | 五 Tab 等宽槽位与指示条；栏高和标签高度使用同一个弹簧进度，标签节点常驻，字体缩放决定预留空间，消除退出末帧跳动；`app/src/main/java/com/example/ui/components/AppBottomTabBar.kt` |
-| `AppButton.kt`（392 行） | 统一按钮 | `AppButtonVariant` / `AppButtonSize`（height/hPadding/fontSize/iconSize）、`primaryGlassStyle`、按压缩放 + 阴影 |
+| `AppBottomTabBar.kt`（539 行） | 五 Tab 等宽槽位与指示条；栏高和标签高度使用同一个弹簧进度，标签节点常驻，字体缩放决定预留空间，消除退出末帧跳动；`app/src/main/java/com/example/ui/components/AppBottomTabBar.kt` |
+| `AppButton.kt`（389 行） | 统一按钮 | `AppButtonVariant` / `AppButtonSize`（height/hPadding/fontSize/iconSize）、`primaryGlassStyle`、按压缩放 + 阴影 |
 | `AppSwitch.kt`（59 行） | 统一开关 | 接收的 `modifier` 必须真正应用（历史 bug：被静默丢弃） |
 | `AppSnackbar.kt`（168 行） | Snackbar 语义分级 | `AppSnackKind` + `AppSnackbarVisuals.kind`；**只有 ERROR 走红色错误卡**，其余走中性卡。语义走 `kind` 字段，**不要往 message 里塞前缀**（"复制日志"复制的是 message） |
 | `AppErrorSnackbar.kt`（165 行） | 错误条 | 友好文案 + 一键复制日志 |
@@ -555,13 +555,13 @@ python novel-reader/.workbuddy/stale_check.py
 | `MaxCardEffects.kt`（151 行）+ `MaxFx.kt`（151 行） | MAX 档特效 | `maxCardAura`（三色极光）/ `chromaFlowEdge`（边缘光弧巡游）/ `glassSheen`（高光带）/ `shimmerPearl`（珠光）；**仅 RenderQuality.MAX 激活**，其余返回 this（零开销） |
 | `CardTweaks.kt`（57 行） | 卡片调参令牌 | 模糊半径/圆角/倾斜/相机距离/涟漪/染色/按压/透明度 + `LocalCardTweaks` |
 | `GlassQuality.kt`（39 行） | 画质档 | `RenderQuality` 枚举（流畅/均衡/高/极致）+ `LocalRenderQuality` |
-| `ChasingDots.kt`（173 行）+ `ChasingDotsTransition.kt`（173 行） | 加载动画 | 追逐圆点（六个 path 角度/半径乘数） |
+| `ChasingDots.kt`（22 行） | 加载兼容入口 | 统一调用 AppProgressIndicator；`ChasingDotsTransition.kt` 已删除（1.5.14，旧多时钟追逐圆点实现） |
 | `ShimmerBox.kt`（58 行） | 微光占位 | ShimmerFy 参考 |
 | `ColorMorph.kt`（192 行） | 颜色弹簧过渡 | 主题色切换 + `ColorMorphSwatch` |
-| `PlayPauseMorph.kt`（112 行） | 播放/暂停形态 | TTS 按钮 |
+| `PlayPauseMorph.kt`（83 行） | 播放/暂停形态 | TTS 按钮 |
 | `LiquidBlob.kt`（68 行） | 液态气泡 | 两圆 metaball 桥接 |
 | `LiquidGlassControls.kt`（89 行） | 玻璃控件 | `DialogLiquidGlass` / `AppLiquidButton` |
-| `CustomButtons.kt`（74 行） | `AppIconButton` / `AppButton` | 全局统一图标按钮 |
+| `CustomButtons.kt`（63 行） | `AppIconButton` / `AppButton` | 全局统一图标按钮 |
 | `GradientActionButton.kt`（34 行） | 渐变动作按钮 | |
 | `HazeProgress.kt`（76 行） | 流动渐变进度条 | |
 | `StarryNightBackground.kt`（75 行） | 星空背景 | |
@@ -628,7 +628,7 @@ python novel-reader/.workbuddy/stale_check.py
 | 文件 | 行 | 当前职责 |
 | --- | --- | --- |
 | `GodCoverEngine.kt` | 479 | 封面解码 / 合成；与阅读器共享图片 key，缓存优先、同页合并、缩略图 3 / 大封面 1 的独立闸门、请求级渐进 JPEG；小图中段裁剪与 320 px 上限 |
-| `GodMomentSheet.kt` | 1386 | 自绘神回窗口；缩略图按页面独立记忆，不随选中取消加载；来源切换清除旧大封面，点选不推动整排图片，失败点按重试 |
+| `GodMomentSheet.kt` | 1385 | 自绘神回窗口；缩略图按页面独立记忆，不随选中取消加载；来源切换清除旧大封面，点选不推动整排图片，失败点按重试 |
 
 ### 4.8 vendored 第三方库（`app/src/main/java/` 下非 `com/example` 包）
 
@@ -1279,7 +1279,7 @@ python novel-reader/.workbuddy/stale_check.py
 | `app/src/androidTest/java/com/example/ui/NovelDownloadPanelDeviceTest.kt` | 68 | Android 原生下载面板的进度、字节量、失败操作与截图验证 |
 | `app/src/main/java/com/example/download/GuestNovelEpub.kt` | 115 | 工作区已有的小说下载/完整性/阅读源码或测试；本轮仅补录清单，未复验 |
 | `app/src/main/java/com/example/download/GuestNovelIntegrity.kt` | 125 | 严格 UTF-8、NUL、CRC、目录、图片与缺译检查；有界容忍源站长章节孤立缺字，保留原文 |
-| `app/src/main/java/com/example/library/NovelDownloadPanel.kt` | 176 | 持久下载任务与准备/失败任务列表；进度、字节量、文件明细、暂停/继续/重试/取消；未知总长不伪报百分比 |
+| `app/src/main/java/com/example/library/NovelDownloadPanel.kt` | 147 | 持久下载任务与准备/失败任务列表；进度、字节量、文件明细、暂停/继续/重试/取消；未知总长不伪报百分比 |
 | `app/src/main/java/com/example/source/ComicChapterTitle.kt` | 46 | 工作区已有的书源/界面源码或测试；本轮仅补录清单，未复验 |
 | `app/src/main/java/com/example/source/NovelContentChecks.kt` | 8 | 工作区已有的小说下载/完整性/阅读源码或测试；本轮仅补录清单，未复验 |
 | `app/src/main/java/com/example/source/impl/GuestNovelTransport.kt` | 21 | 工作区已有的小说下载/完整性/阅读源码或测试；本轮仅补录清单，未复验 |
@@ -1340,7 +1340,7 @@ python novel-reader/.workbuddy/stale_check.py
 | `PullOutMotion.kt` | 315 | 来源几何、冻结交接入口与上级返回位置；近临界展开 / 独立关闭弹簧；同一物理时钟控制保留与关闭；`app/src/main/java/com/example/ui/components/PullOutMotion.kt` |
 | `PullOutRender.kt` | 238 | 实时 StablePaperSurface：128 前向点→64 行逆向表，AGSL 单次内容采样；完整页面显式启用，透明全屏包装器仍排除；`app/src/main/java/com/example/ui/components/PullOutRender.kt` |
 | `PullOutHosts.kt` | 511 | 弹窗 / 菜单 / 底部面板、paperOpen 向前交接与 pullOutPage 完整页面公共宿主；原窗口销毁后从冻结按钮位置展开，页面背景独立采样；`app/src/main/java/com/example/ui/components/PullOutHosts.kt` |
-| `PullOutButtons.kt` | 63 | 保持 Material 交互语义的按钮代理；自动注册纸面来源与动作关闭适配；`app/src/main/java/com/example/ui/components/PullOutButtons.kt` |
+| `PullOutButtons.kt` | 78 | 保持 Material 交互语义的按钮代理；自动注册纸面来源与动作关闭适配；`app/src/main/java/com/example/ui/components/PullOutButtons.kt` |
 | `TouchZoneSystemTest.kt` | 135 | 持久化、旧配置回退、重叠分区、触发距离、多指与漫画方向回归；`app/src/test/java/com/example/ui/TouchZoneSystemTest.kt` |
 | `PaperAndSliderTest.kt` | 241 | 21 项：解析弹簧平稳落定 / 反转、来源冻结与返回、逆向行表及滑条既有触摸 / 范围 / 分档约束；`app/src/test/java/com/example/ui/components/PaperAndSliderTest.kt` |
 | `TouchZoneInteractionDeviceTest.kt` | 344 | 真实 Compose / Android Canvas 交互、编辑器与纸面关闭时序、设备截图；`app/src/androidTest/java/com/example/ui/TouchZoneInteractionDeviceTest.kt` |
@@ -1475,6 +1475,21 @@ python novel-reader/.workbuddy/stale_check.py
 | `app/src/debug/java/com/example/ui/perf/PaperMotionProbeActivity.kt` | 122 | 真实原生窗口受控掉帧计时，仅 debug，未进入正式 APK |
 | `app/src/test/resources/paper-warp-1.5.12.csv` | 84 | 发布版 84 个状态的亚像素形变参考 |
 
+
+### 4.35 2026-11-05 共用状态反馈与下载入口
+
+| 文件 | 行数 | 作用 |
+| --- | --- | --- |
+| `app/src/main/java/com/example/library/DownloadCenterButton.kt` | 190 | 共用状态绘制/业务边界 |
+| `app/src/main/java/com/example/library/DownloadIndicatorState.kt` | 82 | 共用状态绘制/业务边界 |
+| `app/src/main/java/com/example/ui/components/StateIcons.kt` | 93 | 共用状态绘制/业务边界 |
+| `app/src/main/java/com/example/ui/components/AppProgressIndicator.kt` | 65 | 共用状态绘制/业务边界 |
+| `app/src/test/java/com/example/library/DownloadIndicatorStateTest.kt` | 62 | 回归与实际渲染验证 |
+| `app/src/test/java/com/example/library/DownloadCenterButtonTest.kt` | 63 | 回归与实际渲染验证 |
+| `app/src/test/java/com/example/ui/components/SharedStateMotionTest.kt` | 70 | 回归与实际渲染验证 |
+| `app/src/androidTest/java/com/example/ui/DownloadIndicatorDeviceTest.kt` | 112 | 回归与实际渲染验证 |
+| `app/src/androidTest/java/com/example/ui/SharedStateMotionDeviceTest.kt` | 94 | 回归与实际渲染验证 |
+
 ## 5. 关键算法清单汇总
 
 - 1.4.12：HardwarePaperSurface 按行计算昂贵函数、复用顶点与颜色数组，原生硬件 drawBitmapMesh 直接提交缓存纹理；弹簧按实际帧时推进，单一生命周期驱动绘制、遮罩与关闭动作。fastPageCommit 仅在速度模长 ≥850dp/s 且配置了距离时按二维位移覆写完成判定，慢速保持原生。
@@ -1487,6 +1502,7 @@ python novel-reader/.workbuddy/stale_check.py
 
 | 算法 | 所在文件 | 一句话说明 |
 | --- | --- | --- |
+| 状态反馈与一次完成事件 | `DownloadIndicatorState.kt` / `DownloadCenterButton.kt` / `StateIcons.kt` / `AppProgressIndicator.kt` | 历史与事件分离，徽标在按钮圆形裁剪层外；共用有限图标过渡、单绘制进度时钟和当前无障碍语义 |
 | 抽纸真实时间与背景复用 | `PullOutMotion.kt` / `WindowBackdrop.kt` / `PullOutRender.kt` | 解析弹簧一次消费实际 dt；窗口级同曲线驱动背景，owner 最大半径、有界整数缓存、固定三角项复用，不降低网格精度 |
 | 平板热路径去重与缓存预算 | `ReaderChapterWindow.kt` / `ReaderProgressEffect.kt` / `AppDatabase.kt` / `ReaderPagination.kt` | 只加载新入窗章；快变偏移在组合外观察；数据库返回计数 / 标题；分页同时受条目与字节预算约束 |
 | Z-Library 下载容灾 | `ZLibrarySource.kt` / `ZLibraryEndpointProvider.kt` / `DownloadWorker.kt` | 保留搜索卡下载链接和实际来源；数字书号直接提取 API key；直连阶段先于系统代理。失败节点排除并冷却，持久保存成功节点；跨节点重新按书名/作者/格式唯一匹配，额度/频率/存储错误终止；文件仍须完整性校验与入库成功。 |
@@ -1744,6 +1760,8 @@ adb logcat -b crash
 - **改提示文案**：统一走 `AppToast`（不要再用 `Toast.makeText`）；错误语义用 `AppSnackKind.ERROR`，其余中性。
 
 ### 6.4 工程约定与已知陷阱（**改代码前必读**）
+
+- 下载中心入口是导航，不是单任务的暂停/完成动作。历史完成记录不控制常态图标；只有观察到的活动任务完成才发短确认，事件时钟不能以每次队列更新为 key。数量徽标必须在 IconButton 的圆形裁剪层之外，并留稳定布局槽；检查 1/两位数/99+ 和出场中间帧。实际渲染截图需等待绘制提交，不能仅凭语义树判定像素状态。
 
 - 抽纸解析弹簧不得再把真实 dt 截成 33 ms：解析解为 O(1)，无需分步补算；截断会令掉帧变成额外慢放。模糊/原生 dim/Compose 遮罩必须使用窗口生命周期；子窗口只释放自身 owner，不能清父窗口。窗口属性只初始化一次，不能在每次内容重组时归零 dim。形变参考 fixture 固定为 1.5.12，改数学实现必须保持亚像素一致，不能用降网格/画质掩盖卡顿。
 
@@ -5016,3 +5034,30 @@ Commit `8d6e3847b1a8fd53df9adbee0ded4f89701bdc4e`；Release 413307957：https://
 第 90 章正式包校验：1.5.13 / 255，ARM64，29306016 B，SHA-256 7571f9d87188775f2380ec69bab8b0a0fa5b6f54a135462fcfa211074b243717。沿用现有新签名，与官方 1.5.12 覆盖升级条件、ZIP CRC、16 KiB 对齐通过；735 个生产输入与冻结清单一致。发布回执随后追加。
 
 第 90 章发布回执：发布代码 ed77644b0581dc14765f660e3f97bc24ee397ea9 已推送 origin/main，标签 v1.5.13；GitHub Release https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.13 已公开并核对 latest。APK 29306016 B，远端 digest 与本地 SHA-256 7571f9d87188775f2380ec69bab8b0a0fa5b6f54a135462fcfa211074b243717 一致；公开下载 HTTP 200，重新下载大小与摘要匹配。README、CHANGELOG、QA 摘要与指导文件随源码提交。工作树为同级 novel-reader-unified，分支 codex/paper-motion-smooth，原目录草稿保留。
+
+## 91. 第九十七轮执行（2026-11-05：统一状态反馈与下载入口，1.5.14）
+
+### 已落地
+
+- 下载入口常态箭头，真实完成短确认约 950ms 后恢复。取消、切页、删除、加载旧历史不重播勾号；暂停/错误为小标记，始终导航同一下载中心。
+- 修复徽标被 Material IconButton 圆形裁剪层截断；移到独立层，稳定槽容纳 1/12/99+，包括出场中间帧。按压只缩放内部图形，不改变纸面来源矩形。
+- 共用状态图标、展开旋转、章节选中、播放/暂停、按压和圆角进度环，覆盖书库、发现、小说/漫画阅读器、书源管理及底栏。保留原尺寸、材质、毛玻璃、抽纸和质量档位。
+- 复杂六点加载路径收敛为单绘制时钟，删除不用的 ChasingDotsTransition.kt；路径/描边复用，动态值尽量在绘制阶段读取。图标过渡只暴露当前无障碍标签，减少动画时停止循环/过渡。开关跟随当前主题；恢复喜欢记录不再触发新反应。
+- 独立 Compose 实现参考 Telegram 官方与 Canvas 示例的交互思路，无新增 UI 运行依赖；既有播放形变的 Apache-2.0 来源署名保留。
+
+### 未做
+
+- 没有重排主页面、替换毛玻璃/抽纸主视觉、改变下载后端/书源协议/schema，未修改文件归属；没有实体手机 FPS 结论。
+- 不是逐像素复刻 Telegram；统一的是交互语言和共用组件，保留本项目视觉主题。
+
+### 踩到的坑
+
+- 把“存在已完成记录”当作当前状态会让导航永远变勾。完成反馈必须来自身份稳定的活动任务变化；进度更新不能重启/取消确认计时。
+- 徽标在 48dp 点击范围内不代表不会被裁切：Material 内部还有圆形状态层。应作为按钮的兄弟绘制层，并固定出场布局槽。
+- 固定槽内的 AnimatedContent 会把最小尺寸传给徽标，需用 wrapContentSize 解除最小约束，避免数字底色被撑成大胶囊；布局槽保持稳定，数字底色按内容收紧。
+- 图标交叉过渡不能把旧标签和新标签同时读给无障碍服务；父级只保留当前标签。喜欢状态初次恢复只同步状态，不播放新用户事件。
+- 首轮一个控件时序测试未等待快照通知，修正等待后通过。发现徽标真实裁切后修复了层级，并对数量边界和实际像素复查，未以仅语义通过代替视觉验收。
+
+第 91 章验证：6 套件 / 46 项 JVM 检查通过，0 失败/错误/跳过；18 项设备回归通过，固定槽后 3 项针对复查通过。原 UI gate 基线通过。覆盖冷启动历史、真正完成及恢复、取消/删除不重播、暂停/错误、1/12/99+、深浅主题、减少动画、控件动作及原抽纸行为。源码 800 项、覆盖遗漏 0；六项已删除历史名字单列保留。
+
+第 91 章正式包：1.5.14 / 256，ARM64，29312108 B，SHA-256 912baf6fce761df7c19336597c848a454f34e910527c1659bb3b15235feac684。沿用现有新签名，与官方 1.5.13 的覆盖升级条件、ZIP CRC、16 KiB 对齐均通过；738 个生产输入与冻结清单一致。

@@ -1,6 +1,9 @@
 package com.example.ui.theme
 
 import com.example.ui.components.pullOutClickable
+import com.example.ui.feedback.AppMotion
+import com.example.ui.feedback.LocalReduceMotion
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -34,13 +37,11 @@ fun Modifier.clickableWithFeedback(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val haptics = LocalHapticFeedback.current
+    val reduce = LocalReduceMotion.current
 
     val scaleState = animateFloatAsState(
-        targetValue = if (isPressed) 0.96f else 1.0f,
-        animationSpec = tween(
-            durationMillis = if (isPressed) 100 else 150,
-            easing = EaseOut
-        ),
+        targetValue = if (isPressed && enabled) AppMotion.CONTROL_PRESS_SCALE else 1.0f,
+        animationSpec = if (reduce) snap() else AppMotion.press(),
         label = "click_scale"
     )
 
@@ -49,11 +50,8 @@ fun Modifier.clickableWithFeedback(
     // 是全局最不像 iOS 的一处交互。iOS 的按压反馈是「整体变淡」（dim 到 0.7），
     // 只改透明度、不改变任何颜色关系，对任意底色都成立。
     val dimState = animateFloatAsState(
-        targetValue = if (isPressed) 0.7f else 1f,
-        animationSpec = tween(
-            durationMillis = if (isPressed) 100 else 180,
-            easing = EaseOut
-        ),
+        targetValue = if (isPressed && enabled) .82f else 1f,
+        animationSpec = if (reduce) snap() else AppMotion.icon(),
         label = "click_dim"
     )
 
@@ -97,14 +95,12 @@ fun Modifier.clickableRowFeedback(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val haptics = LocalHapticFeedback.current
+    val reduce = LocalReduceMotion.current
 
     // 按下要“立刻”有反应（80ms），松手则缓慢淡出（220ms），这个不对称是 iOS 手感的关键
-    val highlightAlpha by animateFloatAsState(
+    val highlightAlpha = animateFloatAsState(
         targetValue = if (isPressed) 1f else 0f,
-        animationSpec = tween(
-            durationMillis = if (isPressed) 80 else 220,
-            easing = EaseOut
-        ),
+        animationSpec = if (reduce) snap() else tween(if (isPressed) 80 else AppMotion.ICON_MS, easing = AppMotion.easeOutCubic),
         label = "row_highlight"
     )
 
@@ -116,10 +112,10 @@ fun Modifier.clickableRowFeedback(
 
     this
         .drawBehind {
-            if (highlightAlpha > 0f) {
+            if (highlightAlpha.value > 0f) {
                 // 中性灰，深浅主题下都成立；不用白色（深色卡片上会发白）
                 drawRect(
-                    color = Color.Gray.copy(alpha = 0.16f * highlightAlpha),
+                    color = Color.Gray.copy(alpha = 0.16f * highlightAlpha.value),
                     size = size
                 )
             }

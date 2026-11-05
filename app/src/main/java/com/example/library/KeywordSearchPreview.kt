@@ -73,7 +73,6 @@ internal fun KeywordSearchPreview(
 ) {
     val reduce = LocalReduceMotion.current
     var expanded by rememberSaveable(words.firstOrNull()) { mutableStateOf(false) }
-    val arrow by animateFloatAsState(if (expanded) 0f else -90f, tween(if (reduce) 0 else AppMotion.CONTENT_MS), label = "keywordArrow")
     GlassKitCard(modifier = modifier.fillMaxWidth().animateContentSize(tween(if (reduce) 0 else 220, easing = AppMotion.easeOutCubic)).testTag("keyword_search_preview")) {
         Column(Modifier.padding(DesignTokens.SpaceMd), verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
             Row(Modifier.fillMaxWidth().heightIn(min = DesignTokens.SpaceXxl * 2)
@@ -97,8 +96,8 @@ internal fun KeywordSearchPreview(
                             color = if (currentStatus.startsWith("正在")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                Icon(Icons.Default.ExpandMore, contentDescription = if (expanded) "收起搜索用词" else "查看搜索用词",
-                    modifier = Modifier.graphicsLayer { rotationZ = arrow }, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                com.example.ui.components.AnimatedChevron(expanded, collapsedRotation = -90f, expandedRotation = 0f, contentDescription = if (expanded) "收起搜索用词" else "查看搜索用词",
+                    modifier = Modifier, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (!expanded) {
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),

@@ -28,10 +28,6 @@ fun FaqExpandableItem(
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val rotationState by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        label = "arrow_rotation"
-    )
 
     Card(
         modifier = modifier
@@ -63,11 +59,11 @@ fun FaqExpandableItem(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
                 )
-                Icon(
-                    imageVector = Icons.Default.ExpandMore,
+                com.example.ui.components.AnimatedChevron(
+                    expanded = expanded,
                     contentDescription = if (expanded) "收起" else "展开",
                     tint = MintPrimary,
-                    modifier = Modifier.rotate(rotationState)
+                    modifier = Modifier
                 )
             }
             PullOutVisibility(

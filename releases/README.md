@@ -1,5 +1,7 @@
 # releases
 
+**1.5.14 / 256**：[GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.14) · [更新说明](../docs/release-1.5.14-2026-11-05.md)。下载入口状态纠正、数量徽标完整显示；统一高频状态图标、加载和按压反馈。
+
 **1.5.13 / 255**：[GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.13) · [下载 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.13/Ciallo-Reader-v1.5.13.apk) · [发布说明](../docs/release-1.5.13-2026-11-05.md)。
 
 保留抽纸外观，修复低帧率计时拖尾，背景模糊与压暗同步渐变关闭。

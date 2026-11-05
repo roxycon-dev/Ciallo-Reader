@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -84,11 +85,17 @@ fun FavoriteHeartButton(
     var burstId by remember { mutableIntStateOf(0) }
     val burst = remember { Animatable(0f) }
 
+    var initialized by remember { mutableStateOf(false) }
     LaunchedEffect(favorite) {
+        if (!initialized) {
+            initialized = true
+            fill.snapTo(if (favorite) 1f else 0f)
+            return@LaunchedEffect
+        }
         if (favorite) {
             haptics.perform(HapticKind.LIGHT)
             fill.snapTo(0f)
-            fill.animateTo(1f, tween(if (reduceMotion) 100 else 260))
+            fill.animateTo(1f, tween(if (reduceMotion) 0 else AppMotion.ICON_MS))
             if (!reduceMotion) {
                 scale.snapTo(0.6f)
                 scale.animateTo(1.25f, AppMotion.springDefault)
@@ -97,7 +104,7 @@ fun FavoriteHeartButton(
             }
         } else {
             haptics.perform(HapticKind.SELECTION)
-            fill.animateTo(0f, tween(if (reduceMotion) 100 else 180))
+            fill.animateTo(0f, tween(if (reduceMotion) 0 else AppMotion.ICON_MS))
             if (!reduceMotion) {
                 scale.animateTo(0.86f, tween(110))
                 scale.animateTo(1f, AppMotion.springDefault)
@@ -120,7 +127,7 @@ fun FavoriteHeartButton(
         label = "fav_press",
     )
 
-    val tint = if (favorite) MintPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+    val tint = if (favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
     val containerAlpha = if (enabled) 1f else 0.4f
 
     Box(

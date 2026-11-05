@@ -1,6 +1,14 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import com.example.ui.feedback.AppMotion
+import com.example.ui.feedback.LocalReduceMotion
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -50,7 +58,14 @@ fun PullOutIconButton(onClick: () -> Unit, modifier: Modifier = Modifier, enable
     colors: IconButtonColors = IconButtonDefaults.iconButtonColors(), interactionSource: MutableInteractionSource? = null,
     content: @Composable () -> Unit) {
     val source = rememberPaperTrigger()
-    IconButton(paperClick(onClick, source), modifier.pullOutAnchor(source), enabled, colors, interactionSource, content = content)
+    val interactions = interactionSource ?: remember { MutableInteractionSource() }
+    val pressed by interactions.collectIsPressedAsState()
+    val reduce = LocalReduceMotion.current
+    val scale = animateFloatAsState(if (pressed && enabled) AppMotion.ICON_PRESS_SCALE else 1f,
+        if (reduce) snap() else AppMotion.press(), label = "iconPress")
+    IconButton(paperClick(onClick, source), modifier.pullOutAnchor(source), enabled, colors, interactions) {
+        Box(Modifier.graphicsLayer { scaleX = scale.value; scaleY = scale.value }) { content() }
+    }
 }
 @Composable
 fun PullOutDropdownMenuItem(text: @Composable () -> Unit, onClick: () -> Unit, modifier: Modifier = Modifier,

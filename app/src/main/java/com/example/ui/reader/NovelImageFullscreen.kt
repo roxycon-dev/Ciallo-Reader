@@ -110,7 +110,7 @@ fun NovelImageFullscreenViewer(
         ) {
             val bmp = bitmap
             if (bmp == null && !loaded) {
-                androidx.compose.material3.CircularProgressIndicator(
+                com.example.ui.components.AppProgressIndicator(
                     modifier = Modifier.align(Alignment.Center),
                     color = Color.White
                 )

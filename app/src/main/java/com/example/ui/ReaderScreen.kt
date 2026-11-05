@@ -1826,7 +1826,7 @@ fun ReaderScreen(
 
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
 
-                    CircularProgressIndicator(color = MintPrimary)
+                    com.example.ui.components.AppProgressIndicator(color = MintPrimary)
 
                 }
 
@@ -2683,7 +2683,7 @@ fun ReaderScreen(
 
                                             Row(verticalAlignment = Alignment.CenterVertically) {
 
-                                                Icon(
+                                                com.example.ui.components.AnimatedStateIcon(
 
                                                     imageVector = if (isNext) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
 
@@ -2923,7 +2923,7 @@ fun ReaderScreen(
 
                                         ) {
 
-                                            Icon(
+                                            com.example.ui.components.AnimatedStateIcon(
 
                                                 if (isTtsPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
 
@@ -3263,7 +3263,7 @@ fun ReaderScreen(
 
                                             AppIconButton(onClick = { toggleBookmark() }) {
 
-                                                Icon(
+                                                com.example.ui.components.AnimatedStateIcon(
 
                                                     imageVector = if (currentBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
 
@@ -3297,7 +3297,7 @@ fun ReaderScreen(
 
                                             }) {
 
-                                                Icon(
+                                                com.example.ui.components.AnimatedStateIcon(
 
                                                     imageVector = if (isTtsPlaying) Icons.AutoMirrored.Filled.VolumeUp else Icons.Filled.Headphones,
 
@@ -3591,7 +3591,7 @@ fun ReaderScreen(
 
                                                 ) {
 
-                                                    Icon(
+                                                    com.example.ui.components.AnimatedStateIcon(
 
                                                         imageVector = if (isTtsPlaying) Icons.AutoMirrored.Filled.VolumeUp else Icons.Filled.Headphones,
 
@@ -3973,7 +3973,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                 modifier = Modifier.weight(1f),
                                 maxLines = 1
                             )
-                            Icon(
+                            com.example.ui.components.AnimatedStateIcon(
                                 if (fontPanelOpen) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                                 contentDescription = if (fontPanelOpen) "收起字体列表" else "展开字体列表",
                                 tint = textColor.copy(alpha = 0.65f).copy(alpha = 0.6f),
@@ -4194,7 +4194,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                     if (isSearching) {
 
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                        com.example.ui.components.AppProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
 
                     } else if (searchResults.isEmpty() && searchKeyword.isNotBlank()) {
 
@@ -5114,7 +5114,7 @@ private fun ReaderFontOptionRow(
             .padding(horizontal = DesignTokens.SpaceSm, vertical = DesignTokens.SpaceCompact),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
+        com.example.ui.components.AnimatedStateIcon(
             if (selected) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
             contentDescription = null,
             tint = if (selected) MintPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),

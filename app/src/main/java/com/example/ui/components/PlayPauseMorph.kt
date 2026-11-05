@@ -1,112 +1,83 @@
 /*
- * Copied from skydoves/compose-animations (Apache-2.0):
+ * Geometry adapted from skydoves/compose-animations (Apache-2.0):
  * https://github.com/skydoves/compose-animations/blob/main/app/src/main/kotlin/com/skydoves/hotreloadanimations/animations/AnimationExample11.kt
- * Play / Pause Morph：三角形播放键与暂停双竖条之间随 progress 形变。
  */
 package com.example.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.example.ui.theme.clickableWithFeedback
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.unit.dp
+import com.example.ui.feedback.AppMotion
+import com.example.ui.feedback.LocalReduceMotion
+import com.example.ui.theme.clickableWithFeedback
 
-/** 播放/暂停形态动画（skydoves/compose-animations 原版实现）。 */
 @Composable
-fun PlayPauseMorph(progress: Float, iconBoxDp: Int) {
-    Canvas(modifier = Modifier.size((iconBoxDp / 2).dp)) {
-        val w = size.width
-        val h = size.height
-        val cx = w / 2f
-        val cy = h / 2f
-        val triHalf = w * 0.32f
-        val barHalfW = w * 0.12f
-        val barGap = w * 0.18f
+fun PlayPauseMorph(progress: Float, iconBoxDp: Int) =
+    PlayPauseGlyph({ progress }, iconBoxDp, { Color.White })
 
-        val triTopX = cx - triHalf * 0.65f
-        val triTopY = cy - triHalf
-        val triBotX = cx - triHalf * 0.65f
-        val triBotY = cy + triHalf
-        val triRightX = cx + triHalf
-        val triRightY = cy
 
-        val leftBarL = cx - barGap - barHalfW
-        val leftBarR = cx - barGap + barHalfW
-        val rightBarL = cx + barGap - barHalfW
-        val rightBarR = cx + barGap + barHalfW
-        val barTop = cy - triHalf
-        val barBot = cy + triHalf
-
-        val leftPath = Path().apply {
-            moveTo(lerp(triTopX, leftBarL, progress), lerp(triTopY, barTop, progress))
-            lineTo(lerp(triRightX, leftBarR, progress), lerp(triRightY, barTop, progress))
-            lineTo(lerp(triRightX, leftBarR, progress), lerp(triRightY, barBot, progress))
-            lineTo(lerp(triBotX, leftBarL, progress), lerp(triBotY, barBot, progress))
-            close()
-        }
-        val rightPath = Path().apply {
-            moveTo(lerp(triRightX, rightBarL, progress), lerp(triRightY, barTop, progress))
-            lineTo(lerp(triRightX, rightBarR, progress), lerp(triRightY, barTop, progress))
-            lineTo(lerp(triRightX, rightBarR, progress), lerp(triRightY, barBot, progress))
-            lineTo(lerp(triRightX, rightBarL, progress), lerp(triRightY, barBot, progress))
-            close()
-        }
-        drawPath(path = leftPath, color = Color.White)
-        drawPath(path = rightPath, color = Color.White)
-        drawCircle(color = Color.Transparent, radius = 0f, center = Offset(cx, cy))
+/** Reuses both paths and reads progress while drawing, not while composing the button. */
+@Composable
+private fun PlayPauseGlyph(progress: () -> Float, iconBoxDp: Int, color: () -> Color) {
+    val left = remember { Path() }
+    val right = remember { Path() }
+    Canvas(Modifier.size((iconBoxDp / 2).dp)) {
+        val p = progress().coerceIn(0f, 1f)
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val half = size.width * .32f
+        val bar = size.width * .12f
+        val gap = size.width * .18f
+        fun mix(a: Float, b: Float) = a + (b - a) * p
+        left.reset()
+        left.moveTo(mix(cx - half * .65f, cx - gap - bar), cy - half)
+        left.lineTo(mix(cx + half, cx - gap + bar), mix(cy, cy - half))
+        left.lineTo(mix(cx + half, cx - gap + bar), mix(cy, cy + half))
+        left.lineTo(mix(cx - half * .65f, cx - gap - bar), cy + half)
+        left.close()
+        right.reset()
+        right.moveTo(mix(cx + half, cx + gap - bar), mix(cy, cy - half))
+        right.lineTo(mix(cx + half, cx + gap + bar), mix(cy, cy - half))
+        right.lineTo(mix(cx + half, cx + gap + bar), mix(cy, cy + half))
+        right.lineTo(mix(cx + half, cx + gap - bar), mix(cy, cy + half))
+        right.close()
+        drawPath(left, color())
+        drawPath(right, color())
     }
 }
 
-private fun lerp(start: Float, end: Float, fraction: Float): Float = start + (end - start) * fraction
-
-/** 圆形播放/暂停按钮：点击时播放键与暂停键随背景色一起形变。 */
 @Composable
-fun PlayPauseMorphButton(
-    isPlaying: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    sizeDp: Int = 40
-) {
-    val morphProgress by animateFloatAsState(
-        targetValue = if (isPlaying) 1f else 0f,
-        animationSpec = tween(durationMillis = 500),
-        label = "morph"
-    )
-    val bgColor by animateColorAsState(
-        targetValue = if (isPlaying) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.secondary
-        },
-        animationSpec = tween(durationMillis = 500),
-        label = "morphBg"
-    )
-    Box(
-        modifier = modifier
-            .size(sizeDp.dp)
-            .clip(CircleShape)
-            .background(color = bgColor, shape = CircleShape)
-            .clickableWithFeedback { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        PlayPauseMorph(progress = morphProgress, iconBoxDp = sizeDp)
+fun PlayPauseMorphButton(isPlaying: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, sizeDp: Int = 40) {
+    val reduce = LocalReduceMotion.current
+    val colors = MaterialTheme.colorScheme
+    val morph = animateFloatAsState(if (isPlaying) 1f else 0f,
+        if (reduce) snap() else AppMotion.icon(), label = "playPauseShape")
+    val background = animateColorAsState(if (isPlaying) colors.primary else colors.secondary,
+        if (reduce) snap() else AppMotion.icon(), label = "playPauseBackground")
+    val ink = if (isPlaying) colors.onPrimary else colors.onSecondary
+    Box(modifier.size(sizeDp.dp).semantics {
+        role = Role.Button
+        contentDescription = if (isPlaying) "暂停" else "播放"
+    }.clip(CircleShape).drawBehind { drawCircle(background.value) }
+        .clickableWithFeedback(onClick = onClick), contentAlignment = Alignment.Center) {
+        PlayPauseGlyph({ morph.value }, sizeDp, { ink })
     }
 }

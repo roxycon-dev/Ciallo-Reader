@@ -154,7 +154,7 @@ fun AppBottomTabBar(
                     .background(if (index == selectedIndex) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
                     .pullOutClickable { onTabSelected(index) }.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box {
-                        Icon(if (index == selectedIndex) item.selectedIcon else item.icon, null, modifier = Modifier.size(24.dp))
+                        com.example.ui.components.AnimatedStateIcon(if (index == selectedIndex) item.selectedIcon else item.icon, null, modifier = Modifier.size(24.dp))
                         item.badgeCount?.takeIf { it > 0 }?.let { Text(it.toString(), fontSize = 9.sp, modifier = Modifier.align(Alignment.TopEnd)) }
                     }
                     Text(item.label, fontSize = 11.sp)
@@ -460,7 +460,7 @@ private fun TabIcon(
     // B7：Tab 此前 indication = null 且无任何按压缩放/触觉，点下去完全没有手感。
     val isPressed by interactionSource.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.88f else 1f,
+        targetValue = if (isPressed) com.example.ui.feedback.AppMotion.CONTROL_PRESS_SCALE else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessHigh
@@ -478,11 +478,8 @@ private fun TabIcon(
     }
 
     val iconScale by animateFloatAsState(
-        targetValue = if (selected) 1.15f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioHighBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
+        targetValue = if (selected) 1.06f else 1f,
+        animationSpec = com.example.ui.feedback.AppMotion.settle(),
         label = "tabIconScale"
     )
     // ③ 未选中项压到 0.48（原 0.55），让选中项更突出；
@@ -504,7 +501,7 @@ private fun TabIcon(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box {
-            Icon(
+            com.example.ui.components.AnimatedStateIcon(
                 imageVector = if (selected) item.selectedIcon else item.icon,
                 contentDescription = item.label,
                 tint = iconColor,

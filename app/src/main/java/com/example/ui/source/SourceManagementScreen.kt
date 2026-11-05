@@ -802,7 +802,7 @@ private fun SourceQuickTilesRow(
         ) {
             SourceQuickTile(
                 icon = {
-                    Icon(
+                    com.example.ui.components.AnimatedStateIcon(
                         imageVector = if (loggedIn) Icons.Filled.CheckCircle else Icons.Filled.Lock,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,

@@ -44,3 +44,10 @@ API 33+ 有实际来源的弹层在原窗口 RenderEffect 内使用单次内容�
 `PaperSpring` 为解析解，每帧一次消费真实经过时间，不截断为 33 ms，也不补算多步。原弹簧参数、64 行逆表、128 前向分段和单次内容采样保留；固定的 flutter/shade 三角项复用。
 
 `LocalPaperBackdropOwner` 对应窗口生命周期，避免面板子节点或嵌套窗口另起背景时钟。原生模糊、原生压暗及 Compose scrim 共用 `paperBackdropProgress` 的端点平滑曲线。`WindowBackdrop.kt` 中 `GlassWindowBlur` 采用各有效 owner 的最大半径，半物理像素去重并缓存至多 128 个 RenderEffect；子窗口退场不清父窗口。禁止重新在内容 SideEffect 中每次重组重置原生 dim、布局及窗口动画参数。
+
+## 1.5.14 统一状态反馈
+
+- `StateIcons.kt` 提供有限时长的状态图标、原位旋转的展开箭头和选中标记。动态图标在过渡时只暴露当前无障碍语义。
+- `AppProgressIndicator.kt` 统一已知/未知进度：圆角端点、主题色、平滑进度，单个绘制时钟。`ChasingDots.kt` 保留旧入口兼容，旧 `ChasingDotsTransition.kt` 已删除。
+- `PullOutIconButton` 与 `AppIconButton` 共用按压反馈；纸面来源矩形不随内部图标缩放。`PlayPauseMorph.kt` 复用路径并在绘制阶段读取进度。尺寸、材质、毛玻璃、抽纸形变及纸面弹簧参数继续保留。
+- 动效令牌集中到 `AppMotion`，减少动态效果时跳过循环和形变。徽标必须放在图标按钮圆形裁剪层之外，并使用稳定布局槽，不用负偏移把文字挤出容器。

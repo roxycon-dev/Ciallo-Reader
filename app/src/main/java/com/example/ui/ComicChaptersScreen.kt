@@ -996,7 +996,7 @@ private fun ChapterCardSpec(
             ) {
                 when {
                     selecting -> CheckCircleSpec(checked = checked)
-                    downloading -> CircularProgressIndicator(
+                    downloading -> com.example.ui.components.AppProgressIndicator(
                         progress = { downloadProgress.coerceIn(0f, 1f) },
                         modifier = Modifier.size(20.dp),
                         strokeWidth = 2.5.dp,
@@ -1249,32 +1249,7 @@ private fun GodCardSpec(
 
 @Composable
 private fun CheckCircleSpec(checked: Boolean, uncheckedStroke: Color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)) {
-    Box(
-        modifier = Modifier.size(22.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (checked) {
-            Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .background(MintPrimary, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Filled.Check,
-                    contentDescription = "已选中",
-                    tint = Color.White,
-                    modifier = Modifier.size(14.dp),
-                )
-            }
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .border(1.5.dp, uncheckedStroke, CircleShape),
-            )
-        }
-    }
+    com.example.ui.components.AnimatedSelectionMark(checked, uncheckedColor = uncheckedStroke)
 }
 
 /* ══════════════ 页面头部（旧版样式：封面模糊背景 + 封面卡 + 标题 + 徽章 + 作者 + 简介） ══════════════ */
@@ -1492,7 +1467,7 @@ private fun DownloadProgressOverlay(
                     .padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                CircularProgressIndicator(
+                com.example.ui.components.AppProgressIndicator(
                     progress = { progress.coerceIn(0f, 1f) },
                     modifier = Modifier.size(26.dp),
                     strokeWidth = 3.dp,

@@ -2809,7 +2809,7 @@ private fun BookActionSheet(
                                     .padding(horizontal = 20.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                CircularProgressIndicator(
+                                com.example.ui.components.AppProgressIndicator(
                                     modifier = Modifier.size(18.dp),
                                     strokeWidth = 2.dp,
                                     color = primary

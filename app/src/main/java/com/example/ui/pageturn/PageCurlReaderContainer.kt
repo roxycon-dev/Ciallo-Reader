@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -372,13 +371,13 @@ fun PageCurlReaderContainer(
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator(
+                                com.example.ui.components.AppProgressIndicator(
                                     progress = { (pullValue / 80f).coerceIn(0f, 1f) },
                                     strokeWidth = 3.dp,
                                     color = if (charged) MintGold else MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(40.dp)
                                 )
-                                Icon(
+                                com.example.ui.components.AnimatedStateIcon(
                                     imageVector = if (isCurrentBookmarked) Icons.Filled.BookmarkBorder else Icons.Filled.Bookmark,
                                     contentDescription = null,
                                     tint = if (charged) MintGold else MaterialTheme.colorScheme.onSurfaceVariant,

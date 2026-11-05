@@ -2228,7 +2228,7 @@ fun SearchResultFavoriteButton(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.84f else 1f,
+        targetValue = if (pressed) com.example.ui.feedback.AppMotion.ICON_PRESS_SCALE else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMedium,
@@ -2252,7 +2252,7 @@ fun SearchResultFavoriteButton(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
+        com.example.ui.components.AnimatedStateIcon(
             imageVector = if (favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
             contentDescription = if (favorite) "取消喜欢" else "加入我喜欢的",
             tint = tint,
@@ -2430,7 +2430,7 @@ fun LibraryBookCard(
                                     .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
                                     .padding(horizontal = 10.dp, vertical = 4.dp)
                             ) {
-                                CircularProgressIndicator(
+                                com.example.ui.components.AppProgressIndicator(
                                     modifier = Modifier.size(14.dp),
                                     strokeWidth = 2.dp,
                                     color = MaterialTheme.colorScheme.secondary
@@ -2455,7 +2455,7 @@ fun LibraryBookCard(
                                         if (isPaused) {
                                             Icon(Icons.Default.Pause, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(14.dp))
                                         } else {
-                                            CircularProgressIndicator(
+                                            com.example.ui.components.AppProgressIndicator(
                                                 progress = {
                                                     (state as? DownloadState.Downloading)?.progress ?: 0f
                                                 },
@@ -3083,7 +3083,7 @@ private fun AggregateSourceError(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
+            com.example.ui.components.AnimatedStateIcon(
                 imageVector = if (timedOut) Icons.Default.Info else Icons.Default.ErrorOutline,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,

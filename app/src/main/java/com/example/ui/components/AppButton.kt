@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -165,12 +164,10 @@ fun AppActionButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
+    val reduceMotion = com.example.ui.feedback.LocalReduceMotion.current
     val scale = animateFloatAsState(
-        targetValue = if (isPressed && enabled) 0.96f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessHigh
-        ),
+        targetValue = if (isPressed && enabled) com.example.ui.feedback.AppMotion.CONTROL_PRESS_SCALE else 1f,
+        animationSpec = if (reduceMotion) androidx.compose.animation.core.snap() else com.example.ui.feedback.AppMotion.press(),
         label = "appButtonScale"
     )
     // Only Primary draws this shadow. Other variants previously ran an unread spring.
@@ -347,7 +344,7 @@ fun AppActionButton(
             label = "appButtonContent"
         ) { isLoading ->
             if (isLoading) {
-                CircularProgressIndicator(
+                com.example.ui.components.AppProgressIndicator(
                     modifier = Modifier.size(buttonSize.iconSize),
                     color = contentColor,
                     strokeWidth = 2.dp

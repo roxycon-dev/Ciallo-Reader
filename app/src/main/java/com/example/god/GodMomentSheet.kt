@@ -59,7 +59,6 @@ import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -878,7 +877,7 @@ private fun GodTiltCover(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-                loading -> CircularProgressIndicator(
+                loading -> com.example.ui.components.AppProgressIndicator(
                     modifier = Modifier.size(28.dp),
                     strokeWidth = 2.5.dp,
                     color = GodGold.LightMid,
@@ -1252,7 +1251,7 @@ fun GodShineButton(
                     },
             )
             if (loading) {
-                CircularProgressIndicator(
+                com.example.ui.components.AppProgressIndicator(
                     modifier = Modifier.size(20.dp),
                     strokeWidth = 2.5.dp,
                     color = Color(0xFF3B2A08),

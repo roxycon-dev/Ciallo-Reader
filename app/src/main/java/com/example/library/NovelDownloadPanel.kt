@@ -1,9 +1,7 @@
 package com.example.library
 
 import com.example.ui.components.PullOutTextButton
-import com.example.ui.components.PullOutIconButton
 import com.example.ui.glasskit.GlassKitCard
-import com.example.ui.feedback.LocalReduceMotion
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,38 +35,6 @@ internal fun downloadStatusLabel(state: DownloadState): String = when (state) {
     is DownloadState.Success -> "已完成"
     is DownloadState.Error -> "下载失败"
     DownloadState.Idle -> "等待中"
-}
-
-@Composable
-internal fun DownloadCenterEntry(model: LibraryViewModel, onClick: () -> Unit) {
-    val novels by model.downloadStates.collectAsStateWithLifecycle()
-    val comics by model.comicDownloadTasks.collectAsStateWithLifecycle()
-    val active=novels.values.filter { it is DownloadState.Pending || it is DownloadState.Downloading } +
-        comics.values.filter { it.status==ComicDownloadStatus.DOWNLOADING }.map { DownloadState.Downloading(0,0,it.progress) }
-    val paused=novels.values.any { it is DownloadState.Paused } || comics.values.any { it.status==ComicDownloadStatus.PAUSED }
-    val failed=novels.values.any { it is DownloadState.Error } || comics.values.any { it.status==ComicDownloadStatus.FAILED }
-    val completed=novels.values.any { it is DownloadState.Success } || comics.values.any { it.status==ComicDownloadStatus.SUCCESS }
-    val tint=if(failed && active.isEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-    val determinate=active.isNotEmpty() && active.all { it is DownloadState.Downloading && (it.totalBytes>0 || it.progress>0) }
-    val progress=active.filterIsInstance<DownloadState.Downloading>().map { it.progress }.average().toFloat().takeIf { it.isFinite() } ?: 0f
-    val reduce=LocalReduceMotion.current
-    PullOutIconButton(onClick=onClick,modifier=Modifier.testTag("download_tasks_entry")) {
-        BadgedBox(badge={if(active.isNotEmpty()) Badge { Text(active.size.toString()) }}) {
-            Box(Modifier.size(32.dp),contentAlignment=Alignment.Center) {
-                if(active.isNotEmpty()) {
-                    if(determinate || reduce) CircularProgressIndicator(progress={if(determinate) progress.coerceIn(0f,1f) else .25f},modifier=Modifier.fillMaxSize(),strokeWidth=2.dp)
-                    else CircularProgressIndicator(Modifier.fillMaxSize(),strokeWidth=2.dp)
-                }
-                Icon(when {
-                    active.isNotEmpty() -> Icons.Default.Download
-                    failed -> Icons.Default.ErrorOutline
-                    paused -> Icons.Default.Pause
-                    completed -> Icons.Default.Check
-                    else -> Icons.Default.Download
-                },"下载任务",tint=tint,modifier=Modifier.size(if(active.isEmpty()) 24.dp else 18.dp))
-            }
-        }
-    }
 }
 
 @Composable
@@ -151,13 +117,18 @@ private fun DownloadTaskRow(title:String, subtitle:String, state:DownloadState,
                 Text(title,maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.titleSmall)
                 Text(subtitle,maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            when(state) {
-                is DownloadState.Downloading -> IconButton(onClick=onPause) { Icon(Icons.Default.Pause,"暂停") }
-                is DownloadState.Paused -> IconButton(onClick=onResume) { Icon(Icons.Default.PlayArrow,"继续") }
-                is DownloadState.Error -> IconButton(onClick=onRetry) { Icon(Icons.Default.Refresh,"重新获取并重试") }
-                else -> Unit
+            val action = when (state) {
+                is DownloadState.Downloading -> Triple(Icons.Default.Pause, "暂停", onPause)
+                is DownloadState.Paused -> Triple(Icons.Default.PlayArrow, "继续", onResume)
+                is DownloadState.Error -> Triple(Icons.Default.Refresh, "重新获取并重试", onRetry)
+                else -> null
             }
-            IconButton(onClick=onDelete) { Icon(Icons.Default.Close,"删除记录") }
+            action?.let { (icon, description, click) ->
+                com.example.ui.components.PullOutIconButton(onClick = click) {
+                    com.example.ui.components.AnimatedStateIcon(icon, description)
+                }
+            }
+            com.example.ui.components.PullOutIconButton(onClick = onDelete) { Icon(Icons.Default.Close, "删除记录") }
         }
         Text(if(state is DownloadState.Error) DownloadWorker.failureMessage(state.message) else downloadStatusLabel(state),maxLines=2,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodySmall,
             color=if(state is DownloadState.Error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)

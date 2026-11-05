@@ -455,14 +455,14 @@ fun PageTurnContainer(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier.size(32.dp)
                         ) {
-                            CircularProgressIndicator(
+                            com.example.ui.components.AppProgressIndicator(
                                 progress = { pullProgress },
                                 modifier = Modifier.fillMaxSize(),
                                 color = if (isCharged) MintGold else MintPrimary,
                                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
                                 strokeWidth = 3.dp
                             )
-                            Icon(
+                            com.example.ui.components.AnimatedStateIcon(
                                 imageVector = if (isBookmarked) Icons.Filled.BookmarkRemove else Icons.Filled.BookmarkAdded,
                                 contentDescription = null,
                                 tint = if (isCharged) MintGold else MintPrimary,

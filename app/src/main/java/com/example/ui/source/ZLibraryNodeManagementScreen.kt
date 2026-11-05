@@ -456,7 +456,7 @@ private fun NodeCard(
                     Spacer(modifier = Modifier.height(2.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (isTesting) {
-                            CircularProgressIndicator(
+                            com.example.ui.components.AppProgressIndicator(
                                 modifier = Modifier.size(14.dp),
                                 strokeWidth = 2.dp,
                                 color = MintPrimary

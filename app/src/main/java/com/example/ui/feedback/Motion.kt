@@ -21,6 +21,13 @@ import androidx.compose.ui.platform.LocalContext
  * - 触觉分级：selection / light / medium / heavy / success，设置里可关。
  */
 object AppMotion {
+    const val ICON_MS = 240
+    const val PROGRESS_MS = 220
+    const val PROGRESS_CYCLE_MS = 1400
+    const val FEEDBACK_HOLD_MS = 950L
+    const val ICON_PRESS_SCALE = .92f
+    const val CONTROL_PRESS_SCALE = .96f
+    fun <T> icon() = androidx.compose.animation.core.tween<T>(ICON_MS, easing = easeOutCubic)
     const val PRESS_MS = 110
     const val CONTENT_MS = 200
     const val PAGE_MS = 280

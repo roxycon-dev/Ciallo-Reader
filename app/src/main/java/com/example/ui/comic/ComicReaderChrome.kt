@@ -1,5 +1,9 @@
 package com.example.ui.comic
 
+import androidx.compose.ui.composed
+
+import androidx.compose.ui.graphics.graphicsLayer
+
 import com.example.ui.components.PullOutIconButton
 import com.example.ui.components.PullOutDropdownMenuItem
 import com.example.ui.components.PullOutDropdownMenu
@@ -36,6 +40,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -652,19 +657,24 @@ internal fun ChromeIconButton(
     tint: Color = TextPrimary.copy(alpha = 0.92f),
     onClick: () -> Unit,
 ) {
-    Box(
-        Modifier
-            .size(44.dp)
-            .clip(CircleShape)
-            .clickableNoRipple(onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(icon, desc, tint = tint, modifier = Modifier.size(22.dp))
+    val interaction = androidx.compose.runtime.remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val reduce = com.example.ui.feedback.LocalReduceMotion.current
+    val scale = androidx.compose.animation.core.animateFloatAsState(
+        if (pressed) com.example.ui.feedback.AppMotion.ICON_PRESS_SCALE else 1f,
+        if (reduce) androidx.compose.animation.core.snap() else com.example.ui.feedback.AppMotion.press(), label = "chromePress")
+    Box(Modifier.size(44.dp).clip(CircleShape).pullOutClickable(
+        interactionSource = interaction, indication = null, onClick = onClick), contentAlignment = Alignment.Center) {
+        com.example.ui.components.AnimatedStateIcon(icon, desc, tint = tint, modifier = Modifier.size(22.dp)
+            .graphicsLayer { scaleX = scale.value; scaleY = scale.value })
     }
 }
 
 internal fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier =
-    this.pullOutClickable(interactionSource = MutableInteractionSource(), indication = null, onClick = onClick)
+    this.composed {
+        val interaction = androidx.compose.runtime.remember { MutableInteractionSource() }
+        this.pullOutClickable(interactionSource = interaction, indication = null, onClick = onClick)
+    }
 
 /** 分段选择器（id 由调用方定义）。
  *  FlowRow 流式布局：每项按文字实际宽度占位，一行放不下自动换行——
