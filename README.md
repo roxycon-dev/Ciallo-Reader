@@ -11,7 +11,7 @@
 
 [🌐 产品主页](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.5.14 更新说明](docs/release-1.5.14-2026-11-05.md) ·
+[1.5.15 更新说明](docs/release-1.5.15-2026-11-06.md) ·
 [查看截图](#界面预览) ·
 [全部功能](#功能亮点) ·
 [提交问题或建议](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -27,7 +27,7 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 **English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
 
-**1.5.14 / 256 · 统一状态反馈**：下载入口恢复常态箭头，完成时短暂确认；修复数量徽标裁切。收藏、书签、播放/暂停、展开箭头、选择和加载指示共用更一致的动效与主题色，保留毛玻璃和抽纸主视觉。[更新说明](docs/release-1.5.14-2026-11-05.md)。
+**1.5.15 / 257 · 爱丽丝书屋与自动备份**：新增内置书源「爱丽丝书屋」，多线路自动切选、搜索与整本 EPUB；发现页接入日／周／月／总榜单与分类目录。新增自动备份与空书架一键恢复，卸载重装不再丢书源和已下载的书。[更新说明](docs/release-1.5.15-2026-11-06.md)。
 
 **1.5.13 / 255 · 抽纸过渡优化**：保留原有形变和弹簧手感，修复掉帧时动画被拉长的问题；背景模糊与压暗随窗口同步淡入淡出，多层窗口分别保留效果。详见 [更新说明](docs/release-1.5.13-2026-11-05.md)。
 

@@ -2,7 +2,7 @@
 
 > 本文档的目标：让一个**对项目一无所知的 AI / 开发者**，不联网、不翻源码，只读本文档即可快速掌握整个项目的结构、每个文件的作用、以及每个模块用到的核心算法，从而能快速上手改代码、修 bug、加功能。
 >
-> **校准基准**：2026-11-06 · 1.5.14 / 256；发布代码 bf678f5a，验证及发布回执见第 91 章。
+> **校准基准**：2026-11-06 · 1.5.15 / 257；发布代码与验证见第 94 章。
 > `app` 模块：**443 个生产 Kotlin 文件**（另有 4 个 Java 文件）；JVM 测试 **212 文件 / 1257 项定义**；设备测试 **74 文件 / 249 项定义**。定义数不等于执行数；本轮性能专项见第 90 章；1.4.14 的快速输入回归见第 81 章；历史指定小说下载、图片解码及阅读器验收见第 75 章。
 >
 > **覆盖度声明**：第 4 章逐包逐文件覆盖了 `app`、`backdrop`、`liquidglass-core`、`liquidglass-compose`
@@ -57,14 +57,14 @@ python novel-reader/.workbuddy/stale_check.py
 
 | 项目 | 内容 |
 | --- | --- |
-| 当前版本 | **1.5.14 / 256**；本轮验证及发布见第 91 章 |
+| 当前版本 | **1.5.15 / 257**；本轮验证及发布见第 94 章 |
 | applicationId | `com.aistudio.novelreader.kxmpzq` |
 | 最低系统 | Android 7.0（API 24）；compileSdk / targetSdk = 35 |
 | 技术栈 | Kotlin + Compose M3 + Room + WorkManager + OkHttp + Jsoup + Coil + QuickJS（quickjs-kt）+ **ONNX Runtime**（漫画 OCR / 画质增强 CPU 推理）+ **Cronet**（JS 源网络）+ Brotli + core-splashscreen |
 | 架构 | MVVM + StateFlow + Repository；单 Activity + Navigation Compose |
 | 构建 | Gradle Kotlin DSL，4 模块工程 |
-| APK | 当前 1.5.14 / 256；签名、升级与发布回执见第 91 章 |
-| 测试 | 212 个 JVM 文件 / 1257 项定义；74 个设备文件 / 249 项定义；本轮 46 项 JVM、18 项设备定点回归通过，见第 91 章 |
+| APK | 当前 1.5.15 / 257；签名、升级与发布回执见第 94 章 |
+| 测试 | 212 个 JVM 文件 / 1257 项定义；74 个设备文件 / 249 项定义；本轮 20 项 JVM 用例通过、8 类历史用例与基线同结果，见第 94 章 |
 
 **已移除的依赖**（历史文档里还写着，注意别再用）：`moshi-kotlin`（连 `kotlin-reflect`，序列化点改 `org.json` 手写）、`flexible-bottomsheet-material3`（从未使用）、ML Kit（国内设备无 GMS，在线兜底改自定义 AI 接口 / 在线翻译）。
 
@@ -5117,3 +5117,30 @@ Commit `8d6e3847b1a8fd53df9adbee0ded4f89701bdc4e`；Release 413307957：https://
 - 备份不能写在 `filesDir` 或 `filesDir/downloads` 的旁边图省事：那正是卸载时被删的位置，必须落到 SAF 公共目录才有意义。
 - SAF 的 `createDocument` 遇到同名会自动改名成 “-1”，所以写之前先按名字删掉旧的，否则保留份数统计会失真。
 - 用 PowerShell 批量改 `gradle.properties` 时带进了 BOM，`android.useAndroidX` 首行失效、报「contains AndroidX dependencies」；改文件必须写无 BOM 的 UTF-8。
+## 94. 第一百轮执行（2026-11-06：发布 1.5.15 爱丽丝书屋与自动备份）
+
+### 已落地
+
+- 版本 1.5.15 / 257；README 版本行与更新说明链接、CHANGELOG、`app/build.gradle.kts` 四处同步；新增 `docs/release-1.5.15-2026-11-06.md` 与 `docs/qa-1.5.15.json`。
+- 正式包用交接的等值私钥签署：证书 SHA-256 `3ee5fb4018a00457eb24cbbfc43e78967d24069b760a5d386d6c9454b3770794`，与 `signing/release-cert.sha256` 一致；`verifyReleaseSigning` 通过，v2 + v3 签名，arm64-v8a，29,342,012 B。
+- `verify-apk-upgrade.py` 对官方 1.5.14 判定通过：签名相同、包名一致、版本递增，满足覆盖升级。
+- 交接材料只解出 `.p12` 与密码文件；原 DPAPI 密码文件绑定创建它的机器账户（`ConvertTo-SecureString` 与 `ProtectedData.Unprotect` 两种作用域均报 `Key not valid for use in specified state`），因此改用对方重导出的可跨机器私钥副本。
+
+### 验证
+
+- 新增与相关用例 20 项全通过（AliceSwParser 7、AliceSwDiscover 7、AliceSwDiscovery 2、AutoBackupNaming 4）。
+- 回归对比：同一组 8 个过滤类（64 项）在 `af6e1b5` 与本次分支结果完全一致，都是 4 项既有失败（RealEpubPipelineTest、ComicCatalogOrderReconciliationTest ×2、DiscoverUiTest），没有新增失败。
+- 全量 JVM 套件 667 项运行时 23 项失败，报错为 `Not a Conscrypt trust manager`、`Could not initialize class JsSourceRepo`、Robolectric 拉取 `android-all-instrumented` 失败，属本机环境与依赖下载问题，未计入本次回归。
+- 未连接实体手机，书源阅读、整本下载、自动备份与恢复均未设备验收。
+
+### 未做
+
+- 没有设备端回归，也没有 1.5.14 → 1.5.15 的真机覆盖安装与数据保留验证（仅静态校验）。
+- 没有补「重装后自动找回备份目录」：卸载会回收 SAF 授权，仍需用户重新选目录或挑文件。
+- 未改动下载后端、数据库 schema 与既有书源行为。
+
+### 踩到的坑
+
+- DPAPI 密码文件不能跨机器/账户使用，报错是 `Key not valid for use in specified state`；只换 keystore 密码重新导出 `.p12`（证书不变）就能跨机器。
+- `git push` 到 github.com:443 在本网络持续超时（api.github.com 正常），只能用 Git Data API 重建提交：tree 哈希与本地一致即证明内容相同，提交哈希会因元数据不同而不同。
+- 本机工作区路径过长会让 CMake/ninja 报 260 字符限制，构建需从 `C:\cr` 目录联接进行；SDK 放在 `C:\asdk`。

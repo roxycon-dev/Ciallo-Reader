@@ -1,0 +1,59 @@
+{
+  "version": "1.5.15",
+  "versionCode": 257,
+  "environment": "Windows 11, JDK 17 (Temurin 17.0.20.1), Android SDK platform 35 / build-tools 35.0.0 / NDK 29.0.14206865, Gradle 9.3.0 + AGP 8.7.3",
+  "jvm": {
+    "tests": 20,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": [
+      "AliceSwParserTest (7)",
+      "AliceSwDiscoverTest (7)",
+      "AliceSwDiscoveryTest (2)",
+      "AutoBackupNamingTest (4)"
+    ]
+  },
+  "regressionParity": {
+    "filter": "SourceTlsVerificationTest, JsSourcePayloadTest, ComicCatalogOrderReconciliationTest, GodMomentSheetComposeTest, SourceTransportFormatTest, EpubCompatibilityTest, DiscoverUiTest, RealEpubPipelineTest",
+    "baselineCommit": "af6e1b5",
+    "baseline": "64 tests, 4 failed",
+    "current": "64 tests, 4 failed",
+    "verdict": "same pre-existing failures, no new regressions"
+  },
+  "fullSuiteObservation": {
+    "tests": 667,
+    "failed": 23,
+    "cause": "Conscrypt trust manager unavailable on plain JVM, JsSourceRepo static init cascade, Robolectric android-all-instrumented download failure",
+    "status": "environmental, not counted as this change's regression"
+  },
+  "device": {
+    "planned": 0,
+    "failures": 0,
+    "note": "未连接实体手机；书源阅读、整本下载、自动备份与恢复均未设备验收"
+  },
+  "dependenciesAdded": [],
+  "apk": {
+    "apk": "Ciallo-Reader-v1.5.15.apk",
+    "package": "com.aistudio.novelreader.kxmpzq",
+    "versionName": "1.5.15",
+    "versionCode": 257,
+    "bytes": 29342012,
+    "sha256": "3aeeb64267c8e3284523c663de7105cea34fa550d767dcb2a5f212fd4d238014",
+    "compileSdk": 35,
+    "minSdk": 24,
+    "targetSdk": 35,
+    "abis": ["arm64-v8a"],
+    "signatureSchemes": ["v2", "v3"],
+    "certificateSha256": "3ee5fb4018a00457eb24cbbfc43e78967d24069b760a5d386d6c9454b3770794",
+    "certificateMatchesPinned": true,
+    "signatureAndUpgrade": "passed vs official 1.5.14 (verify-apk-upgrade.py)"
+  },
+  "knownLimitations": [
+    "爱丽丝书屋搜索只返回首 10 条（源站无分页参数）",
+    "热议/点击维度无数据，发现页会明确提示",
+    "自动备份需用户授权公共目录；卸载会回收 SAF 授权，重装后需重新选择目录或直接挑选备份文件",
+    "未实体机验证"
+  ],
+  "publicationDateAsiaShanghai": "2026-11-06"
+}
