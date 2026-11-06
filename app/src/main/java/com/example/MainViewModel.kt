@@ -474,6 +474,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val streak = prefs.calculateStreak()
             _streakDays.value = streak
         }
+        launchStartupTask("auto-backup") {
+            offerRestoreIfNeeded()
+        }
     }
 
     val allBooks: StateFlow<List<Book>> = repository.allBooks
@@ -542,6 +545,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _importStatusMessage = MutableStateFlow<String?>(null)
     val importStatusMessage: StateFlow<String?> = _importStatusMessage
+
+    /** 自动备份：写在用户选的公共目录，卸载重装后靠它把书源和下载的书找回来。 */
+    val autoBackup by lazy { com.example.data.AutoBackup(application, backupManager) }
+
+    private val _restoreOffer = MutableStateFlow<com.example.data.AutoBackupStore.Snapshot?>(null)
+    val restoreOffer: StateFlow<com.example.data.AutoBackupStore.Snapshot?> = _restoreOffer
+
+    private val _restoreBusy = MutableStateFlow(false)
+    val restoreBusy: StateFlow<Boolean> = _restoreBusy
+
+    /** 恢复完成后自增，界面据此重载书源列表。 */
+    private val _restoreCompleted = MutableStateFlow(0)
+    val restoreCompleted: StateFlow<Int> = _restoreCompleted
 
     private var cachedMetadataList = emptyList<Chapter>()
     private var chapterMapping: LogicalChapterBook? = null
@@ -774,6 +790,66 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearImportMessage() {
         _importStatusMessage.value = null
+    }
+
+    /** 启动阶段调用：能自动备份就备一份，书架为空且目录里有备份时提示恢复。 */
+    suspend fun offerRestoreIfNeeded() {
+        runCatching { autoBackup.runIfDue() }
+        runCatching {
+            if (autoBackup.shouldOfferRestore()) {
+                val latest = autoBackup.latest() ?: return@runCatching
+                autoBackup.markRestoreOffered()
+                _restoreOffer.value = latest
+            }
+        }
+    }
+
+    fun dismissRestoreOffer() {
+        if (_restoreBusy.value) return
+        _restoreOffer.value = null
+    }
+
+    /** 用备份目录里最新的那份覆盖恢复。 */
+    fun acceptRestore() {
+        val snapshot = _restoreOffer.value ?: return
+        _restoreOffer.value = null
+        viewModelScope.launch(Dispatchers.IO) {
+            _restoreBusy.value = true
+            try {
+                autoBackup.restore(snapshot.name)
+                _restoreCompleted.value += 1
+                _importStatusMessage.value = "已从备份恢复"
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                _importStatusMessage.value = e.message ?: "恢复失败"
+            } finally {
+                _restoreBusy.value = false
+            }
+        }
+    }
+
+    /** 用户自己挑备份文件（重装后目录授权已失效时走这里）。 */
+    fun restoreFromUri(uri: android.net.Uri) {
+        _restoreOffer.value = null
+        viewModelScope.launch(Dispatchers.IO) {
+            _restoreBusy.value = true
+            val temp = java.io.File(getApplication<android.app.Application>().filesDir, "picked_restore_${System.nanoTime()}.zip")
+            try {
+                val copied = getApplication<android.app.Application>().contentResolver.openInputStream(uri)?.use { input ->
+                    temp.outputStream().use { out -> input.copyTo(out) }
+                }
+                require(copied != null && temp.length() > 0L) { "无法读取所选备份文件" }
+                backupManager.importArchive(temp, com.example.transfer.ImportMode.REPLACE)
+                _restoreCompleted.value += 1
+                _importStatusMessage.value = "已从备份恢复"
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                _importStatusMessage.value = e.message ?: "恢复失败"
+            } finally {
+                runCatching { temp.delete() }
+                _restoreBusy.value = false
+            }
+        }
     }
 
     private val progressSaveJobs = java.util.concurrent.ConcurrentHashMap<Int, Job>()

@@ -5063,3 +5063,57 @@ Commit `8d6e3847b1a8fd53df9adbee0ded4f89701bdc4e`；Release 413307957：https://
 第 91 章正式包：1.5.14 / 256，ARM64，29312108 B，SHA-256 912baf6fce761df7c19336597c848a454f34e910527c1659bb3b15235feac684。沿用现有新签名，与官方 1.5.13 的覆盖升级条件、ZIP CRC、16 KiB 对齐均通过；738 个生产输入与冻结清单一致。
 
 第 91 章发布回执（北京时间 2026-11-06）：发布代码 bf678f5ae363e948e9dc4c7e47d7a94c7fff79b0 已推送 origin/main，标签 v1.5.14；GitHub Release https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.14 已公开并核对 latest。APK 29312108 B，服务端 digest 与本地 SHA-256 912baf6fce761df7c19336597c848a454f34e910527c1659bb3b15235feac684 一致；公开下载 HTTP 200，重新下载大小与摘要匹配。README、CHANGELOG、QA 摘要与指导文件已同步。工作树为同级 novel-reader-unified，分支 codex/download-indicator-motion；原目录草稿保留。首次创建与发布阶段的 GitHub 502/500 经重试恢复，没有重复创建或改写旧版。
+## 92. 第九十八轮执行（2026-11-06：新增爱丽丝书屋书源，多线路切换）
+
+### 已落地
+
+- 新增内置书源「爱丽丝书屋」（`alicesw`）：搜索、详情、完整目录、在线正文、整本 EPUB 打包下载，源站免登录。实现照书阁（`xbookcn`）同一套约定：`ComicSource` + `UpdatableNovelSource`、`supportOnlineText = true`、`supportComic = false`，因此归入小说源并接入整本下载与更新流程。
+- 线路池 `AliceSwEndpoints`：预置 `alicesw4/3/2/1.homes` 与 `alicesw.com`，并行探活、首条真实站点即用、失败线路冷却 5 分钟、成功线路缓存 12 小时；全部预置失败时到线路页（`alicesw1.quest`、`als1007.space`）抽倒写域名做动态发现。选路校验"页面确实含 `alicesw` 或「爱丽丝书屋」"，挡掉 `.cn`/`.icu` 这类 302 到广告跳转的停放域名。
+- 发现页 `AliceSwDiscover`：榜单四档（日／周／月／总，对应 `/other/rank_hits/order/hits*.html`）、最近更新（`/all/order/update_time+desc.html`）与 2–3 位数字 id 的分类目录（`/lists/{id}.html`）。站点这三处共用 `div.rec_rullist > ul` 卡片，名次取 `li.one` 不按热度重排，热度进 `clicks`、日期进 `updatedAt`；排行页固定 50 条不分页，分类与更新页按 `?page=N` 续页。首页挂的 `/lists/31156.html` 等多位数字链接实测是失效页，不当分类。
+- 整本下载 `AliceSwEpub`：逐章抓正文打包 EPUB，下载前后比对目录，缺章或目录变化即整本作废；`DownloadWorker` 增加对应分支，`WholeBookNovelSources` 加入 `alicesw`。
+- 注册位置与书阁一致（`LibraryViewModel`），始终启用，不跟随成人源开关。
+
+### 验证
+
+- 解析层 9 项 JVM 用例（`AliceSwParserTest`、`AliceSwDiscoveryTest`）用 kotlinc + JUnit4 真编译真执行，`OK (9 tests)`；页面快照为 2026-11-06 实测抓取，正文文字已替换为中性占位，DOM 结构（含 158 段、11 节目录、封面、标签、复合信息行）保持原样。复跑命令 `python ciallo/tools/verify_parsers.py`。
+- 首轮 10 项跑出 2 项失败、第三轮 1 项失败，都是真实缺陷：搜索标题带 `1. ` 序号、详情「字 数：… · 章 节：11」只解析出第一个字段、封面 `https://` 分支被 `when` 漏判。三处已修复，未以改断言迁就实现。
+- 装好 JDK 17 + Android SDK（platform 35、build-tools 35.0.0、NDK 29）后真编译：`:app:testDebugUnitTest --tests "*AliceSw*"` 三项套件 16 项用例全通过（Parser 7、Discovery 2、Discover 7），`:app:assembleDebug` 出包 50.35 MB。CMake 因工作区路径超 260 字符失败，SDK 移到 `C:\asdk` 并在 `C:\cr` 建目录联接后通过；`gradle.properties` 的 `org.gradle.java.home`（作者机器路径）构建时临时改指 JDK 17，完成即还原。
+
+### 未做
+
+- 未上真机：搜索→详情→阅读→整本下载入库、发现页排行／分类切换都没有在设备上跑过；APK 只验证到编译、单测、包结构与签名（v2，Debug 证书）合法。
+- 搜索只返回首 10 条：源站无分页参数，`&page=2` 返回同一批结果，属站点能力限制，未做客户端拼接。
+- 未改 README 的"验证样书"表格与 CHANGELOG、未升版本号：这些条目记录的是设备端已验收结果，需真机跑完整本下载后再补。
+
+### 踩到的坑
+
+- 同一天里同一域名会先 TLS RST 再 200，单次探测失败不能当长期结论，只能进冷却队列；`.cn`/`.icu` 能完成 TLS 握手却是广告跳转，必须靠页面特征而不是"能连上"判定可用。
+- 作品 id 与书库 id 不同（`/novel/35647.html` 的章节在 `/book/37187/...`），章节标识必须存 `书库id/章节hash`；用作品 id 拼正文地址会 404。
+- 本机 kotlinc 2.0.21 在 JDK 25 下解析版本号直接崩，改用 2.2.20；编译器与依赖混在同一 classpath（两份 kotlin-stdlib）会报 "Exception while generating code" 的假故障，需把 compiler 与 lib 分开；缺 `org.jetbrains:annotations` 会以 NoClassDefFoundError 的形式伪装成后端崩溃。
+## 93. 第九十九轮执行（2026-11-06：自动备份与一键恢复）
+
+### 已落地
+
+- 新增 `AutoBackupStore`：把备份写到用户用系统文件选择器授权的 SAF 目录（`takePersistableUriPermission` 持久化），文件名 `ciallo-auto-yyyyMMdd-HHmmss.zip`，只保留最近 3 份，同一秒重复写入不会堆出同名副本。
+- 新增 `AutoBackup`：到期判断（开关 + 有目录 + 满 12 小时）、备份、恢复、是否需要提示。备份文件与「保存本地备份」同格式，恢复直接走 `importArchive(REPLACE)`，不新增数据格式。
+- 启动阶段 `launchStartupTask("auto-backup")` 跑一次自动备份；书架为空且目录里有备份时弹恢复提示（每个安装只提示一次），恢复完成后重载自定义 JS 书源。
+- 「设备互传与备份」新增自动备份卡片：开关、选择/更换目录、立即备份、上次备份时间与目录名。
+- 刻意取舍：只在书库非空时备份（免得空备份顶掉可用备份）；默认不导出受保护内容；自动备份不写进便携设置（SAF 授权是设备本地状态）。
+
+### 验证
+
+- `:app:testDebugUnitTest --tests "*AutoBackup*" --tests "*AliceSw*" :app:assembleDebug` 通过，`AutoBackupNamingTest` 4 项（命名可排序、重复调用稳定、间隔判定、保留份数）+ 爱丽丝书屋 16 项，共 20 项全绿；APK 52.25 MB。
+- 顺带核了发布签名：GitHub 上 1.5.11–1.5.14 四个正式包证书都是 `3ee5fb40…0794`，与 `signing/release-cert.sha256` 一致，说明 1.5.6 之后官方包之间可覆盖升级；签名冲突只发生在旧密钥包、第三方重签包和调试包（包名 `.debug`，是另一个应用）。
+- 未上真机：SAF 授权、写入、读取、删除只有编译与代码审查背书；`takePersistableUriPermission` 在部分厂商系统可能被回收，需真机确认「杀进程后仍可备份」；恢复后书源、书架、进度是否齐全也需实测。
+
+### 未做
+
+- 重装后无法自动找回：卸载会清掉 SAF 授权，App 不知道上次备份目录在哪。重装路径仍是「设备互传与备份 → 打开已有备份或分享文件」，或在设置里重新选目录。
+- 没有做「从常见公共目录自动查找备份」的扫描入口，留作后续。
+- 未改版本号、未发布。
+
+### 踩到的坑
+
+- 备份不能写在 `filesDir` 或 `filesDir/downloads` 的旁边图省事：那正是卸载时被删的位置，必须落到 SAF 公共目录才有意义。
+- SAF 的 `createDocument` 遇到同名会自动改名成 “-1”，所以写之前先按名字删掉旧的，否则保留份数统计会失真。
+- 用 PowerShell 批量改 `gradle.properties` 时带进了 BOM，`android.useAndroidX` 首行失效、报「contains AndroidX dependencies」；改文件必须写无 BOM 的 UTF-8。

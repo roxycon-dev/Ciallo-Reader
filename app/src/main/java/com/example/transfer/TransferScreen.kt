@@ -143,6 +143,16 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
             Toast.makeText(context,"备份已保存",Toast.LENGTH_SHORT).show()
         }catch(e:Exception){if(e is kotlinx.coroutines.CancellationException)throw e;localError=e.message}finally{localProgress=null}
     } }
+    // 自动备份：目录选在公共位置，卸载重装后书源与下载的书还能靠它回来。
+    val autoStore=remember { com.example.data.AutoBackupStore(context) }
+    val autoBackup=remember(backup) { com.example.data.AutoBackup(context,backup) }
+    var autoEnabled by remember { mutableStateOf(autoStore.enabled) }
+    var autoFolder by remember { mutableStateOf(autoStore.treeLabel()) }
+    var autoLast by remember { mutableStateOf(autoStore.lastSuccessAt) }
+    val pickAutoFolder=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if(uri!=null && autoBackup.attachFolder(uri)) { autoStore.enabled=true; autoEnabled=true; autoFolder=autoBackup.treeLabel() }
+        else if(uri!=null) localError="无法写入所选目录，请换一个文件夹"
+    }
     val open=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if(uri!=null)manager.openShared(uri) }
     val activeState=localProgress?.let { TransferSessionState(it.phase,progress=it,message=it.message) }?:state
     val colors=MaterialTheme.colorScheme
@@ -277,6 +287,34 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                     PullOutTextButton(enabled=selected.categories.isNotEmpty(),onClick={save.launch("Ciallo-backup.ciallo")}) {Text("保存本地备份")}
                     PullOutTextButton(onClick={open.launch(arrayOf(TRANSFER_MIME,"application/zip","application/octet-stream"))}) {Text("打开已有备份或分享文件")}
                     if(backup.hasMigrationUndo())PullOutTextButton(onClick={scope.launch {try {localProgress=TransferProgress(TransferPhase.IMPORTING);backup.undoMigration();restart()}catch(e:Exception){localError=e.message}finally{localProgress=null}}}) {Text("撤销最近一次整机迁移")}
+                } } }
+                item(key="auto_backup",contentType="backup") {GlassKitCard(Modifier.fillMaxWidth()) {Column(Modifier.padding(D.SpaceLg),verticalArrangement=Arrangement.spacedBy(D.SpaceSm)) {
+                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("自动备份",style=MaterialTheme.typography.titleMedium)
+                            Text(
+                                when {
+                                    !autoEnabled -> "关闭后不会自动备份；卸载重装会丢掉书源和下载的书"
+                                    autoFolder==null -> "已开启，还需要选择一个备份目录"
+                                    autoLast>0L -> "已开启 · ${java.text.SimpleDateFormat("MM-dd HH:mm",java.util.Locale.US).format(java.util.Date(autoLast))} · ${autoFolder}"
+                                    else -> "已开启，尚未备份 · ${autoFolder}"
+                                },
+                                style=MaterialTheme.typography.labelMedium,color=colors.onSurfaceVariant
+                            )
+                        }
+                        AppSwitch(checked=autoEnabled,onCheckedChange={autoEnabled=it;autoStore.enabled=it})
+                    }
+                    Row(horizontalArrangement=Arrangement.spacedBy(D.SpaceSm)) {
+                        PullOutTextButton(onClick={pickAutoFolder.launch(null)}) {Text(if(autoFolder==null)"选择备份目录" else "更换目录")}
+                        PullOutTextButton(enabled=autoEnabled && autoFolder!=null,onClick={scope.launch {
+                            try { localProgress=TransferProgress(TransferPhase.PREPARING)
+                                val outcome=autoBackup.backupNow()
+                                autoLast=autoStore.lastSuccessAt
+                                if(outcome.ok)Toast.makeText(context,outcome.message,Toast.LENGTH_SHORT).show() else localError=outcome.message
+                            }catch(e:Exception){if(e is kotlinx.coroutines.CancellationException)throw e;localError=e.message}finally{localProgress=null}
+                        }}) {Text("立即备份")}
+                    }
+                    Text("备份内容与「保存本地备份」相同，保留最近 3 份。",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
                 } } }
             }
             if(state.busy && state.phase!=TransferPhase.AWAITING_CONFIRMATION)item(key="cancel",contentType="cancel") {

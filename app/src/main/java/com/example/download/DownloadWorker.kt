@@ -157,6 +157,18 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                             dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), 0L, null, progress=completed.toFloat()/count)
                         }
                         resume.writeText(JSONObject().put("url", task.downloadUrl).put("complete", false).toString())
+                    } else if (task.sourceId == com.example.source.impl.AliceSwSource.SOURCE_ID) {
+                        // 爱丽丝书屋同样没有整本文件：逐章抓取后在本地打包 EPUB。
+                        require(format == "epub") { "此源整本下载格式为 EPUB" }
+                        AliceSwEpub.write(
+                            com.example.source.impl.AliceSwSource(context), task.downloadUrl, temp
+                        ) { completed, count ->
+                            currentCoroutineContext().ensureActive()
+                            DownloadProgressBroadcaster.updateState(taskId,
+                                DownloadState.Downloading(temp.length(), 0L, completed.toFloat() / count))
+                            dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), 0L, null, progress=completed.toFloat()/count)
+                        }
+                        resume.writeText(JSONObject().put("url", task.downloadUrl).put("complete", false).toString())
                     } else {
                     var offset = temp.takeIf { it.isFile }?.length() ?: 0L
                     val validator = metadata?.optString("validator")?.takeIf { it.isNotBlank() }

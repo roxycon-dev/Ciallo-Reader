@@ -514,6 +514,48 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     }
+                    val restoreOffer by viewModel.restoreOffer.collectAsStateWithLifecycle()
+                    val restoreBusy by viewModel.restoreBusy.collectAsStateWithLifecycle()
+                    val restoreCompleted by viewModel.restoreCompleted.collectAsStateWithLifecycle()
+                    val restoreFilePicker = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.OpenDocument()
+                    ) { uri ->
+                        if (uri != null) viewModel.restoreFromUri(uri)
+                    }
+                    LaunchedEffect(restoreCompleted) {
+                        if (restoreCompleted > 0) {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                libraryViewModel.sourceManager.reloadAfterTransfer()
+                                com.example.source.js.JsSourceRepo.loadCached(application, viewModel.prefs.showAdultSources)
+                                    .forEach { libraryViewModel.sourceManager.registerSource(it, defaultEnabled = true) }
+                            }
+                        }
+                    }
+                    restoreOffer?.let { snapshot ->
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { viewModel.dismissRestoreOffer() },
+                            title = { androidx.compose.material3.Text("发现可恢复的备份") },
+                            text = {
+                                androidx.compose.material3.Text(
+                                    "书架是空的。备份目录里有 ${snapshot.name}（${
+                                        android.text.format.DateUtils.getRelativeTimeSpanString(snapshot.modifiedAt)
+                                    }），要恢复到这台设备吗？"
+                                )
+                            },
+                            confirmButton = {
+                                androidx.compose.material3.TextButton(
+                                    enabled = !restoreBusy,
+                                    onClick = { viewModel.acceptRestore() }
+                                ) { androidx.compose.material3.Text(if (restoreBusy) "正在恢复…" else "立即恢复") }
+                            },
+                            dismissButton = {
+                                androidx.compose.material3.TextButton(
+                                    enabled = !restoreBusy,
+                                    onClick = { viewModel.dismissRestoreOffer() }
+                                ) { androidx.compose.material3.Text("稍后") }
+                            }
+                        )
+                    }
                     val fileLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.OpenMultipleDocuments()
                     ) { uris ->

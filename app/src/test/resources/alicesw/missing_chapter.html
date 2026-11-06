@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+    <meta name="robots" content="noindex,nofollow"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <title>提示信息</title>
+    <link rel="stylesheet" href="/public/static/cute-alert/style.css"/>
+</head>
+<body>
+<script src="/public/static/cute-alert/cute-alert.js"></script>
+<script>
+    let code = 0;
+    let msg = "\u7ae0\u8282\u4e0d\u5b58\u5728\u6216\u83b7\u53d6\u5931\u8d25\uff01";
+    let btn = "\u8df3\u8f6c";
+    let type;
+    if (code) {
+        type = 'success';
+    } else {
+        type = 'error';
+    }
+    let href = "\/";
+    cuteAlert({
+        type: type,
+        title: msg,
+        message: '',
+        buttonText: btn
+    }).then(() => {
+        location.href = href;
+    });
+    let wait = 3;
+    let interval = setInterval(function () {
+        if (--wait <= 0) {
+            clearInterval(interval);
+            location.href = href;
+        }
+    }, 1000);
+</script>
+</body>
+</html>
