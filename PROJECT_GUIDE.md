@@ -4711,6 +4711,8 @@ Commit `8d6e3847b1a8fd53df9adbee0ded4f89701bdc4e`；Release 413307957：https://
 - API 29+ HardwareRenderer / ImageReader 异步接收，后台像素打包、裁边与阴影；UI 显式负责 RenderNode 记录 / 提交 / 清理，离屏目标空闲释放。混色限定实际纸面覆盖范围，省略零贡献纹理提交，顶点直接写浮点数组。
 - 通用 clickableWithFeedback 把来源锚点放到按压 graphicsLayer 外层；按压缩放与透明度一起进入来源纹理，避免接管时亮度突跳；普通按压外观不变。
 
+- 发布回执（北京时间 2026-11-06）：标签 `v1.5.15`，Release https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.15，代码 `7e975bd437eb8b53faa032437ea2c74876b8146`；服务端摘要与本地一致，公开 APK 重新下载 HTTP 200，字节数 29342012 与 SHA-256 `3aeeb64267c8e3284523c663de7105cea34fa550d767dcb2a5f212fd4d238014` 匹配。
+
 ### 验证与发布
 
 - 24 项有保存 XML 的相关 JVM 用例分批通过；最后仅复验几何、像素打包与关闭器 3 项。没有重跑全量套件。

@@ -43,8 +43,13 @@
     "compileSdk": 35,
     "minSdk": 24,
     "targetSdk": 35,
-    "abis": ["arm64-v8a"],
-    "signatureSchemes": ["v2", "v3"],
+    "abis": [
+      "arm64-v8a"
+    ],
+    "signatureSchemes": [
+      "v2",
+      "v3"
+    ],
     "certificateSha256": "3ee5fb4018a00457eb24cbbfc43e78967d24069b760a5d386d6c9454b3770794",
     "certificateMatchesPinned": true,
     "signatureAndUpgrade": "passed vs official 1.5.14 (verify-apk-upgrade.py)"
@@ -55,5 +60,28 @@
     "自动备份需用户授权公共目录；卸载会回收 SAF 授权，重装后需重新选择目录或直接挑选备份文件",
     "未实体机验证"
   ],
-  "publicationDateAsiaShanghai": "2026-11-06"
+  "publicationDateAsiaShanghai": "2026-11-06",
+  "githubPublication": {
+    "releaseUrl": "https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.15",
+    "releaseId": 436535611,
+    "tag": "v1.5.15",
+    "commit": "7e975bd437eb8b53faa032437ea2c74876b8146",
+    "latestVerified": true,
+    "draft": false,
+    "assets": [
+      {
+        "name": "Ciallo-Reader-v1.5.15.apk",
+        "bytes": 29342012,
+        "digest": "sha256:3aeeb64267c8e3284523c663de7105cea34fa550d767dcb2a5f212fd4d238014",
+        "url": "https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.15/Ciallo-Reader-v1.5.15.apk"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "bytes": 93,
+        "digest": "sha256:476ca5741ffe1574e3ebd33554c76a9e5e479e4497df28dfb5bd26b98c080e1f",
+        "url": "https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.15/SHA256SUMS.txt"
+      }
+    ]
+  },
+  "publicDownload": "HTTP 200, byte count and SHA-256 match"
 }

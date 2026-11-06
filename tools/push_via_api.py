@@ -58,10 +58,14 @@ print("本地 HEAD:", head, "父提交:", parent, "tree:", tree)
 ref = api("GET", "/git/ref/heads/main")
 remote = ref["object"]["sha"]
 print("远端 main:", remote)
-if remote != parent:
-    raise SystemExit(f"远端已变化（{remote}），先同步再推")
 if remote == head:
     raise SystemExit("远端已包含该提交")
+base_tree = api("GET", f"/git/commits/{remote}")["tree"]["sha"]
+local_parent_tree = git("rev-parse", "HEAD^^{tree}")
+if remote != parent and base_tree != local_parent_tree:
+    raise SystemExit(f"远端已变化且内容不同（{remote}），先同步再推")
+if remote != parent:
+    print("远端父提交哈希不同但 tree 一致（之前用 API 重建过），按远端为父继续", remote[:10])
 
 status = git("diff", "--name-status", parent, head).splitlines()
 changes = []
@@ -80,7 +84,7 @@ for kind, path in changes:
     entries.append({"path": path, "mode": "100644", "type": "blob", "sha": sha})
     print("  blob", path, "->", sha[:10])
 
-new_tree = api("POST", "/git/trees", {"base_tree": api("GET", f"/git/commits/{remote}")["tree"]["sha"], "tree": entries})
+new_tree = api("POST", "/git/trees", {"base_tree": base_tree, "tree": entries})
 print("新 tree:", new_tree["sha"], "(本地一致)" if new_tree["sha"] == tree else "(与本地不同!)")
 
 commit = api("POST", "/git/commits", {
