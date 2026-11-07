@@ -241,6 +241,9 @@ Many changes in this project come from issues: bug reports, new sources, and rep
     <td align="center" width="112">
       <a href="https://github.com/Yang-p-c"><img src="https://github.com/Yang-p-c.png" width="64" height="64" alt="Yang-p-c avatar" /><br /><sub><b>Yang-p-c</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/5">#5</a></sub>
     </td>
+    <td align="center" width="112">
+      <a href="https://github.com/jesonab"><img src="https://github.com/jesonab.png" width="64" height="64" alt="jesonab avatar" /><br /><sub><b>jesonab</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/6">#6</a></sub>
+    </td>
   </tr>
 </table>
 

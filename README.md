@@ -271,6 +271,9 @@ Windows 可使用 gradlew.bat :app:assembleDebug。遇到问题或想提出功�
     <td align="center" width="112">
       <a href="https://github.com/Yang-p-c"><img src="https://github.com/Yang-p-c.png" width="64" height="64" alt="Yang-p-c 的头像" /><br /><sub><b>Yang-p-c</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/5">#5</a></sub>
     </td>
+    <td align="center" width="112">
+      <a href="https://github.com/jesonab"><img src="https://github.com/jesonab.png" width="64" height="64" alt="jesonab 的头像" /><br /><sub><b>jesonab</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/6">#6</a></sub>
+    </td>
   </tr>
 </table>
 
