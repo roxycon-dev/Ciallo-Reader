@@ -2,7 +2,7 @@
 
 > 本文档的目标：让一个**对项目一无所知的 AI / 开发者**，不联网、不翻源码，只读本文档即可快速掌握整个项目的结构、每个文件的作用、以及每个模块用到的核心算法，从而能快速上手改代码、修 bug、加功能。
 >
-> **校准基准**：2026-11-06 · 1.5.15 / 257；发布代码与验证见第 94 章。
+> **校准基准**：2026-11-07 · 1.5.16 / 258；本轮修复见第 95 章，上一版发布回执见第 94 章。
 > `app` 模块：**443 个生产 Kotlin 文件**（另有 4 个 Java 文件）；JVM 测试 **212 文件 / 1257 项定义**；设备测试 **74 文件 / 249 项定义**。定义数不等于执行数；本轮性能专项见第 90 章；1.4.14 的快速输入回归见第 81 章；历史指定小说下载、图片解码及阅读器验收见第 75 章。
 >
 > **覆盖度声明**：第 4 章逐包逐文件覆盖了 `app`、`backdrop`、`liquidglass-core`、`liquidglass-compose`
@@ -57,14 +57,14 @@ python novel-reader/.workbuddy/stale_check.py
 
 | 项目 | 内容 |
 | --- | --- |
-| 当前版本 | **1.5.15 / 257**；本轮验证及发布见第 94 章 |
+| 当前版本 | **1.5.16 / 258**；本轮修复与验证见第 95 章 |
 | applicationId | `com.aistudio.novelreader.kxmpzq` |
 | 最低系统 | Android 7.0（API 24）；compileSdk / targetSdk = 35 |
 | 技术栈 | Kotlin + Compose M3 + Room + WorkManager + OkHttp + Jsoup + Coil + QuickJS（quickjs-kt）+ **ONNX Runtime**（漫画 OCR / 画质增强 CPU 推理）+ **Cronet**（JS 源网络）+ Brotli + core-splashscreen |
 | 架构 | MVVM + StateFlow + Repository；单 Activity + Navigation Compose |
 | 构建 | Gradle Kotlin DSL，4 模块工程 |
-| APK | 当前 1.5.15 / 257；签名、升级与发布回执见第 94 章 |
-| 测试 | 212 个 JVM 文件 / 1257 项定义；74 个设备文件 / 249 项定义；本轮 20 项 JVM 用例通过、8 类历史用例与基线同结果，见第 94 章 |
+| APK | 当前 1.5.16 / 258；签名、升级与发布回执见第 95 章 |
+| 测试 | 212 个 JVM 文件 / 1257 项定义；74 个设备文件 / 249 项定义；本轮新增 3 项插图回归，data/components 共 189 项中 187 项通过、2 项既有失败与改动前一致，见第 95 章 |
 
 **已移除的依赖**（历史文档里还写着，注意别再用）：`moshi-kotlin`（连 `kotlin-reflect`，序列化点改 `org.json` 手写）、`flexible-bottomsheet-material3`（从未使用）、ML Kit（国内设备无 GMS，在线兜底改自定义 AI 接口 / 在线翻译）。
 
@@ -597,10 +597,10 @@ python novel-reader/.workbuddy/stale_check.py
 `MascotAnimationController.kt`（102 行，`MascotEvent` 事件总线 + `MascotOverlay`）、`MascotSpriteSheet.kt`（49 行，七套姿态 + `MascotMood`）、`BookCompleteAnimation.kt`（182 行，含礼花）、`BookmarkHappyAnimation.kt`（101 行）、`DeleteSadAnimation.kt`（101 行）、`MoveBookAnimation.kt`（101 行）。
 素材：`res/drawable/roxy_*.xml`（矢量五姿态）+ `res/drawable-nodpi/mascot_*.webp`。
 
-#### 4.7.10 `ui/reader/` 小说内嵌图（2 文件 / 610 行，2026-09 新增）
+#### 4.7.10 `ui/reader/` 小说内嵌图（2 文件 / 711 行，2026-09 新增）
 
-`NovelInlineImages.kt`（437 行）：`TOKEN_REGEX` 解析正文里的图片 token、`NovelImageCache`（内存 + EPUB 原包流）、`epubImageRef` 解码 `file://...!条目` 引用、`ImageHitRegistry`、`splitIntoBlocks`（图文混排切块）、`buildAnnotatedWithImages`、`displaySize`。
-`NovelImageFullscreen.kt`（248 行）：全屏查看 + `saveNovelImageToGallery`，解码失败显示明确错误。
+`NovelInlineImages.kt`（462 行）：`TOKEN_REGEX` 解析正文里的图片 token、`NovelImageCache`（内存 + EPUB 原包流）、`epubImageRef` 解码 `file://...!条目` 引用、`ImageHitRegistry`、`splitIntoBlocks`（图文混排切块，`densityScale` 决定小图原尺寸上限）、`buildAnnotatedWithImages`、`displaySize`（宽度取 `min(内容宽, 原图宽 × 密度)`）。
+`NovelImageFullscreen.kt`（249 行）：全屏查看 + `saveNovelImageToGallery`，解码失败显示明确错误；位图状态随 path 重建。
 
 #### 4.7.11 `ui/privacy/` 隐私（1 文件 / 633 行）
 
@@ -1250,7 +1250,7 @@ python novel-reader/.workbuddy/stale_check.py
 | 文件 | 行数 | 作用 |
 | --- | --- | --- |
 | `values-v29/themes.xml`（`app/src/main/res/values-v29/themes.xml`） | 10 | 仅 Android 10+ 的强制深色属性，继承公共基础样式 |
-| `ProducedState.kt`（`app/src/main/java/com/example/ui/components/ProducedState.kt`） | 15 | 标准 remember + LaunchedEffect 异步状态封装，保留旧值并按 key 取消/重启 |
+| `ProducedState.kt`（`app/src/main/java/com/example/ui/components/ProducedState.kt`） | 35 | `rememberAsyncState`（保留旧值，按 key 取消/重启）与 `rememberKeyedAsyncState`（值随 key 重建；位图等"旧值即错误"的场景必须用它） |
 | `ReleaseCompatibilityTest.kt`（`app/src/test/java/com/example/ui/components/ReleaseCompatibilityTest.kt`） | 60 | API 28 弹窗清理、producer 重启及音量键按下/抬起回归 |
 | `EpubCompatibilityTest.kt`（`app/src/test/java/com/example/data/EpubCompatibilityTest.kt`） | 49 | 根目录/嵌套 OPF 的 EPUB 正文目录导入及越界路径拒绝回归 |
 
@@ -5146,3 +5146,28 @@ Commit `8d6e3847b1a8fd53df9adbee0ded4f89701bdc4e`；Release 413307957：https://
 - DPAPI 密码文件不能跨机器/账户使用，报错是 `Key not valid for use in specified state`；只换 keystore 密码重新导出 `.p12`（证书不变）就能跨机器。
 - `git push` 到 github.com:443 在本网络持续超时（api.github.com 正常），只能用 Git Data API 重建提交：tree 哈希与本地一致即证明内容相同，提交哈希会因元数据不同而不同。
 - 本机工作区路径过长会让 CMake/ninja 报 260 字符限制，构建需从 `C:\cr` 目录联接进行；SDK 放在 `C:\asdk`。
+
+## 95. 第一百零一轮执行（2026-11-07：EPUB 连续插图与小图尺寸修复，1.5.16）
+
+### 已落地
+
+- 复现 issue #6（"在 EPUB 里的插画问题（极简模式下）"）：用官方 **1.5.14 / 256** 与 **1.5.15 / 257** 正式包 + D 盘 AVD `ciallo_security_api35`，在真机文件《无职转生 01》上复现"连续插图全部显示第一张、点开大图却是对的、退出大图后前后几张又都变成刚看的那张"。
+- 定位根因：`NovelInlineImage` 的位图状态挂在组合槽位上。`rememberAsyncState` 用无 key 的 `remember { mutableStateOf(initialValue) }`（保留旧值是它的设计目标），生产者又有 `if (value == null)` 守卫；而极简质量走 `PageTurnContainer` 的极简分支（`PageTurnContainer.kt:114-142`，只组合 `currentContent()`、没有 `key(pageKey)`），翻页时同一槽位换绑新的图片路径 → 永远沿用上一张位图。非极简之所以正常：仿真卷页由 vendored `PageCurl`（`PageCurl.kt:81` 用 `key(updatedCurrent, forward, backward)` 包住内容）在换页时整棵子树重建，覆盖/平移/渐变按 `dragPx` 三分支切换同样会重建。
+- 修复（`ui/components/ProducedState.kt`）：新增 `rememberKeyedAsyncState`——值随 key 重建；`ui/reader/NovelInlineImages.kt` 的 `NovelInlineImage` 与 `ui/reader/NovelImageFullscreen.kt` 全屏查看器改用它。`rememberAsyncState` 语义保持不变，其它调用点不受影响。
+- 修复小图被放大（同 issue 第 2 点）：`NovelInlineImages.displaySize` 增加密度参数，宽度上限取 `min(内容宽, 原图宽 × 屏幕密度)`；`splitIntoBlocks` 透传 `densityScale`，`ReaderPagination`（两处）与 `ReaderScreen`（分页/滚动两处）都传实际密度，保证"测量 == 渲染"。EPUB 里 20×20 的分隔符 `note.png` 从整栏方块恢复为 40×40（320dpi）。
+- 回归新增：`ImageBlockSplitTest.smallImageKeepsItsNaturalWidthInsteadOfFillingTheColumn`、`NovelInlineImageRenderTest.inlineImageDecodesTheNewPathWhenTheSlotIsRebound`（旧代码下失败，修复后通过）、`ReleaseCompatibilityTest.keyedProducerDropsThePreviousValueWhenItsKeyChanges`；`PaginationImageHeightTest` 改为传实际 density。
+- 验证矩阵：极简 + 覆盖（极简分支）在 fixture 与真机上逐页正确；均衡 + 仿真/覆盖/平移/渐变、滚动模式各连续 4 张插图全部正确；真机第 5–7 章彩页与第 24–29 章 6 张连续黑白插图逐页核对通过。
+- 版本提升为 **1.5.16 / 258**；`README.md`、`README_EN.md`、`CHANGELOG.md`、`docs/release-1.5.16-2026-11-07.md` 同步。
+
+### 未做
+
+- 未改变 `rememberAsyncState` 的"保留旧值"语义（漫画阅读器、背景图、登录弹窗等仍依赖它避免闪空），只在位图这类"旧值即错误"的场景换用 keyed 版本。
+- 极简分支仍不强制 `key(pageKey)`：位图问题已在图片层根治，加页级 key 会让极简模式每次翻页重建整页（低端机收益为负）。若将来出现非图片的槽位残留状态，再评估。
+- 未测：平板/折叠屏、API 24–30 真机、超大章节（>20 万字）连续插图；设备测试套件未跑。
+
+### 踩到的坑
+
+- GitHub 附件 `01.zip` 在本机不可达（`github.com` / `objects.githubusercontent.com` 全部超时，只有 `api.github.com` 通），先用等价 fixture 复现、再由用户提供原始 EPUB 复核。
+- Robolectric 的 main looper 是暂停的：回归用例要用 `compose.waitForIdle()` 推进一帧，`runOnUiThread {}` 空转不足以让 `LaunchedEffect` + `Dispatchers.IO` 的回写落到缓存。
+- 首次写的回归用例在修复前后都失败（等待方式问题），改成 `waitForIdle` 后先确认"旧代码失败、新代码通过"，避免假绿。
+- `RealEpubPipelineTest`（缺本机真实 EPUB）与 `Round7DataTest.variantBuilder_originalFirst_capAndDedupe` 在改动前后同样失败，属既有环境/数据问题，不计入本轮回归。

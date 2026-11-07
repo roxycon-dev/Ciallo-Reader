@@ -467,8 +467,9 @@ private fun paginateChunk(
     // Keep exact source boundaries instead of allocating an Item and substring per line.
     val items = PaginationItems((chunk.length / 32 + 1).coerceIn(1, 128))
     var blockStart = 0
-    NovelInlineImages.splitIntoBlocks(chunk, params.widthPx.toFloat(), params.pageHeightPx.toFloat())
-        .forEach { block ->
+    NovelInlineImages.splitIntoBlocks(
+        chunk, params.widthPx.toFloat(), params.pageHeightPx.toFloat(), params.density.density
+    ).forEach { block ->
             cancellationCheck()
             when (block) {
                 is NovelInlineImages.InlineBlock.Image -> {
@@ -555,7 +556,9 @@ private fun paginateChunk(
 
 /** 与 RenderSinglePage 的块布局一致，计入首尾字体边界、末尾空行和像素取整。 */
 private fun measurePageHeightPx(text: String, params: LayoutParams): Float =
-    NovelInlineImages.splitIntoBlocks(text, params.widthPx.toFloat(), params.pageHeightPx.toFloat())
+    NovelInlineImages.splitIntoBlocks(
+        text, params.widthPx.toFloat(), params.pageHeightPx.toFloat(), params.density.density
+    )
         .sumOf { block ->
             when (block) {
                 is NovelInlineImages.InlineBlock.Text -> ceil(buildParagraph(block.text, params).height).toInt()

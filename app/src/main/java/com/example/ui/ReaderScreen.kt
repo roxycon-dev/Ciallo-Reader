@@ -2130,7 +2130,9 @@ fun ReaderScreen(
                                                                 text = chunk,
                                                                 contentWidthPx = textWidthPx.toFloat(),
                                                                 // 滚动模式无页高限制，长图自然延展
-                                                                maxHeightPx = Float.MAX_VALUE
+                                                                maxHeightPx = Float.MAX_VALUE,
+                                                                // 小图按原图尺寸显示（与分页测量同一口径）
+                                                                densityScale = scrollDensity.density
                                                             ).forEach { block ->
                                                                 val gb = globalBlockIndex
                                                                 globalBlockIndex++
@@ -4932,7 +4934,9 @@ private fun RenderSinglePage(
                     }
                 }
 
-                NovelInlineImages.splitIntoBlocks(pageText, contentWidthPx, maxImageHeightPx).forEachIndexed { blockIndex, block ->
+                NovelInlineImages.splitIntoBlocks(
+                    pageText, contentWidthPx, maxImageHeightPx, blockDensity.density
+                ).forEachIndexed { blockIndex, block ->
                     when (block) {
                         is com.example.ui.reader.NovelInlineImages.InlineBlock.Image -> {
                             if (registerImageHit) {

@@ -11,7 +11,7 @@ Read local ebooks, novels, and comics in one Android app.
 
 [🌐 Product site](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ Download the latest APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.5.14 release notes](docs/release-1.5.14-2026-11-05.md) ·
+[1.5.16 release notes](docs/release-1.5.16-2026-11-07.md) ·
 [See screenshots](#screenshots) ·
 [Features](#features) ·
 [Report an issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -24,6 +24,8 @@ Read local ebooks, novels, and comics in one Android app.
 </div>
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
+
+**1.5.16 / 258 · Consecutive EPUB illustrations fixed:** Under the minimal render quality every page after the first one kept drawing the previous illustration; images are now keyed by their path, so the inline image and the full-screen viewer always agree. Small EPUB art (dividers, ornaments) is no longer stretched to the full column width. Verified page by page in curl, cover, slide, fade and scroll page turns. [Release notes](docs/release-1.5.16-2026-11-07.md).
 
 **1.5.14 / 256 · Consistent state feedback:** The download entry keeps its navigation arrow, acknowledges fresh completion briefly and shows uncropped counts. Favorites, bookmarks, playback, disclosure, selection and loading share consistent transitions and theme colors. Glass and paper motion remain. [Release notes](docs/release-1.5.14-2026-11-05.md).
 

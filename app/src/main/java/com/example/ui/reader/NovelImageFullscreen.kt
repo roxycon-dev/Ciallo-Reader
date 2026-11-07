@@ -76,7 +76,8 @@ fun NovelImageFullscreenViewer(
     val dismiss = com.example.ui.components.rememberPaperClose(visibility, onDismiss)
     val close = { dismiss {} }
     var loaded by remember(path) { mutableStateOf(false) }
-    val bitmap by com.example.ui.components.rememberAsyncState<android.graphics.Bitmap?>(initialValue = null, path) {
+    // 全屏查看器会被复用去打开另一张图：位图状态同样必须随 path 重建。
+    val bitmap by com.example.ui.components.rememberKeyedAsyncState<android.graphics.Bitmap?>(initialValue = null, path) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 if (path.startsWith("epzip:")) {
