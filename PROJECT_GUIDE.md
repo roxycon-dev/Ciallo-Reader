@@ -5158,6 +5158,9 @@ Commit `8d6e3847b1a8fd53df9adbee0ded4f89701bdc4e`；Release 413307957：https://
 - 回归新增：`ImageBlockSplitTest.smallImageKeepsItsNaturalWidthInsteadOfFillingTheColumn`、`NovelInlineImageRenderTest.inlineImageDecodesTheNewPathWhenTheSlotIsRebound`（旧代码下失败，修复后通过）、`ReleaseCompatibilityTest.keyedProducerDropsThePreviousValueWhenItsKeyChanges`；`PaginationImageHeightTest` 改为传实际 density。
 - 验证矩阵：极简 + 覆盖（极简分支）在 fixture 与真机上逐页正确；均衡 + 仿真/覆盖/平移/渐变、滚动模式各连续 4 张插图全部正确；真机第 5–7 章彩页与第 24–29 章 6 张连续黑白插图逐页核对通过。
 - 版本提升为 **1.5.16 / 258**；`README.md`、`README_EN.md`、`CHANGELOG.md`、`docs/release-1.5.16-2026-11-07.md` 同步。
+- 发布回执（北京时间 2026-11-07）：代码提交 `4887f316` 已推送 `origin/main`（`66513439..4887f316`，快进），标签 `v1.5.16`；GitHub Release <https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.16> 已公开，资产 `Ciallo-Reader-v1.5.16.apk` 29340392 B，SHA-256 `1c0651f631d97dc4de30b0d720165376a99bcba20a25ab51aab590d071d084c7`，服务端 digest 与公开下载复核一致。
+- 正式包用 `tools/build-secure-release.ps1` + 私有 `.p12`/DPAPI 密码构建，证书 `3ee5fb40…0794` 与 `signing/release-cert.sha256` 一致；`tools/verify-apk-upgrade.py` 对 v1.5.14、v1.5.15 均为「满足覆盖升级条件」；模拟器 1.5.14 → 1.5.16 覆盖安装成功，真机文件《无职转生 01》第 24、26 章连续插图各自正确。
+- issue #6 已回复（<https://github.com/roxycon-dev/Ciallo-Reader/issues/6#issuecomment-6707139180>）。
 
 ### 未做
 
