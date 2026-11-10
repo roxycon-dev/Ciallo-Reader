@@ -32,7 +32,7 @@ import java.io.File
 @OptIn(com.github.takahirom.roborazzi.ExperimentalRoborazziApi::class)
 class TabBarMotionTest {
     @get:Rule val compose = createComposeRule()
-    private fun lineCenter(): Float {
+    private fun indicatorCenter(): Float {
         val root = generateSequence(File(requireNotNull(System.getProperty("user.dir")))) { it.parentFile }
             .first { File(it, "gradlew.bat").exists() }
         val file = File(root, "artifacts/multilingual-search-v5/tab-probe.png")
@@ -40,8 +40,14 @@ class TabBarMotionTest {
         compose.onNodeWithTag("app_tab_bar_surface").captureRoboImage(file.absolutePath,
             roborazziOptions = RoborazziOptions(taskType = RoborazziTaskType.Record))
         val pixels = requireNotNull(android.graphics.BitmapFactory.decodeFile(file.absolutePath))
-        val y = 9.coerceAtMost(pixels.height - 1)
-        val xs = (0 until pixels.width).filter { x -> Color(pixels.getPixel(x,y)).luminance() < 0.12f }
+        // Sample inside the rounded indicator but above the tab glyphs.
+        val y = pixels.height / 8
+        val edge = pixels.width / 20
+        val luminance = (edge until pixels.width - edge).associateWith { x ->
+            Color(pixels.getPixel(x, y)).luminance()
+        }
+        val panel = luminance.values.max()
+        val xs = luminance.filterValues { it < panel - 0.045f }.keys
         assertTrue("The indicator must be visible", xs.isNotEmpty())
         return xs.average().toFloat()
     }
@@ -63,7 +69,7 @@ class TabBarMotionTest {
                 }
             }
         } }
-        val before = lineCenter()
+        val before = indicatorCenter()
         val width = compose.onNodeWithTag("app_tab_bar_surface").fetchSemanticsNode().boundsInRoot.width
         screenshot("tab-before.png")
         compose.mainClock.autoAdvance = false
@@ -72,19 +78,19 @@ class TabBarMotionTest {
         compose.waitForIdle()
         compose.mainClock.advanceTimeBy(64)
         compose.waitForIdle()
-        val moving = lineCenter()
-        assertTrue("The line must travel rather than jump: before=$before, moving=$moving, width=$width", moving > before + 1 && moving < width * 0.875f - 1)
+        val moving = indicatorCenter()
+        assertTrue("The indicator must travel between slots: before=$before, moving=$moving, width=$width", moving > before + 1 && moving < width * 0.875f - 1)
         screenshot("tab-moving.png")
         compose.mainClock.advanceTimeBy(2000)
         compose.waitForIdle()
-        val settled = lineCenter()
+        val settled = indicatorCenter()
         assertEquals(width * 0.875f, settled, 2f)
         compose.runOnIdle { collapse.connection().onPreScroll(Offset(0f,-12f), NestedScrollSource.UserInput) }
         compose.mainClock.advanceTimeBy(2000)
         compose.waitForIdle()
         val collapsedWidth = compose.onNodeWithTag("app_tab_bar_surface").fetchSemanticsNode().boundsInRoot.width
         assertEquals(width, collapsedWidth, 0.5f)
-        assertEquals(settled, lineCenter(), 2f)
+        assertEquals(settled, indicatorCenter(), 2f)
         screenshot("tab-collapsed.png")
         compose.mainClock.autoAdvance = true
     }
