@@ -4,6 +4,7 @@
 
 ## 许可与来源
 
+- [Wenku8 Flutter](https://github.com/mikufoxxx/Wenku8_Flutter/tree/ebcd7f1891b54a92fc045c372974d70ec829f10a)，由 mikufoxxx 与贡献者维护。Ciallo 1.6.0 参考其 UI、交互与动效，并将封面飞行、列表重排等实现从 Dart 适配到 Kotlin／Compose。相关版权与许可见[上游 NOTICE](https://github.com/mikufoxxx/Wenku8_Flutter/blob/ebcd7f1891b54a92fc045c372974d70ec829f10a/NOTICE)及其链接的许可证。
 - [MangaJaNai 漫画增强模型](MangaJaNai/README.md)：CC BY-NC 4.0，包含非商业使用限制。
 - [EhTagTranslation 多语言搜索词库](keyword-data.md)：CC BY-NC-SA 3.0 中国大陆。
 - [ncnn 推理库](ncnn/README.md)：BSD 3-Clause 及随附第三方条款。

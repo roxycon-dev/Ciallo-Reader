@@ -13,7 +13,7 @@
 
 ## 鸣谢
 
-特别感谢 [mikufoxxx 与 Wenku8 Flutter 的贡献者](https://github.com/mikufoxxx/Wenku8_Flutter) 开源分享 UI、人机交互和动效实现。档案式排版、玻璃浮层、连续转场及图标反馈为 Ciallo Reader 这次 UI 重构提供了参考和灵感。
+特别感谢 [mikufoxxx 与 Wenku8 Flutter 的贡献者](https://github.com/mikufoxxx/Wenku8_Flutter) 开源分享 UI、人机交互和动效实现。档案式排版、玻璃浮层、连续转场及图标反馈为 Ciallo Reader 这次 UI 重构提供了参考和灵感。 部分动效实现从 Dart 适配到 Kotlin／Compose。[上游源码版本](https://github.com/mikufoxxx/Wenku8_Flutter/tree/ebcd7f1891b54a92fc045c372974d70ec829f10a) · [许可声明](https://github.com/mikufoxxx/Wenku8_Flutter/blob/ebcd7f1891b54a92fc045c372974d70ec829f10a/NOTICE)
 
 感谢 [qianyunli114514](https://github.com/qianyunli114514) 在 [Issue #7](https://github.com/roxycon-dev/Ciallo-Reader/issues/7) 提出平板适配和漫画预加载数量自定义的建议。
 
