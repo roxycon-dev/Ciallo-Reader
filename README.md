@@ -254,9 +254,9 @@ Windows 可使用 gradlew.bat :app:assembleDebug。遇到问题或想提出功�
 
 ## 贡献者与致谢
 
-特别感谢 [mikufoxxx 与 Wenku8 Flutter 的贡献者](https://github.com/mikufoxxx/Wenku8_Flutter) 开源分享 UI、人机交互和动效实现。档案式排版、玻璃浮层、连续转场和图标反馈为这次重构提供了参考与灵感。感谢 [qianyunli114514](https://github.com/qianyunli114514) 在 [Issue #7](https://github.com/roxycon-dev/Ciallo-Reader/issues/7) 提出平板适配和漫画图片预加载数量自定义的建议。
+特别感谢 [mikufoxxx 与 Wenku8 Flutter 的贡献者](https://github.com/mikufoxxx/Wenku8_Flutter) 开源分享 UI、人机交互和动效实现。档案式排版、玻璃浮层、连续转场和图标反馈为这次重构提供了参考与灵感。
 
-项目里的不少改动来自 Issues：报告故障、补充书源、指出排版与兼容性问题。下面是反馈过问题的用户，编号对应各自提出的 issue。
+项目里的不少改动来自 Issues：报告故障、补充书源、指出排版与兼容性问题。下面是反馈过问题的用户，编号对应各自提出的 issue。在此十分感谢！
 
 <table>
   <tr>
