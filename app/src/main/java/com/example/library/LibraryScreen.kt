@@ -6,6 +6,10 @@
 
 package com.example.library
 
+import com.example.ui.wenku.rememberWenkuAccessibility
+import com.example.ui.wenku.WenkuMotion
+import com.example.ui.wenku.wenkuPagePart
+import com.example.ui.wenku.WenkuIconButton
 import com.example.ui.components.pullOutCombinedClickable
 import com.example.ui.components.paperSheetDragHandle
 import com.example.ui.components.PullOutTextButton
@@ -14,6 +18,13 @@ import com.example.ui.components.PullOutAlertDialog
 import com.example.ui.components.PullOutDialog
 import com.example.ui.components.PullOutBottomSheet
 import com.example.ui.components.PullOutVisibility
+import com.example.ui.theme.clickableWithFeedback
+import com.example.ui.wenku.WenkuIcon
+import com.example.ui.wenku.WenkuLoadingHandoff
+import com.example.ui.wenku.WenkuSkeletonBlock
+import com.example.ui.wenku.WenkuSymbol
+import com.example.ui.wenku.WenkuTextButton
+import com.example.ui.wenku.wenkuReveal
 import com.example.ui.components.pullOutClickable
 import com.example.ui.components.catalogCoverMotion
 
@@ -40,6 +51,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.staggeredgrid.items as gridItems
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.rememberScrollState
@@ -103,10 +115,11 @@ import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.*
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.haze
 
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -135,7 +148,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import kotlin.math.max
@@ -146,7 +158,6 @@ import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
 import coil.request.ImageRequest
 import android.webkit.CookieManager
-import android.app.Activity
 import android.widget.Toast
 import com.example.download.DownloadState
 import com.example.source.SearchBook
@@ -159,19 +170,13 @@ import com.example.source.isComicSource
 import com.example.ui.components.CollapsingTabScreenHeader
 import com.example.ui.components.GlassCard
 import com.example.ui.glasskit.GlassKitCard
-import com.example.ui.components.GlassDialogWindowEffect
 import com.example.ui.components.scrollTiltSource
 import com.example.ui.components.AcrylicBottomOverlay
 import com.example.ui.components.PlayPauseMorphButton
-import com.example.ui.components.filmGrain
 import com.example.ui.components.iridescentBorder
-import com.example.ui.components.liquidGlass
 import com.example.ui.components.radialGlassScrim
-import com.example.ui.components.rememberGlassPanelBackdrop
-import com.example.ui.components.rememberIridescentColors
 import com.example.ui.components.rememberThemedGlassBackdrop
 import com.example.ui.components.SourceAvatar
-import com.example.ui.components.ShimmerBox
 import com.example.ui.components.AppActionButton
 import com.example.ui.components.AppButtonSize
 import com.example.ui.components.AppButtonVariant
@@ -201,6 +206,7 @@ fun LibraryScreen(
     onToggleFavorite: (SearchBook, Boolean) -> Unit = { _, _ -> },
     extraBottomPadding: Dp = 0.dp,
     onBack: (() -> Unit)? = null,
+    onOpenDownloads: () -> Unit = {},
 ) {
     val currentSource by viewModel.currentSource.collectAsStateWithLifecycle()
     val aggregateMode by viewModel.aggregateMode.collectAsStateWithLifecycle()
@@ -220,7 +226,8 @@ fun LibraryScreen(
     val availableSources by viewModel.availableSources.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val searchResults = (uiState as? LibraryUiState.SearchResults)?.results ?: emptyList()
-    val isSearching = uiState is LibraryUiState.Searching
+    val isSearching = uiState is LibraryUiState.Searching ||
+        (uiState as? LibraryUiState.SearchResults)?.let { it.loading && it.results.isEmpty() } == true
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val downloadStatesState = viewModel.downloadStates.collectAsStateWithLifecycle()
     val downloadStates by downloadStatesState
@@ -257,7 +264,6 @@ fun LibraryScreen(
     var loginMessage by remember { mutableStateOf("") }
     var loginLoading by remember { mutableStateOf(false) }
     var loginChecked by remember { mutableStateOf(false) }
-    var showDownloadPanel by remember { mutableStateOf(false) }
     var novelDetailBook by remember { mutableStateOf<SearchBook?>(null) }
     var novelDetailLoading by remember { mutableStateOf(false) }
     var novelDetailError by remember { mutableStateOf<String?>(null) }
@@ -334,7 +340,7 @@ fun LibraryScreen(
 
     LaunchedEffect(comicDownloading) {
         if (comicDownloading.isNotEmpty()) {
-            showDownloadPanel = true
+            onOpenDownloads()
         }
     }
 
@@ -518,7 +524,7 @@ fun LibraryScreen(
     }
 
     loginDialogSource?.let { src ->
-        ZLibraryLoginDialog(hazeState = hazeState,
+        ZLibraryLoginDialog(
             source = src,
             onDismiss = { loginDialogSource = null },
             onSuccess = {
@@ -582,14 +588,7 @@ fun LibraryScreen(
                     )
                 }
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(
-                        // 仅在登录弹窗/下载卡片可见时才启用毛玻璃背板，平时滚动不产生模糊开销
-                        if (showLoginDialog || showDownloadPanel) Modifier.haze(hazeState) else Modifier
-                    )
-            ) {
+            Column(modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 1040.dp).fillMaxSize()) {
     // 滚动渐进折叠头部（书库强化版）：fraction 连续驱动副标题淡出→标题缩小→整卡高度归零，
     // 完全收起后零垂直占用；回顶或搜索失焦后按同一路径平滑恢复。
     // 折叠补间与「读取滚动状态」都下沉到 LibraryCollapsingHeader 内部，
@@ -603,17 +602,30 @@ fun LibraryScreen(
         titleColor = glassTitleColor(),
         leading = {
             onBack?.let { back ->
-                PullOutIconButton(onClick = back) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回上一层")
-                }
+                PullOutIconButton(
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "返回上一层",
+                    onClick = back,
+                    glyphSize = 22.dp
+                )
             }
         },
                 trailing = {
                     val activeCount = downloadStates.values.count { it is DownloadState.Pending || it is DownloadState.Downloading } + comicDownloading.size
-                    PullOutTextButton(onClick = { showDownloadPanel = true }, modifier = Modifier.testTag("download_tasks_entry")) {
-                        Icon(Icons.Default.Download, contentDescription = "下载任务", modifier = Modifier.size(DesignTokens.SpaceXl))
-                        Spacer(Modifier.width(DesignTokens.SpaceXs))
-                        Text(if (activeCount > 0) "下载中 $activeCount" else "下载任务")
+                    Box {
+                        WenkuIconButton(
+                            Icons.Filled.Download,
+                            if (activeCount > 0) "下载任务，${activeCount} 项进行中" else "下载任务",
+                            onClick = onOpenDownloads,
+                            modifier = Modifier.testTag("download_tasks_entry"),
+                            wenkuSymbol = WenkuSymbol.Download,
+                        )
+                        if (activeCount > 0) {
+                            Box(
+                                Modifier.align(Alignment.TopEnd).padding(4.dp).size(8.dp)
+                                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+                            )
+                        }
                     }
                 }
             )
@@ -630,23 +642,6 @@ fun LibraryScreen(
                     // （视觉零差异），代价仅是不再跟随键盘做逐帧位移。
                     .windowInsetsPadding(WindowInsets.imeAnimationTarget)
             ) {
-                val visibleDownloads = downloadStates.values.filter { it !is DownloadState.Idle && it !is DownloadState.Success }
-                if (visibleDownloads.isNotEmpty() || comicDownloading.isNotEmpty()) {
-                    Surface(onClick = { showDownloadPanel = true }, color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = RoundedCornerShape(DesignTokens.SpaceComfortable), modifier = Modifier.fillMaxWidth().padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceCompact)
-                            .testTag("download_progress_banner")) {
-                        Row(Modifier.padding(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceMd), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Download, null)
-                            Spacer(Modifier.width(DesignTokens.SpaceTight))
-                            Column(Modifier.weight(1f)) {
-                                Text("下载任务 · ${visibleDownloads.size + comicDownloading.size} 项", fontWeight = FontWeight.SemiBold)
-                                Text(visibleDownloads.firstOrNull()?.let { downloadStatusLabel(it) } ?: "漫画正在下载",
-                                    style = MaterialTheme.typography.bodySmall)
-                            }
-                            Text("查看进度", style = MaterialTheme.typography.labelLarge)
-                        }
-                    }
-                }
                 // 一体化搜索组件：书源入口整合进搜索框左侧（任务书「删除独立书源区域+搜索框重新设计」）
                 Column(modifier = Modifier.padding(horizontal = DesignTokens.SpacePage)) {
                     UnifiedSearchField(
@@ -654,12 +649,16 @@ fun LibraryScreen(
                         onQueryChange = { searchQuery = it },
                         onSearch = { performSearch(searchQuery) },
                         onFocusChanged = { searchFieldFocused = it },
-                        onSourceClick = { showSourceSheet = true },
+                        onSourceClick = {
+                            focusManager.clearFocus()
+                            showSourceSheet = true
+                        },
+                        sourceSheetOpen = showSourceSheet,
                         sourceLabel = if (aggregateMode)
                             if (aggregateKind == "novel") "全部小说" else "全部漫画"
                         else currentSource?.name ?: "书源",
                         searchFocused = searchFieldFocused,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().wenkuPagePart(1)
                     )
 
                     if (errorMessage != null) {
@@ -691,6 +690,24 @@ fun LibraryScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
                 
+                val visibleDownloads = downloadStates.values.filter { it !is DownloadState.Idle && it !is DownloadState.Success }
+                if (visibleDownloads.isNotEmpty() || comicDownloading.isNotEmpty()) {
+                    GlassCard(onClick = onOpenDownloads,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceCompact)
+                            .testTag("download_progress_banner")) {
+                        Row(Modifier.padding(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceMd), verticalAlignment = Alignment.CenterVertically) {
+                            WenkuIcon(WenkuSymbol.Download, size = 22.dp, tint = MaterialTheme.colorScheme.primary, entrance = false)
+                            Spacer(Modifier.width(DesignTokens.SpaceTight))
+                            Column(Modifier.weight(1f)) {
+                                Text("下载任务 · ${visibleDownloads.size + comicDownloading.size} 项", fontWeight = FontWeight.SemiBold)
+                                Text(visibleDownloads.firstOrNull()?.let { downloadStatusLabel(it) } ?: "漫画正在下载",
+                                    style = MaterialTheme.typography.bodySmall)
+                            }
+                            Text("查看进度", style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
+
                 // 面板显隐条件（玻璃外观与动画均保持原有实现，只做了两处不改视觉的提速：
                 // 动画时长 320/280 → 200/180；聚焦期间禁用网格的 animateItemPlacement）
                 val historyPanelVisible =
@@ -723,6 +740,15 @@ fun LibraryScreen(
                     )
                 }
 
+                val hasAggregateResults = (uiState as? LibraryUiState.AggregateResults)?.groups
+                    ?.any { it.books.isNotEmpty() } == true
+                WenkuLoadingHandoff(
+                    loading = isSearching,
+                    contentKey = Triple(currentSource?.id, searchKeywords.firstOrNull(), hasAggregateResults),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    skeleton = { LibrarySearchSkeleton() }
+                ) {
+                Column(Modifier.fillMaxSize()) {
                 if (aggregateMode && uiState is LibraryUiState.AggregateResults) {
                     val agg = uiState as LibraryUiState.AggregateResults
                     // 每源结果预览折叠（任务一）：换搜索词才复位展开组。
@@ -764,7 +790,7 @@ fun LibraryScreen(
                         verticalItemSpacing = 10.dp
                     ) {
                         keywordSearchPreviewItem(keywordPreviewWords, keywordStatus, keywordOrigins, keywordDispatches, keywordProviders, retryKeywordLookup)
-                        agg.groups.forEach { group ->
+                        agg.groups.forEachIndexed { groupIndex, group ->
                             item(
                                 key = "agg_group_header_${group.sourceId}",
                                 contentType = "fullspan",
@@ -774,7 +800,8 @@ fun LibraryScreen(
                                     name = group.sourceName,
                                     loading = group.loading,
                                     resultCount = group.books.size,
-                                    onClick = { showJumpSheet = true }
+                                    onClick = { showJumpSheet = true },
+                                    modifier = Modifier.wenkuReveal(groupIndex)
                                 )
                             }
                             // 已有结果即显示，loading 仅表示后台仍在补充其它语言。
@@ -782,14 +809,15 @@ fun LibraryScreen(
                                 val groupExpanded = expandedGroups[group.sourceId] == true
                                 val visibleBooks = if (groupExpanded) group.books
                                     else group.books.take(AGGREGATE_PREVIEW_COUNT)
-                                gridItems(visibleBooks, key = { "${group.sourceId}_${it.id}" }, contentType = { "book" },
-                                    span = { book -> if (availableSources.any { it.id == book.sourceId && it.isNovelSource }) StaggeredGridItemSpan.FullLine else StaggeredGridItemSpan.SingleLane }) { book ->
+                                gridItemsIndexed(visibleBooks, key = { _, book -> "${group.sourceId}_${book.id}" }, contentType = { _, _ -> "book" },
+                                    span = { _, book -> if (availableSources.any { it.id == book.sourceId && it.isNovelSource }) StaggeredGridItemSpan.FullLine else StaggeredGridItemSpan.SingleLane }) { index, book ->
                                     val bookSource = availableSources.firstOrNull { it.id == book.sourceId }
                                     if (bookSource?.isNovelSource == true) {
                                         NovelSearchCard(book, group.sourceName, if (book.sourceId == "zlibrary") ZLibraryCoverLoader.get(context) else imageLoader,
                                             state = downloadStates[com.example.download.DownloadManager.taskId(book.sourceId, book.id)] ?: DownloadState.Idle,
                                             downloaded = com.example.download.DownloadManager.taskId(book.sourceId, book.id) in downloadedNovelKeys,
-                                            onClick = { novelDetailBook = book })
+                                            onClick = { novelDetailBook = book },
+                                            modifier = Modifier.wenkuReveal(groupIndex + index + 1))
                                     } else {
                                     StaggeredComicCard(
                                         book = book,
@@ -807,8 +835,8 @@ fun LibraryScreen(
                                         // 输入法弹出/收起时 IME insets 动画会持续改变网格高度，
                                         // 若此时保留 animateItemPlacement，每个可见卡片都会跟着做
                                         // 位移动画（几十个动画器同时跑）→ 掉帧。聚焦期间直接跳位。
-                                        modifier = if (searchFieldFocused) Modifier
-                                        else Modifier.animateItemPlacement(),
+                                        modifier = (if (searchFieldFocused) Modifier else Modifier.animateItemPlacement())
+                                            .wenkuReveal(groupIndex + index + 1),
                                         onClick = {
                                             onOpenComic(book)
                                         }
@@ -829,7 +857,7 @@ fun LibraryScreen(
                                 }
                             } else if (group.loading) {
                                 gridItems(List(4) { it }, contentType = { "skeleton" }) { index ->
-                                    ShimmerBox(
+                                    WenkuSkeletonBlock(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .aspectRatio(STAGGER_RATIO_PALETTE[index % STAGGER_RATIO_PALETTE.size])
@@ -920,17 +948,7 @@ fun LibraryScreen(
                         keywordSearchPreviewItem(keywordPreviewWords, keywordStatus, keywordOrigins, keywordDispatches, keywordProviders, retryKeywordLookup)
                         item(key = "search_status", contentType = "search_status") {
                             if (isSearching) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .fillParentMaxHeight(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    ChasingDots(
-                                        size = 52.dp,
-                                        color = MaterialTheme.colorScheme.secondary
-                                    )
-                                }
+                                return@item
                             } else if (uiState is LibraryUiState.Error) {
                                 val error = (uiState as LibraryUiState.Error).error
                                 val (title, desc, action) = when (error) {
@@ -943,47 +961,27 @@ fun LibraryScreen(
                                     is LibraryError.ParseFailed -> Triple("数据解析失败", "返回数据格式异常，无法解析内容", "重试")
                                     else -> Triple("请求超时", error.message ?: "网络请求超时，请重试", "重试")
                                 }
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .fillParentMaxHeight(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    com.example.ui.components.MascotEmptyState(
-                                        mascotResId = com.example.ui.mascot.MascotSpriteSheet.sadDrawable,
-                                        title = title,
-                                        description = desc,
-                                        actionLabel = action,
-                                        onActionClick = {
-                                            if (error is LibraryError.AuthenticationRequired) {
-                                                onOpenSourceManagement()
-                                            } else {
-                                                performSearch(searchQuery)
-                                            }
-                                        },
-                                        testTagPrefix = "search_error_state"
-                                    )
-                                }
+                                LibrarySearchNotice(
+                                    title, desc, action, "search_error_state",
+                                    onAction = {
+                                        if (error is LibraryError.AuthenticationRequired) onOpenSourceManagement()
+                                        else performSearch(searchQuery)
+                                    },
+                                    symbol = if (error is LibraryError.AuthenticationRequired) WenkuSymbol.Shield else WenkuSymbol.Refresh,
+                                )
                             } else {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .fillParentMaxHeight(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    com.example.ui.components.MascotEmptyState(
-                                        mascotResId = com.example.ui.mascot.MascotSpriteSheet.sadDrawable,
-                                        title = if (searchQuery.isBlank()) "检索图书" else "未找到结果",
-                                        description = if (searchQuery.isBlank()) {
-                                            "在上方输入书名、作者或关键词"
-                                        } else {
-                                            "未找到与“$searchQuery”匹配的内容，请尝试更换关键词或书源"
-                                        },
-                                        actionLabel = "管理与导入书源",
-                                        onActionClick = onOpenSourceManagement,
-                                        testTagPrefix = "search_empty_state"
-                                    )
-                                }
+                                LibrarySearchNotice(
+                                    title = if (searchQuery.isBlank()) "检索图书" else "未找到结果",
+                                    description = if (searchQuery.isBlank()) {
+                                        "在上方输入书名、作者或关键词"
+                                    } else {
+                                        "未找到与“$searchQuery”匹配的内容，请尝试更换关键词或书源"
+                                    },
+                                    action = "管理与导入书源",
+                                    tag = "search_empty_state",
+                                    symbol = WenkuSymbol.Folder,
+                                    onAction = onOpenSourceManagement,
+                                )
                             }
                         }
                     }
@@ -997,7 +995,7 @@ fun LibraryScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         keywordSearchPreviewItem(keywordPreviewWords, keywordStatus, keywordOrigins, keywordDispatches, keywordProviders, retryKeywordLookup)
-                        columnItems(searchResults, key = { it.id }) { book ->
+                        itemsIndexed(searchResults, key = { _, book -> book.id }) { index, book ->
                             val st by remember(book.id) {
                                 derivedStateOf {
                                     downloadStatesState.value[com.example.download.DownloadManager.taskId(book.sourceId, book.id)] ?: DownloadState.Idle
@@ -1006,13 +1004,14 @@ fun LibraryScreen(
                             if (currentSource?.isNovelSource == true) {
                                 NovelSearchCard(book, currentSource?.name.orEmpty(), imageLoader, state = st,
                                     downloaded = com.example.download.DownloadManager.taskId(book.sourceId, book.id) in downloadedNovelKeys,
-                                    onClick = { novelDetailBook = book })
+                                    onClick = { novelDetailBook = book },
+                                    modifier = Modifier.wenkuReveal(index))
                             } else LibraryBookCard(
                                 book = book,
                                 downloadState = st,
                                 // 同上：输入法动画期间不做卡片位移动画，避免几十个动画器并发
-                                modifier = if (searchFieldFocused) Modifier
-                                else Modifier.animateItemPlacement(),
+                                modifier = (if (searchFieldFocused) Modifier else Modifier.animateItemPlacement())
+                                    .wenkuReveal(index),
                                 imageLoader = imageLoader,
                                 coverHeaders = rememberCoverHeaders(book, availableSources),
                                 comicMode = currentSource?.capabilities?.supportComic == true ||
@@ -1029,7 +1028,7 @@ fun LibraryScreen(
                                         loginDialogSource = currentSource
                                     } else {
                                         activeDownloadBook = book
-                                        showDownloadPanel = true
+                                        onOpenDownloads()
                                         viewModel.startDownload(book)
                                     }
                                 },
@@ -1041,12 +1040,15 @@ fun LibraryScreen(
                     }
                 }
 
+                }
+                }
+
                 // 原生登录弹窗
                 if (showLoginDialog) {
                     LibraryLoginDialog(
                         message = loginMessage,
                         loading = loginLoading,
-                        onLogin = { email, pass ->
+                        onLogin = { email, pass, close ->
                             val src = currentSource
                             if (src == null) {
                                 loginLoading = false
@@ -1060,7 +1062,7 @@ fun LibraryScreen(
                                     is SourceResult.Success -> {
                                         loginLoading = false
                                         loginMessage = "登录成功"
-                                        showLoginDialog = false
+                                        close()
                                         viewModel.checkSourceLoginStatus()
                                     }
                                     is SourceResult.Error -> {
@@ -1070,8 +1072,7 @@ fun LibraryScreen(
                                 }
                             }
                         },
-                        onDismiss = { if (!loginLoading) showLoginDialog = false },
-                        hazeState = hazeState
+                        onDismiss = { showLoginDialog = false }
                     )
                 }
 
@@ -1085,17 +1086,18 @@ fun LibraryScreen(
                 if (book.sourceId == "zlibrary") ZLibraryCoverLoader.get(context) else imageLoader,
                 novelDetailLoading, novelDetailError, downloadStates[id] ?: DownloadState.Idle,
                 hasLocal = id in downloadedNovelKeys,
-                onDismiss = { novelDetailBook = null }, onDownload = {
+                onDismiss = { novelDetailBook = null }, onDownload = { close ->
                     scope.launch {
                         val source = availableSources.firstOrNull { it.id == book.sourceId }
                         if (source?.capabilities?.downloadRequiresLogin == true && !source.isLoggedIn()) {
                             loginDialogSource = source
                         } else {
-                            activeDownloadBook = book
-                            novelDetailBook = null
-                            showDownloadPanel = true
-                            if (book.sourceId == "zlibrary") viewModel.startDownload(book)
-                            else viewModel.startDownload(book, book.format)
+                            close {
+                                activeDownloadBook = book
+                                onOpenDownloads()
+                                if (book.sourceId == "zlibrary") viewModel.startDownload(book)
+                                else viewModel.startDownload(book, book.format)
+                            }
                         }
                     }
                 },
@@ -1113,26 +1115,6 @@ fun LibraryScreen(
                 onDismiss = { viewModel.dismissFormatPicker() },
                 hazeState = hazeState
             )
-        }
-
-        // 下载管理中心：亚克力底部面板（Dialog + decorView 实时模糊 + 径向遮罩）
-        if (showDownloadPanel) {
-            AcrylicBottomOverlay(onDismissRequest = { showDownloadPanel = false }) {
-                val closeDownloadPanel = com.example.ui.components.LocalOverlayClose.current
-                Box(Modifier.fillMaxWidth().padding(20.dp)) {
-                    NovelDownloadPanel(allDownloadTasks, preparingDownloads, downloadStates,
-                        onPause = viewModel::pauseDownload, onResume = viewModel::resumeDownload,
-                        onCancel = viewModel::cancelDownload, onRetry = { viewModel.startDownload(it, it.format.takeIf(String::isNotBlank)) },
-                        onDismiss = { closeDownloadPanel {} },
-                        comicContent = if (comicDownloadTasks.isEmpty()) null else ({
-                            ComicDownloadGlassCard(tasks = comicDownloadTasks.values.toList(),
-                                onPause = { viewModel.pauseComicChapter(it) },
-                                onResume = { id -> comicDownloadTasks[id]?.let { viewModel.downloadComicChapter(it.book, it.chapter) } },
-                                onRetry = { id -> comicDownloadTasks[id]?.let { viewModel.retryComicChapter(it.book, it.chapter) } },
-                                onCancel = { viewModel.cancelComicChapter(it) }, onDismiss = { closeDownloadPanel {} })
-                        }))
-                }
-            }
         }
 
         // 书源选择 Liquid Glass 底部弹层
@@ -1190,6 +1172,25 @@ fun LibraryScreen(
 }
 }
 
+@Composable
+private fun LibrarySearchSkeleton() {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        repeat(4) {
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                WenkuSkeletonBlock(Modifier.size(66.dp, 96.dp))
+                Column(Modifier.weight(1f).padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    WenkuSkeletonBlock(Modifier.fillMaxWidth(.72f).height(16.dp))
+                    WenkuSkeletonBlock(Modifier.fillMaxWidth(.43f).height(10.dp))
+                    WenkuSkeletonBlock(Modifier.fillMaxWidth(.85f).height(10.dp))
+                }
+            }
+        }
+    }
+}
+
 /**
  * 一体化搜索组件：书源入口 + 搜索输入合体（任务书「搜索框重新设计」）。
  * 左侧书源区（当前书源名 + 下拉箭头）点击展开 Liquid Glass 书源选择浮层，
@@ -1198,6 +1199,42 @@ fun LibraryScreen(
  * [searchFocused]：聚焦态描边高亮信号。
  */
 @Composable
+private fun LibrarySearchNotice(
+    title: String,
+    description: String,
+    action: String,
+    tag: String,
+    symbol: WenkuSymbol,
+    onAction: () -> Unit,
+) {
+    com.example.ui.wenku.WenkuContentPanel(
+        Modifier.fillMaxWidth().testTag(tag),
+        contentPadding = PaddingValues(14.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Image(
+                painterResource(com.example.ui.mascot.MascotSpriteSheet.readingDrawable),
+                contentDescription = null,
+                modifier = Modifier.size(54.dp),
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        WenkuTextButton(
+            action, onAction,
+            modifier = Modifier.align(Alignment.End),
+            compact = true, wenkuSymbol = symbol,
+        )
+    }
+}
+
+@Composable
 private fun UnifiedSearchField(
     query: String,
     onQueryChange: (String) -> Unit,
@@ -1205,6 +1242,7 @@ private fun UnifiedSearchField(
     onFocusChanged: (Boolean) -> Unit,
     onSourceClick: () -> Unit,
     sourceLabel: String,
+    sourceSheetOpen: Boolean,
     modifier: Modifier = Modifier,
     searchFocused: Boolean = false,
 ) {
@@ -1217,14 +1255,11 @@ private fun UnifiedSearchField(
     val placeholderColor = MaterialTheme.colorScheme.onSurfaceVariant
     val dividerColor = MaterialTheme.colorScheme.outlineVariant
     val sourceTint = MaterialTheme.colorScheme.onSurface
-    // 聚焦态视觉反馈：整条胶囊轻微放大 1.02 + 描边转 primary
+    val reduceMotion = rememberWenkuAccessibility().reduceMotion
     val focusScale by animateFloatAsState(
-        targetValue = if (searchFocused) 1.02f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "searchFocusScale"
+        targetValue = if (searchFocused && !reduceMotion) 1.015f else 1f,
+        animationSpec = if (searchFocused) WenkuMotion.contactSpec() else WenkuMotion.settleSpec(),
+        label = "searchFocusScale",
     )
     val capsuleShape = RoundedCornerShape(50)
 
@@ -1246,31 +1281,16 @@ private fun UnifiedSearchField(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
-            // ① 范围选择：点击展开书源选择浮层（复用 Liquid Glass SourcePickerSheet）；
-            // 保留 ripple 按压反馈；垂直 padding 加大到 14dp 保证 ≥44dp 命中高度
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .pullOutClickable(onClick = onSourceClick)
-                    .padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 12.dp)
-            ) {
-                Text(
-                    text = sourceLabel,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = sourceTint,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 96.dp)
-                )
-                Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = "选择书源",
-                    tint = sourceTint.copy(alpha = 0.7f),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+            WenkuTextButton(
+                sourceLabel,
+                onSourceClick,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp).widthIn(max = 140.dp)
+                    .align(Alignment.CenterVertically)
+                    .semantics { contentDescription = "选择书源" },
+                selected = sourceSheetOpen,
+                compact = true,
+                wenkuSymbol = if (sourceSheetOpen) WenkuSymbol.Up else WenkuSymbol.Down,
+            )
             // 范围区与输入区之间的竖线分隔。
             // 高度必须固定：fillMaxHeight 在 Row 内会把子项量到父级最大可用高度（~整屏），
             // Row 随之被撑满 → 56dp 搜索卡变成整屏大空面板（用户实机"搜索框那么大"的真根因）
@@ -1317,34 +1337,28 @@ private fun UnifiedSearchField(
                 }
             )
             if (query.isNotBlank()) {
-                PullOutIconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "清空",
-                        tint = sourceTint.copy(alpha = 0.55f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+                PullOutIconButton(
+                    icon = Icons.Default.Close,
+                    contentDescription = "清空",
+                    onClick = { onQueryChange("") },
+                    modifier = Modifier.size(36.dp),
+                    tint = sourceTint.copy(alpha = 0.55f),
+                    glyphSize = 18.dp
+                )
             } else {
                 Spacer(modifier = Modifier.width(4.dp))
             }
-            // ③ 圆形 primary 搜索按钮
-            Box(
-                modifier = Modifier
-                    .padding(end = 6.dp)
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(primary)
-                    .pullOutClickable(onClick = onSearch),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "搜索",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+            PullOutIconButton(
+                icon = Icons.Default.Search,
+                contentDescription = "搜索",
+                onClick = {
+                    focusManager.clearFocus()
+                    onSearch()
+                },
+                modifier = Modifier.padding(end = 6.dp).size(40.dp).background(primary, CircleShape),
+                tint = MaterialTheme.colorScheme.onPrimary,
+                glyphSize = 20.dp
+            )
         }
     }
 }
@@ -1707,131 +1721,25 @@ internal fun SourcePickerSheet(
     onManageSources: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val activity = androidx.compose.ui.platform.LocalContext.current as? Activity
-    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-    val backdrop = rememberGlassPanelBackdrop()
-    val iridescentColors = rememberIridescentColors()
-    val blurPx = with(density) { 24.dp.toPx() }
-    // 系统"减少透明度/关闭动画"开启时降级：不再用折射等重效果，面板更实
-    val sheetContext = androidx.compose.ui.platform.LocalContext.current
-    val reduceEffects = remember {
-        val resolver = sheetContext.contentResolver
-        val reduceTransparency = try {
-            android.provider.Settings.Global.getInt(resolver, "reduce_transparency", 0) == 1
-        } catch (_: Exception) {
-            false
-        }
-        val animationsOff = try {
-            android.provider.Settings.Global.getFloat(
-                resolver,
-                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
-                1f
-            ) == 0f
-        } catch (_: Exception) {
-            false
-        }
-        reduceTransparency || animationsOff
-    }
-
-    PullOutBottomSheet(onDismissRequest = onDismiss, shape = sheetShape,
-        containerColor = Color.Transparent, dragHandle = null) {
-        GlassDialogWindowEffect(activity = activity, blurRadiusPx = blurPx)
+    PullOutBottomSheet(onDismissRequest = onDismiss) {
         val close = com.example.ui.components.LocalOverlayClose.current
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .zIndex(1f)
-                // 双层阴影：环境阴影（品牌色）+ 贴地接触阴影
-                .consistentShadow(
-                    elevation = 32.dp,
-                    shape = sheetShape,
-                    ambientColor = iridescentColors.first().copy(alpha = 0.12f),
-                    spotColor = iridescentColors.first().copy(alpha = 0.12f)
-                )
-                .consistentShadow(
-                    elevation = 8.dp,
-                    shape = sheetShape,
-                    ambientColor = Color.Black.copy(alpha = 0.20f),
-                    spotColor = Color.Black.copy(alpha = 0.20f)
-                )
-                // 整个弹窗只有「一层」毛玻璃：blur 24 + surface 62~70%，
-                // 内部分区一律不设独立背景（色差的根因）。
-                .liquidGlass(
-                    highlightEnabled = false,
-                    backdrop = backdrop,
-                    shape = sheetShape,
-                    surfaceColor = MaterialTheme.colorScheme.surface.copy(
-                        alpha = if (reduceEffects) 0.70f else 0.66f
-                    ),
-                    blurRadius = 24.dp,
-                    refraction = false
-                )
-                .clip(sheetShape)
-                // 极细噪点（可选项，不改变分区底色）
-                .filmGrain(alpha = 0.035f)
-        ) {
-            // 拖拽手柄（弹窗内容最顶部）
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp, bottom = 6.dp)
-                    .paperSheetDragHandle(),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(36.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f))
-                )
-            }
-            // 标题栏：左「选择书源」20 加粗；右「管理书源」纯 primary 文字按钮（不加底、不加框）
+        Column(Modifier.fillMaxWidth()) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "选择书源",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
-                    modifier = Modifier.weight(1f)
+                Text("选择书源", Modifier.weight(1f), fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                WenkuTextButton(
+                    text = "管理书源",
+                    onClick = com.example.ui.components.paperOpen(onManageSources),
+                    wenkuSymbol = WenkuSymbol.Settings,
+                    compact = true
                 )
-                val manageInteraction = remember { MutableInteractionSource() }
-                val managePressed by manageInteraction.collectIsPressedAsState()
-                val manageScale by animateFloatAsState(
-                    targetValue = if (managePressed) 0.96f else 1f,
-                    animationSpec = tween(200, easing = CubicBezierEasing(0f, 0f, 0.2f, 1f)),
-                    label = "managePress"
+                PullOutIconButton(
+                    icon = Icons.Default.Close,
+                    contentDescription = "关闭书源选择",
+                    onClick = { close {} }
                 )
-                // 规范：标题右侧「管理书源」= **primary 10% 底的小胶囊，高 28**
-                Box(
-                    modifier = Modifier
-                        .graphicsLayer {
-                            scaleX = manageScale
-                            scaleY = manageScale
-                        }
-                        .clip(RoundedCornerShape(50))
-                        .height(28.dp)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
-                        .pullOutClickable(
-                            interactionSource = manageInteraction,
-                            indication = null,
-                            onClick = com.example.ui.components.paperOpen(onManageSources)
-                        )
-                        .padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "管理书源",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
             }
             LazyColumn(
                 modifier = Modifier
@@ -2098,181 +2006,6 @@ private fun SourceOptionItem(
 }
 
 @Composable
-private fun ComicDownloadGlassCard(
-    tasks: List<ComicDownloadTask>,
-    onPause: (String) -> Unit,
-    onResume: (String) -> Unit,
-    onRetry: (String) -> Unit,
-    onCancel: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "漫画下载",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                PullOutIconButton(onClick = com.example.ui.components.paperDismiss(onDismiss), modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "关闭",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            if (tasks.isEmpty()) {
-                Text(
-                    text = "暂无漫画下载任务",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                tasks.take(4).forEach { task ->
-                    ComicDownloadTaskRow(
-                        task = task,
-                        onPause = onPause,
-                        onResume = onResume,
-                        onRetry = onRetry,
-                        onCancel = onCancel
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-                if (tasks.size > 4) {
-                    Text(
-                        text = "还有 ${tasks.size - 4} 个任务…",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ComicDownloadTaskRow(
-    task: ComicDownloadTask,
-    onPause: (String) -> Unit,
-    onResume: (String) -> Unit,
-    onRetry: (String) -> Unit,
-    onCancel: (String) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
-            .padding(horizontal = 16.dp, vertical = 14.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = task.chapter.title.ifBlank { "漫画章节" },
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            when (task.status) {
-                ComicDownloadStatus.DOWNLOADING -> {
-                    Text(
-                        text = "${(task.progress.coerceIn(0f, 1f) * 100).toInt()}%",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MintPrimary
-                    )
-                }
-                ComicDownloadStatus.PAUSED -> {
-                    Text("已暂停", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                ComicDownloadStatus.FAILED -> {
-                    Text("失败", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                }
-                ComicDownloadStatus.SUCCESS -> {
-                    Text(
-                        "已完成",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
-            }
-            // 同一槽位的播放/暂停形态按钮：状态切换时形变动画不重置
-            if (task.status == ComicDownloadStatus.DOWNLOADING || task.status == ComicDownloadStatus.PAUSED) {
-                Spacer(modifier = Modifier.width(8.dp))
-                PlayPauseMorphButton(
-                    isPlaying = task.status == ComicDownloadStatus.DOWNLOADING,
-                    onClick = if (task.status == ComicDownloadStatus.DOWNLOADING) {
-                        { onPause(task.chapterId) }
-                    } else {
-                        { onResume(task.chapterId) }
-                    },
-                    sizeDp = 36
-                )
-            }
-            if (task.status == ComicDownloadStatus.FAILED) {
-                Spacer(modifier = Modifier.width(8.dp))
-                AppIconButton(onClick = { onRetry(task.chapterId) }, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        Icons.Default.Refresh,
-                        contentDescription = "重新下载",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(4.dp))
-            AppIconButton(onClick = { onCancel(task.chapterId) }, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "取消任务",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-        if (task.status == ComicDownloadStatus.DOWNLOADING) {
-            Spacer(modifier = Modifier.height(6.dp))
-            LinearProgressIndicator(
-                progress = { task.progress.coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth(),
-                color = MintPrimary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        }
-        if (task.status == ComicDownloadStatus.FAILED && !task.error.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = task.error,
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.error,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
 fun LibraryWelcomeScreen(
     onImportLocal: () -> Unit,
     onOnlineSearch: () -> Unit,
@@ -2447,17 +2180,23 @@ fun SearchResultFavoriteButton(
     modifier: Modifier = Modifier,
     touchSize: Dp = 30.dp,
 ) {
+    val reduceMotion = com.example.ui.feedback.LocalReduceMotion.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.84f else 1f,
+        targetValue = if (pressed && !reduceMotion) 0.84f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMedium,
         ),
         label = "searchFavPress",
     )
-    val tint = if (favorite) MintPrimary else Color.White
+    val fill = animateFloatAsState(
+        targetValue = if (favorite) 1f else 0f,
+        animationSpec = tween(if (reduceMotion) 0 else 180),
+        label = "searchFavoriteFill"
+    )
+    val label = if (favorite) "取消喜欢" else "加入我喜欢的"
     Box(
         modifier = modifier
             .size(touchSize)
@@ -2467,6 +2206,7 @@ fun SearchResultFavoriteButton(
             }
             .clip(CircleShape)
             .background(Color.Black.copy(alpha = 0.38f))
+            .semantics { contentDescription = label }
             .pullOutClickable(
                 interactionSource = interaction,
                 indication = null,
@@ -2475,10 +2215,20 @@ fun SearchResultFavoriteButton(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = if (favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-            contentDescription = if (favorite) "取消喜欢" else "加入我喜欢的",
-            tint = tint,
-            modifier = Modifier.size(17.dp),
+            imageVector = Icons.Outlined.FavoriteBorder,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(17.dp).graphicsLayer { alpha = 1f - fill.value }
+        )
+        Icon(
+            imageVector = Icons.Filled.Favorite,
+            contentDescription = null,
+            tint = MintPrimary,
+            modifier = Modifier.size(17.dp).graphicsLayer {
+                alpha = fill.value
+                scaleX = .75f + .25f * fill.value
+                scaleY = scaleX
+            }
         )
     }
 }
@@ -2661,7 +2411,11 @@ fun LibraryBookCard(
                                 Text("正在准备...", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 AppIconButton(onClick = onCancelDownload, modifier = Modifier.size(24.dp)) {
-                                    Icon(Icons.Default.Close, contentDescription = "取消", tint = Color.Gray, modifier = Modifier.size(14.dp))
+                                    com.example.ui.wenku.WenkuIcon(
+                                        com.example.ui.wenku.WenkuSymbol.Close,
+                                        size = 15.dp,
+                                        tint = Color.Gray
+                                    )
                                 }
                             }
                         }
@@ -2705,7 +2459,11 @@ fun LibraryBookCard(
                                             sizeDp = 30
                                         )
                                         AppIconButton(onClick = onCancelDownload, modifier = Modifier.size(30.dp)) {
-                                            Icon(Icons.Default.Close, contentDescription = "取消", tint = Color.Gray, modifier = Modifier.size(16.dp))
+                                            com.example.ui.wenku.WenkuIcon(
+                                                com.example.ui.wenku.WenkuSymbol.Close,
+                                                size = 17.dp,
+                                                tint = Color.Gray
+                                            )
                                         }
                                     }
                                 }
@@ -3105,11 +2863,12 @@ private fun AggregateExpandButton(
             color = MintPrimary
         )
         Spacer(modifier = Modifier.width(4.dp))
-        Icon(
-            imageVector = Icons.Default.KeyboardArrowDown,
-            contentDescription = "展开该书源全部结果",
+        WenkuIcon(
+            symbol = WenkuSymbol.Down,
             tint = MintPrimary,
-            modifier = Modifier.size(18.dp)
+            size = 18.dp,
+            contact = if (pressed) 1f else 0f,
+            entrance = false
         )
     }
 }
@@ -3190,9 +2949,13 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(Modifier.weight(1f))
-                    PullOutIconButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) {
-                        Icon(Icons.Default.Close, "关闭", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    PullOutIconButton(
+                        icon = Icons.Default.Close,
+                        contentDescription = "关闭",
+                        onClick = com.example.ui.components.paperDismiss(onDismiss),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        glyphSize = 20.dp
+                    )
                 }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))

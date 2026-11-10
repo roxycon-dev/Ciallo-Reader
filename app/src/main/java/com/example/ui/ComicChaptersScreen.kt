@@ -1,47 +1,32 @@
 package com.example.ui
 
 import com.example.ui.components.pullOutCombinedClickable
-import com.example.ui.components.PullOutButton
-import com.example.ui.components.PullOutTextButton
-import com.example.ui.components.PullOutIconButton
 import com.example.ui.components.pullOutClickable
 import android.widget.Toast
-import android.os.Build
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.RemoveDone
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.SolidColor
@@ -49,12 +34,22 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.catalogCoverMotion
 import coil.compose.AsyncImage
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -66,7 +61,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.zIndex
 import coil.request.ImageRequest
@@ -74,15 +71,12 @@ import kotlinx.coroutines.launch
 import com.example.data.favorite.ChapterReadState
 import com.example.data.favorite.ComicProgressEntity
 import com.example.data.favorite.ComicReadingLogic
-import com.example.data.favorite.OrderedChapter
 import com.example.god.GodMomentEntity
 import com.example.source.ComicChapter
 import com.example.source.SearchBook
 import com.example.source.isKnownComicAuthor
 import com.example.ui.components.AppIconButton
-import com.example.ui.components.ChasingDots
 import com.example.ui.components.PlayPauseMorphButton
-import com.example.ui.components.AppLiquidButton
 import com.example.ui.favorite.BookmarkRibbon
 import com.example.ui.favorite.FavoriteHeartIcon
 import com.example.ui.favorite.SourceUnavailableBanner
@@ -94,6 +88,18 @@ import kotlinx.coroutines.withTimeoutOrNull
 import com.example.ui.components.AppToast
 import androidx.compose.ui.platform.LocalView
 import com.example.ui.feedback.HapticsGate
+import com.example.ui.wenku.WenkuIcon
+import com.example.ui.wenku.WenkuLoadingHandoff
+import com.example.ui.wenku.WenkuMotion
+import com.example.ui.wenku.WenkuPillButton
+import com.example.ui.wenku.WenkuRevealAxis
+import com.example.ui.wenku.WenkuSectionHeader
+import com.example.ui.wenku.WenkuSkeletonBlock
+import com.example.ui.wenku.wenkuColors
+import com.example.ui.wenku.wenkuReveal
+import com.example.ui.wenku.WenkuSymbol
+import com.example.ui.wenku.WenkuTextButton
+import com.example.ui.wenku.wenkuPagePart
 import kotlin.math.abs
 
 /** 神回金色（仅神回卡片使用）。 */
@@ -113,7 +119,7 @@ private const val LIST_HEADER_ITEMS = 3
  * 保留的全部既有接线：缓存秒开与错误重试/换源、下载管理与悬浮窗、长按标记菜单、
  * 滑动书签、神回编辑、排行榜跳转定位、文本小说模式、自动定位续读。
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun ComicChaptersScreen(
     book: SearchBook?,
@@ -165,6 +171,8 @@ fun ComicChaptersScreen(
     estimatedChapterSizeMb: Double = 2.0,
     sourceName: String? = null,
     onSearchText: (String) -> Unit = {},
+    readingStateReady: Boolean = true,
+    onOpenCover: ((SearchBook) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val ordered = remember(chapters) { ComicReadingLogic.ordered(chapters) }
@@ -175,15 +183,34 @@ fun ComicChaptersScreen(
     }
     val newIds = remember(chapters, progress) { ComicReadingLogic.newChapterIds(chapters, progress) }
 
-    var sortDesc by rememberSaveable { mutableStateOf(false) }
+    val workKey = book?.let { "${it.sourceId}:${it.id}" }
+    var sortDesc by rememberSaveable(workKey) { mutableStateOf(false) }
+    var initialPositionHandled by rememberSaveable(workKey) { mutableStateOf(false) }
+    val selectableChapters = remember(ordered, downloadedChapterIds, downloadingChapters, pausedChapters) {
+        ordered.filter { row ->
+            val chapter = row.chapter
+            !chapter.external && chapter.id !in downloadedChapterIds &&
+                chapter.id !in downloadingChapters && chapter.id !in pausedChapters
+        }
+    }
+    val selectableIds = remember(selectableChapters) { selectableChapters.map { it.chapter.id }.toSet() }
     val displayChapters = remember(ordered, sortDesc) {
         if (sortDesc) ordered.asReversed() else ordered
     }
 
     val listState = rememberLazyListState()
     var highlightId by remember { mutableStateOf<String?>(null) }
-    var selectionMode by remember { mutableStateOf(false) }
-    val selectedChapterIds = remember { mutableStateListOf<String>() }
+    var selectionMode by rememberSaveable(workKey) { mutableStateOf(false) }
+    var selectedChapterIds by rememberSaveable(workKey) { mutableStateOf(ArrayList<String>()) }
+    val effectiveSelection = selectedChapterIds.filter { it in selectableIds }
+    val allSelected = selectableIds.isNotEmpty() && effectiveSelection.size == selectableIds.size
+    fun replaceSelection(ids: Collection<String>) {
+        selectedChapterIds = ArrayList(ids)
+    }
+    fun toggleChapter(id: String) {
+        if (id !in selectableIds) return
+        replaceSelection(if (id in selectedChapterIds) selectedChapterIds - id else selectedChapterIds + id)
+    }
 
     /* ── 神回：长按神回卡片 → 打开编辑窗口（本页自持宿主，无需回传 Activity） ── */
     val godBinding = com.example.god.rememberGodEditBinding()
@@ -205,35 +232,28 @@ fun ComicChaptersScreen(
         return -1
     }
 
-    // 从排行榜跳转：滚动定位到该话 + 金色高亮脉冲
-    var godFocus by remember { mutableStateOf(godFocusChapterId) }
-    LaunchedEffect(godFocus, godList.size, normalChapters.size) {
-        val id = godFocus ?: return@LaunchedEffect
-        val idx = rowIndexOf(id) + LIST_HEADER_ITEMS
-        if (idx >= 0) {
-            listState.animateScrollToItem(idx)
-            highlightId = id
-            delay(1600)
-            highlightId = null
-            godFocus = null
+    // Locate only once per detail entry. The lazy list restores its viewport after reading.
+    LaunchedEffect(workKey, ordered, godFocusChapterId, godMomentsReady, readingStateReady, target) {
+        if (initialPositionHandled || ordered.isEmpty() || !godMomentsReady || !readingStateReady) {
+            return@LaunchedEffect
         }
-    }
-
-    // 进入页面：自动滚动到"阅读中"或"下一话"，并轻微高亮闪一下
-    LaunchedEffect(ordered.size, target) {
-        if (ordered.isEmpty()) return@LaunchedEffect
-        val focusIndex = when (target) {
+        val chapterIndex = when (target) {
             is ComicReadingLogic.ContinueTarget.Resume -> target.chapterIndex
             is ComicReadingLogic.ContinueTarget.Next -> target.chapterIndex
-            else -> ordered.indexOfFirst { chapterStates[it.chapter.id]?.state == ChapterReadState.READING }
-                .takeIf { it >= 0 } ?: 0
+            else -> -1
         }
-        val focusId = ordered.getOrNull(focusIndex)?.chapter?.id ?: return@LaunchedEffect
-        val idx = rowIndexOf(focusId) + LIST_HEADER_ITEMS
-        if (idx >= 0) {
-            listState.animateScrollToItem(idx)
-            highlightId = focusId
-            delay(1000)
+        val chapterId = godFocusChapterId ?: ordered.getOrNull(chapterIndex)?.chapter?.id
+        initialPositionHandled = true
+        val row = chapterId?.let(::rowIndexOf) ?: -1
+        if (row >= 0) {
+            if (reduceMotion) listState.scrollToItem(row + LIST_HEADER_ITEMS)
+            else listState.animateScrollToItem(row + LIST_HEADER_ITEMS)
+            highlightId = chapterId
+        }
+    }
+    LaunchedEffect(highlightId) {
+        if (highlightId != null) {
+            delay(1100)
             highlightId = null
         }
     }
@@ -259,7 +279,7 @@ fun ComicChaptersScreen(
     }
 
     fun exitSelection() {
-        selectedChapterIds.clear()
+        replaceSelection(emptyList())
         selectionMode = false
     }
 
@@ -272,127 +292,79 @@ fun ComicChaptersScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            if (selectionMode && !textMode) {
-                // ── 多选顶栏：✕ | 已选 N 话 | 全选 ──
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface)
-                        .statusBarsPadding()
-                        .padding(horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    PullOutIconButton(onClick = ::exitSelection, modifier = Modifier.size(40.dp)) {
-                        Icon(
-                            Icons.Filled.Close,
-                            contentDescription = "退出多选",
-                            tint = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                    Text(
-                        text = "已选 ${selectedChapterIds.size} 话",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.weight(1f),
-                    )
-                    PullOutTextButton(onClick = {
-                        selectedChapterIds.clear()
-                        selectedChapterIds.addAll(ordered.map { it.chapter.id })
-                    }) {
-                        Text(
-                            "全选",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MintPrimary,
-                        )
-                    }
-                }
-            } else {
-                // ── 顶栏：返回 + 标题（17/500 单行省略） ──
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface)
-                        .statusBarsPadding()
-                        .padding(end = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AppIconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
-                            tint = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                    SelectionContainer { Text(
-                        text = book?.title ?: "漫画章节",
-                        modifier = Modifier.comicSearchActions("漫画名", book?.title.orEmpty(), onSearchText),
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    ) }
-                }
+            AnimatedContent(
+                targetState = selectionMode && !textMode,
+                transitionSpec = {
+                    if (reduceMotion) EnterTransition.None togetherWith ExitTransition.None
+                    else fadeIn(tween(175, delayMillis = 110)) togetherWith fadeOut(tween(110))
+                },
+                label = "chapterSelectionHeader",
+            ) { selecting ->
+                CenterAlignedTopAppBar(
+                    expandedHeight = 48.dp,
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+                    navigationIcon = {
+                        if (selecting) AppIconButton(Icons.Filled.Close, "退出多选", onClick = ::exitSelection)
+                        else AppIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", onClick = onBack)
+                    },
+                    title = {
+                        Column(Modifier.wenkuPagePart(), horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (selecting) {
+                                Text("已选 ${effectiveSelection.size} 话", style = MaterialTheme.typography.titleSmall)
+                            } else {
+                                Text(
+                                    if (textMode) "小说详情" else "漫画详情",
+                                    style = MaterialTheme.typography.titleSmall,
+                                )
+                                Text("ARCHIVE / CONTENTS", style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    },
+                    actions = {
+                        if (selecting) {
+                            WenkuTextButton(
+                                if (allSelected) "取消全选" else "全选",
+                                onClick = { replaceSelection(if (allSelected) emptySet() else selectableIds) },
+                                compact = true, selected = allSelected, enabled = selectableIds.isNotEmpty(),
+                                wenkuSymbol = if (allSelected) WenkuSymbol.Selected else WenkuSymbol.Circle,
+                            )
+                        }
+                    },
+                )
             }
         },
         bottomBar = {
-            when {
-                // ── 多选底部：通栏「下载 N 话」 ──
-                selectionMode && !textMode -> {
-                    val n = selectedChapterIds.size
-                    PullOutButton(
+            AnimatedContent(
+                targetState = selectionMode && !textMode,
+                transitionSpec = {
+                    if (reduceMotion) EnterTransition.None togetherWith ExitTransition.None
+                    else fadeIn(tween(175, delayMillis = 110)) togetherWith fadeOut(tween(110))
+                },
+                label = "chapterSelectionFooter",
+            ) { selecting ->
+                if (selecting) {
+                    val count = effectiveSelection.size
+                    val size = String.format(java.util.Locale.US, "%.1f", count * estimatedChapterSizeMb)
+                    WenkuTextButton(
+                        if (count == 0) "选择要下载的章节" else "下载 $count 话 · 约 $size MB",
                         onClick = {
-                            if (n == 0) {
-                                AppToast.makeText(context, "先勾选要下载的章节", Toast.LENGTH_SHORT).show()
-                            } else {
-                                chapters.filter { it.id in selectedChapterIds }.forEach(onDownloadChapter)
-                                exitSelection()
-                            }
+                            selectableChapters.filter { it.chapter.id in effectiveSelection }
+                                .forEach { onDownloadChapter(it.chapter) }
+                            exitSelection()
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 10.dp)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary),
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                    ) {
-                        Text(
-                            text = buildAnnotatedString {
-                                if (n == 0) {
-                                    append("选择要下载的章节")
-                                } else {
-                                    append("下载 $n 话")
-                                    withStyle(
-                                        androidx.compose.ui.text.SpanStyle(
-                                            fontWeight = FontWeight.Normal,
-                                            color = Color.White.copy(alpha = 0.85f),
-                                        )
-                                    ) {
-                                        val mb = n * estimatedChapterSizeMb
-                                        append("  约 ${String.format(java.util.Locale.US, "%.1f", mb)} MB")
-                                    }
-                                }
-                            },
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                // ── 普通底部：♥ + 继续阅读 ──
-                else -> {
+                        modifier = Modifier.fillMaxWidth().navigationBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        enabled = count > 0, selected = true, wenkuSymbol = WenkuSymbol.Download,
+                    )
+                } else {
                     val cont = continueTargetChapter()
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(MaterialTheme.colorScheme.surface)
+                            .navigationBarsPadding()
                             .padding(horizontal = 16.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -409,339 +381,250 @@ fun ComicChaptersScreen(
                             )
                         }
                         Spacer(Modifier.width(8.dp))
-                        PullOutButton(
-                            onClick = {
-                                val pair = cont
-                                if (pair == null) {
-                                    AppToast.makeText(context, "暂无可阅读章节", Toast.LENGTH_SHORT).show()
+                        WenkuPillButton(
+                            text = buildString {
+                                append("继续阅读")
+                                append(" · ")
+                                if (cont != null) {
+                                    append(com.example.source.ComicChapterTitle.label(cont.first.title))
+                                    append(" · P")
+                                    append(cont.second + 1)
                                 } else {
-                                    onReadChapterAt(pair.first, pair.second)
+                                    append(ordered.firstOrNull()?.chapter?.title?.let(com.example.source.ComicChapterTitle::label) ?: "开始阅读")
                                 }
                             },
-                            modifier = Modifier.weight(1f).height(48.dp),
-                            shape = RoundedCornerShape(24.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary),
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                        ) {
-                            Text(
-                                text = buildAnnotatedString {
-                                    append("继续阅读 ")
-                                    withStyle(
-                                        androidx.compose.ui.text.SpanStyle(
-                                            fontWeight = FontWeight.Normal,
-                                            color = Color.White.copy(alpha = 0.85f),
-                                        )
-                                    ) {
-                                        if (cont != null) {
-                                            append("${com.example.source.ComicChapterTitle.label(cont.first.title)} · P${cont.second + 1}")
-                                        } else {
-                                            append(ordered.firstOrNull()?.chapter?.title?.let(com.example.source.ComicChapterTitle::label) ?: "开始阅读")
-                                        }
-                                    }
-                                },
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color.White,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
+                            onClick = {
+                                val pair = cont
+                                if (pair != null && !pair.first.external) onReadChapterAt(pair.first, pair.second)
+                            },
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            primary = true,
+                            enabled = cont != null && !cont.first.external,
+                        )
                     }
                 }
             }
         },
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when {
-                loading && chapters.isEmpty() -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            ChasingDots(size = 52.dp, color = MintPrimary)
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text("正在加载章节…", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
+            val loadingDirectory = loading && chapters.isEmpty()
+            val initialDirectoryLoading = remember(workKey) { loadingDirectory }
+            Column(Modifier.fillMaxSize()) {
+                if (error != null && chapters.isNotEmpty()) {
+                    SourceUnavailableBanner(
+                        message = "来源暂不可用（已保留缓存信息与阅读进度）",
+                        onRetry = onRetry,
+                        onChangeSource = onChangeSource,
+                    )
                 }
-
-                error != null && chapters.isEmpty() -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = error, color = MaterialTheme.colorScheme.error, fontSize = 14.sp)
-                            Spacer(modifier = Modifier.height(12.dp))
-                            AppLiquidButton(text = "重试", onClick = onRetry)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            PullOutTextButton(onClick = onChangeSource) { Text("换源") }
-                        }
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    state = listState,
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    item(key = "hero") {
+                        ComicHeroHeader(
+                            book = book,
+                            textMode = textMode,
+                            onTextClick = onSearchText,
+                            onOpenCover = onOpenCover,
+                        )
                     }
-                }
-
-                else -> {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        // 缓存信息仍在 → 顶部提示条（保留已读状态，可重试/换源）
-                        if (error != null) {
-                            SourceUnavailableBanner(
-                                message = "来源暂不可用（已保留缓存信息与阅读进度）",
-                                onRetry = onRetry,
-                                onChangeSource = onChangeSource,
-                            )
+                    if (loadingDirectory || error != null && chapters.isEmpty()) {
+                        item(key = "directory-status") {
+                            if (loadingDirectory) {
+                                ComicDirectorySkeleton()
+                            } else {
+                                Column(
+                                    Modifier.padding(top = 16.dp).wenkuPagePart(3),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        WenkuTextButton("重试", onRetry, selected = true, wenkuSymbol = WenkuSymbol.Refresh)
+                                        WenkuTextButton("换源", onChangeSource, wenkuSymbol = WenkuSymbol.Branch)
+                                    }
+                                }
+                            }
                         }
-
-                        // ── 章节列表：头部/信息行/工具行随内容滚动（旧版页面结构） ──
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            state = listState,
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            // ── 头部：封面模糊背景 + 封面卡 + 标题 + 徽章 + 作者 + 简介（旧版样式） ──
-                            item(key = "hero") { ComicHeroHeader(book = book, textMode = textMode, onTextClick = onSearchText) }
-
-                            // ── 信息行（13，secondary；「已读 N 话」accent） ──
-                            item(key = "info") {
+                    } else {
+                        item(key = "info") {
                             Text(
-                            text = buildAnnotatedString {
-                                append("${sourceName ?: book?.sourceId.orEmpty()} · 当前源共 ${chapters.size} 话 · ")
-                                withStyle(
-                                    androidx.compose.ui.text.SpanStyle(
-                                        color = MintPrimary,
-                                        fontWeight = FontWeight.Medium,
-                                    )
-                                ) { append("已读 $readCount 话") }
-                            },
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                                text = buildAnnotatedString {
+                                    append("${sourceName ?: book?.sourceId.orEmpty()} · 当前源共 ${chapters.size} 话 · ")
+                                    withStyle(
+                                        androidx.compose.ui.text.SpanStyle(
+                                            color = MintPrimary,
+                                            fontWeight = FontWeight.Medium,
+                                        )
+                                    ) { append("已读 $readCount 话") }
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp).wenkuPagePart(2),
                             )
-                            }
+                        }
 
-                            // ── 工具行（高 32）：正序 | 跳到最新章 | 多选 ──
-                            item(key = "toolbar") {
-                            Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(32.dp)
-                                .padding(horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .pullOutClickable { sortDesc = !sortDesc }
-                                    .padding(horizontal = 4.dp),
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.Sort,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                                Spacer(Modifier.width(3.dp))
-                                Text(
-                                    text = if (sortDesc) "倒序" else "正序",
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                        item(key = "toolbar") {
+                            Column(Modifier.fillMaxWidth().wenkuPagePart(3), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                if (initialDirectoryLoading) {
+                                    WenkuLoadingHandoff(loaded = true, skeleton = { DirectoryHeadingSkeleton() }) {
+                                        WenkuSectionHeader("02", "CONTENTS", "目录")
+                                    }
+                                } else {
+                                    WenkuSectionHeader("02", "CONTENTS", "目录")
+                                }
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    WenkuTextButton(
+                                        if (sortDesc) "倒序" else "正序",
+                                        onClick = { sortDesc = !sortDesc },
+                                        enabled = ordered.size > 1, compact = true, selected = sortDesc,
+                                        wenkuSymbol = if (sortDesc) WenkuSymbol.Down else WenkuSymbol.Up,
+                                    )
+                                    WenkuTextButton(
+                                        "跳到最新章",
+                                        onClick = {
+                                            val latest = ordered.lastOrNull()?.chapter?.id
+                                            val row = latest?.let(::rowIndexOf) ?: -1
+                                            if (row >= 0) scope.launch {
+                                                if (reduceMotion) listState.scrollToItem(row + LIST_HEADER_ITEMS)
+                                                else listState.animateScrollToItem(row + LIST_HEADER_ITEMS)
+                                            }
+                                        },
+                                        enabled = ordered.isNotEmpty(), compact = true, wenkuSymbol = WenkuSymbol.Down,
+                                    )
+                                    if (textMode && onDownloadNovel != null) {
+                                        WenkuTextButton("整本下载", onDownloadNovel, compact = true, wenkuSymbol = WenkuSymbol.Download)
+                                    }
+                                    if (!textMode) {
+                                        WenkuTextButton("多选", { selectionMode = true }, compact = true,
+                                            selected = selectionMode, enabled = selectableIds.isNotEmpty(),
+                                            wenkuSymbol = WenkuSymbol.Selected)
+                                    }
+                                }
+                                AnimatedVisibility(
+                                    visible = selectionMode && !textMode,
+                                    enter = if (reduceMotion) EnterTransition.None else expandVertically(tween(WenkuMotion.ENTER_MS, easing = WenkuMotion.ease)) + fadeIn(),
+                                    exit = if (reduceMotion) ExitTransition.None else shrinkVertically(tween(WenkuMotion.EXIT_MS, easing = WenkuMotion.ease)) + fadeOut(),
+                                ) {
+                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        WenkuTextButton("选未读", {
+                                            replaceSelection(selectableChapters.filter {
+                                                chapterStates[it.chapter.id]?.state != ChapterReadState.READ
+                                            }.map { it.chapter.id })
+                                        }, compact = true, wenkuSymbol = WenkuSymbol.Book)
+                                        WenkuTextButton("选后 10 话", {
+                                            replaceSelection(ordered.takeLast(10).map { it.chapter.id }.filter { it in selectableIds })
+                                        }, compact = true, wenkuSymbol = WenkuSymbol.Down)
+                                        WenkuTextButton("反选", {
+                                            replaceSelection(selectableIds - selectedChapterIds.toSet())
+                                        }, compact = true, wenkuSymbol = WenkuSymbol.Sync)
+                                    }
+                                }
                             }
-                            Spacer(Modifier.width(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .height(32.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(MintPrimary.copy(alpha = 0.12f))
-                                    .pullOutClickable {
-                                        val idx = if (sortDesc) 0 else (normalChapters.size - 1).coerceAtLeast(0)
-                                        scope.launch {
-                                            listState.animateScrollToItem(godList.size + idx + LIST_HEADER_ITEMS)
+                        }
+                        itemsIndexed(godList, key = { _, god -> "god_${god.chapterId}" }) { index, g ->
+                            val chapter = chapters.firstOrNull { it.id == g.chapterId }
+                            GodCardSpec(
+                                god = g,
+                                chapterTitle = chapter?.title
+                                    ?: g.chapterTitle.ifBlank { "第 ${g.chapterNumber} 话" },
+                                highlighted = highlightId == g.chapterId,
+                                modifier = Modifier.wenkuPagePart(index + 4)
+                                    .then(if (reduceMotion) Modifier else Modifier.animateItem()),
+                                selecting = selectionMode && !textMode,
+                                checked = g.chapterId in effectiveSelection,
+                                canSelect = g.chapterId in selectableIds,
+                                onOpen = {
+                                    if (selectionMode && !textMode) {
+                                        toggleChapter(g.chapterId)
+                                    } else {
+                                        val oc = ordered.firstOrNull { it.chapter.id == g.chapterId }
+                                        if (oc == null) {
+                                            AppToast.makeText(context, "该话暂不可读", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            onReadChapterAt(oc.chapter, 0)
                                         }
                                     }
-                                    .padding(horizontal = 12.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    "跳到最新章",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MintPrimary,
-                                )
-                            }
-                            Spacer(Modifier.weight(1f))
-                            if (textMode && onDownloadNovel != null) {
-                                PullOutTextButton(onClick = onDownloadNovel) {
-                                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(3.dp))
-                                    Text("整本下载", fontSize = 13.sp)
-                                }
-                            }
-                            if (!textMode) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .pullOutClickable { selectionMode = true }
-                                        .padding(horizontal = 4.dp),
-                                ) {
-                                    Icon(
-                                        Icons.Filled.Checklist,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onBackground,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                    Spacer(Modifier.width(3.dp))
-                                    Text(
-                                        "多选",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onBackground,
-                                    )
-                                }
-                            }
-                        }
-
-                        // ── 多选快捷胶囊（高 30，圆角 16，0.5 边框） ──
-                        if (selectionMode && !textMode) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                QuickPill("选未读") {
-                                    selectedChapterIds.clear()
-                                    selectedChapterIds.addAll(
-                                        ordered.filter {
-                                            chapterStates[it.chapter.id]?.state != ChapterReadState.READ
-                                        }.map { it.chapter.id }
-                                    )
-                                }
-                                QuickPill("选后 10 话") {
-                                    selectedChapterIds.clear()
-                                    selectedChapterIds.addAll(
-                                        ordered.takeLast(10).map { it.chapter.id }
-                                    )
-                                }
-                                QuickPill("反选") {
-                                    val pool = ordered.map { it.chapter.id }
-                                    val inverted = pool.filter { it !in selectedChapterIds }
-                                    selectedChapterIds.clear()
-                                    selectedChapterIds.addAll(inverted)
-                                }
-                            }
-                        }
-
-                            } // toolbar item 收尾
-
-                            items(godList, key = { "god_${it.chapterId}" }) { g ->
-                                val chapter = chapters.firstOrNull { it.id == g.chapterId }
-                                GodCardSpec(
-                                    god = g,
-                                    chapterTitle = chapter?.title
-                                        ?: g.chapterTitle.ifBlank { "第 ${g.chapterNumber} 话" },
-                                    highlighted = highlightId == g.chapterId,
-                                    selecting = selectionMode && !textMode,
-                                    checked = g.chapterId in selectedChapterIds,
-                                    onOpen = {
-                                        if (selectionMode && !textMode) {
-                                            // 多选：整卡任意位置都可勾选/取消（不只右边圆圈）
-                                            if (g.chapterId in selectedChapterIds) {
-                                                selectedChapterIds.remove(g.chapterId)
-                                            } else {
-                                                selectedChapterIds.add(g.chapterId)
-                                            }
-                                        } else {
-                                            val oc = ordered.firstOrNull { it.chapter.id == g.chapterId }
-                                            if (oc == null) {
-                                                AppToast.makeText(context, "该话暂不可读", Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                onReadChapterAt(oc.chapter, 0)
-                                            }
-                                        }
-                                    },
-                                    onDownload = {
-                                        val chapter2 = chapters.firstOrNull { it.id == g.chapterId }
-                                        if (chapter2 == null || chapter2.external) {
-                                            AppToast.makeText(context, "站外链接章节暂不支持下载", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            onDownloadChapter(chapter2)
-                                        }
-                                    },
-                                    onToggleCheck = {
-                                        if (g.chapterId in selectedChapterIds) {
-                                            selectedChapterIds.remove(g.chapterId)
-                                        } else {
-                                            selectedChapterIds.add(g.chapterId)
-                                        }
-                                    },
-                                    onLongPress = { godBinding.openEdit(g) },
-                                )
-                            }
-                            items(normalChapters, key = { it.chapter.id }) { entry ->
-                                val chapter = entry.chapter
-                                val st = chapterStates[chapter.id]
-                                val visual = st?.state?.toVisual() ?: com.example.ui.favorite.ChapterVisual.UNREAD
-                                val pageIndex = st?.pageIndex
-                                    ?: if (progress?.lastChapterId == chapter.id) progress.lastPageIndex else 0
-                                val pageCount = st?.pageCount?.takeIf { it > 0 }
-                                    ?: if (progress?.lastChapterId == chapter.id) progress.lastPageCount else 0
-                                ChapterCardSpec(
-                                    title = chapter.title,
-                                    visual = visual,
-                                    lastPage = pageIndex,
-                                    pageCount = pageCount,
-                                    isNew = chapter.id in newIds,
-                                    downloaded = chapter.id in downloadedChapterIds,
-                                    downloading = chapter.id in downloadingChapters,
-                                    downloadProgress = downloadProgress[chapter.id] ?: 0f,
-                                    external = chapter.external,
-                                    highlighted = highlightId == chapter.id,
-                                    selecting = selectionMode && !textMode,
-                                    checked = chapter.id in selectedChapterIds,
-                                    textMode = textMode,
-                                    bookmarked = chapter.id in bookmarkedChapterIds,
-                                    // 神回章节不可加书签：神回 map 加载完成前不武装手势（写入侧另有兜底）
-                                    bookmarkEnabled = if (godMomentsReady) {
-                                        godMoments[chapter.id] == null && onSetChapterBookmark != null
+                                },
+                                onDownload = {
+                                    val chapter2 = chapters.firstOrNull { it.id == g.chapterId }
+                                    if (chapter2 == null || chapter2.external) {
+                                        AppToast.makeText(context, "站外链接章节暂不支持下载", Toast.LENGTH_SHORT).show()
                                     } else {
-                                        false
-                                    },
-                                    onClick = {
-                                        if (selectionMode && !textMode) {
-                                            if (chapter.id in selectedChapterIds) {
-                                                selectedChapterIds.remove(chapter.id)
-                                            } else {
-                                                selectedChapterIds.add(chapter.id)
-                                            }
-                                        } else if (chapter.external) {
-                                            AppToast.makeText(context, "站外链接章节暂不支持在线阅读", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            onReadChapterAt(chapter, if (visual == com.example.ui.favorite.ChapterVisual.UNREAD) 0 else pageIndex)
-                                        }
-                                    },
-                                    onDownload = {
-                                        if (chapter.external) {
-                                            AppToast.makeText(context, "站外链接章节暂不支持下载", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            onDownloadChapter(chapter)
-                                        }
-                                    },
-                                    onToggleBookmark = {
-                                        onSetChapterBookmark?.invoke(
-                                            chapter.id,
-                                            entry.order,
-                                            chapter.id !in bookmarkedChapterIds,
-                                        )
-                                    },
-                                    onLongPress = {
-                                        // 长按普通章节 = 进入多选并自动选中该话（顶栏随之切换）
+                                        onDownloadChapter(chapter2)
+                                    }
+                                },
+                                onToggleCheck = { toggleChapter(g.chapterId) },
+                                onLongPress = { godBinding.openEdit(g) },
+                            )
+                        }
+                        itemsIndexed(normalChapters, key = { _, item -> item.chapter.id }) { index, entry ->
+                            val chapter = entry.chapter
+                            val st = chapterStates[chapter.id]
+                            val visual = st?.state?.toVisual() ?: com.example.ui.favorite.ChapterVisual.UNREAD
+                            val pageIndex = st?.pageIndex
+                                ?: if (progress?.lastChapterId == chapter.id) progress.lastPageIndex else 0
+                            val pageCount = st?.pageCount?.takeIf { it > 0 }
+                                ?: if (progress?.lastChapterId == chapter.id) progress.lastPageCount else 0
+                            ChapterCardSpec(
+                                title = chapter.title,
+                                modifier = Modifier.wenkuPagePart(godList.size + index + 4)
+                                    .then(if (reduceMotion) Modifier else Modifier.animateItem()),
+                                canSelect = chapter.id in selectableIds,
+                                visual = visual,
+                                lastPage = pageIndex,
+                                pageCount = pageCount,
+                                isNew = chapter.id in newIds,
+                                downloaded = chapter.id in downloadedChapterIds,
+                                downloading = chapter.id in downloadingChapters,
+                                downloadProgress = downloadProgress[chapter.id] ?: 0f,
+                                external = chapter.external,
+                                highlighted = highlightId == chapter.id,
+                                selecting = selectionMode && !textMode,
+                                checked = chapter.id in effectiveSelection,
+                                textMode = textMode,
+                                bookmarked = chapter.id in bookmarkedChapterIds,
+                                // 神回章节不可加书签：神回 map 加载完成前不武装手势（写入侧另有兜底）
+                                bookmarkEnabled = if (godMomentsReady) {
+                                    godMoments[chapter.id] == null && onSetChapterBookmark != null
+                                } else {
+                                    false
+                                },
+                                onClick = {
+                                    if (selectionMode && !textMode) {
+                                        toggleChapter(chapter.id)
+                                    } else if (chapter.external) {
+                                        AppToast.makeText(context, "站外链接章节暂不支持在线阅读", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        onReadChapterAt(chapter, if (visual == com.example.ui.favorite.ChapterVisual.UNREAD) 0 else pageIndex)
+                                    }
+                                },
+                                onDownload = {
+                                    if (chapter.external) {
+                                        AppToast.makeText(context, "站外链接章节暂不支持下载", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        onDownloadChapter(chapter)
+                                    }
+                                },
+                                onToggleBookmark = {
+                                    onSetChapterBookmark?.invoke(
+                                        chapter.id,
+                                        entry.order,
+                                        chapter.id !in bookmarkedChapterIds,
+                                    )
+                                },
+                                onLongPress = {
+                                    // 长按普通章节 = 进入多选并自动选中该话（顶栏随之切换）
+                                    if (!textMode && chapter.id in selectableIds) {
                                         selectionMode = true
-                                        if (entry.chapter.id !in selectedChapterIds) {
-                                            selectedChapterIds.add(entry.chapter.id)
-                                        }
-                                    },
-                                )
-                            }
+                                        if (chapter.id !in selectedChapterIds) toggleChapter(chapter.id)
+                                    }
+                                },
+                            )
                         }
                     }
                 }
@@ -773,20 +656,21 @@ fun ComicChaptersScreen(
     }
 }
 
-/* ══════════════ 快捷胶囊 ══════════════ */
+@Composable
+private fun DirectoryHeadingSkeleton() {
+    Box(Modifier.fillMaxWidth().height(32.dp), contentAlignment = Alignment.CenterStart) {
+        WenkuSkeletonBlock(Modifier.fillMaxWidth(.36f).height(14.dp))
+    }
+}
 
 @Composable
-private fun QuickPill(text: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .height(30.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .border(0.5.dp, SolidColor(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)), RoundedCornerShape(16.dp))
-            .pullOutClickable(onClick = onClick)
-            .padding(horizontal = 12.dp),
-        contentAlignment = Alignment.Center,
+private fun ComicDirectorySkeleton() {
+    Column(
+        Modifier.fillMaxWidth().padding(top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(text, fontSize = 13.sp, color = MaterialTheme.colorScheme.onBackground)
+        DirectoryHeadingSkeleton()
+        repeat(4) { WenkuSkeletonBlock(Modifier.fillMaxWidth().height(56.dp)) }
     }
 }
 
@@ -814,6 +698,8 @@ private fun ChapterCardSpec(
     onDownload: () -> Unit,
     onToggleBookmark: () -> Unit,
     onLongPress: () -> Unit,
+    modifier: Modifier = Modifier,
+    canSelect: Boolean = true,
 ) {
     val isCurrent = visual == com.example.ui.favorite.ChapterVisual.READING
     val isRead = visual == com.example.ui.favorite.ChapterVisual.READ
@@ -841,7 +727,7 @@ private fun ChapterCardSpec(
     val view = LocalView.current
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .zIndex(if (dragActive) 1f else 0f)
             .graphicsLayer { translationX = dragAnim.value }
@@ -869,6 +755,7 @@ private fun ChapterCardSpec(
                 }
             )
             .semantics {
+                if (selecting && canSelect) selected = checked
                 contentDescription = buildString {
                     append(title)
                     append("，")
@@ -885,7 +772,7 @@ private fun ChapterCardSpec(
             }
             .then(
                 if (selecting) {
-                    Modifier.pullOutClickable(onClick = onClick)
+                    Modifier.pullOutClickable(enabled = canSelect, onClick = onClick)
                 } else {
                     Modifier.pullOutCombinedClickable(
                         onClick = onClick,
@@ -960,7 +847,8 @@ private fun ChapterCardSpec(
                     isNew -> "新"
                     else -> "未读"
                 }
-                val caption = listOfNotNull(label, status).joinToString(" · ")
+                val labelAlreadyInTitle = label?.filterNot(Char::isWhitespace) == title.filterNot(Char::isWhitespace)
+                val caption = if (label == null || labelAlreadyInTitle) status else "$label · $status"
                 Text(
                     text = caption,
                     fontSize = 12.sp,
@@ -987,15 +875,14 @@ private fun ChapterCardSpec(
                 modifier = Modifier.size(40.dp)
                     .then(
                         when {
-                            selecting -> Modifier.clip(CircleShape).pullOutClickable(onClick = onClick)
-                            downloading || downloaded || external || textMode -> Modifier
-                            else -> Modifier.pullOutClickable(onClick = onDownload)
+                            selecting && canSelect -> Modifier.clip(CircleShape).pullOutClickable(onClick = onClick)
+                            else -> Modifier
                         }
                     ),
                 contentAlignment = Alignment.Center,
             ) {
                 when {
-                    selecting -> CheckCircleSpec(checked = checked)
+                    selecting -> if (canSelect) CheckCircleSpec(checked = checked)
                     downloading -> CircularProgressIndicator(
                         progress = { downloadProgress.coerceIn(0f, 1f) },
                         modifier = Modifier.size(20.dp),
@@ -1003,18 +890,21 @@ private fun ChapterCardSpec(
                         color = MintPrimary,
                         trackColor = MintPrimary.copy(alpha = 0.18f),
                     )
-                    downloaded -> Icon(
-                        Icons.Filled.Download,
-                        contentDescription = "已下载",
+                    downloaded -> WenkuIcon(
+                        WenkuSymbol.Check,
+                        modifier = Modifier.semantics { contentDescription = "已下载" },
+                        size = 20.dp,
                         tint = MintPrimary,
-                        modifier = Modifier.size(20.dp),
                     )
-                    external || textMode -> Unit
-                    else -> Icon(
-                        Icons.Filled.Download,
+                    external || textMode -> WenkuIcon(WenkuSymbol.Forward, size = 18.dp, tint = textMuted)
+                    else -> AppIconButton(
+                        icon = Icons.Filled.Download,
                         contentDescription = "下载",
+                        onClick = onDownload,
+                        modifier = Modifier.size(40.dp),
                         tint = textMuted,
-                        modifier = Modifier.size(20.dp),
+                        glyphSize = 20.dp,
+                        wenkuSymbol = WenkuSymbol.Download,
                     )
                 }
             }
@@ -1072,6 +962,8 @@ private fun GodCardSpec(
     onDownload: () -> Unit,
     onToggleCheck: () -> Unit,
     onLongPress: () -> Unit,
+    modifier: Modifier = Modifier,
+    canSelect: Boolean = true,
 ) {
     val shape = RoundedCornerShape(14.dp)
     val view = LocalView.current
@@ -1092,7 +984,7 @@ private fun GodCardSpec(
     )
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
@@ -1104,37 +996,33 @@ private fun GodCardSpec(
                 SolidColor(if (isSelected) MintPrimary else GodGoldStroke),
                 shape,
             )
+            .semantics { if (selecting && canSelect) selected = checked }
             .pullOutCombinedClickable(
+                enabled = !selecting || canSelect,
                 onClick = onOpen,
-                onLongClick = {
+                onLongClick = if (selecting) null else ({
                     if (HapticsGate.enabled) {
                         view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
                     }
                     onLongPress()
-                },
+                }),
             ),
     ) {
-        // 背景：神回封面填满 + 左深右浅暗层
+        Box(
+            Modifier.matchParentSize().background(
+                Brush.horizontalGradient(listOf(Color(0xFF242833), Color(0xFF3A3140))),
+            ),
+        )
         if (!god.coverPath.isNullOrBlank()) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(java.io.File(god.coverPath!!))
+                    .data(java.io.File(god.coverPath))
                     .memoryCacheKey("god_cover_${god.coverPath}_${god.updatedAt}")
                     .crossfade(220)
                     .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize(),
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(Color(0xFF242833), Color(0xFF3A3140))
-                        )
-                    )
             )
         }
         Box(
@@ -1196,7 +1084,7 @@ private fun GodCardSpec(
             Box(
                 modifier = Modifier.size(40.dp)
                     .then(
-                        if (selecting) {
+                        if (selecting && canSelect) {
                             Modifier.clip(CircleShape).pullOutClickable(onClick = onToggleCheck)
                         } else {
                             Modifier
@@ -1204,12 +1092,12 @@ private fun GodCardSpec(
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (selecting) {
+                if (selecting && canSelect) {
                     CheckCircleSpec(
                         checked = checked,
                         uncheckedStroke = Color.White.copy(alpha = 0.70f),
                     )
-                } else {
+                } else if (!selecting) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Filled.Star,
@@ -1227,17 +1115,15 @@ private fun GodCardSpec(
                 }
             }
             if (!selecting) {
-                Box(
-                    modifier = Modifier.size(40.dp).pullOutClickable(onClick = onDownload),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Filled.Download,
-                        contentDescription = "下载",
-                        tint = Color.White.copy(alpha = 0.70f),
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
+                AppIconButton(
+                    icon = Icons.Filled.Download,
+                    contentDescription = "下载",
+                    onClick = onDownload,
+                    modifier = Modifier.size(40.dp),
+                    tint = Color.White.copy(alpha = 0.70f),
+                    glyphSize = 20.dp,
+                    wenkuSymbol = WenkuSymbol.Download,
+                )
             }
         }
 
@@ -1281,160 +1167,122 @@ private fun CheckCircleSpec(checked: Boolean, uncheckedStroke: Color = MaterialT
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ComicHeroHeader(book: SearchBook?, textMode: Boolean, onTextClick: (String) -> Unit) {
+private fun ComicHeroHeader(
+    book: SearchBook?,
+    textMode: Boolean,
+    onTextClick: (String) -> Unit,
+    onOpenCover: ((SearchBook) -> Unit)?,
+) {
     if (book == null) return
     var descriptionExpanded by remember(book.sourceId, book.id) { mutableStateOf(false) }
-    val scrimSurface = MaterialTheme.colorScheme.surface
+    val colors = wenkuColors()
+    val fontScale = LocalDensity.current.fontScale
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))) {
-            if (!book.cover.isNullOrBlank()) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        BoxWithConstraints(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
+                .background(colors.panel)
+        ) {
+            if (!textMode && !book.cover.isNullOrBlank()) {
                 AsyncImage(
                     model = book.cover,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp)
-                        .graphicsLayer {
-                            // RenderEffect 仅 API 31+；低版本直接调用会 VerifyError
-                            renderEffect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                android.graphics.RenderEffect
-                                    .createBlurEffect(30f, 30f, android.graphics.Shader.TileMode.CLAMP)
-                                    .asComposeRenderEffect()
-                            } else {
-                                null
-                            }
-                        }
-                        .then(
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                Modifier
-                            } else {
-                                Modifier.drawWithContent {
-                                    drawContent()
-                                    drawRect(
-                                        Brush.verticalGradient(
-                                            listOf(
-                                                scrimSurface.copy(alpha = 0.40f),
-                                                scrimSurface.copy(alpha = 0.30f),
-                                            )
-                                        )
-                                    )
-                                    drawRect(
-                                        Brush.linearGradient(
-                                            listOf(
-                                                Color.White.copy(alpha = 0.10f),
-                                                Color.Transparent,
-                                                Color.Black.copy(alpha = 0.08f),
-                                            )
-                                        )
-                                    )
-                                }
-                            }
-                        ),
+                    modifier = Modifier.matchParentSize().blur(24.dp),
                 )
-            } else {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
-                                    MaterialTheme.colorScheme.secondary.copy(alpha = 0.65f),
-                                )
-                            )
-                        )
+                    Modifier.matchParentSize().background(
+                        Brush.verticalGradient(listOf(colors.panel.copy(alpha = .44f), colors.panel.copy(alpha = .96f)))
+                    )
                 )
             }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(300.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Black.copy(alpha = 0.45f), Color.Black.copy(alpha = 0.82f))
-                        )
-                    )
-            )
-            Row(
-                modifier = Modifier.align(Alignment.BottomStart).padding(16.dp),
-                verticalAlignment = Alignment.Bottom,
-            ) {
+            val wide = maxWidth >= 650.dp
+            val stacked = fontScale >= 1.45f && !wide
+            val coverWidth = if (wide) 150.dp else 118.dp
+            val cover: @Composable () -> Unit = {
+                val shape = RoundedCornerShape(10.dp)
+                val coverAction = if (onOpenCover != null && !book.cover.isNullOrBlank()) {
+                    Modifier.semantics { contentDescription = "查看封面" }
+                        .pullOutClickable(role = Role.Button, onClick = { onOpenCover(book) })
+                } else {
+                    Modifier
+                }
                 Box(
-                    modifier = Modifier
-                        .width(120.dp)
-                        .height(170.dp)
-                        .consistentShadow(12.dp, RoundedCornerShape(12.dp))
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.Gray.copy(alpha = 0.3f))
+                    modifier = Modifier.size(coverWidth, coverWidth * 1.4f)
+                        .consistentShadow(8.dp, shape)
+                        .clip(shape)
+                        .background(colors.raised)
+                        .then(coverAction),
+                    contentAlignment = Alignment.Center,
                 ) {
                     if (!book.cover.isNullOrBlank()) {
                         AsyncImage(
                             model = book.cover,
-                            contentDescription = book.title,
+                            contentDescription = if (onOpenCover == null) book.title else null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize().catalogCoverMotion(book.sourceId, book.id),
                         )
                     } else {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.Filled.MenuBook,
-                                contentDescription = null,
-                                tint = Color.White.copy(alpha = 0.8f),
-                                modifier = Modifier.size(36.dp),
+                        WenkuIcon(WenkuSymbol.Book, size = 36.dp, tint = colors.inkSecondary)
+                    }
+                }
+            }
+            val metadata: @Composable (Modifier) -> Unit = { modifier ->
+                SelectionContainer(modifier) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = book.title,
+                            modifier = Modifier.wenkuReveal(0, axis = WenkuRevealAxis.Horizontal)
+                                .comicSearchActions(if (textMode) "书名" else "漫画名", book.title, onTextClick),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontSize = if (wide) 28.sp else 24.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = colors.ink,
+                        )
+                        val hasAuthor = book.author.isKnownComicAuthor()
+                        Text(
+                            text = if (hasAuthor) book.author else "源站未提供作者",
+                            modifier = Modifier.wenkuReveal(1, axis = WenkuRevealAxis.Horizontal).then(
+                                if (hasAuthor) Modifier.comicSearchActions("作者名", book.author, onTextClick) else Modifier,
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.inkSecondary,
+                        )
+                        Surface(shape = RoundedCornerShape(50), color = colors.raised) {
+                            Text(
+                                text = if (textMode) "小说" else "漫画",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = colors.ink,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            )
+                        }
+                        book.comicId?.trim()?.takeIf { it.isNotEmpty() }?.let { comicId ->
+                            Text(
+                                text = "编号：$comicId",
+                                modifier = Modifier.comicSearchActions("作品编号", comicId, onTextClick),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.inkSecondary,
                             )
                         }
                     }
                 }
-                Spacer(Modifier.width(14.dp))
-                SelectionContainer(modifier = Modifier.weight(1f)) {
-                Column {
-                    Text(
-                        text = book.title,
-                        modifier = Modifier.comicSearchActions(if (textMode) "书名" else "漫画名", book.title, onTextClick),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Surface(shape = RoundedCornerShape(50), color = Color.White.copy(alpha = 0.18f)) {
-                        Text(
-                            text = if (textMode) "小说" else "漫画",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        )
-                    }
-                    if (book.author.isKnownComicAuthor()) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "作者：${book.author}",
-                            modifier = Modifier.comicSearchActions("作者名", book.author, onTextClick),
-                            fontSize = 12.sp,
-                            color = Color.White.copy(alpha = 0.75f),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    if (!book.author.isKnownComicAuthor()) {
-                        Spacer(Modifier.height(6.dp))
-                        Text("源站未提供作者", fontSize = 12.sp, color = Color.White.copy(alpha = 0.75f))
-                    }
-                    book.comicId?.trim()?.takeIf { it.isNotBlank() }?.let { comicId ->
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "编号：$comicId",
-                            modifier = Modifier.comicSearchActions("作品编号", comicId, onTextClick),
-                            fontSize = 12.sp,
-                            color = Color.White.copy(alpha = 0.75f),
-                        )
-                    }
+            }
+            if (stacked) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    cover()
+                    metadata(Modifier.fillMaxWidth())
                 }
+            } else {
+                Row(
+                    Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (wide) 24.dp else 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    cover()
+                    metadata(Modifier.weight(1f))
                 }
             }
         }
@@ -1443,7 +1291,7 @@ private fun ComicHeroHeader(book: SearchBook?, textMode: Boolean, onTextClick: (
         // 简介：默认 3 行，可展开
         val desc = book.description?.takeIf { it.isNotBlank() }
         if (desc != null) {
-            Spacer(Modifier.height(12.dp))
+            WenkuSectionHeader("01", "SYNOPSIS", "简介", Modifier.wenkuPagePart(2))
             SelectionContainer { Text(
                 text = desc,
                 fontSize = 13.sp,
@@ -1452,9 +1300,9 @@ private fun ComicHeroHeader(book: SearchBook?, textMode: Boolean, onTextClick: (
                 overflow = TextOverflow.Ellipsis,
             ) }
             if (desc.length > 60) {
-                PullOutTextButton(onClick = { descriptionExpanded = !descriptionExpanded }) {
-                    Text(if (descriptionExpanded) "收起" else "展开")
-                }
+                WenkuTextButton(if (descriptionExpanded) "收起" else "展开",
+                    onClick = { descriptionExpanded = !descriptionExpanded }, compact = true,
+                    wenkuSymbol = if (descriptionExpanded) WenkuSymbol.Up else WenkuSymbol.Down)
             }
         } else if (!textMode) {
             Text("源站暂未提供简介", modifier = Modifier.padding(top = 12.dp),
@@ -1531,14 +1379,13 @@ private fun DownloadProgressOverlay(
                     onClick = if (paused) onResume else onPause,
                     sizeDp = 36
                 )
-                AppIconButton(onClick = onCancel, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "取消下载",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                AppIconButton(
+                    icon = Icons.Default.Close,
+                    contentDescription = "取消下载",
+                    tint = MaterialTheme.colorScheme.error,
+                    glyphSize = 20.dp,
+                    onClick = onCancel, modifier = Modifier.size(36.dp)
+                )
             }
         }
     }

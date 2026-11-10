@@ -1,52 +1,26 @@
 package com.example.ui
 
 
-import com.example.ui.components.PullOutTextButton
-import com.example.ui.components.PullOutAlertDialog
-import com.example.ui.components.PullOutDialog
-import com.example.ui.components.pullOutClickable
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.ui.components.AppIconButton
+import com.example.ui.components.paperDismiss
+import com.example.ui.wenku.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,7 +35,7 @@ import com.example.download.DownloadTaskEntity
  * 逐文件/逐目录列表（可读名+大小），单删、批删、全选、全清。
  * 漫画译文缓存条目附加智能标签（原文→译文，复用 TranslationCacheIndex）。
  *
- * 窗口开合统一由 PullOutDialog 驱动，避免独立缩放与纸面竞争。
+ * 文件扫描与删除使用相同的索引和写入保护。
  */
 data class StorageFileEntry(
     val file: File,
@@ -254,6 +228,7 @@ fun StorageDetailDialog(
     val scope = rememberCoroutineScope()
     var entries by remember { mutableStateOf<List<StorageFileEntry>>(emptyList()) }
     var scanning by remember { mutableStateOf(true) }
+    var deleting by remember { mutableStateOf(false) }
     val checked = remember { mutableStateMapOf<File, Boolean>() }
     var pendingDeletion by remember { mutableStateOf<List<File>?>(null) }
 
@@ -272,203 +247,154 @@ fun StorageDetailDialog(
                 entries = StorageDetailIndex.scan(rowKey, targets, books, tasks).map {
                     if (allowDelete) it else it.copy(deletable = false)
                 }
-                checked.keys.retainAll(entries.map { it.file }.toSet())
+                checked.keys.retainAll(entries.filter { it.deletable }.map { it.file }.toSet())
             } finally {
                 scanning = false
             }
         }
     }
-    fun requestDeletion(files: List<File>) {
-        if (files.isEmpty()) return
-        if (confirmTip != null) {
-            pendingDeletion = files
-        } else {
-            scope.launch {
+    fun deleteFiles(files: List<File>) {
+        if (deleting || scanning) return
+        deleting = true
+        scope.launch {
+            try {
                 StorageDetailIndex.delete(files, rowKey)
                 onChanged()
                 refresh()
+            } finally {
+                deleting = false
             }
         }
     }
-    LaunchedEffect(Unit) {
-        refresh()
+
+    fun requestDeletion(files: List<File>) {
+        if (files.isEmpty() || scanning || deleting) return
+        if (confirmTip != null) pendingDeletion = files else deleteFiles(files)
     }
 
-    val selectedFiles = entries.filter { checked[it.file] == true }.map { it.file }
-    val totalSize = entries.sumOf { it.size }
+    LaunchedEffect(Unit) { refresh() }
 
-    PullOutDialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Folder, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Spacer(Modifier.weight(1f))
-                    Icon(
-                        Icons.Filled.Close, contentDescription = "关闭",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .pullOutClickable(onClick = com.example.ui.components.paperDismiss(onDismiss)),
-                    )
-                }
-                Text(
-                    if (scanning) "扫描中…" else "${entries.size} 项 · 共 ${formatCacheSize(totalSize)}",
-                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-                Spacer(Modifier.height(10.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                Spacer(Modifier.height(6.dp))
+    val eligibleFiles = entries.filter { it.deletable }
+    val selectedFiles = eligibleFiles.filter { checked[it.file] == true }
+    val allSelected = eligibleFiles.isNotEmpty() && selectedFiles.size == eligibleFiles.size
+    val canEdit = allowDelete && !scanning && !deleting
+    val colors = MaterialTheme.colorScheme
 
-                if (!scanning && entries.isEmpty()) {
-                    Box(Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
-                        Text("暂无可管理的内容", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+    WenkuSheetDialog(onDismissRequest = onDismiss, dismissGesturesEnabled = !deleting) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val maxListHeight = maxHeight * .60f
+            WenkuLoadedContentSequence(contentKey = scanning) {
+                Column(Modifier.fillMaxWidth().padding(start = 18.dp, top = 14.dp, end = 18.dp, bottom = 24.dp)) {
+                    Row(Modifier.fillMaxWidth().wenkuPagePart(0), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                            val status = when {
+                                deleting -> "正在清理…"
+                                scanning -> "扫描中…"
+                                else -> "${entries.size} 项 · 共 ${formatCacheSize(entries.sumOf { it.size })}"
+                            }
+                            Text(status, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                        }
+                        AppIconButton(Icons.Filled.Close, "关闭面板", onClick = paperDismiss {}, enabled = !deleting)
                     }
-                } else {
-                    LazyColumn(
-                        Modifier.fillMaxWidth().height(340.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        if (allowDelete) item(key = "select_all") {
-                            Row(
-                                Modifier.fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .pullOutClickable {
-                                        val allOn = entries.isNotEmpty() && entries.all { checked[it.file] == true }
-                                        entries.forEach { if (it.deletable) checked[it.file] = !allOn }
-                                    }
-                                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    if (entries.isNotEmpty() && entries.all { checked[it.file] == true || !it.deletable }) "取消全选"
-                                    else "全选",
-                                    fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                                Spacer(Modifier.weight(1f))
-                                if (selectedFiles.isNotEmpty()) {
-                                    Text(
-                                        "已选 ${selectedFiles.size} 项 / ${formatCacheSize(entries.filter { checked[it.file] == true }.sumOf { it.size })}",
-                                        fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    Spacer(Modifier.height(8.dp))
+                    if (entries.isEmpty()) {
+                        Text(
+                            if (scanning) "正在读取存储内容…" else "暂无可管理的内容",
+                            Modifier.padding(vertical = 18.dp).wenkuPagePart(1),
+                            style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
+                        )
+                    } else {
+                        LazyColumn(
+                            Modifier.fillMaxWidth().heightIn(max = maxListHeight),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            contentPadding = PaddingValues(vertical = 6.dp),
+                        ) {
+                            if (eligibleFiles.isNotEmpty()) {
+                                item(key = "select_all") {
+                                    WenkuTextButton(
+                                        if (allSelected) "取消全选" else "全选",
+                                        onClick = { eligibleFiles.forEach { checked[it.file] = !allSelected } },
+                                        modifier = Modifier.fillMaxWidth().wenkuPagePart(1),
+                                        enabled = canEdit, selected = allSelected, compact = true,
+                                        wenkuSymbol = if (allSelected) WenkuSymbol.Selected else WenkuSymbol.Circle,
                                     )
                                 }
                             }
-                        }
-                        items(entries, key = { it.file.absolutePath }) { entry ->
-                            Row(
-                                Modifier.fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .then(
-                                        if (entry.deletable) Modifier.pullOutClickable {
-                                            checked[entry.file] = !(checked[entry.file] ?: false)
-                                        } else Modifier
-                                    )
-                                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                if (entry.deletable) {
-                                    Box(
-                                        Modifier
-                                            .size(18.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                if (checked[entry.file] == true) MaterialTheme.colorScheme.primary
-                                                else MaterialTheme.colorScheme.surfaceVariant
-                                            ),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        if (checked[entry.file] == true) {
-                                            Text("✓", color = MaterialTheme.colorScheme.onPrimary, fontSize = 11.sp)
+                            itemsIndexed(entries, key = { _, entry -> entry.file.absolutePath }) { index, entry ->
+                                val isSelected = entry.deletable && checked[entry.file] == true
+                                WenkuContentPanel(
+                                    Modifier.fillMaxWidth().wenkuPagePart(index + 2).semantics {
+                                        if (entry.deletable) selected = isSelected
+                                    },
+                                    onClick = if (canEdit && entry.deletable) ({
+                                        checked[entry.file] = !isSelected
+                                    }) else null,
+                                    contentPadding = PaddingValues(start = 10.dp, end = 4.dp, top = 3.dp, bottom = 3.dp),
+                                ) {
+                                    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                        verticalAlignment = Alignment.CenterVertically) {
+                                        if (entry.deletable) {
+                                            WenkuIcon(
+                                                if (isSelected) WenkuSymbol.Selected else WenkuSymbol.Circle,
+                                                size = 16.dp,
+                                                tint = if (isSelected) colors.primary else colors.onSurfaceVariant,
+                                                entrance = false,
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                        }
+                                        Column(Modifier.weight(1f)) {
+                                            Text(entry.label, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                                style = MaterialTheme.typography.labelLarge)
+                                            if (entry.sublabel.isNotEmpty()) {
+                                                Text(entry.sublabel, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                                    style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                                            }
+                                            Text(formatCacheSize(entry.size), style = MaterialTheme.typography.bodySmall,
+                                                color = colors.primary)
+                                        }
+                                        if (entry.deletable) {
+                                            AppIconButton(Icons.Filled.Delete, "清理 ${entry.label}",
+                                                onClick = { requestDeletion(listOf(entry.file)) }, enabled = canEdit,
+                                                tint = colors.error, glyphSize = 17.dp, wenkuSymbol = WenkuSymbol.Delete)
                                         }
                                     }
-                                    Spacer(Modifier.width(10.dp))
-                                }
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        entry.label, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                        fontWeight = FontWeight.Medium,
-                                    )
-                                    if (entry.sublabel.isNotEmpty()) {
-                                        Text(
-                                            entry.sublabel, fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                }
-                                Text(
-                                    formatCacheSize(entry.size), fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                                if (entry.deletable) {
-                                    Spacer(Modifier.width(8.dp))
-                                    Icon(
-                                        Icons.Filled.Delete, contentDescription = "删除",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                        modifier = Modifier
-                                            .size(18.dp)
-                                            .pullOutClickable {
-                                                requestDeletion(listOf(entry.file))
-                                            },
-                                    )
                                 }
                             }
                         }
                     }
+                    if (eligibleFiles.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "已选 ${selectedFiles.size} 项 · ${formatCacheSize(selectedFiles.sumOf { it.size })}",
+                            style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            WenkuTextButton(
+                                "全部清理", { requestDeletion(eligibleFiles.map { it.file }) }, Modifier.weight(1f),
+                                enabled = canEdit, compact = true, color = colors.error, wenkuSymbol = WenkuSymbol.Delete,
+                            )
+                            WenkuTextButton(
+                                "删除所选", { requestDeletion(selectedFiles.map { it.file }) }, Modifier.weight(1f),
+                                enabled = canEdit && selectedFiles.isNotEmpty(), selected = true, compact = true,
+                                wenkuSymbol = WenkuSymbol.Check,
+                            )
+                        }
+                    }
                 }
-
-                Spacer(Modifier.height(8.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                Spacer(Modifier.height(8.dp))
-                if (allowDelete) Row {
-                    PullOutTextButton(
-                        onClick = {
-                            requestDeletion(entries.filter { it.deletable }.map { it.file })
-                        },
-                        enabled = entries.any { it.deletable } && !scanning,
-                    ) { Text("全部清理", color = MaterialTheme.colorScheme.error) }
-                    Spacer(Modifier.weight(1f))
-                    PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Text("关闭") }
-                    PullOutTextButton(
-                        onClick = {
-                            requestDeletion(selectedFiles)
-                        },
-                        enabled = selectedFiles.isNotEmpty(),
-                    ) { Text("删除所选（${selectedFiles.size}）") }
-                }
-                else PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Text("关闭") }
             }
         }
     }
     pendingDeletion?.let { files ->
         val selectedBytes = entries.filter { it.file in files }.sumOf { it.size }
-        PullOutAlertDialog(
-            onDismissRequest = { pendingDeletion = null },
-            title = { Text("确认清理 ${files.size} 项") },
-            text = { Text("预计清理 ${formatCacheSize(selectedBytes)}。\n\n${confirmTip.orEmpty()}") },
-            confirmButton = {
-                PullOutTextButton(onClick = {
-                    pendingDeletion = null
-                    scope.launch {
-                        StorageDetailIndex.delete(files, rowKey)
-                        onChanged()
-                        refresh()
-                    }
-                }) { Text("清理") }
-            },
-            dismissButton = {
-                PullOutTextButton(onClick = { pendingDeletion = null }) { Text("取消") }
-            }
-        )
+        WenkuActionSheet("确认清理 ${files.size} 项", onDismiss = { pendingDeletion = null }) {
+            Text("预计清理 ${formatCacheSize(selectedBytes)}。")
+            Text(confirmTip.orEmpty(), color = colors.onSurfaceVariant)
+            WenkuTextButton("清理", onClick = paperDismiss { deleteFiles(files) }, modifier = Modifier.fillMaxWidth(),
+                color = colors.error, wenkuSymbol = WenkuSymbol.Delete)
+            WenkuTextButton("取消", onClick = paperDismiss {}, modifier = Modifier.fillMaxWidth(),
+                wenkuSymbol = WenkuSymbol.Close)
+        }
     }
 }

@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.example.ui.adaptive.adaptiveDialogWidth
 import com.example.ui.adaptive.adaptiveSheetWidth
+import com.example.ui.wenku.wenkuTabTitle
+import com.example.ui.wenku.wenkuPagePart
 import me.trishiraj.shadowglow.consistentShadow
 
 /** Allows an action button to finish the same exit as back/outside dismissal. */
@@ -117,15 +119,15 @@ fun AcrylicDialog(
                         .pointerInput(Unit) { detectTapGestures(onTap = {}) }
                         .padding(24.dp)
                 ) {
-                    title?.invoke()
+                    if (title != null) Box(Modifier.wenkuTabTitle(0)) { title() }
                     if (title != null && text != null) {
                         Spacer(modifier = Modifier.height(12.dp))
                     }
-                    text?.invoke()
+                    if (text != null) Box(Modifier.wenkuPagePart(1)) { text() }
                     if (confirmButton != null || dismissButton != null) {
                         Spacer(modifier = Modifier.height(18.dp))
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().wenkuPagePart(2),
                             horizontalArrangement = Arrangement.End,
                             verticalAlignment = Alignment.CenterVertically
                         ) {

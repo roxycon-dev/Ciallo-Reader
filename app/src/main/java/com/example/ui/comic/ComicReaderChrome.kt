@@ -1,10 +1,19 @@
 package com.example.ui.comic
 
 import com.example.ui.components.PullOutIconButton
+import com.example.ui.components.AppIconButton
+import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutDropdownMenuItem
 import com.example.ui.components.PullOutDropdownMenu
 import com.example.ui.components.pullOutCombinedClickable
-import com.example.ui.components.PullOutVisibility
+import com.example.ui.wenku.WenkuReaderChromeLayer
+import com.example.ui.wenku.WenkuReaderChromePart
+import com.example.ui.wenku.WenkuReaderProgressSlider
+import com.example.ui.wenku.wenkuReaderCapsule
+import androidx.compose.runtime.State
+import com.example.ui.wenku.rememberWenkuReaderChrome
+import com.example.ui.wenku.WenkuSheetHost
+import com.example.ui.wenku.WenkuMotion
 import com.example.ui.components.paperSurface
 import com.example.ui.components.pullOutClickable
 import com.example.ui.design.DesignTokens
@@ -13,22 +22,16 @@ import com.example.ui.design.ReadingPalette
 import com.example.ui.components.overlayTouchShield
 
 import android.graphics.Bitmap
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.semantics.Role
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,6 +40,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -44,6 +48,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -73,10 +78,13 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -84,12 +92,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
@@ -100,6 +110,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.MintPrimary
@@ -110,11 +122,14 @@ import com.kashif_e.backdrop.effects.blur
 import com.kashif_e.backdrop.effects.colorControls
 import com.example.ui.adaptive.adaptiveSheetWidth
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalConfiguration
 import com.example.ui.reader.LocalReadingGlass
 import com.example.ui.reader.ReadingGlassStyle
 import com.example.ui.feedback.LocalReduceMotion
 import com.example.ui.feedback.AppMotion
+import com.example.ui.wenku.LocalWenkuIconContact
+import com.example.ui.wenku.WenkuIcon
+import com.example.ui.wenku.WenkuIconContact
+import com.example.ui.wenku.WenkuSymbol
 
 // 第 11 条：半透明面板底。第七轮第 3 条：毛玻璃路径的暗纱从 0xD9（85%）
 // 收敛到 0xCC（80%）+ 模糊加深——玻璃质感更通透、不再"接近纯黑的沉闷"；
@@ -145,7 +160,7 @@ internal fun Modifier.comicPanelGlass(backdrop: Backdrop?, shape: Shape): Modifi
             colorControls(saturation = 1.18f)
             blur(radius = DesignTokens.SpaceTight.toPx())
         },
-    ).background(PanelBgGlass.copy(alpha = .62f))
+    ).background(PanelBgGlass)
 
 /** 面板/控件的统一过渡节奏 */
 private const val ENTER_MS = 240
@@ -159,7 +174,6 @@ private const val EXIT_MS = 180
 fun ComicReaderChrome(
     visible: Boolean,
     panel: ComicPanel,
-    panelVisibility: androidx.compose.animation.core.MutableTransitionState<Boolean>,
     onPanelChange: (ComicPanel) -> Unit,
     panelGlassBackdrop: Backdrop? = null,
     settingsInitialTab: Int = 0,
@@ -204,21 +218,15 @@ fun ComicReaderChrome(
     onEditTouchZones: () -> Unit = {},
 ) {
     val reduceMotion = LocalReduceMotion.current
-    val configuration = LocalConfiguration.current
-    val wide = configuration.screenWidthDp >= 600 || configuration.screenWidthDp > configuration.screenHeightDp
+    val chrome = rememberWenkuReaderChrome(visible)
     val onDismissPanel = { onPanelChange(ComicPanel.NONE) }
     val currentRaw = (currentPage - 1).coerceIn(0, (pages.size - 1).coerceAtLeast(0))
     // 进度条拖动中的缩略图预览目标页（-1 = 关闭）
     var thumbPreviewRaw by remember { mutableStateOf(-1) }
     var thumbPreviewFraction by remember { mutableFloatStateOf(-1f) }
 
-    // 面板打开时系统返回先关面板
-    BackHandler(enabled = panel != ComicPanel.NONE) { onDismissPanel() }
-
     // 顶部控制栏
-    PullOutVisibility(
-        visible = visible,
-    ) {
+    WenkuReaderChromeLayer(chrome, visible) {
         ComicTopBar(
             title = title, chapterTitle = chapterTitle,
             config = config,
@@ -237,11 +245,9 @@ fun ComicReaderChrome(
 
     // 底部控制栏 + 悬浮缩略图气泡（气泡由 Chrome 层渲染，不占底栏布局）
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-        PullOutVisibility(
-            modifier = Modifier.onSizeChanged { onBottomBarHeightChanged(it.height) },
-            visible = visible,
-        ) {
+        Box(Modifier.onSizeChanged { onBottomBarHeightChanged(it.height) }) {
             ComicBottomBar(
+                chrome = chrome, visible = visible,
                 currentPage = currentPage, totalPages = totalPages,
                 spreadCount = spreadCount, currentSpread = currentSpread,
                 config = config,
@@ -282,78 +288,74 @@ fun ComicReaderChrome(
 
     var displayedPanel by remember { mutableStateOf(panel) }
     if (panel != ComicPanel.NONE) displayedPanel = panel
-    // Scrim and paper use exactly one retained lifecycle and physical progress.
-    com.example.ui.components.ScrimEntrance(visibility = panelVisibility) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = com.example.ui.components.PullOutConfig.SCRIM))
-                .clickableNoRipple { onDismissPanel() }
-        )
-    }
-
-    CompositionLocalProvider(com.example.ui.components.LocalPaperFullSurface provides true) {
-    PullOutVisibility(
-        visibleState = panelVisibility,
-        modifier = Modifier.fillMaxSize(), deformContent = false,
+    WenkuSheetHost(
+        visible = panel != ComicPanel.NONE,
+        anchorBounds = null,
+        onDismiss = onDismissPanel,
+        viewportContent = true
     ) {
-        CompositionLocalProvider(LocalReadingGlass provides ReadingGlassStyle(panelGlassBackdrop, Color(0xFF232329), TextPrimary)) {
-        AnimatedContent(
-            targetState = displayedPanel,
-            transitionSpec = {
-                (fadeIn(tween(if (reduceMotion) 0 else 160, delayMillis = if (reduceMotion) 0 else 65)) togetherWith
-                    fadeOut(tween(if (reduceMotion) 0 else 90))).using(SizeTransform(clip = false))
-            }, modifier = Modifier.fillMaxSize(), label = "comicPanelContent",
-        ) { activePanel ->
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            when (activePanel) {
-                ComicPanel.SETTINGS -> ComicSettingsSheet(
-                    config = config, store = store, perBookConfig = perBookConfig,
-                    onPerBookConfigChange = onPerBookConfigChange,
-                    onConfigChange = onConfigChange,
-                    onOpenPreset = { onPanelChange(ComicPanel.PRESET) },
-                    onOpenCrop = { onPanelChange(ComicPanel.CROP) },
-                    pages = pages, loader = loader,
-                    currentRawPage = currentRaw,
-                    bookState = bookState, onBookStateChange = onBookStateChange,
-                    onDismiss = onDismissPanel,
-                    glassBackdrop = panelGlassBackdrop,
-                    onDownloadTranslationModels = onDownloadTranslationModels,
-                    onTranslationRefresh = onTranslationRefresh,
-                    initialTab = settingsInitialTab,
-                    onEditTouchZones = onEditTouchZones,
-                )
-                ComicPanel.TOC -> ComicTocSheet(
-                    toc = toc, currentChapterIndex = currentChapterIndex,
-                    onJumpToChapter = onJumpToChapter,
-                    pages = pages, loader = loader,
-                    currentPage = currentPage,
-                    onJumpToRawPage = onJumpToRawPage,
-                    onDismiss = onDismissPanel,
-                    glassBackdrop = panelGlassBackdrop,
-                )
-                ComicPanel.PRESET -> ComicPresetSheet(
-                    store = store, currentConfig = config,
-                    onApply = { onConfigChange(it) },
-                    onDismiss = onDismissPanel,
-                    glassBackdrop = panelGlassBackdrop,
-                )
-                ComicPanel.CROP -> ComicCropSheet(
-                    page = pages.getOrNull(currentRaw),
-                    loader = loader, config = config,
-                    onDismiss = onDismissPanel,
-                    onApply = { l, t, r, b ->
-                        onConfigChange(config.copy(manualCrop = listOf(l, t, r, b)))
-                        onDismissPanel()
-                    },
-                )
-                ComicPanel.NONE -> Unit
+        // Only the panel boundary samples the comic. Its controls tint the panel already underneath them.
+        CompositionLocalProvider(LocalReadingGlass provides ReadingGlassStyle(ink = TextPrimary)) {
+            AnimatedContent(
+                targetState = displayedPanel,
+                transitionSpec = {
+                    if (reduceMotion) {
+                        androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None
+                    } else {
+                        val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                        slideInHorizontally(tween(280, easing = WenkuMotion.plane)) { it * direction } togetherWith
+                            slideOutHorizontally(tween(280, easing = WenkuMotion.plane)) { -it * direction }
+                    }
+                }, modifier = Modifier.fillMaxSize(), label = "comicPanelContent",
+            ) { activePanel ->
+                when (activePanel) {
+                    ComicPanel.SETTINGS -> ComicSettingsSheet(
+                        config = config, store = store, perBookConfig = perBookConfig,
+                        onPerBookConfigChange = onPerBookConfigChange,
+                        onConfigChange = onConfigChange,
+                        onOpenPreset = { onPanelChange(ComicPanel.PRESET) },
+                        onOpenCrop = { onPanelChange(ComicPanel.CROP) },
+                        pages = pages, loader = loader,
+                        currentRawPage = currentRaw,
+                        bookState = bookState, onBookStateChange = onBookStateChange,
+                        onDismiss = onDismissPanel,
+                        glassBackdrop = panelGlassBackdrop,
+                        onDownloadTranslationModels = onDownloadTranslationModels,
+                        onTranslationRefresh = onTranslationRefresh,
+                        initialTab = settingsInitialTab,
+                        onEditTouchZones = onEditTouchZones,
+                    )
+                    ComicPanel.TOC -> ComicTocSheet(
+                        toc = toc, currentChapterIndex = currentChapterIndex,
+                        onJumpToChapter = onJumpToChapter,
+                        pages = pages, loader = loader,
+                        currentPage = currentPage,
+                        onJumpToRawPage = onJumpToRawPage,
+                        onDismiss = onDismissPanel,
+                        glassBackdrop = panelGlassBackdrop,
+                    )
+                    ComicPanel.PRESET -> ComicPresetSheet(
+                        store = store, currentConfig = config,
+                        onApply = { onConfigChange(it) },
+                        onDismiss = onDismissPanel,
+                        glassBackdrop = panelGlassBackdrop,
+                    )
+                    ComicPanel.CROP -> {
+                        val close = com.example.ui.components.LocalOverlayClose.current
+                        ComicCropSheet(
+                            page = pages.getOrNull(currentRaw),
+                            loader = loader, config = config,
+                            onDismiss = onDismissPanel,
+                            onApply = { l, t, r, b ->
+                                close { onConfigChange(config.copy(manualCrop = listOf(l, t, r, b))) }
+                            },
+                        )
+                    }
+                    ComicPanel.NONE -> Unit
+                }
             }
         }
-        }
-        }
     }
-}
 }
 
 /* ══════════════ 顶栏 ══════════════ */
@@ -375,6 +377,13 @@ private fun ComicTopBar(
     // 收藏预设快捷应用（第 27 条）：长按"阅读设置"按钮直接弹出收藏列表一键应用
     var favMenuOpen by remember { mutableStateOf(false) }
     var favorites by remember { mutableStateOf(store.favoritePresets()) }
+    var settingsAnchor by remember { mutableStateOf<Rect?>(null) }
+    var menuAnchor by remember { mutableStateOf<Rect?>(null) }
+    var settingsCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var menuCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val settingsInteraction = remember { MutableInteractionSource() }
+    val settingsPressed by settingsInteraction.collectIsPressedAsState()
+    var settingsActivation by remember { mutableIntStateOf(0) }
     Column(
         Modifier
             .fillMaxWidth()
@@ -406,27 +415,39 @@ private fun ComicTopBar(
                 Box(
                     Modifier
                         .size(44.dp)
+                        .onGloballyPositioned { settingsCoordinates = it }
                         .clip(CircleShape)
+                        .semantics { contentDescription = "阅读设置" }
                         .pullOutCombinedClickable(
+                            interactionSource = settingsInteraction,
                             role = androidx.compose.ui.semantics.Role.Button,
                             onLongClick = {
+                                settingsActivation++
                                 favorites = store.favoritePresets()
-                                if (favorites.isNotEmpty()) favMenuOpen = true else onOpenPanel(ComicPanel.PRESET)
+                                if (favorites.isNotEmpty()) {
+                                    settingsAnchor = settingsCoordinates?.takeIf { it.isAttached }?.boundsInWindow()
+                                    favMenuOpen = true
+                                } else onOpenPanel(ComicPanel.PRESET)
                             },
                             indication = null,
-                            onClick = { onOpenPanel(ComicPanel.SETTINGS) },
+                            onClick = {
+                                settingsActivation++
+                                onOpenPanel(ComicPanel.SETTINGS)
+                            },
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Filled.Settings, "阅读设置",
-                        tint = TextPrimary.copy(alpha = 0.92f), modifier = Modifier.size(22.dp)
-                    )
+                    CompositionLocalProvider(
+                        LocalWenkuIconContact provides WenkuIconContact(settingsPressed, settingsActivation)
+                    ) {
+                        WenkuIcon(WenkuSymbol.Settings, size = 22.dp, tint = TextPrimary, entrance = false)
+                    }
                 }
                 PullOutDropdownMenu(
                     expanded = favMenuOpen,
                     onDismissRequest = { favMenuOpen = false },
                     containerColor = ReadingPalette.DialogSurface,
+                    anchorInWindow = settingsAnchor,
                 ) {
                     Text(
                         "收藏预设",
@@ -437,26 +458,30 @@ private fun ComicTopBar(
                         PullOutDropdownMenuItem(
                             text = { Text(p.name, color = TextPrimary) },
                             leadingIcon = { Text(p.emoji, color = MintPrimary, fontSize = DesignTokens.TypeCaption) },
-                            onClick = {
-                                favMenuOpen = false
-                                onApplyPresetConfig(p.config)
-                            },
+                            onClick = com.example.ui.components.paperDismiss { onApplyPresetConfig(p.config) },
                         )
                     }
                 }
             }
             Box {
-                ChromeIconButton(Icons.Filled.MoreHoriz, "更多") { menuOpen = true }
+                ChromeIconButton(
+                    Icons.Filled.MoreHoriz, "更多",
+                    modifier = Modifier.onGloballyPositioned { menuCoordinates = it }
+                ) {
+                    menuAnchor = menuCoordinates?.takeIf { it.isAttached }?.boundsInWindow()
+                    menuOpen = true
+                }
                 PullOutDropdownMenu(
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
                     containerColor = ReadingPalette.DialogSurface,
+                    anchorInWindow = menuAnchor,
                 ) {
                     PullOutDropdownMenuItem(
                         text = { Text("临时合页 / 取消", color = TextPrimary) },
                         leadingIcon = { Icon(Icons.Filled.AutoStories, null, tint = TextSecondary) },
                         enabled = canToggleMerge,
-                        onClick = { menuOpen = false; onToggleMerge() }
+                        onClick = com.example.ui.components.paperDismiss(onToggleMerge)
                     )
                     PullOutDropdownMenuItem(
                         text = { Text("手动裁边", color = TextPrimary) },
@@ -478,6 +503,8 @@ private fun ComicTopBar(
 
 @Composable
 private fun ComicBottomBar(
+    chrome: State<Float>,
+    visible: Boolean,
     currentPage: Int,
     totalPages: Int,
     spreadCount: Int,
@@ -498,94 +525,96 @@ private fun ComicBottomBar(
     onJumpToScrollFraction: ((Float) -> Unit)? = null,
     spreadAtScrollFraction: (Float) -> Int = { 0 },
 ) {
-    var dragging by remember { mutableStateOf(false) }
-    val scrollFraction = continuousFractionSource?.invoke() ?: continuousFraction
-    val scrolling = scrollFraction in 0f..1f && onJumpToScrollFraction != null
-    val sliderRange = 0f..if (scrolling) 1f else (spreadCount - 1).coerceAtLeast(1).toFloat()
-    val sliderValue = if (scrolling) scrollFraction else currentSpread.toFloat()
-    var dragTarget by remember(scrolling) { mutableFloatStateOf(sliderValue) }
-    val sliderEnabled = spreadCount > 1 || scrolling
     val reverse = config.direction == ComicDirection.RTL &&
         config.mode !in setOf(ComicMode.WEBTOON, ComicMode.CONTINUOUS)
-
     Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = DesignTokens.SpaceXl, topEnd = DesignTokens.SpaceXl))
-            .background(ReadingPalette.ChromeSurface)
-            .border(0.5.dp, StrokeColor, RoundedCornerShape(topStart = DesignTokens.SpaceXl, topEnd = DesignTokens.SpaceXl))
+        Modifier.widthIn(max = 480.dp).fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceCompact)
+            .padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceSm),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "$currentPage / $totalPages",
-                color = TextPrimary, fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.width(DesignTokens.SpaceSm))
-            Text(
-                // 垂直列表按滚动位置，其余模式按页数。
-                "· ${
-                    if (scrollFraction in 0f..1f) (scrollFraction * 100).toInt()
-                    else (currentPage.toFloat() / totalPages.coerceAtLeast(1) * 100).toInt()
-                }%",
-                color = TextSecondary, fontSize = DesignTokens.TypeCaption
-            )
-            Spacer(Modifier.weight(1f))
-            Text(
-                if (autoRead) "自动阅读中" else config.mode.label,
-                // 状态文字默认次级色；自动阅读激活态才用强调色（强调色留给可交互/激活语义）
-                color = if (autoRead) MintPrimary else TextSecondary,
-                fontSize = DesignTokens.TypeCaptionSmall
-            )
-            Spacer(Modifier.width(DesignTokens.SpaceCompact))
-            ChromeIconButton(if (reverse) Icons.Filled.ChevronRight else Icons.Filled.ChevronLeft, "上一页") { onGoPrev() }
-            ChromeIconButton(
-                if (autoRead) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                if (autoRead) "暂停自动阅读" else "开始自动阅读"
-            ) { onAutoReadToggle() }
-            ChromeIconButton(if (reverse) Icons.Filled.ChevronLeft else Icons.Filled.ChevronRight, "下一页") { onGoNext() }
-        }
+        WenkuReaderChromeLayer(chrome, visible, part = WenkuReaderChromePart.Progress) {
+            val onstage by remember(chrome) {
+                derivedStateOf { chrome.value > WenkuReaderChromePart.Progress.start }
+            }
+            val fraction = if (onstage) continuousFractionSource?.invoke() ?: continuousFraction else continuousFraction
+            val scrolling = fraction in 0f..1f && onJumpToScrollFraction != null
+            val sliderRange = 0f..if (scrolling) 1f else (spreadCount - 1).coerceAtLeast(1).toFloat()
+            val sliderValue = if (scrolling) fraction else currentSpread.toFloat()
+            var dragging by remember { mutableStateOf(false) }
+            var dragTarget by remember(scrolling) { mutableFloatStateOf(sliderValue) }
 
-        // 第七轮第 3 条：底栏进度滑条同步迁移到面板统一滑条（同一套视觉语言）
-        PanelSlider(
-            value = if (dragging) dragTarget else sliderValue,
-            onValueChange = {
-                dragging = true
-                dragTarget = it
-                val spreadIdx = (if (scrolling) spreadAtScrollFraction(it) else it.toInt())
-                    .coerceIn(0, (spreadCount - 1).coerceAtLeast(0))
-                onThumbPreview(spreadFirstRaw(spreadIdx), it / sliderRange.endInclusive)
-            },
-            onValueChangeFinished = {
-                if (scrolling) onJumpToScrollFraction?.invoke(dragTarget)
-                else onJumpToSpread(dragTarget.toInt())
-                dragging = false
-                onThumbPreview(-1, -1f)
-            },
-            formatLabel = { if (scrolling) "${(it * 100).toInt()}%" else "第 ${spreadFirstRaw(it.toInt().coerceIn(0, (spreadCount - 1).coerceAtLeast(0))) + 1} 页" },
-            enabled = sliderEnabled,
-            reverse = reverse,
-            valueRange = sliderRange,
-            modifier = Modifier.semantics {
-                contentDescription = "阅读进度"
-                progressBarRangeInfo = ProgressBarRangeInfo(sliderValue, sliderRange)
-            },
-        )
-
-        if (onPrevChapter != null || onNextChapter != null) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)
+                Modifier.fillMaxWidth().wenkuReaderCapsule(ReadingPalette.ChromeSurface, StrokeColor)
+                    .padding(horizontal = DesignTokens.SpaceComfortable),
+                horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                ChapterNavButton(
-                    "上一$chapterNavLabel", enabled = onPrevChapter != null,
+                Text("$currentPage / $totalPages", color = TextPrimary, fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Bold)
+                WenkuReaderProgressSlider(
+                    value = if (dragging) dragTarget else sliderValue,
+                    label = "阅读进度",
+                    tint = MintPrimary,
+                    onValueChange = {
+                        dragging = true
+                        dragTarget = it
+                        val spread = (if (scrolling) spreadAtScrollFraction(it) else it.toInt())
+                            .coerceIn(0, (spreadCount - 1).coerceAtLeast(0))
+                        onThumbPreview(spreadFirstRaw(spread), it / sliderRange.endInclusive)
+                    },
+                    onCommit = {
+                        if (scrolling) onJumpToScrollFraction?.invoke(dragTarget)
+                        else onJumpToSpread(dragTarget.toInt())
+                        dragging = false
+                        onThumbPreview(-1, -1f)
+                    },
+                    format = {
+                        if (scrolling) "${(it * 100).toInt()}%"
+                        else "第 ${spreadFirstRaw(it.toInt().coerceIn(0, (spreadCount - 1).coerceAtLeast(0))) + 1} 页"
+                    },
+                    enabled = spreadCount > 1 || scrolling,
+                    reverse = reverse,
+                    valueRange = sliderRange,
                     modifier = Modifier.weight(1f)
-                ) { onPrevChapter?.invoke() }
-                ChapterNavButton(
-                    "下一$chapterNavLabel", enabled = onNextChapter != null,
-                    modifier = Modifier.weight(1f)
-                ) { onNextChapter?.invoke() }
+                )
+                val percent = if (fraction in 0f..1f) fraction else currentPage.toFloat() / totalPages.coerceAtLeast(1)
+                Text("· ${(percent * 100).toInt()}%", color = TextSecondary, fontSize = DesignTokens.TypeCaption)
+            }
+        }
+        WenkuReaderChromeLayer(chrome, visible, part = WenkuReaderChromePart.Dock) {
+            Column(
+                Modifier.fillMaxWidth().wenkuReaderCapsule(ReadingPalette.ChromeSurface, StrokeColor)
+                    .padding(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceXs)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (autoRead) "自动阅读中" else config.mode.label,
+                        color = if (autoRead) MintPrimary else TextSecondary,
+                        fontSize = DesignTokens.TypeCaptionSmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    ChromeIconButton(if (reverse) Icons.Filled.ChevronRight else Icons.Filled.ChevronLeft, "上一页") { onGoPrev() }
+                    ChromeIconButton(
+                        if (autoRead) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        if (autoRead) "暂停自动阅读" else "开始自动阅读"
+                    ) { onAutoReadToggle() }
+                    ChromeIconButton(if (reverse) Icons.Filled.ChevronLeft else Icons.Filled.ChevronRight, "下一页") { onGoNext() }
+                }
+                if (onPrevChapter != null || onNextChapter != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = DesignTokens.SpaceTight),
+                        horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)
+                    ) {
+                        ChapterNavButton(
+                            "上一$chapterNavLabel", enabled = onPrevChapter != null,
+                            modifier = Modifier.weight(1f)
+                        ) { onPrevChapter?.invoke() }
+                        ChapterNavButton(
+                            "下一$chapterNavLabel", enabled = onNextChapter != null,
+                            modifier = Modifier.weight(1f)
+                        ) { onNextChapter?.invoke() }
+                    }
+                }
             }
         }
     }
@@ -593,15 +622,20 @@ private fun ComicBottomBar(
 
 @Composable
 private fun ChapterNavButton(text: String, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Box(
-        modifier
-            .clip(RoundedCornerShape(DesignTokens.RadiusSm))
-            .background(if (enabled) PanelChipBg else Color(0x10FFFFFF))
-            .clickableNoRipple { if (enabled) onClick() }
-            .padding(vertical = DesignTokens.SpaceTight),
-        contentAlignment = Alignment.Center
+    PullOutTextButton(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        shape = RoundedCornerShape(DesignTokens.RadiusSm),
+        colors = ButtonDefaults.textButtonColors(
+            containerColor = PanelChipBg,
+            contentColor = TextPrimary,
+            disabledContainerColor = Color(0x10FFFFFF),
+            disabledContentColor = Color(0x55FFFFFF)
+        ),
+        contentPadding = PaddingValues(vertical = DesignTokens.SpaceTight)
     ) {
-        Text(text, color = if (enabled) TextPrimary else Color(0x55FFFFFF), fontSize = DesignTokens.TypeCaption)
+        Text(text, fontSize = DesignTokens.TypeCaption)
     }
 }
 
@@ -650,17 +684,10 @@ internal fun ChromeIconButton(
     icon: ImageVector,
     desc: String,
     tint: Color = TextPrimary.copy(alpha = 0.92f),
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    Box(
-        Modifier
-            .size(44.dp)
-            .clip(CircleShape)
-            .clickableNoRipple(onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(icon, desc, tint = tint, modifier = Modifier.size(22.dp))
-    }
+    AppIconButton(icon, desc, onClick, modifier.size(44.dp), tint = tint)
 }
 
 internal fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier =
@@ -808,9 +835,12 @@ internal fun ComicSheetContainer(
         }
         Row(Modifier.fillMaxWidth().padding(start = DesignTokens.SpaceXl, end = DesignTokens.SpaceSm), verticalAlignment = Alignment.CenterVertically) {
             Text(title, color = TextPrimary, fontSize = DesignTokens.TypeSectionLineHeight, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            PullOutIconButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) {
-                Icon(androidx.compose.material.icons.Icons.Filled.Close, "关闭$title", tint = TextSecondary)
-            }
+            PullOutIconButton(
+                icon = androidx.compose.material.icons.Icons.Filled.Close,
+                contentDescription = "关闭$title",
+                tint = TextSecondary,
+                onClick = com.example.ui.components.paperDismiss(onDismiss)
+            )
         }
         Box(
             Modifier

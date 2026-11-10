@@ -1,11 +1,9 @@
 package com.example.ui.components
 
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.staticCompositionLocalOf
 
 /**
- * 毛玻璃卡片可调参数（设置页「自定义卡片参数」折叠栏实时写入，
- * 经 [LocalCardTweaks] 提供到所有 GlassCard）。
+ * 毛玻璃卡片可调参数。外观设置实时写入，并经 [LocalCardTweaks] 提供给玻璃卡。
  *
  * v2 默认档：为让滑条开箱即有强可感知反馈，出厂值整体上探一档
  * （tilt 6° / 相机 5× / 压力 125%）；配合旧安装的一次性迁移。
@@ -28,7 +26,7 @@ data class CardTweaks(
 )
 
 /** 默认实例：未 provide 时 GlassCard 回退到历史视觉。 */
-val LocalCardTweaks = staticCompositionLocalOf { CardTweaks() }
+val LocalCardTweaks = compositionLocalOf { CardTweaks() }
 
 /** 从持久化偏好读取当前卡片参数。 */
 fun com.example.data.PreferencesManager.readCardTweaks(): CardTweaks = CardTweaks(

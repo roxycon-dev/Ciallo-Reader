@@ -21,10 +21,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -54,6 +57,10 @@ import dev.liquidglass.compose.GlassShape
 import dev.liquidglass.compose.GlassStyle
 import dev.liquidglass.compose.LiquidGlassProviderState
 import dev.liquidglass.compose.liquidGlass
+import com.example.ui.wenku.LocalWenkuIconContact
+import com.example.ui.wenku.WenkuButtonGlyph
+import com.example.ui.wenku.WenkuIconContact
+import com.example.ui.wenku.rememberWenkuAccessibility
 
 /**
  * 全局统一按钮模块（真液态玻璃版）。
@@ -128,6 +135,17 @@ fun AppActionButton(
 ) {
     val paperSource = rememberPaperTrigger()
     val paperAction = paperClick(onClick, paperSource)
+    val actionable = enabled && !loading
+    val reduceMotion = rememberWenkuAccessibility().reduceMotion
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    var activation by remember { mutableIntStateOf(0) }
+    val activate: () -> Unit = {
+        if (actionable) {
+            activation++
+            paperAction()
+        }
+    }
     if (!LocalRenderQuality.current.enhancedMotion) {
         val cs = MaterialTheme.colorScheme
         val bg = when (variant) {
@@ -144,10 +162,18 @@ fun AppActionButton(
         }
         Row(modifier.pullOutAnchor(paperSource).then(if (fullWidth) Modifier.fillMaxWidth() else Modifier)
             .heightIn(min = buttonSize.height).clip(RoundedCornerShape(12.dp))
-            .background(bg).clickable(enabled = enabled && !loading, onClick = paperAction)
+            .background(bg).clickable(
+                interactionSource = interactionSource, indication = androidx.compose.foundation.LocalIndication.current,
+                enabled = actionable, role = Role.Button, onClick = activate,
+            )
             .padding(horizontal = buttonSize.horizontalPadding),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-            icon?.let { Icon(it, null, tint = ink, modifier = Modifier.size(buttonSize.iconSize)); Spacer(Modifier.width(6.dp)) }
+            if (icon != null && !loading) {
+                CompositionLocalProvider(LocalWenkuIconContact provides WenkuIconContact(pressed && actionable, activation)) {
+                    WenkuButtonGlyph(icon, buttonSize.iconSize, ink.copy(alpha = if (enabled) 1f else .4f))
+                }
+                Spacer(Modifier.width(6.dp))
+            }
             Text(if (loading) "处理中…" else text, color = ink.copy(alpha = if (enabled) 1f else .4f), fontSize = buttonSize.fontSize)
         }
         return
@@ -162,11 +188,8 @@ fun AppActionButton(
             colors.primary
         )
     }
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-
     val scale = animateFloatAsState(
-        targetValue = if (isPressed && enabled) 0.96f else 1f,
+        targetValue = if (pressed && actionable && !reduceMotion) 0.96f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessHigh
@@ -175,7 +198,7 @@ fun AppActionButton(
     )
     // Only Primary draws this shadow. Other variants previously ran an unread spring.
     val shadowElevation = if (variant == AppButtonVariant.Primary) animateDpAsState(
-        targetValue = if (isPressed && enabled) 2.dp else 16.dp,
+        targetValue = if (pressed && actionable && !reduceMotion) 2.dp else 16.dp,
         label = "appButtonShadow"
     ) else remember { mutableStateOf(0.dp) }
 
@@ -329,8 +352,9 @@ fun AppActionButton(
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-                enabled = enabled,
-                onClick = paperAction
+                enabled = actionable,
+                role = Role.Button,
+                onClick = activate
             )
             .padding(horizontal = buttonSize.horizontalPadding),
         contentAlignment = Alignment.Center
@@ -355,12 +379,9 @@ fun AppActionButton(
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     icon?.let {
-                        Icon(
-                            imageVector = it,
-                            contentDescription = null,
-                            tint = contentColor,
-                            modifier = Modifier.size(buttonSize.iconSize)
-                        )
+                        CompositionLocalProvider(LocalWenkuIconContact provides WenkuIconContact(pressed && actionable, activation)) {
+                            WenkuButtonGlyph(it, buttonSize.iconSize, contentColor)
+                        }
                         Spacer(modifier = Modifier.width(6.dp))
                     }
                     Text(

@@ -36,11 +36,12 @@ fun Modifier.clickableWithFeedback(
     val haptics = LocalHapticFeedback.current
 
     val scaleState = animateFloatAsState(
-        targetValue = if (isPressed) 0.96f else 1.0f,
-        animationSpec = tween(
-            durationMillis = if (isPressed) 100 else 150,
-            easing = EaseOut
-        ),
+        targetValue = if (isPressed) 0.97f else 1.0f,
+        animationSpec = if (isPressed) {
+            com.example.ui.wenku.WenkuMotion.contactSpec()
+        } else {
+            com.example.ui.wenku.WenkuMotion.settleSpec()
+        },
         label = "click_scale"
     )
 

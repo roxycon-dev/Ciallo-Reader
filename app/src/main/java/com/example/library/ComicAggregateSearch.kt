@@ -69,7 +69,6 @@ internal class ComicAggregateSearch(
         sources.forEachIndexed { index, source ->
             launch {
                 val books = LinkedHashMap<String, SearchBook>()
-                var anySuccess = false
                 var lastError: String? = null
                 var lastFailure: SourceException? = null
 
@@ -79,9 +78,9 @@ internal class ComicAggregateSearch(
                             sourceId = source.id,
                             sourceName = source.name,
                             books = books.values.toList(),
-                            error = if (anySuccess) null else lastError,
+                            error = if (books.isNotEmpty()) null else lastError,
                             loading = loading,
-                            failure = if (anySuccess) null else lastFailure,
+                            failure = if (books.isNotEmpty()) null else lastFailure,
                         )
                     )
                 }
@@ -89,7 +88,6 @@ internal class ComicAggregateSearch(
                 fun accept(result: SourceResult<List<SearchBook>>?) {
                     when (result) {
                         is SourceResult.Success -> {
-                            anySuccess = true
                             result.data.forEach { book ->
                                 // Keep first-hit order and all distinct resources in each source.
                                 if (book.id !in books) books[book.id] = book.copy(sourceId = source.id)

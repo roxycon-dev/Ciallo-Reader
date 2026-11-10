@@ -2,13 +2,25 @@
 
 package com.example.ui.source
 
+import androidx.compose.runtime.CompositionLocalProvider
+import com.example.ui.wenku.rememberWenkuAccessibility
+import com.example.ui.wenku.WenkuIconContact
+import com.example.ui.wenku.LocalWenkuIconContact
+import com.example.ui.components.pullOutClickable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.example.ui.components.PullOutTextButton
-import com.example.ui.components.PullOutVisibility
 import android.net.Uri
 import android.webkit.CookieManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
@@ -55,6 +67,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Link
@@ -98,6 +111,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
@@ -119,10 +134,15 @@ import com.example.source.importer.SourceImporter
 import com.example.source.isNovelSource
 import com.example.source.isComicSource
 import com.example.source.zlibrary.ZLibrarySource
-import com.example.ui.components.AcrylicDialog
+import com.example.ui.components.paperDismiss
+import com.example.ui.wenku.WenkuIcon
+import com.example.ui.wenku.WenkuMotion
+import com.example.ui.wenku.WenkuActionSheet
+import com.example.ui.wenku.WenkuSymbol
+import com.example.ui.wenku.WenkuTextButton
+import com.example.ui.wenku.wenkuPagePart
 import com.example.ui.components.AppIconButton
 import com.example.ui.components.AppSwitch
-import com.example.ui.components.GradientActionButton
 import com.example.ui.components.SourceAvatar
 import com.example.ui.feedback.AppMotion
 import com.example.ui.feedback.LocalReduceMotion
@@ -134,8 +154,6 @@ import com.example.ui.glasskit.GlassTopBarStrip
 import com.example.ui.shelf.pressScale
 import com.example.ui.theme.AppFonts
 import com.example.ui.theme.LocalAppBottomInset
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.haze
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -178,7 +196,6 @@ private val SourceExpandRowHeight = 44.dp     // 「展开其余 N 个」
 private val SourceImportRowHeight = 48.dp     // D 导入行
 private val SourceDividerWidth = 0.5.dp       // 细分割线（卡内）
 /** Material3 LargeTopAppBar 展开态高度（用于顶部渐变遮罩的高度计算）。 */
-private val SourceLargeTitleHeight = GlassTokens.ManagementTitleHeight
 /** 页面级壁纸模糊半径（sigma ≈ 16，功能页规格：壁纸只留氛围色、看不出线条）。 */
 
 
@@ -264,7 +281,8 @@ private fun dividerColor(): Color = MaterialTheme.colorScheme.onSurface.copy(alp
 @Composable
 fun SourceManagementScreen(
     viewModel: SourceViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenNodeManagement: () -> Unit
 ) {
     val context = LocalContext.current
     val allSources by viewModel.allSources.collectAsStateWithLifecycle()
@@ -276,24 +294,16 @@ fun SourceManagementScreen(
     var showNetworkDialog by remember { mutableStateOf(false) }
     var showImportPicker by remember { mutableStateOf(false) }
     var loginSource by remember { mutableStateOf<BookSource?>(null) }
-    var showNodeManagement by remember { mutableStateOf(false) }
     var pasteJsonText by remember { mutableStateOf("") }
     var networkUrl by remember { mutableStateOf("") }
     var showDebugLog by remember { mutableStateOf(false) }
     var debugLogText by remember { mutableStateOf("") }
-
-    if (showNodeManagement) {
-        ZLibraryNodeManagementScreen(onBack = { showNodeManagement = false })
-        return
-    }
-
 
     // 登录状态检测：负责提示用户进入书库前是否已配置账号
     var loggedIn by remember { mutableStateOf(false) }
     var showLoginDialog by remember { mutableStateOf(false) }
     var loginMessage by remember { mutableStateOf("") }
     var loginLoading by remember { mutableStateOf(false) }
-    val hazeState = remember { HazeState() }
 
     val zlibSource = allSources.firstOrNull { it.id == "zlibrary" } as? ZLibrarySource
 
@@ -353,11 +363,12 @@ fun SourceManagementScreen(
     }
 
     // 折叠 / 「展开其余」状态：以组标题为 key，旋转屏幕后保留
-    var collapsedGroupKeys by remember { mutableStateOf(emptySet<String>()) }
-    var expandedGroupKeys by remember { mutableStateOf(emptySet<String>()) }
+    var collapsedGroupKeys by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var expandedGroupKeys by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val headerTravel = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() }
 
     Box(Modifier.fillMaxSize()) {
         // ── 可读性由 GlassKitHost 一次提供 ──────────────────────────────
@@ -365,7 +376,7 @@ fun SourceManagementScreen(
         //    因此玻璃卡采样到的是「已压暗、已保护标题」的背景，而不是原始壁纸；
         // ③ 页面内容作为这层的**兄弟节点**画在上层（放进录制层会采样到自己 → 递归）。
         GlassKitHost(
-            topGradientHeight = statusBarTop + SourceLargeTitleHeight + 24.dp
+            topGradientHeight = statusBarTop + GlassTokens.TopBarHeight + 24.dp
         ) {
             Scaffold(
                 modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -401,7 +412,7 @@ fun SourceManagementScreen(
                         // 折叠顶栏：blur(8) + 页面背景色 60%，随 collapsedFraction 淡入，
                         // 底边一条 0.5dp 线 —— 顶栏区域不会是实色块，也没有硬切边
                         GlassTopBarStrip(
-                            collapsedFraction = scrollBehavior.state.collapsedFraction,
+                            collapsedFraction = (-scrollBehavior.state.contentOffset / headerTravel).coerceIn(0f, 1f),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(statusBarTop + GlassTokens.TopBarHeight)
@@ -417,10 +428,7 @@ fun SourceManagementScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
-                        .padding(horizontal = SourcePageMargin)
-                        .then(
-                            if (showLoginDialog) Modifier.haze(hazeState) else Modifier
-                        ),
+                        .padding(horizontal = SourcePageMargin),
                     verticalArrangement = Arrangement.spacedBy(SourceCardGap),
                     contentPadding = PaddingValues(
                         top = 4.dp,
@@ -431,6 +439,7 @@ fun SourceManagementScreen(
                     // ── A 快捷入口卡：Z-Library 账号 / Venera 源仓库 / 调试日志 ──
                     item(key = "quick_tiles") {
                         SourceQuickTilesRow(
+                            modifier = Modifier.wenkuPagePart(1),
                             hasZLibrary = zlibSource != null,
                             loggedIn = loggedIn,
                             onLoginClick = {
@@ -446,10 +455,11 @@ fun SourceManagementScreen(
                     }
 
                     // ── B / C（+ 自定义）分组：每张卡 = 头部 + 行列表 ──
-                    groups.forEach { group ->
+                    groups.forEachIndexed { index, group ->
                         item(key = "body_${group.title}") {
                             SourceGroupCard(
                                 group = group,
+                                modifier = Modifier.wenkuPagePart(index + 2),
                                 expanded = group.title !in collapsedGroupKeys,
                                 showAll = group.title in expandedGroupKeys,
                                 onToggleExpand = {
@@ -475,7 +485,7 @@ fun SourceManagementScreen(
                                 onOpenLogin = { source ->
                                     loginSource = source
                                 },
-                                onOpenNodeManager = { showNodeManagement = true },
+                                onOpenNodeManager = onOpenNodeManagement,
                                 onDelete = { source -> viewModel.removeSource(source.id) }
                             )
                         }
@@ -484,7 +494,8 @@ fun SourceManagementScreen(
                     // ── D 导入行：虚线胶囊「＋ 导入 JSON 书源」 ──
                     item(key = "import_row") {
                         SourceImportEntryRow(
-                            onClick = { showImportPicker = true }
+                            onClick = { showImportPicker = true },
+                            modifier = Modifier.wenkuPagePart(groups.size + 2)
                         )
                     }
                 }
@@ -494,200 +505,115 @@ fun SourceManagementScreen(
 
     if (showDebugLog) {
         val clipboard = LocalClipboardManager.current
-        AcrylicDialog(
-            onDismissRequest = { showDebugLog = false },
-            title = { Text("书源调试日志") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "每次搜索/目录/正文请求的完整记录。反馈问题时请点击「复制全部」并把内容发给开发者。",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = debugLogText,
-                        fontSize = 11.sp,
-                        lineHeight = 16.sp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 360.dp)
-                            .verticalScroll(rememberScrollState())
-                    )
-                }
-            },
-            confirmButton = {
-                GradientActionButton(
-                    text = "复制全部",
-                    onClick = {
-                        clipboard.setText(AnnotatedString(debugLogText))
-                        AppToast.makeText(context, "日志已复制到剪贴板", Toast.LENGTH_SHORT).show()
-                    }
-                )
-            },
-            dismissButton = {
-                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                Row {
-                    PullOutTextButton(onClick = {
-                        com.example.source.SourceLog.clear()
-                        debugLogText = "（已清空）"
-                    }) {
-                        Text("清空")
-                    }
-                    PullOutTextButton(onClick = { closeOverlay { showDebugLog = false } }) {
-                        Text("关闭")
-                    }
-                }
-            }
-        )
+        WenkuActionSheet("书源调试日志", onDismiss = { showDebugLog = false }) {
+            Text(
+                "查看搜索、目录与正文请求。需要反馈时可以复制日志。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                debugLogText, fontSize = 11.sp, lineHeight = 16.sp,
+                modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).verticalScroll(rememberScrollState())
+            )
+            WenkuTextButton(
+                "复制全部",
+                onClick = {
+                    clipboard.setText(AnnotatedString(debugLogText))
+                    AppToast.makeText(context, "日志已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                wenkuSymbol = WenkuSymbol.Copy
+            )
+            WenkuTextButton(
+                "清空",
+                onClick = {
+                    com.example.source.SourceLog.clear()
+                    debugLogText = "（已清空）"
+                },
+                modifier = Modifier.fillMaxWidth(),
+                wenkuSymbol = WenkuSymbol.Delete
+            )
+        }
     }
 
-    // 「＋ 导入 JSON 书源」的三条路径收敛到一个面板：
-    // 页面上只保留一行虚线入口（规范：结构里只有 3 张玻璃卡 + 1 个导入行），
-    // 但「粘贴 JSON / 网络导入」是功能而不是装饰，不能因为排版被删掉。
     if (showImportPicker) {
-        AcrylicDialog(
-            onDismissRequest = { showImportPicker = false },
-            title = { Text("导入书源") },
-            text = {
-                val closePicker = com.example.ui.components.LocalOverlayClose.current
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "支持「阅读」书源 JSON：单源文件、粘贴配置、或直接拉取社区合集。",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    PullOutTextButton(
-                        onClick = { closePicker {
-                            showImportPicker = false
-                            fileLauncher.launch("*/*")
-                        } },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("从本地文件导入") }
-                    PullOutTextButton(
-                        onClick = { closePicker {
-                            showImportPicker = false
-                            showPasteDialog = true
-                        } },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("粘贴 JSON 配置") }
-                    PullOutTextButton(
-                        onClick = { closePicker {
-                            showImportPicker = false
-                            showNetworkDialog = true
-                        } },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("网络导入书源") }
-                }
-            },
-            dismissButton = {
-                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                PullOutTextButton(onClick = { closeOverlay { showImportPicker = false } }) {
-                    Text("取消")
-                }
-            }
-        )
+        WenkuActionSheet("导入书源", onDismiss = { showImportPicker = false }) {
+            Text("支持「阅读」书源 JSON 文件、粘贴配置和社区合集。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            WenkuTextButton(
+                "从本地文件导入", onClick = paperDismiss { fileLauncher.launch("*/*") },
+                modifier = Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.FolderOpen
+            )
+            WenkuTextButton(
+                "粘贴 JSON 配置", onClick = paperDismiss { showPasteDialog = true },
+                modifier = Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Document
+            )
+            WenkuTextButton(
+                "网络导入书源", onClick = paperDismiss { showNetworkDialog = true },
+                modifier = Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Link
+            )
+        }
     }
 
     if (showPasteDialog) {
-        AcrylicDialog(
-            onDismissRequest = { showPasteDialog = false },
-            title = { Text("粘贴 JSON 书源配置") },
-            text = {
-                androidx.compose.material3.OutlinedTextField(
-                    value = pasteJsonText,
-                    onValueChange = { pasteJsonText = it },
-                    placeholder = { Text("{\n  \"name\": \"我的书源\",\n  \"search\": { ... }\n}") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    shape = RoundedCornerShape(SourceAvatarRadius)
-                )
-            },
-            confirmButton = {
-                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                GradientActionButton(
-                    text = "确定导入",
-                    onClick = {
-                        if (pasteJsonText.isNotBlank()) closeOverlay {
-                            viewModel.importSourceFromJsonString(pasteJsonText)
-                            pasteJsonText = ""
-                            showPasteDialog = false
-                        }
-                    }
-                )
-            },
-            dismissButton = {
-                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                PullOutTextButton(onClick = { closeOverlay { showPasteDialog = false } }) {
-                    Text("取消")
-                }
-            }
-        )
+        WenkuActionSheet("粘贴 JSON 书源配置", onDismiss = { showPasteDialog = false }, fitKeyboard = true) {
+            androidx.compose.material3.OutlinedTextField(
+                value = pasteJsonText,
+                onValueChange = { pasteJsonText = it },
+                label = { Text("JSON 配置") },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp),
+                minLines = 4, maxLines = 6,
+                shape = RoundedCornerShape(SourceAvatarRadius)
+            )
+            WenkuTextButton(
+                "确定导入",
+                onClick = paperDismiss {
+                    viewModel.importSourceFromJsonString(pasteJsonText)
+                    pasteJsonText = ""
+                },
+                modifier = Modifier.fillMaxWidth(),
+                selected = true, enabled = pasteJsonText.isNotBlank(), wenkuSymbol = WenkuSymbol.Check
+            )
+        }
     }
 
     if (showNetworkDialog) {
-        AcrylicDialog(
-            onDismissRequest = { showNetworkDialog = false },
-            title = { Text("网络导入书源") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "粘贴任意「阅读」书源合集 JSON 地址（shuyuan 文件），系统会自动转换并批量导入，不兼容的会跳过。",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    androidx.compose.material3.OutlinedTextField(
-                        value = networkUrl,
-                        onValueChange = { networkUrl = it },
-                        placeholder = { Text("https://.../shuyuan") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(SourceAvatarRadius),
-                        singleLine = true
-                    )
-                    Text("快速选择社区源：", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    SourceImporter.PRESET_SOURCE_URLS.forEach { (url, label) ->
-                        PullOutTextButton(
-                            onClick = { networkUrl = url },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = label,
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.primary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                GradientActionButton(
-                    text = "开始导入",
-                    onClick = {
-                        if (networkUrl.isNotBlank()) closeOverlay {
-                            viewModel.importSourceFromUrl(networkUrl.trim())
-                            networkUrl = ""
-                            showNetworkDialog = false
-                        }
-                    }
+        WenkuActionSheet("网络导入书源", onDismiss = { showNetworkDialog = false }, fitKeyboard = true) {
+            Text(
+                "输入「阅读」书源合集的 JSON 地址。导入时会跳过不兼容的书源。",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            androidx.compose.material3.OutlinedTextField(
+                value = networkUrl,
+                onValueChange = { networkUrl = it },
+                label = { Text("书源地址") },
+                placeholder = { Text("https://…/shuyuan") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(SourceAvatarRadius),
+                singleLine = true
+            )
+            Text("快速选择社区源", style = MaterialTheme.typography.labelLarge)
+            SourceImporter.PRESET_SOURCE_URLS.forEach { (url, label) ->
+                WenkuTextButton(
+                    label, onClick = { networkUrl = url }, modifier = Modifier.fillMaxWidth(),
+                    selected = networkUrl == url, compact = true, wenkuSymbol = WenkuSymbol.Link
                 )
-            },
-            dismissButton = {
-                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                PullOutTextButton(onClick = { closeOverlay { showNetworkDialog = false } }) {
-                    Text("取消")
-                }
             }
-        )
+            WenkuTextButton(
+                "开始导入",
+                onClick = paperDismiss {
+                    viewModel.importSourceFromUrl(networkUrl.trim())
+                    networkUrl = ""
+                },
+                modifier = Modifier.fillMaxWidth(),
+                selected = true, enabled = networkUrl.isNotBlank(), wenkuSymbol = WenkuSymbol.Check
+            )
+        }
     }
-
     if (showLoginDialog) {
         LibraryLoginDialog(
             message = loginMessage,
             loading = loginLoading,
-            onLogin = { email, pass ->
+            onLogin = { email, pass, close ->
                 loginLoading = true
                 loginMessage = "登录中…"
                 scope.launch {
@@ -702,7 +628,7 @@ fun SourceManagementScreen(
                             loginLoading = false
                             loginMessage = "登录成功"
                             loggedIn = true
-                            showLoginDialog = false
+                            close()
                         }
                         is SourceResult.Error -> {
                             loginLoading = false
@@ -711,8 +637,7 @@ fun SourceManagementScreen(
                     }
                 }
             },
-            onDismiss = { if (!loginLoading) showLoginDialog = false },
-            hazeState = hazeState
+            onDismiss = { showLoginDialog = false }
         )
     }
 
@@ -735,23 +660,6 @@ fun SourceManagementScreen(
     }
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * ③ 大标题：随滚动缩放，折叠后顶栏带毛玻璃
- * ══════════════════════════════════════════════════════════════════════════ */
-
-/**
- * 「书源管理」折叠大标题（Compose 侧的 SliverAppBar + FlexibleSpaceBar 等价实现）。
- *
- * 大→小的折叠行为与高度插值直接复用 Material3 的 [LargeTopAppBar] +
- * `exitUntilCollapsedScrollBehavior`（不自己算），只额外做两件事：
- * - 标题字号 28sp → 20sp 跟着 `collapsedFraction` 连续过渡；
- * - 一旦开始折叠（`collapsedFraction > 0`）就把顶栏挂上毛玻璃：
- *   sigma 16 的背景采样模糊 + **页面背景色 60%** 薄底（不再用 surface 72%，
- *   否则折叠后的顶栏与页面底色不是一个色，整页会出现一条明显的"色带"）。
- *
- * 「展开时有大标题没有玻璃」与「折叠后有玻璃没有大标题」是互斥的，
- * 所以这块玻璃不会与页面级遮罩长期叠加。
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SourceCollapsingTopBar(
@@ -759,7 +667,7 @@ private fun SourceCollapsingTopBar(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    com.example.ui.glasskit.GlassManagementTopBar("书源管理",scrollBehavior,onBack,modifier)
+    com.example.ui.glasskit.GlassManagementTopBar("书源管理", "LIBRARY / SOURCES", scrollBehavior, onBack, modifier)
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -771,13 +679,7 @@ private const val VENERA_IDLE = 0
 private const val VENERA_BUSY = 1
 private const val VENERA_DONE = 2
 
-/**
- * 一张玻璃卡内的三等分：Z-Library 账号 / Venera 源仓库 / 调试日志。
- *
- * ⚠️ 规范：三个入口**合并为一张玻璃卡内的三等分区域**，格间用 0.5px 细竖线分隔，
- * 卡高由内容撑开（minHeight 84）。格子本身完全透明 —— 全页只有这 1 层玻璃，
- * 禁止玻璃套玻璃。
- */
+/** Z-Library、Venera 与日志共享一张玻璃卡。 */
 @Composable
 private fun SourceQuickTilesRow(
     hasZLibrary: Boolean,
@@ -802,11 +704,9 @@ private fun SourceQuickTilesRow(
         ) {
             SourceQuickTile(
                 icon = {
-                    Icon(
-                        imageVector = if (loggedIn) Icons.Filled.CheckCircle else Icons.Filled.Lock,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(SourceQuickIconSize)
+                    WenkuIcon(
+                        WenkuSymbol.Shield, size = SourceQuickIconSize, active = loggedIn,
+                        tint = MaterialTheme.colorScheme.primary, entrance = false,
                     )
                 },
                 name = "Z-Library",
@@ -840,11 +740,9 @@ private fun SourceQuickTilesRow(
             SourceTileDivider()
             SourceQuickTile(
                 icon = {
-                    Icon(
-                        imageVector = Icons.Filled.Code,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(SourceQuickIconSize)
+                    WenkuIcon(
+                        WenkuSymbol.Document, size = SourceQuickIconSize,
+                        tint = MaterialTheme.colorScheme.primary, entrance = false,
                     )
                 },
                 name = "调试日志",
@@ -895,10 +793,31 @@ private fun SourceQuickTile(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    var activation by remember { mutableIntStateOf(0) }
+    val haptic = LocalHapticFeedback.current
+    val reduce = rememberWenkuAccessibility().reduceMotion
+    val scale = animateFloatAsState(
+        targetValue = if (pressed && enabled && !reduce) .97f else 1f,
+        animationSpec = if (pressed) WenkuMotion.contactSpec() else WenkuMotion.settleSpec(),
+        label = "sourceTilePress",
+    )
     Box(
         modifier = modifier
-            .graphicsLayer { alpha = if (enabled) 1f else 0.55f }
-            .pressScale(scale = 0.96f, enabled = enabled, onTap = onClick)
+            .graphicsLayer {
+                alpha = if (enabled) 1f else .55f
+                scaleX = scale.value
+                scaleY = scale.value
+            }
+            .pullOutClickable(
+                interactionSource = interaction, indication = null, enabled = enabled, role = Role.Button,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    activation++
+                    onClick()
+                },
+            )
             .fillMaxHeight()
             .padding(horizontal = 8.dp)
     ) {
@@ -913,7 +832,9 @@ private fun SourceQuickTile(
                     .background(accentContainer()),
                 contentAlignment = Alignment.Center
             ) {
-                icon()
+                CompositionLocalProvider(LocalWenkuIconContact provides WenkuIconContact(pressed && enabled, activation)) {
+                    icon()
+                }
             }
             Spacer(modifier = Modifier.height(6.dp))
             Text(
@@ -954,22 +875,17 @@ private fun SourceVeneraTile(
             ) { state ->
                 when (state) {
                     VENERA_BUSY -> VeneraSpinningIcon()
-                    VENERA_DONE -> Icon(
-                        imageVector = Icons.Filled.CheckCircle,
-                        contentDescription = null,
+                    else -> WenkuIcon(
+                        if (state == VENERA_DONE) WenkuSymbol.CheckCircle else WenkuSymbol.Link,
+                        size = SourceQuickIconSize,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(SourceQuickIconSize)
-                    )
-                    else -> Icon(
-                        imageVector = Icons.Filled.Link,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(SourceQuickIconSize)
+                        entrance = false,
                     )
                 }
             }
         },
         name = "Venera 源",
+        enabled = phase != VENERA_BUSY,
         status = {
             SourceTileStatusText(
                 text = when (phase) {
@@ -1125,9 +1041,14 @@ private fun SourceGroupCard(
         // 头部与列表之间：0.5px 分割线，左右**不缩进**
         SourceLine()
 
-        PullOutVisibility(
+        val animate = !LocalReduceMotion.current
+        AnimatedVisibility(
             visible = expanded,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enter = if (animate) expandVertically(tween(WenkuMotion.ENTER_MS, easing = WenkuMotion.ease)) +
+                fadeIn(tween(180)) else EnterTransition.None,
+            exit = if (animate) shrinkVertically(tween(WenkuMotion.EXIT_MS, easing = WenkuMotion.ease)) +
+                fadeOut(tween(160)) else ExitTransition.None
         ) {
             // AnimatedSize：展开/收起「其余 N 个」时高度与内容同步过渡，不跳变
             Column(
@@ -1215,12 +1136,13 @@ private fun SourceGroupHeader(
         Spacer(modifier = Modifier.width(8.dp))
         SourceCountBadge(text = badge)
         Spacer(modifier = Modifier.weight(1f))
-        Icon(
-            imageVector = Icons.Filled.KeyboardArrowDown,
-            contentDescription = if (expanded) "折叠分组" else "展开分组",
+        WenkuIcon(
+            WenkuSymbol.Down,
+            size = 20.dp,
             tint = secondaryText(),
+            entrance = false,
             modifier = Modifier
-                .size(20.dp)
+                .semantics { contentDescription = if (expanded) "折叠分组" else "展开分组" }
                 .graphicsLayer { rotationZ = chevron }
         )
     }
@@ -1400,13 +1322,13 @@ private fun SourceRow(
                 padding = 3
             )
             if (isCustom) {
-                AppIconButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
-                        contentDescription = "删除书源",
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
+                AppIconButton(
+                    icon = Icons.Filled.Delete,
+                    contentDescription = "删除书源",
+                    onClick = onDelete,
+                    tint = MaterialTheme.colorScheme.error,
+                    glyphSize = 22.dp
+                )
             }
         }
     }
@@ -1496,12 +1418,7 @@ private fun SourceImportEntryRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
-        Icon(
-            imageVector = Icons.Filled.Add,
-            contentDescription = null,
-            tint = accentText(),
-            modifier = Modifier.size(18.dp)
-        )
+        WenkuIcon(WenkuSymbol.Add, size = 18.dp, tint = accentText(), entrance = false)
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = "导入 JSON 书源",

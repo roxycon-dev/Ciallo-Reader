@@ -63,6 +63,35 @@ data class ComicLayout(
         .takeIf { it >= 0 } ?: 0
 }
 
+/** Orders current, forward, then previous slots. Split halves share one image allowance. */
+internal fun ComicLayout.preloadSlots(
+    current: Int,
+    configuredImages: Int,
+    automaticSpreads: Int,
+): List<Pair<Int, ComicSlot>> {
+    val visible = spreads.getOrNull(current) ?: return emptyList()
+    val imageIds = visible.slots.mapTo(mutableSetOf()) { it.ref.id }
+    val limit = configuredImages.coerceIn(-1, 12)
+    var remaining = limit
+    return buildList {
+        visible.slots.forEach { add(current to it) }
+        if (limit != 0) {
+            val end = if (limit < 0) minOf(spreads.lastIndex, current + automaticSpreads) else spreads.lastIndex
+            for (index in current + 1..end) {
+                for (slot in spreads[index].slots) {
+                    if (limit < 0 || slot.ref.id in imageIds || remaining > 0) {
+                        if (imageIds.add(slot.ref.id) && limit >= 0) remaining--
+                        add(index to slot)
+                    }
+                }
+                if (limit >= 0 && remaining <= 0 &&
+                    spreads.getOrNull(index + 1)?.slots?.none { it.ref.id in imageIds } != false) break
+            }
+            spreads.getOrNull(current - 1)?.slots?.forEach { add(current - 1 to it) }
+        }
+    }
+}
+
 /**
  * 垂直阅读策略（第 6 条：条漫与无缝滚动必须本质不同，不共用逻辑只改开关）。
  *

@@ -1,13 +1,13 @@
 package com.example.ui
 
-import com.example.ui.components.PullOutTextButton
-import com.example.ui.components.PullOutAlertDialog
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LinearProgressIndicator
@@ -32,7 +32,11 @@ import com.example.data.AppUpdateManager
 import com.example.data.AppUpdateStage
 import com.example.data.AppUpdateState
 import com.example.ui.components.AppToast
-import com.example.ui.design.DesignTokens
+import com.example.ui.components.LocalOverlayClose
+import com.example.ui.wenku.WenkuIconButton
+import com.example.ui.wenku.WenkuSheetDialog
+import com.example.ui.wenku.WenkuSymbol
+import com.example.ui.wenku.WenkuTextButton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -131,19 +135,32 @@ internal fun AppUpdateDialog(
     onReleasePage: () -> Unit,
 ) {
     val release = state.release ?: return
-    PullOutAlertDialog(
-        onDismissRequest = onDismiss,
-        shape = DesignTokens.shape(DesignTokens.RadiusXl),
-        title = { Text(when (state.stage) {
+    WenkuSheetDialog(onDismissRequest = onDismiss) {
+        val close = LocalOverlayClose.current
+        val title = when (state.stage) {
             AppUpdateStage.DOWNLOADING -> "正在下载更新"
             AppUpdateStage.VERIFYING -> "正在校验安装包"
             AppUpdateStage.NEED_PERMISSION -> "选择安装方式"
             AppUpdateStage.READY, AppUpdateStage.INSTALLING -> "更新已就绪"
             AppUpdateStage.FAILED -> "更新下载未完成"
             AppUpdateStage.AVAILABLE -> "发现新版本"
-        }) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceMd)) {
+        }
+        Column(
+            Modifier.fillMaxWidth().heightIn(max = 560.dp).padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium)
+                    Text("SYSTEM / UPDATE", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                WenkuIconButton(Icons.Default.Close, "关闭更新窗口", onClick = { close {} })
+            }
+            Column(
+                Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Text("Ciallo Reader ${release.version}", style = MaterialTheme.typography.titleMedium)
                 if (state.transferring) {
                     if (state.stage == AppUpdateStage.DOWNLOADING && state.total != null && state.total > 0) {
@@ -163,29 +180,40 @@ internal fun AppUpdateDialog(
                     }
                     if (state.hasPackage) {
                         Text("系统仍需你确认安装。升级成功后自动清理应用内安装包；导出的副本由你保留。", style = MaterialTheme.typography.bodySmall)
-                        PullOutTextButton(enabled = !exporting, onClick = onExport) { Text(if (exporting) "导出中…" else "导出安装包") }
+                        WenkuTextButton(if (exporting) "导出中…" else "导出安装包", onExport, enabled = !exporting, wenkuSymbol = WenkuSymbol.Share)
                     }
-                    PullOutTextButton(onClick = onBrowser) { Text("浏览器下载") }
-                    PullOutTextButton(onClick = onReleasePage) { Text("查看完整更新说明") }
+                    WenkuTextButton("浏览器下载", onBrowser, wenkuSymbol = WenkuSymbol.Globe)
+                    WenkuTextButton("查看完整更新说明", onReleasePage, wenkuSymbol = WenkuSymbol.Document)
                 }
             }
-        },
-        confirmButton = {
+
+            val full = Modifier.fillMaxWidth()
             when (state.stage) {
-                AppUpdateStage.DOWNLOADING, AppUpdateStage.VERIFYING -> PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Text("收起") }
-                AppUpdateStage.NEED_PERMISSION -> PullOutTextButton(enabled = !exporting, onClick = onPermission) { Text("允许安装") }
-                AppUpdateStage.READY, AppUpdateStage.INSTALLING -> PullOutTextButton(enabled = !exporting, onClick = onInstall) { Text("安装") }
-                AppUpdateStage.AVAILABLE, AppUpdateStage.FAILED -> if (release.apk != null)
-                    PullOutTextButton(onClick = onDownload) { Text(if (state.stage == AppUpdateStage.FAILED) "重新下载" else "下载并安装") }
-                else PullOutTextButton(onClick = onReleasePage) { Text("打开发布页") }
+                AppUpdateStage.DOWNLOADING, AppUpdateStage.VERIFYING ->
+                    WenkuTextButton("收起", { close {} }, full, selected = true, wenkuSymbol = WenkuSymbol.Down)
+                AppUpdateStage.NEED_PERMISSION ->
+                    WenkuTextButton("允许安装", onPermission, full, selected = true, enabled = !exporting, wenkuSymbol = WenkuSymbol.Shield)
+                AppUpdateStage.READY, AppUpdateStage.INSTALLING ->
+                    WenkuTextButton("安装", onInstall, full, selected = true, enabled = !exporting, wenkuSymbol = WenkuSymbol.Upload)
+                AppUpdateStage.AVAILABLE, AppUpdateStage.FAILED -> if (release.apk != null) {
+                    WenkuTextButton(
+                        if (state.stage == AppUpdateStage.FAILED) "重新下载" else "下载并安装",
+                        onDownload, full, selected = true,
+                        wenkuSymbol = if (state.stage == AppUpdateStage.FAILED) WenkuSymbol.Refresh else WenkuSymbol.Download,
+                    )
+                } else {
+                    WenkuTextButton("打开发布页", onReleasePage, full, selected = true, wenkuSymbol = WenkuSymbol.External)
+                }
             }
-        },
-        dismissButton = {
-            PullOutTextButton(enabled = !exporting, onClick = if (state.transferring) onCancel else onDismiss) {
-                Text(if (state.transferring) "取消下载" else "稍后")
-            }
-        },
-    )
+            WenkuTextButton(
+                if (state.transferring) "取消下载" else "稍后",
+                onClick = if (state.transferring) onCancel else ({ close {} }),
+                modifier = full.padding(bottom = 6.dp),
+                enabled = !exporting,
+                wenkuSymbol = if (state.transferring) WenkuSymbol.Close else null,
+            )
+        }
+    }
 }
 
 internal fun updateBytes(bytes: Long): String = String.format(Locale.ROOT, "%.1f MB", bytes / (1024.0 * 1024.0))

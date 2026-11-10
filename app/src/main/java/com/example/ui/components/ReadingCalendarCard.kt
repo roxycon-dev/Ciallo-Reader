@@ -9,7 +9,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -92,13 +95,15 @@ fun ReadingCalendarCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                AppIconButton(onClick = {
-                    if (showYear) viewYear-- else {
-                        if (viewMonth == Calendar.JANUARY) { viewMonth = Calendar.DECEMBER; viewYear-- } else viewMonth--
+                AppIconButton(
+                    icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    contentDescription = "上个月/年",
+                    onClick = {
+                        if (showYear) viewYear-- else {
+                            if (viewMonth == Calendar.JANUARY) { viewMonth = Calendar.DECEMBER; viewYear-- } else viewMonth--
+                        }
                     }
-                }) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "上个月/年")
-                }
+                )
                 Text(
                     text = if (showYear) "$viewYear 年" else "${viewYear}年${viewMonth + 1}月",
                     fontWeight = FontWeight.Bold,
@@ -106,13 +111,15 @@ fun ReadingCalendarCard(
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
-                AppIconButton(onClick = {
-                    if (showYear) viewYear++ else {
-                        if (viewMonth == Calendar.DECEMBER) { viewMonth = Calendar.JANUARY; viewYear++ } else viewMonth++
+                AppIconButton(
+                    icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = "下个月/年",
+                    onClick = {
+                        if (showYear) viewYear++ else {
+                            if (viewMonth == Calendar.DECEMBER) { viewMonth = Calendar.JANUARY; viewYear++ } else viewMonth++
+                        }
                     }
-                }) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "下个月/年")
-                }
+                )
                 if (viewYear != today.get(Calendar.YEAR) ||
                     (!showYear && viewMonth != today.get(Calendar.MONTH))
                 ) {
@@ -127,16 +134,21 @@ fun ReadingCalendarCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 月/年切换：新旧视图交叉淡入淡出 + 轻缩放，替代生硬的清空重绘；
-            // 流畅档直接无过渡切换
-            val lowQuality = LocalRenderQuality.current <= RenderQuality.LOW
+            val reduce = com.example.ui.feedback.LocalReduceMotion.current ||
+                LocalRenderQuality.current <= RenderQuality.LOW
             AnimatedContent(
                 targetState = Triple(showYear, viewYear, viewMonth),
                 transitionSpec = {
-                    if (lowQuality) {
-                        fadeIn(tween(0)) togetherWith fadeOut(tween(0))
-                    } else {
-                        (fadeIn(tween(200)) + scaleIn(initialScale = 0.97f)) togetherWith fadeOut(tween(120))
+                    if (reduce) EnterTransition.None togetherWith ExitTransition.None
+                    else {
+                        val direction = when {
+                            targetState.first != initialState.first -> if (targetState.first) 1 else -1
+                            targetState.second != initialState.second -> if (targetState.second > initialState.second) 1 else -1
+                            else -> if (targetState.third >= initialState.third) 1 else -1
+                        }
+                        val easing = com.example.ui.wenku.WenkuMotion.plane
+                        slideInHorizontally(tween(280, easing = easing)) { it * direction } togetherWith
+                            slideOutHorizontally(tween(280, easing = easing)) { -it * direction }
                     }
                 },
                 label = "calendarSwitch"

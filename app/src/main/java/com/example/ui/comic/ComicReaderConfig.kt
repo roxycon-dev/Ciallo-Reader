@@ -18,6 +18,8 @@ data class ComicReaderConfig(
     val direction: ComicDirection = ComicDirection.RTL,
     /** 条漫模式磁吸到页边界（第 6/7 条：可关闭；无缝滚动恒无磁吸） */
     val webtoonSnap: Boolean = true,
+    /** -1 retains the existing automatic look-ahead for the selected reading mode. */
+    val imagePreloadCount: Int = -1,
 
     /* ── 页面显示 ── */
     val fit: ComicFit = ComicFit.FIT_WIDTH,
@@ -118,6 +120,7 @@ data class ComicReaderConfig(
             if (r - l >= 0.05f - 0.00001f && b - t >= 0.05f - 0.00001f) listOf(l, t, r, b) else null
         }
         return copy(
+            imagePreloadCount = imagePreloadCount.coerceIn(-1, 12),
             touchZones = touchZones?.take(64)?.map { it.normalized() }?.distinctBy { it.id },
             customFitBase = customFitBase.takeUnless { it == ComicFit.CUSTOM } ?: ComicFit.FIT_PAGE,
             customFitScale = customFitScale.bounded(0.5f, 2.5f, 1f),
@@ -147,6 +150,7 @@ data class ComicReaderConfig(
         put("mode", mode.name)
         put("direction", direction.name)
         put("webtoonSnap", webtoonSnap)
+        put("imagePreloadCount", imagePreloadCount)
         put("fit", fit.name)
         put("customFitBase", customFitBase.name)
         put("customFitScale", customFitScale)
@@ -224,6 +228,7 @@ data class ComicReaderConfig(
                 mode = safe("mode", ComicMode.SINGLE, ComicMode.entries.toTypedArray()),
                 direction = safe("direction", ComicDirection.RTL, ComicDirection.entries.toTypedArray()),
                 webtoonSnap = json.optBoolean("webtoonSnap", true),
+                imagePreloadCount = json.optInt("imagePreloadCount", -1),
                 fit = safe("fit", ComicFit.FIT_WIDTH, ComicFit.entries.toTypedArray()),
                 customFitBase = safe("customFitBase", ComicFit.FIT_PAGE, ComicFit.entries.toTypedArray()),
                 customFitScale = json.optDouble("customFitScale", 1.0).toFloat().coerceIn(0.5f, 2.5f),

@@ -37,7 +37,12 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick as semanticClick
+import androidx.compose.ui.semantics.onLongClick as semanticLongClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -137,8 +142,16 @@ fun CategoryPill(
                     onLongPress = { onLongClick?.invoke() },
                 )
             }
-            .semantics {
+            .semantics(mergeDescendants = true) {
+                role = Role.Tab
+                this.selected = selected
                 contentDescription = if (selected) "分类 $name，已选中" else "分类 $name"
+                semanticClick {
+                    if (hapticEnabled) haptics.perform(HapticKind.SELECTION)
+                    onClick()
+                    true
+                }
+                onLongClick?.let { action -> semanticLongClick { action(); true } }
             }
             .padding(horizontal = 13.dp),
         verticalAlignment = Alignment.CenterVertically,

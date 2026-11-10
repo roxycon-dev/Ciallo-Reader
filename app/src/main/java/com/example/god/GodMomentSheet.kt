@@ -1071,9 +1071,12 @@ private fun GodTitleField(
             ),
             trailingIcon = {
                 if (custom) {
-                    PullOutIconButton(onClick = onResetDefault) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "还原默认", modifier = Modifier.size(18.dp))
-                    }
+                    PullOutIconButton(
+                        icon = Icons.Filled.Refresh,
+                        contentDescription = "还原默认",
+                        onClick = onResetDefault,
+                        glyphSize = 18.dp
+                    )
                 }
             },
         )

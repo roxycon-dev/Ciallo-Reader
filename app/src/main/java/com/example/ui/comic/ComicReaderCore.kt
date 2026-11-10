@@ -442,10 +442,7 @@ fun ComicReaderCore(
     var controlsVisible by remember { mutableStateOf(true) }
     var readerBottomBarHeightPx by remember { mutableIntStateOf(0) }
     var panel by remember { mutableStateOf(ComicPanel.NONE) }
-    val panelVisibility = remember { androidx.compose.animation.core.MutableTransitionState(false) }
-    panelVisibility.targetState = panel != ComicPanel.NONE
-    val panelLife = com.example.ui.components.rememberPaperLifecycle(panelVisibility)
-    val panelShown = panel != ComicPanel.NONE || panelLife.retained
+    val panelShown = panel != ComicPanel.NONE
     var settingsInitialTab by remember { mutableIntStateOf(0) }
     var autoRead by remember { mutableStateOf(false) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -622,12 +619,8 @@ fun ComicReaderCore(
             // 同页双份处理；displayConfig 入 key 后指纹落定即自动重预载并重建驻留，
             // 旧指纹驻留项随之解除——同时消解 F4 的陈旧驻留残留）。
             val online = pages.any { it is ComicPageRef.Remote }
-            val order = if (displayConfig.enhanceMode.isJaNai)
-                intArrayOf(currentSpread, currentSpread + 1, currentSpread + 2, currentSpread + 3, currentSpread - 1)
-                else if (online) intArrayOf(currentSpread, currentSpread + 1, currentSpread + 2, currentSpread - 1)
-                else intArrayOf(currentSpread, currentSpread + 1, currentSpread - 1)
-            order.filter { it in layout.spreads.indices }.forEach { si ->
-                layout.spreads[si].slots.forEach { slot ->
+            val automatic = if (displayConfig.enhanceMode.isJaNai) 3 else if (online) 2 else 1
+            layout.preloadSlots(currentSpread, displayConfig.imagePreloadCount, automatic).forEach { (si, slot) ->
                     val rot = ((displayConfig.bookRotation + (bookState.pageRotations[slot.ref.id] ?: 0)) % 360 + 360) % 360
                     entries.add(
                         ComicPageLoader.WindowEntry(
@@ -642,7 +635,6 @@ fun ComicReaderCore(
                             ),
                         ),
                     )
-                }
             }
             loader.preloadWindow(entries, toneOf(displayConfig))
             scheduleTranslationWindow(entries, displayConfig)
@@ -849,7 +841,6 @@ fun ComicReaderCore(
 
     /* ── 控制层与面板 ── */
     ComicReaderChrome(
-        panelVisibility = panelVisibility,
         visible = controlsVisible,
         panel = panel,
         onPanelChange = { settingsInitialTab = 0; panel = it },
@@ -1620,8 +1611,7 @@ private fun ComicVerticalList(
         // config（=防抖 displayConfig）入 key：指纹落定自动重预载并重建驻留。
         val entries = ArrayList<ComicPageLoader.WindowEntry>(8)
         val prefetch = if (config.enhanceMode.isJaNai) maxOf(3, strategy.prefetchWindow) else strategy.prefetchWindow
-        verticalPreloadIndices(currentSpread, prefetch, layout.spreadCount).forEach { si ->
-            layout.spreads[si].slots.forEach { slot ->
+        layout.preloadSlots(currentSpread, config.imagePreloadCount, prefetch).forEach { (si, slot) ->
                 val rot = ((config.bookRotation + (bookState.pageRotations[slot.ref.id] ?: 0)) % 360 + 360) % 360
                 entries.add(
                     ComicPageLoader.WindowEntry(
@@ -1636,7 +1626,6 @@ private fun ComicVerticalList(
                         ),
                     ),
                 )
-            }
         }
         loader.preloadWindow(entries, toneOf(config))
         onScheduleTranslation(entries, config)

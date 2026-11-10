@@ -4,6 +4,7 @@ package com.example.ui
 
 
 import com.example.ui.components.PullOutButton
+import com.example.ui.components.GlassCard
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutFilledTonalButton
 import com.example.ui.components.PullOutIconButton
@@ -13,6 +14,15 @@ import com.example.ui.components.PullOutBottomSheet
 import com.example.ui.components.PullOutDropdownMenu
 import com.example.ui.components.PullOutVisibility
 import com.example.ui.components.pullOutClickable
+import com.example.ui.wenku.WenkuReaderChromeLayer
+import com.example.ui.wenku.WenkuReaderChromePart
+import com.example.ui.wenku.WenkuReaderProgressSlider
+import com.example.ui.wenku.wenkuReaderCapsule
+import com.example.ui.wenku.wenkuReaderLocation
+import com.example.ui.wenku.rememberWenkuReaderChrome
+import com.example.ui.wenku.WenkuSearchField
+import com.example.ui.components.SegmentedPillSelector
+import com.example.ui.components.paperDismiss
 import com.example.ui.reader.TouchZone
 import com.example.ui.reader.TouchAction
 import com.example.ui.reader.SwipeAction
@@ -130,7 +140,6 @@ import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 
 import androidx.compose.material3.*
-import com.ramotion.fluidslider.FluidSlider
 
 import androidx.compose.runtime.*
 
@@ -204,6 +213,7 @@ import com.example.ui.reader.NovelInlineImage
 import com.example.ui.reader.NovelInlineImages
 import com.example.ui.reader.buildAnnotatedWithImages
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.boundsInWindow
@@ -238,7 +248,6 @@ import com.example.ui.components.AppButtonSize
 import com.example.ui.components.AppButtonVariant
 
 import com.example.ui.theme.clickableWithFeedback
-import com.example.ui.theme.animateAlpha
 
 import com.example.ui.theme.MintGold
 
@@ -372,6 +381,7 @@ fun ReaderScreen(
     var reachedBookEnd by remember(book?.id) { mutableStateOf(false) }
 
     var showBars by remember { mutableStateOf(false) }
+    val chrome = rememberWenkuReaderChrome(showBars)
 
 
 
@@ -1166,6 +1176,12 @@ fun ReaderScreen(
 
 
 
+    // R15：返回时让封面纸飞回书架原位（840ms 反向），再交给路由 pop。
+    fun exitReader() {
+        book?.id?.let { com.example.ui.wenku.WenkuFlightBridge.reverse(it.toString()) }
+        onBack()
+    }
+
     Box(Modifier.fillMaxSize()) {
     Box(
 
@@ -1178,9 +1194,11 @@ fun ReaderScreen(
 
     ) {
 
-        if (book != null && sharedTransitionScope != null && animatedVisibilityScope != null) {
-
-            with(sharedTransitionScope) {
+        // R14：这里不再需要共享元素作用域——封面飞行由根部覆盖层完成；
+        // 而且阅读器路由刻意把 LocalNavAnimatedVisibilityScope 置空（MainActivity），
+        // 旧的 `sharedTransitionScope != null && animatedVisibilityScope != null` 门槛
+        // 会让整块封面根本不组合、arrive() 永远等不到落点。
+        if (book != null) {
 
                 val imageRequest = if (!book.coverUri.isNullOrEmpty() && book.isCoverValid) {
 
@@ -1189,6 +1207,11 @@ fun ReaderScreen(
                     else java.io.File(book.coverUri!!)
 
                 } else null
+
+                // R14：封面飞行目标端。飞行期间这张整屏封面先让出像素（alpha 0），
+                // 由根部的 WenkuFlightOverlay 画那张纸；桥一清空就恢复原本的 alpha 曲线。
+                var flightArrived by remember(book.id) { mutableStateOf(false) }
+                val flightActive = com.example.ui.wenku.WenkuFlightBridge.isActiveFor(book.id.toString())
 
                 if (imageRequest != null) {
 
@@ -1202,19 +1225,27 @@ fun ReaderScreen(
 
                             .fillMaxSize()
 
-                            .sharedElement(
-
-                                state = rememberSharedContentState(key = "book_cover_${book.id}"),
-
-                                animatedVisibilityScope = animatedVisibilityScope,
-
-                                boundsTransform = { _, _ ->
-
-                                    tween(420, easing = com.example.ui.theme.IosMotion.EaseOut)
-
+                            .onGloballyPositioned { coordinates ->
+                                // 落点只登记一次：这是整屏封面，飞行终点就是整块窗口。
+                                //
+                                // ⚠️ 不能用 coordinates.positionInRoot()：阅读器是 paperComposable
+                                // 的滑入页，布局阶段它还停在 x=1080（右侧屏幕外），拿到的落点会把
+                                // 纸直接飞出屏幕（R14 实测：dst=1080..2160）。这里要的是「屏幕矩形」，
+                                // 与入场位移无关。
+                                if (!flightArrived) {
+                                    flightArrived = true
+                                    com.example.ui.wenku.WenkuFlightBridge.arrive(
+                                        bookKey = book.id.toString(),
+                                        bounds = androidx.compose.ui.geometry.Rect(
+                                            0f,
+                                            0f,
+                                            coordinates.size.width.toFloat(),
+                                            coordinates.size.height.toFloat()
+                                        ),
+                                        radius = 0.dp
+                                    )
                                 }
-
-                            )
+                            }
 
                             .clip(
 
@@ -1232,15 +1263,13 @@ fun ReaderScreen(
 
                             )
 
-                            .alpha(coverAlpha),
+                            .alpha(if (flightActive) 0f else coverAlpha),
 
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
 
                     )
 
                 }
-
-            }
 
         }
 
@@ -1804,7 +1833,7 @@ fun ReaderScreen(
                         showTtsBar = true; isAutoScrolling = false
                         if (!isTtsPlaying) currentChapter?.let { ttsManager.startReading(NovelInlineImages.stripTokens(it.content), speed = prefs.ttsSpeed, pitch = prefs.ttsPitch) }
                     }
-                    TouchAction.EXIT -> onBack()
+                    TouchAction.EXIT -> exitReader()
                     TouchAction.NONE -> Unit
                 }
             }
@@ -1892,9 +1921,8 @@ fun ReaderScreen(
 
                                         // 此链禁止添加 clickable/pointerInput：
                                         // graphicsLayer alpha=0 不豁免 Compose 命中测试，会变成幽灵热区
-                                        // B5：原先 alpha 直接取 0/1，页眉页脚是"瞬间闪没"，
-                                        // 与顶/底栏的 slideInVertically 完全不同步。改为透明度过渡。
-                                        .animateAlpha(if (showBars) 0f else 1f),
+
+                                        .wenkuReaderLocation(chrome),
 
                                     horizontalArrangement = Arrangement.SpaceBetween
 
@@ -2797,9 +2825,7 @@ fun ReaderScreen(
 
                                         .padding(horizontal = marginHorizontal.dp, vertical = DesignTokens.SpaceCompact)
 
-                                        // B5：原先 alpha 直接取 0/1，页眉页脚是"瞬间闪没"，
-                                        // 与顶/底栏的 slideInVertically 完全不同步。改为透明度过渡。
-                                        .animateAlpha(if (showBars) 0f else 1f),
+                                        .wenkuReaderLocation(chrome),
 
                                     horizontalArrangement = Arrangement.SpaceBetween
 
@@ -2865,11 +2891,11 @@ fun ReaderScreen(
 
                                         Text("朗读播放器", fontWeight = FontWeight.Bold, fontSize = DesignTokens.TypeBodySmall)
 
-                                        AppIconButton(onClick = { showTtsBar = false }) {
-
-                                            Icon(Icons.Filled.Close, contentDescription = "关闭")
-
-                                        }
+                                        AppIconButton(
+                                            icon = Icons.Filled.Close,
+                                            contentDescription = "关闭",
+                                            onClick = { showTtsBar = false }
+                                        )
 
                                     }
 
@@ -2885,11 +2911,11 @@ fun ReaderScreen(
 
                                     ) {
 
-                                        AppIconButton(onClick = { ttsManager.previousParagraph() }) {
-
-                                            Icon(Icons.Filled.SkipPrevious, contentDescription = "上一段")
-
-                                        }
+                                        AppIconButton(
+                                            icon = Icons.Filled.SkipPrevious,
+                                            contentDescription = "上一段",
+                                            onClick = { ttsManager.previousParagraph() }
+                                        )
 
 
 
@@ -2937,11 +2963,11 @@ fun ReaderScreen(
 
 
 
-                                        AppIconButton(onClick = { ttsManager.nextParagraph() }) {
-
-                                            Icon(Icons.Filled.SkipNext, contentDescription = "下一段")
-
-                                        }
+                                        AppIconButton(
+                                            icon = Icons.Filled.SkipNext,
+                                            contentDescription = "下一段",
+                                            onClick = { ttsManager.nextParagraph() }
+                                        )
 
                                     }
 
@@ -3119,48 +3145,14 @@ fun ReaderScreen(
 
 
 
-        // Reader Overlay (Background Mask)
-
-        com.example.ui.components.PullOutScrim(
-
-            visible = showBars,
-
-            enter = fadeIn(tween(300)),
-
-            exit = fadeOut(tween(300)),
-
-            modifier = Modifier.fillMaxSize()
-
-        ) {
-
+        if (showBars) {
+            // Outside taps dismiss controls without tinting or changing the reading paper.
             Box(
-
-                modifier = Modifier
-
-                    .fillMaxSize()
-
-                    .background(Color.Black.copy(alpha = com.example.ui.components.PullOutConfig.SCRIM))
-
-                    // 菜单打开时点击空白处只关闭菜单，绝不触发翻页/切章
-
-                    .pullOutClickable(
-
-                        interactionSource = remember { MutableInteractionSource() },
-
-                        indication = null
-
-                    ) {
-
-                        showBars = false
-
-                    }
-
+                Modifier.fillMaxSize().pointerInput(Unit) {
+                    detectTapGestures { showBars = false }
+                }
             )
-
         }
-
-
-
         // Top and Bottom Bars
 
         // 栏内文字/图标按栏背景实时取对比色（bgColor.onColor()），
@@ -3173,9 +3165,7 @@ fun ReaderScreen(
 
             Box(modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
 
-                PullOutVisibility(
-
-                                    visible = showBars) {
+                WenkuReaderChromeLayer(chrome, visible = showBars) {
 
                                     // ── 定制阅读器顶栏：圆角浮层 + 章节进度 + 主题自适应色 ──
 
@@ -3215,11 +3205,13 @@ fun ReaderScreen(
 
                                         ) {
 
-                                            AppIconButton(onClick = onBack) {
-
-                                                Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = barContentColor, modifier = Modifier.size(22.dp))
-
-                                            }
+                                            AppIconButton(
+                                                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                                                contentDescription = "返回",
+                                                onClick = { exitReader() },
+                                                tint = barContentColor,
+                                                glyphSize = 22.dp
+                                            )
 
                                             Column(modifier = Modifier.weight(1f).padding(horizontal = DesignTokens.SpaceCompact)) {
 
@@ -3261,74 +3253,69 @@ fun ReaderScreen(
 
                                             }
 
-                                            AppIconButton(onClick = { toggleBookmark() }) {
+                                            AppIconButton(
+                                                icon = if (currentBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+                                                contentDescription = "书签",
+                                                onClick = { toggleBookmark() },
+                                                active = currentBookmarked,
+                                                tint = if (currentBookmarked) MintGold else barContentColor,
+                                                glyphSize = DesignTokens.SpaceXl
+                                            )
 
-                                                Icon(
-
-                                                    imageVector = if (currentBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
-
-                                                    contentDescription = "书签",
-
-                                                    tint = if (currentBookmarked) MintGold else barContentColor,
-
-                                                    modifier = Modifier.size(DesignTokens.SpaceXl)
-
-                                                )
-
-                                            }
-
-                                            AppIconButton(onClick = {
-
-                                                showTtsBar = true
-
-                                                if (isAutoScrolling) isAutoScrolling = false // 与 TTS 互斥
-
-                                                if (!isTtsPlaying) {
-
-                                                    currentChapter?.let { ch ->
-
-                                                        ttsManager.startReading(NovelInlineImages.stripTokens(ch.content), speed = prefs.ttsSpeed, pitch = prefs.ttsPitch)
-
-                                                        AppToast.makeText(context, "已开启语音听书", Toast.LENGTH_SHORT).show()
-
+                                            AppIconButton(
+                                                icon = if (isTtsPlaying) Icons.AutoMirrored.Filled.VolumeUp else Icons.Filled.Headphones,
+                                                contentDescription = "听书",
+                                                tint = if (isTtsPlaying) MintGold else barContentColor,
+                                                glyphSize = DesignTokens.SpaceXl,
+                                                active = isTtsPlaying,
+                                                onClick = {
+                                                    showTtsBar = true
+                                                    isAutoScrolling = false
+                                                    if (!isTtsPlaying) {
+                                                        currentChapter?.let { chapter ->
+                                                            ttsManager.startReading(
+                                                                NovelInlineImages.stripTokens(chapter.content),
+                                                                speed = prefs.ttsSpeed,
+                                                                pitch = prefs.ttsPitch
+                                                            )
+                                                            AppToast.makeText(context, "已开启语音听书", Toast.LENGTH_SHORT).show()
+                                                        }
                                                     }
-
                                                 }
-
-                                            }) {
-
-                                                Icon(
-
-                                                    imageVector = if (isTtsPlaying) Icons.AutoMirrored.Filled.VolumeUp else Icons.Filled.Headphones,
-
-                                                    contentDescription = "听书",
-
-                                                    tint = if (isTtsPlaying) MintGold else barContentColor,
-
-                                                    modifier = Modifier.size(DesignTokens.SpaceXl)
-
-                                                )
-
-                                            }
-
-                                            AppIconButton(onClick = { showTocSheet = true }) {
-                                                Icon(Icons.Filled.Menu, "目录", tint = barContentColor, modifier = Modifier.size(DesignTokens.SpaceXl))
-                                            }
+                                            )
+                                            AppIconButton(
+                                                icon = Icons.Filled.Menu,
+                                                contentDescription = "目录",
+                                                onClick = { showTocSheet = true },
+                                                tint = barContentColor,
+                                                glyphSize = DesignTokens.SpaceXl
+                                            )
 
                                             // ── 更多菜单：低频操作收纳，顶栏只留高频 4 键 ──
                                             var showReaderMoreMenu by remember { mutableStateOf(false) }
+                                            var moreCoordinates by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
+                                            var moreAnchor by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
                                             Box {
-                                                AppIconButton(onClick = { showReaderMoreMenu = true }) {
-                                                    Icon(Icons.Filled.MoreVert, "更多", tint = barContentColor, modifier = Modifier.size(DesignTokens.SpaceXl))
-                                                }
+                                                AppIconButton(
+                                                    icon = Icons.Filled.MoreVert,
+                                                    contentDescription = "更多",
+                                                    onClick = {
+                                                        moreAnchor = moreCoordinates?.takeIf { it.isAttached }?.boundsInWindow()
+                                                        showReaderMoreMenu = true
+                                                    },
+                                                    modifier = Modifier.onGloballyPositioned { moreCoordinates = it },
+                                                    tint = barContentColor,
+                                                    glyphSize = DesignTokens.SpaceXl
+                                                )
                                                 PullOutDropdownMenu(
                                                     expanded = showReaderMoreMenu,
-                                                    onDismissRequest = { showReaderMoreMenu = false }
+                                                    onDismissRequest = { showReaderMoreMenu = false },
+                                                    anchorInWindow = moreAnchor
                                                 ) {
                                                     PullOutDropdownMenuItem(
                                                         text = { Text("全文搜索") },
                                                         leadingIcon = { Icon(Icons.Filled.Search, null, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
-                                                        onClick = com.example.ui.components.paperOpen { showReaderMoreMenu = false; showSearchDialog = true }
+                                                        onClick = com.example.ui.components.paperOpen { isAutoScrolling = false; showSearchDialog = true }
                                                     )
                                                     PullOutDropdownMenuItem(
                                                         text = { Text("书签列表") },
@@ -3338,8 +3325,7 @@ fun ReaderScreen(
                                                     PullOutDropdownMenuItem(
                                                         text = { Text(if (isAutoScrolling) "停止自动滚屏" else "自动滚屏") },
                                                         leadingIcon = { Icon(Icons.Filled.UnfoldMore, null, tint = if (isAutoScrolling) MintGold else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
-                                                        onClick = {
-                                                            showReaderMoreMenu = false
+                                                        onClick = com.example.ui.components.paperDismiss {
                                                             if (!isScrollMode) {
                                                                 AppToast.makeText(context, "自动滚屏需切换到滚动模式", Toast.LENGTH_SHORT).show()
                                                             } else {
@@ -3364,257 +3350,131 @@ fun ReaderScreen(
 
             }
 
-            Box(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
-
-                PullOutVisibility(
-
-                                    visible = showBars && chapters.isNotEmpty()) {
-
-                                    // ── 定制阅读器底栏：与顶栏同风格 ──
-
-                                    Column(
-
-                                        modifier = Modifier
-
-                                            .fillMaxWidth()
-
-                                            .background(bgColor.copy(alpha = 0.97f))
-
-                                            .drawBehind {
-
-                                                drawLine(
-
-                                                    color = barContentColor.copy(alpha = 0.08f),
-
-                                                    start = Offset(0f, 0f),
-
-                                                    end = Offset(size.width, 0f),
-
-                                                    strokeWidth = 0.8f
-
-                                                )
-
-                                            }
-
-                                            .navigationBarsPadding()
-
-                                    ) {
-
-                                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceXs)) {
-
-                                            // 章节拖动预览：拖动中只更新显示，松手才真正切章
-                                            var dragPos by remember { mutableStateOf<Float?>(null) }
-                                            val previewIdx = dragPos?.let {
-                                                Math.round(it * (chapters.size - 1).coerceAtLeast(1).toFloat())
-                                            }?.coerceIn(0, chapters.lastIndex.coerceAtLeast(0)) ?: currentChapterIndex
-
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-
-                                                PullOutTextButton(
-
-                                                    onClick = {
-
-                                                        if (currentChapterIndex > 0) {
-
-                                                            currentChapterIndex--
-
-                                                            scope.launch { scrollState.scrollTo(0) }
-
-                                                        }
-
-                                                    },
-
-                                                    enabled = currentChapterIndex > 0
-
-                                                ) {
-
-                                                    Text("上一章", fontWeight = FontWeight.Bold, color = barContentColor)
-
-                                                }
-
-                
-
-                                                // 基线原版 FluidSlider 视觉（用户设计零改动）；
-                                                // 横向拖动实时预览，松手(onPositionChangeFinished)才真正切章
-                                                    Box(modifier = Modifier.weight(1f)) {
-                                                        if (!isScrollMode && pagesList.size >= 2) {
-                                                            FluidSlider(
-                                                                position = dragPos
-                                                                    ?: activeSubPageIndex.toFloat() /
-                                                                    (pagesList.size - 1).coerceAtLeast(1).toFloat(),
-                                                                onPositionChange = { dragPos = it },
-                                                                onPositionChangeFinished = {
-                                                                    val p = dragPos
-                                                                    dragPos = null
-                                                                    if (p != null) {
-                                                                        val targetPage = Math.round(p * (pagesList.size - 1).coerceAtLeast(1).toFloat())
-                                                                            .coerceIn(0, pagesList.size - 1)
-                                                                        if (targetPage != activeSubPageIndex) {
-                                                                            updateSubPage(targetPage)
-                                                                        }
-                                                                    }
-                                                                },
-                                                                bubbleText = "${(dragPos?.let { Math.round(it * (pagesList.size - 1).coerceAtLeast(1)) } ?: activeSubPageIndex) + 1}",
-                                                                barHeightDp = 26,
-                                                                startText = null,
-                                                                endText = null,
-                                                                colorBar = barContentColor
-                                                            )
-                                                        } else if (isScrollMode) {
-                                                            FluidSlider(
-                                                                position = dragPos
-                                                                    ?: scrollState.value.toFloat() / scrollState.maxValue.coerceAtLeast(1),
-                                                                onPositionChange = { dragPos = it },
-                                                                onPositionChangeFinished = {
-                                                                    val p = dragPos
-                                                                    dragPos = null
-                                                                    if (p != null) {
-                                                                        scope.launch {
-                                                                            scrollState.scrollTo((p * scrollState.maxValue).toInt())
-                                                                        }
-                                                                    }
-                                                                },
-                                                                bubbleText = "${((dragPos ?: (scrollState.value.toFloat() / scrollState.maxValue.coerceAtLeast(1))) * 100).toInt()}%",
-                                                                barHeightDp = 26,
-                                                                startText = null,
-                                                                endText = null,
-                                                                colorBar = barContentColor
-                                                            )
-                                                        } else {
-                                                            FluidSlider(
-                                                                position = 0f,
-                                                                onPositionChange = { },
-                                                                onPositionChangeFinished = { },
-                                                                bubbleText = "1",
-                                                                barHeightDp = 26,
-                                                                startText = null,
-                                                                endText = null,
-                                                                colorBar = barContentColor
-                                                            )
-                                                        }
-                                                    }
-
-                
-
-                                                PullOutTextButton(
-
-                                                    onClick = {
-
-                                                        if (currentChapterIndex < chapters.size - 1) {
-
-                                                            currentChapterIndex++
-
-                                                            scope.launch { scrollState.scrollTo(0) }
-
-                                                        }
-
-                                                    },
-
-                                                    enabled = currentChapterIndex < chapters.size - 1
-
-                                                ) {
-
-                                                    Text("下一章", fontWeight = FontWeight.Bold, color = barContentColor)
-
-                                                }
-
-                                            }
-
-                
-
-                                            Row(
-
-                                                modifier = Modifier.fillMaxWidth(),
-
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-
-                                                verticalAlignment = Alignment.CenterVertically
-
-                                            ) {
-
-                                                Text(
-
-                                                    text = if (dragPos != null && !isScrollMode && pagesList.size >= 2) {
-                                                        val targetPage = Math.round(dragPos!!.toFloat() * (pagesList.size - 1)).coerceIn(0, pagesList.size - 1)
-                                                        "跳转 → 本章第 ${targetPage + 1}/${pagesList.size} 页"
-                                                    } else if (dragPos != null && isScrollMode) {
-                                                        val frac = dragPos!!
-                                                        "跳转 → 本章 ${(frac * 100).toInt()}%"
-                                                    } else if (chapters.isNotEmpty()) {
-                                                        "第 ${currentChapterIndex + 1} / ${chapters.size} 章 · ${currentChapter?.title.orEmpty()}"
-                                                    } else {
-                                                        "第 ${currentChapterIndex + 1} / ${chapters.size} 章"
-                                                    },
-                                                    fontSize = DesignTokens.TypeCaption,
-                                                    color = barContentColor,
-                                                    maxLines = 1,
-                                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                                    modifier = Modifier.weight(1f, fill = false).padding(end = DesignTokens.SpaceSm)
-
-                                                )
-
-                
-
-                                                PullOutFilledTonalButton(
-
-                                                    onClick = {
-
-                                                        showTtsBar = true
-
-                                                        if (isAutoScrolling) isAutoScrolling = false // 与 TTS 互斥
-
-                                                        if (!isTtsPlaying) {
-
-                                                            currentChapter?.let { ch ->
-
-                                                                ttsManager.startReading(NovelInlineImages.stripTokens(ch.content), speed = prefs.ttsSpeed, pitch = prefs.ttsPitch)
-
-                                                                AppToast.makeText(context, "开启语音听书：${ch.title}", Toast.LENGTH_SHORT).show()
-
-                                                            }
-
-                                                        }
-
-                                                    },
-
-                                                    colors = ButtonDefaults.filledTonalButtonColors(
-
-                                                        containerColor = if (isTtsPlaying) MintGold.copy(alpha = 0.25f) else barContentColor.copy(alpha = 0.10f),
-
-                                                        contentColor = if (isTtsPlaying) MintGold else barContentColor
-
-                                                    ),
-
-                                                    shape = RoundedCornerShape(DesignTokens.RadiusLg),
-
-                                                    contentPadding = PaddingValues(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceCompact)
-
-                                                ) {
-
-                                                    Icon(
-
-                                                        imageVector = if (isTtsPlaying) Icons.AutoMirrored.Filled.VolumeUp else Icons.Filled.Headphones,
-
-                                                        contentDescription = "听书模式",
-
-                                                        modifier = Modifier.size(DesignTokens.SpaceLoose)
-
-                                                    )
-
-                                                    Spacer(modifier = Modifier.width(DesignTokens.SpaceCompact))
-
-                                                    Text(if (isTtsPlaying) "朗读中..." else "听书模式", fontSize = DesignTokens.TypeLabel, fontWeight = FontWeight.Bold)
-
-                                                }
-
-                                            }
-
-                                        }
-
+            if (chapters.isNotEmpty()) {
+                val chromeTint = bgColor.copy(alpha = .97f)
+                val chromeOutline = barContentColor.copy(alpha = .12f)
+                var dragPos by remember { mutableStateOf<Float?>(null) }
+                val pageCount = pagesList.size
+                val pagedProgress = !isScrollMode && pageCount >= 2
+                val lastPage = (pageCount - 1).coerceAtLeast(1)
+                Column(
+                    Modifier.align(Alignment.BottomCenter)
+                        .widthIn(max = 480.dp).fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = DesignTokens.SpaceLg, vertical = DesignTokens.SpaceSm),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    WenkuReaderChromeLayer(chrome, showBars, part = WenkuReaderChromePart.Progress) {
+                        val onstage by remember(chrome) {
+                            derivedStateOf { chrome.value > WenkuReaderChromePart.Progress.start }
+                        }
+                        val position = dragPos ?: when {
+                            !onstage -> 0f
+                            isScrollMode -> scrollState.value.toFloat() / scrollState.maxValue.coerceAtLeast(1)
+                            pagedProgress -> activeSubPageIndex.toFloat() / lastPage
+                            else -> 0f
+                        }
+                        Row(
+                            Modifier.fillMaxWidth().wenkuReaderCapsule(chromeTint, chromeOutline)
+                                .padding(horizontal = DesignTokens.SpaceSm),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AppIconButton(
+                                icon = Icons.Filled.SkipPrevious,
+                                contentDescription = "上一章",
+                                tint = barContentColor,
+                                enabled = currentChapterIndex > 0,
+                                onClick = {
+                                    if (currentChapterIndex > 0) {
+                                        currentChapterIndex--
+                                        scope.launch { scrollState.scrollTo(0) }
                                     }
-
                                 }
-
+                            )
+                            WenkuReaderProgressSlider(
+                                modifier = Modifier.weight(1f),
+                                value = position,
+                                label = "本章进度",
+                                tint = barContentColor,
+                                enabled = pagedProgress || isScrollMode,
+                                onValueChange = { dragPos = it },
+                                onCommit = {
+                                    val target = dragPos
+                                    dragPos = null
+                                    if (target != null) {
+                                        if (isScrollMode) {
+                                            scope.launch { scrollState.scrollTo((target * scrollState.maxValue).toInt()) }
+                                        } else if (pagedProgress) {
+                                            val targetPage = Math.round(target * lastPage).coerceIn(0, pageCount - 1)
+                                            if (targetPage != activeSubPageIndex) updateSubPage(targetPage)
+                                        }
+                                    }
+                                },
+                                format = {
+                                    if (isScrollMode) "${(it * 100).toInt()}%"
+                                    else "第 ${Math.round(it * lastPage) + 1} 页"
+                                }
+                            )
+                            AppIconButton(
+                                icon = Icons.Filled.SkipNext,
+                                contentDescription = "下一章",
+                                tint = barContentColor,
+                                enabled = currentChapterIndex < chapters.lastIndex,
+                                onClick = {
+                                    if (currentChapterIndex < chapters.lastIndex) {
+                                        currentChapterIndex++
+                                        scope.launch { scrollState.scrollTo(0) }
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    WenkuReaderChromeLayer(chrome, showBars, part = WenkuReaderChromePart.Dock) {
+                        Row(
+                            Modifier.fillMaxWidth().wenkuReaderCapsule(chromeTint, chromeOutline)
+                                .padding(horizontal = DesignTokens.SpaceComfortable),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val preview = dragPos
+                            Text(
+                                text = when {
+                                    preview != null && pagedProgress -> "跳转 → 本章第 ${Math.round(preview * lastPage) + 1}/$pageCount 页"
+                                    preview != null && isScrollMode -> "跳转 → 本章 ${(preview * 100).toInt()}%"
+                                    else -> "第 ${currentChapterIndex + 1} / ${chapters.size} 章 · ${currentChapter?.title.orEmpty()}"
+                                },
+                                fontSize = DesignTokens.TypeCaption,
+                                color = barContentColor,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f).padding(end = DesignTokens.SpaceSm)
+                            )
+                            if (isTtsPlaying) {
+                                Text("朗读中", color = MintGold, fontSize = DesignTokens.TypeCaption)
+                            }
+                            AppIconButton(
+                                icon = if (isTtsPlaying) Icons.AutoMirrored.Filled.VolumeUp else Icons.Filled.Headphones,
+                                contentDescription = "听书模式",
+                                tint = if (isTtsPlaying) MintGold else barContentColor,
+                                active = isTtsPlaying,
+                                onClick = {
+                                    showTtsBar = true
+                                    isAutoScrolling = false
+                                    if (!isTtsPlaying) {
+                                        currentChapter?.let { chapter ->
+                                            ttsManager.startReading(
+                                                NovelInlineImages.stripTokens(chapter.content),
+                                                speed = prefs.ttsSpeed, pitch = prefs.ttsPitch
+                                            )
+                                            AppToast.makeText(context, "开启语音听书：${chapter.title}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
             }
 
         }
@@ -3814,9 +3674,12 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                     }) {
                         Text("重置", fontWeight = FontWeight.SemiBold, color = accentColor)
                     }
-                    PullOutIconButton(onClick = closePanel) {
-                        Icon(Icons.Filled.Close, "关闭阅读排版", tint = textColor.copy(alpha = 0.65f))
-                    }
+                    PullOutIconButton(
+                        icon = Icons.Filled.Close,
+                        contentDescription = "关闭阅读排版",
+                        tint = textColor.copy(alpha = 0.65f),
+                        onClick = closePanel
+                    )
                 }
 
                 PullOutFilledTonalButton(onClick = com.example.ui.components.paperDismiss { showBars = false; isAutoScrolling = false; showTouchEditor = true }, modifier = Modifier.fillMaxWidth()) {
@@ -4155,149 +4018,108 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
     // 跳转的 LaunchedEffect 放在 BoxWithConstraints 作用域内（那里才能读到 pagesList / updateSubPage）。
 
     if (showSearchDialog) {
-
-        PullOutAlertDialog(
-
-            onDismissRequest = { showSearchDialog = false },
-
-            title = { Text("全文搜索") },
-
-            text = {
-
-                Column {
-
-                    OutlinedTextField(
-
-                        value = searchKeyword,
-
-                        onValueChange = {
-
-                            searchKeyword = it
-
-                            onSearch(it)
-
-                        },
-
-                        placeholder = { Text("输入关键词...") },
-
-                        singleLine = true,
-
-                        modifier = Modifier.fillMaxWidth()
-
+        var searchScope by remember { mutableIntStateOf(1) }
+        var chapterQuery by remember { mutableStateOf("") }
+        val chapterMatches by produceState<List<SearchResultItem>?>(null, currentChapter, chapterQuery) {
+            value = null
+            if (chapterQuery.isBlank() || currentChapter == null) {
+                value = emptyList()
+            } else {
+                delay(150)
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    com.example.data.SearchLocator.buildResults(
+                        listOf(currentChapter),
+                        chapterQuery,
+                        logicalIndexOf = { currentChapterIndex },
+                        logicalTitleOf = { currentChapter.title }
                     )
-
-
-
-                    Spacer(modifier = Modifier.height(DesignTokens.SpaceMd))
-
-
-
-                    if (isSearching) {
-
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-
-                    } else if (searchResults.isEmpty() && searchKeyword.isNotBlank()) {
-
-                        Text("未找到匹配", color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-                    } else {
-
-                        LazyColumn(modifier = Modifier.height(240.dp)) {
-
-                            // key 不能用 chapterIndex：大章拆出的"续N"物理章合并回同一逻辑章后，
-                            // 多条结果 logicalIndex 相同 → LazyColumn "Key was already used" 直接闪退
-                            itemsIndexed(
-                                searchResults,
-                                key = { index, _ -> index }
-                            ) { _, item ->
-
-                                Card(
-
-                                    modifier = Modifier
-
-                                        .animateItemPlacement()
-
-                                        .fillMaxWidth()
-
-                                        .padding(vertical = DesignTokens.SpaceXs)
-
-                                        .clickableWithFeedback {
-
-                                            previousPosition = currentChapterIndex to scrollState.value
-
-                                            showReturnChip = true
-
-                                            currentChapterIndex = item.chapterIndex
-
-                                            // 记下关键词并携带精确偏移跳转：等新章文本/分页就绪后
-                                            // 定位到匹配位置并高亮（见 BoxWithConstraints 内的 LaunchedEffect）
-                                            searchHighlightQuery = searchKeyword
-
-                                            pendingSearchJump = item
-
-                                            showSearchDialog = false
-
-                                        },
-
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-
-                                ) {
-
-                                    Column(modifier = Modifier.padding(DesignTokens.SpaceSm)) {
-
-                                        Text(item.chapterTitle, fontWeight = FontWeight.Bold, fontSize = DesignTokens.TypeCaption, color = MintPrimary)
-
-                                        // 预览里高亮关键词（大小写不敏感的首处匹配）；颜色在组合期取好再进 remember
-                                        val accentColor = MintPrimary
-
-                                        val highlightedSnippet = remember(item.snippet, searchKeyword) {
-                                            buildAnnotatedString {
-                                                append(item.snippet)
-                                                if (searchKeyword.isNotBlank()) {
-                                                    val p = item.snippet.indexOf(searchKeyword, ignoreCase = true)
-                                                    if (p >= 0) {
-                                                        addStyle(
-                                                            SpanStyle(color = accentColor, fontWeight = FontWeight.Bold),
-                                                            p,
-                                                            p + searchKeyword.length
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        Text(highlightedSnippet, fontSize = DesignTokens.TypeCaptionSmall, maxLines = 2)
-
-                                    }
-
-                                }
-
-                            }
-
-                        }
-
-                    }
-
                 }
-
-            },
-
-            confirmButton = {
-
-                PullOutTextButton(onClick = { showSearchDialog = false }) {
-
-                    Text("关闭")
-
-                }
-
             }
-
-        )
-
+        }
+        val query = if (searchScope == 0) chapterQuery else searchKeyword
+        val matches = if (searchScope == 0) chapterMatches.orEmpty() else searchResults
+        val searching = query.isNotBlank() && if (searchScope == 0) chapterMatches == null else isSearching
+        PullOutBottomSheet(onDismissRequest = { showSearchDialog = false }) {
+            val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+            val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+            Column(
+                Modifier.fillMaxWidth().fillMaxHeight(.72f)
+                    .padding(horizontal = DesignTokens.SpaceLg)
+                    .padding(bottom = DesignTokens.SpaceLg)
+            ) {
+                val close = paperDismiss { }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("查找", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    AppIconButton(Icons.Filled.Close, "关闭查找", onClick = close)
+                }
+                SegmentedPillSelector(
+                    options = listOf(0 to "章内查找", 1 to "整书查找"),
+                    selected = searchScope,
+                    onSelect = {
+                        focusManager.clearFocus()
+                        keyboard?.hide()
+                        searchScope = it
+                    }
+                )
+                Spacer(Modifier.height(DesignTokens.SpaceMd))
+                WenkuSearchField(
+                    value = query,
+                    onValueChange = {
+                        if (searchScope == 0) chapterQuery = it else {
+                            searchKeyword = it
+                            onSearch(it)
+                        }
+                    },
+                    hint = "输入关键词...",
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(DesignTokens.SpaceMd))
+                when {
+                    query.isBlank() -> Unit
+                    searching -> CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+                    matches.isEmpty() -> Text("未找到匹配", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    else -> key(searchScope) {
+                        LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
+                            itemsIndexed(matches, key = { index, _ -> index }) { _, item ->
+                                val jump = paperDismiss {
+                                    previousPosition = currentChapterIndex to scrollState.value
+                                    showReturnChip = true
+                                    currentChapterIndex = item.chapterIndex
+                                    searchHighlightQuery = query
+                                    pendingSearchJump = item
+                                }
+                                val accentColor = MintPrimary
+                                val highlightedSnippet = remember(item.snippet, query, accentColor) {
+                                    buildAnnotatedString {
+                                        append(item.snippet)
+                                        val start = item.snippet.indexOf(query, ignoreCase = true)
+                                        if (start >= 0) addStyle(
+                                            SpanStyle(color = accentColor, fontWeight = FontWeight.Bold),
+                                            start, start + query.length
+                                        )
+                                    }
+                                }
+                                GlassCard(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = DesignTokens.SpaceXs),
+                                    contentPadding = PaddingValues(DesignTokens.SpaceSm),
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        keyboard?.hide()
+                                        jump()
+                                    }
+                                ) {
+                                    Column {
+                                        Text(item.chapterTitle, fontWeight = FontWeight.Bold, fontSize = DesignTokens.TypeCaption, color = accentColor)
+                                        Text(highlightedSnippet, fontSize = DesignTokens.TypeCaptionSmall, maxLines = 2)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
-
-
-
     if (showAnnotationsSheet) {
 
         PullOutBottomSheet(
@@ -4366,11 +4188,12 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                                 }
 
-                                AppIconButton(onClick = { onDeleteBookmark(bm.id) }) {
-
-                                    Icon(Icons.Filled.Delete, contentDescription = "删除", tint = MaterialTheme.colorScheme.error)
-
-                                }
+                                AppIconButton(
+                                    icon = Icons.Filled.Delete,
+                                    contentDescription = "删除",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    onClick = { onDeleteBookmark(bm.id) }
+                                )
 
                             }
 

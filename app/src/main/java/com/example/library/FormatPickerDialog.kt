@@ -114,13 +114,12 @@ fun FormatPickerDialog(
                             )
                         }
                         if (!loading) {
-                            PullOutIconButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "关闭",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            PullOutIconButton(
+                                icon = Icons.Default.Close,
+                                contentDescription = "关闭",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                onClick = com.example.ui.components.paperDismiss(onDismiss)
+                            )
                         }
                     }
 

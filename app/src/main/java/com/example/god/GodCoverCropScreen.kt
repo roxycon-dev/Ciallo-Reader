@@ -207,9 +207,12 @@ fun GodCoverCropScreen(
                 .padding(horizontal = 4.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PullOutIconButton(onClick = onCancel) {
-                Icon(Icons.Filled.Close, contentDescription = "取消", tint = Color.White)
-            }
+            PullOutIconButton(
+                icon = Icons.Filled.Close,
+                contentDescription = "取消",
+                onClick = onCancel,
+                tint = Color.White
+            )
             Text(
                 "裁剪封面",
                 color = Color.White,
@@ -217,20 +220,19 @@ fun GodCoverCropScreen(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
-            PullOutIconButton(onClick = {
-                rotation = (rotation + 90f) % 360f
-                scope.launch {
-                    scale.animateTo(1f, GodMotion.springMain())
-                    offX.animateTo(0f, GodMotion.springMain())
-                    offY.animateTo(0f, GodMotion.springMain())
+            PullOutIconButton(
+                icon = Icons.Filled.Refresh,
+                contentDescription = "旋转 90°",
+                tint = Color.White,
+                onClick = {
+                    rotation = (rotation + 90f) % 360f
+                    scope.launch {
+                        scale.animateTo(1f, GodMotion.springMain())
+                        offX.animateTo(0f, GodMotion.springMain())
+                        offY.animateTo(0f, GodMotion.springMain())
+                    }
                 }
-            }) {
-                Icon(
-                    Icons.Filled.Refresh,
-                    contentDescription = "旋转 90°",
-                    tint = Color.White,
-                )
-            }
+            )
         }
 
         /* ── 底栏 ── */

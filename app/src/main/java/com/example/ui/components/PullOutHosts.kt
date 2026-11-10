@@ -139,14 +139,6 @@ fun NavController.replacePaperPage(route: String) {
     }
 }
 
-fun NavGraphBuilder.pullOutPage(route: String, onDismiss: () -> Unit,
-    content: @Composable (close: () -> Unit) -> Unit) {
-    dialog(route, dialogProperties = DialogProperties(usePlatformDefaultWidth = false,
-        dismissOnClickOutside = false, dismissOnBackPress = false, decorFitsSystemWindows = false)) {
-        PullOutPageContent(onDismiss, content)
-    }
-}
-
 /** Activity-window page host: readers keep their brightness, inset and native-surface ownership.
  * Saveable presentation state prevents a second opening when returning to an existing entry.
  * All back buttons and system back share the same interruptible paper close.
@@ -154,51 +146,44 @@ fun NavGraphBuilder.pullOutPage(route: String, onDismiss: () -> Unit,
 private val paperPageOrigins = java.util.WeakHashMap<androidx.navigation.NavBackStackEntry, PullOutSource>()
 private val paperPageClosers = java.util.WeakHashMap<androidx.navigation.NavBackStackEntry, () -> Unit>()
 fun NavController.dismissPaperPage() {
-    val entry = currentBackStackEntry
-    val close = paperPageClosers[entry]
-    if (close != null) close() else popBackStack()
+    popBackStack()
 }
+/** Cupertino push/pop timing from app_ui.dart; the covered page moves one third. */
+private val pageEase = androidx.compose.animation.core.CubicBezierEasing(.18f, 1f, .04f, 1f)
+internal fun paperPageEnter(reduce: Boolean) =
+    if (reduce) androidx.compose.animation.EnterTransition.None
+    else androidx.compose.animation.slideInHorizontally(
+        animationSpec = androidx.compose.animation.core.tween(420, easing = pageEase)
+    ) { it }
+
+internal fun paperPageExit(reduce: Boolean) =
+    if (reduce) androidx.compose.animation.ExitTransition.None
+    else androidx.compose.animation.slideOutHorizontally(
+        animationSpec = androidx.compose.animation.core.tween(420, easing = pageEase)
+    ) { -it / 3 }
+
+internal fun paperPagePopEnter(reduce: Boolean) =
+    if (reduce) androidx.compose.animation.EnterTransition.None
+    else androidx.compose.animation.slideInHorizontally(
+        animationSpec = androidx.compose.animation.core.tween(320, easing = pageEase)
+    ) { -it / 3 }
+
+internal fun paperPagePopExit(reduce: Boolean) =
+    if (reduce) androidx.compose.animation.ExitTransition.None
+    else androidx.compose.animation.slideOutHorizontally(
+        animationSpec = androidx.compose.animation.core.tween(320, easing = pageEase)
+    ) { it }
+
+@Suppress("UNUSED_PARAMETER")
 fun NavGraphBuilder.paperComposable(
     route: String, navController: NavController,
     arguments: List<androidx.navigation.NamedNavArgument> = emptyList(),
+    revealContent: Boolean = false,
     content: @Composable androidx.compose.animation.AnimatedContentScope.(androidx.navigation.NavBackStackEntry) -> Unit,
 ) {
-    composable(route, arguments = arguments,
-        enterTransition = { androidx.compose.animation.EnterTransition.None },
-        exitTransition = { androidx.compose.animation.ExitTransition.None },
-        popEnterTransition = { androidx.compose.animation.EnterTransition.None },
-        popExitTransition = { androidx.compose.animation.ExitTransition.None }) { entry ->
-        val navScope = this
-        var presented by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-        var savedOrigin by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<FloatArray?>(null) }
-        val origin = remember(entry) {
-            paperPageOrigins.getOrPut(entry) {
-                if (presented && savedOrigin != null) PullOutSource().apply {
-                    val b = savedOrigin!!
-                    bounds = androidx.compose.ui.geometry.Rect(b[0], b[1], b[2], b[3]); virtual = b[4] == 1f
-                } else PullOutSources.claim() ?: PullOutSource().apply { virtual = true }
-            }.also { source ->
-                val saved = if (source.frozenOpening) source.returnSource() else source
-                savedOrigin = floatArrayOf(saved.bounds.left, saved.bounds.top, saved.bounds.right, saved.bounds.bottom, if (saved.virtual) 1f else 0f)
-            }
-        }
-        val visibility = remember { MutableTransitionState(presented).apply { targetState = true } }
-        val close = rememberPaperClose(visibility) {
-            if (navController.currentBackStackEntry === entry) navController.popBackStack()
-        }
-        val latestClose by rememberUpdatedState(close)
-        DisposableEffect(entry) {
-            paperPageClosers[entry] = { latestClose {} }
-            onDispose { paperPageClosers.remove(entry) }
-        }
-        LaunchedEffect(entry) { presented = true }
-        BackHandler { close {} }
-        CompositionLocalProvider(LocalPaperOrigin provides origin, LocalPaperOwner provides null,
-            LocalPaperFullSurface provides true, LocalPaperHandoff provides null) {
-            PullOutVisibility(visibility, Modifier.fillMaxSize()) {
-                PaperPageBackground { navScope.content(entry) }
-            }
-        }
+    composable(route = route, arguments = arguments) { entry ->
+        if (revealContent) com.example.ui.wenku.WenkuPageEntrance(transition) { content(entry) }
+        else content(entry)
     }
 }
 
@@ -261,7 +246,7 @@ private fun WindowPaperFinalizer(state: MutableTransitionState<Boolean>?) {
     }
 }
 
-/** Native window host, used by every app dialog. Existing composed surfaces may own their visibility. */
+/** Standard dialog host. The reference uses a popup/route transition; no full-window warp. */
 @Composable
 fun PullOutDialog(
     onDismissRequest: () -> Unit,
@@ -270,41 +255,9 @@ fun PullOutDialog(
     lifecycleState: MutableTransitionState<Boolean>? = null,
     content: @Composable () -> Unit,
 ) {
-    val inheritedOrigin = LocalPaperOrigin.current
-    val origin = remember { PullOutSources.claim() ?: inheritedOrigin?.returnSource() }
-    if (!animateContent) {
-        androidx.compose.ui.window.Dialog(onDismissRequest = onDismissRequest, properties = properties) {
-            DisablePlatformWindowMotion(fillWindow = !properties.usePlatformDefaultWidth); WindowPaperFinalizer(lifecycleState)
-            CompositionLocalProvider(LocalPaperOrigin provides origin, LocalPaperOwner provides null,
-                LocalPaperHandoff provides null, LocalPaperFullSurface provides false) {
-                DialogLiquidGlass(fillMaxSize = false) { content() }
-            }
-        }
-        return
-    }
-    val state = remember { MutableTransitionState(false).apply { targetState = true } }
-    val close = rememberPaperClose(state, onDismissRequest)
-    val forward = rememberPaperHandoff(state, onDismissRequest)
-    androidx.compose.ui.window.Dialog(onDismissRequest = { close {} }, properties = DialogProperties(
-        dismissOnBackPress = properties.dismissOnBackPress, dismissOnClickOutside = false,
-        securePolicy = properties.securePolicy, usePlatformDefaultWidth = false,
-        decorFitsSystemWindows = properties.decorFitsSystemWindows)) {
-        DisablePlatformWindowMotion(); WindowPaperFinalizer(state)
-        CompositionLocalProvider(LocalOverlayClose provides close, LocalPaperHandoff provides forward, LocalPaperOrigin provides origin, LocalPaperOwner provides null, LocalPaperFullSurface provides false) {
-            DialogLiquidGlass(fillMaxSize = false) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                val life = rememberPaperLifecycle(state)
-                Box(Modifier.fillMaxSize().graphicsLayer { alpha = life.progress.coerceIn(0f, 1f) }
-                    .background(Color.Black.copy(alpha = PullOutConfig.SCRIM))
-                    .clickable { if (properties.dismissOnClickOutside) close {} })
-                Box(Modifier.fillMaxSize().safeDrawingPadding().imePadding(), contentAlignment = Alignment.Center) {
-                    PullOutVisibility(state, if (properties.usePlatformDefaultWidth) Modifier.widthIn(max = 560.dp).fillMaxWidth(.9f) else Modifier) {
-                        Box { content() }
-                    }
-                }
-            }
-            }
-        }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismissRequest, properties = properties) {
+        DisablePlatformWindowMotion(fillWindow = !properties.usePlatformDefaultWidth)
+        DialogLiquidGlass(fillMaxSize = !properties.usePlatformDefaultWidth) { content() }
     }
 }
 
@@ -340,11 +293,11 @@ private fun DisablePlatformWindowMotion(fullPage: Boolean = false, lightSystemBa
     }
 }
 
-/** A real modal host, without a second platform slide competing with the paper mesh. */
+/** Material modal sheet; the reference sheet motion is a bottom spring, not a warped page. */
 @Composable
 fun PullOutBottomSheet(
     onDismissRequest: () -> Unit, modifier: Modifier = Modifier,
-    sheetState: SheetState = rememberModalBottomSheetState(),
+    sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     shape: Shape = RoundedCornerShape(topStart = DesignTokens.RadiusOverlay, topEnd = DesignTokens.RadiusOverlay),
     containerColor: Color = MaterialTheme.colorScheme.surface,
     contentColor: Color = contentColorFor(containerColor),
@@ -353,42 +306,14 @@ fun PullOutBottomSheet(
     dragHandle: (@Composable () -> Unit)? = { BottomSheetDefaults.DragHandle() },
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val state = remember { MutableTransitionState(false).apply { targetState = true } }
-    val close = rememberPaperClose(state, onDismissRequest)
-    val forward = rememberPaperHandoff(state, onDismissRequest)
-    var dragTarget by remember { mutableFloatStateOf(1f) }
-    var dragged by remember { mutableFloatStateOf(0f) }
-    val headerDrag = Modifier.pointerInput(Unit) {
-        detectVerticalDragGestures(onDragStart = { dragged = 0f },
-            onDragCancel = { dragTarget = 1f },
-            onDragEnd = { if (dragged > PullOutConfig.DISMISS_DISTANCE.dp.toPx()) close {} else dragTarget = 1f }) { change, amount ->
-            change.consume(); dragged = (dragged + amount).coerceAtLeast(0f)
-            dragTarget = 1f - (dragged / PullOutConfig.DRAG_TRAVEL.dp.toPx()).coerceIn(0f, .65f)
-        }
-    }
-    PullOutDialog(onDismissRequest = { close {} }, animateContent = false, lifecycleState = state,
-        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false, decorFitsSystemWindows = false)) {
-        CompositionLocalProvider(LocalOverlayClose provides close, LocalPaperHandoff provides forward, LocalPaperSheetDrag provides headerDrag) {
-            BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
-                val life = rememberPaperLifecycle(state)
-                Box(Modifier.fillMaxSize().graphicsLayer { alpha = life.progress.coerceIn(0f, 1f) }.background(scrimColor)
-                    .clickable { close {} })
-                CompositionLocalProvider(LocalPaperVisibleTarget provides dragTarget) {
-                PullOutVisibility(state, Modifier.align(Alignment.BottomCenter)) {
-                    Surface(modifier.widthIn(max = 840.dp).fillMaxWidth().heightIn(max = maxHeight * .94f),
-                        shape = shape, color = containerColor, contentColor = contentColor, tonalElevation = tonalElevation) {
-                        Column(Modifier.navigationBarsPadding().imePadding()) {
-                            if (dragHandle != null) Row(Modifier.fillMaxWidth().then(headerDrag), verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { dragHandle?.invoke() }
-                                IconButton(onClick = { close {} }) { Icon(Icons.Default.Close, "关闭面板") }
-                            }
-                            content()
-                        }
-                    }
-                }
-                }
-            }
-        }
+    // R15：统一到 Wenku 玻璃 sheet（与发现页「书源加载详情」同一套宿主）。
+    // 保留 Material 的形参只为不动这 12 个调用点：sheetState / shape / containerColor /
+    // contentColor / tonalElevation / scrimColor 不再参与绘制，外观由 WenkuTokens 决定。
+    com.example.ui.wenku.WenkuSheetDialog(
+        onDismissRequest = onDismissRequest,
+        grabber = dragHandle != null
+    ) {
+        Column(modifier.fillMaxWidth()) { content() }
     }
 }
 
@@ -410,49 +335,47 @@ fun PullOutAlertDialog(
         dismissButton = dismissButton?.let { slot -> { val close = LocalOverlayClose.current; CompositionLocalProvider(LocalPaperButtonAction provides close) { slot() } } })
 }
 
-/** Menus use the same spring and mesh, with an explicit focusable modal boundary. */
+/** Menus follow the reference glass morph (motion_ui.dart:687-1136): the panel grows out of
+ *  the trigger rect with independent width/height curves, then shrinks back over 320ms
+ *  (app_ui.dart:2143-2144 keeps the route mounted until the reverse transition completes). */
 @Composable
 fun PullOutDropdownMenu(
     expanded: Boolean, onDismissRequest: () -> Unit, modifier: Modifier = Modifier,
     offset: DpOffset = DpOffset.Zero,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+    anchorInWindow: androidx.compose.ui.geometry.Rect? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val state = remember { MutableTransitionState(false) }
-    var source by remember { mutableStateOf(PullOutSources.latest) }
-    var menuSize by remember { mutableStateOf(IntSize.Zero) }
-    val density = LocalDensity.current
-    var dismissed by remember { mutableStateOf(false) }
-    LaunchedEffect(expanded) { if (expanded) { source = PullOutSources.latest; dismissed = false; state.targetState = true } else state.targetState = false }
-    val close = rememberPaperClose(state) { if (expanded && !dismissed) { dismissed = true; onDismissRequest() } }
-    val forward = rememberPaperHandoff(state, onDismissRequest)
-    val retainedLife = rememberPaperLifecycle(state)
-    if (expanded || retainedLife.retained || state.currentState || state.targetState) {
-        PullOutDialog(onDismissRequest = { close {} }, animateContent = false, lifecycleState = state,
-            properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
-            val menuView = LocalView.current
-            BoxWithConstraints(Modifier.fillMaxSize()) {
-                val margin = with(density) { DesignTokens.SpaceMd.roundToPx() }
-                val screenWidth = constraints.maxWidth
-                val screenHeight = constraints.maxHeight - maxOf(WindowInsets.navigationBars.getBottom(density), WindowInsets.ime.getBottom(density))
-                val topMargin = maxOf(margin, WindowInsets.statusBars.getTop(density))
-                val bounds = source?.bounds?.translate(-menuView.paperWindowOffset())
-                val life = rememberPaperLifecycle(state)
-                Box(Modifier.fillMaxSize().graphicsLayer { alpha = life.progress.coerceIn(0f, 1f) }
-                    .background(Color.Black.copy(alpha = PullOutConfig.SCRIM)).clickable { close {} })
-                PullOutVisibility(state, Modifier.offset {
-                    val x = ((bounds?.right?.toInt() ?: screenWidth / 2) - menuSize.width + with(density) { offset.x.roundToPx() })
-                        .coerceIn(margin, (screenWidth - menuSize.width - margin).coerceAtLeast(margin))
-                    val below = (bounds?.bottom?.toInt() ?: screenHeight / 2) + margin
-                    val y = (if (below + menuSize.height <= screenHeight - margin) below else (bounds?.top?.toInt() ?: screenHeight / 2) - menuSize.height - margin)
-                        .coerceIn(topMargin, (screenHeight - menuSize.height - margin).coerceAtLeast(topMargin))
-                    IntOffset(x, y)
-                }.onSizeChanged { menuSize = it }) {
-                    Column(modifier.widthIn(min = 180.dp, max = 360.dp).clip(RoundedCornerShape(DesignTokens.SpaceXl))
-                        .background(containerColor).verticalScroll(rememberScrollState()).padding(vertical = DesignTokens.SpaceSm)) {
-                        CompositionLocalProvider(LocalPaperButtonAction provides close, LocalPaperHandoff provides forward) { content() }
-                    }
-                }
+    var retained by remember { mutableStateOf(expanded) }
+    LaunchedEffect(expanded) { if (expanded) retained = true }
+    if (!expanded && !retained) return
+    val sourceView = LocalView.current
+    val screenAnchor = remember {
+        anchorInWindow?.translate(sourceView.paperWindowOffset()) ?: PullOutSources.latest?.bounds
+    }
+    var dismissRequested by remember { mutableStateOf(false) }
+    PullOutDialog(
+        onDismissRequest = { dismissRequested = true },
+        animateContent = false,
+        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
+    ) {
+        val menuView = LocalView.current
+        com.example.ui.wenku.WenkuMenuHost(
+            visible = expanded,
+            anchorBounds = screenAnchor?.translate(-menuView.paperWindowOffset()),
+            sourceRadius = DesignTokens.SpaceXxl,
+            onDismiss = onDismissRequest,
+            dismissRequested = dismissRequested,
+            onHidden = { retained = false }
+        ) {
+            Column(
+                modifier = Modifier
+                    .widthIn(min = 180.dp, max = 360.dp)
+                    .clip(RoundedCornerShape(DesignTokens.SpaceXl))
+                    .background(containerColor)
+                    .padding(vertical = DesignTokens.SpaceSm)
+            ) {
+                content()
             }
         }
     }

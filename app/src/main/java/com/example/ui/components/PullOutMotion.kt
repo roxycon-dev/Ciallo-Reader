@@ -113,43 +113,28 @@ internal fun rememberPaperTrigger(): PullOutSource {
     return source
 }
 
-/** Registration is geometry only. Ordinary clicks never allocate, record or read a bitmap. */
-fun Modifier.pullOutAnchor(): Modifier = composed { pullOutAnchor(rememberPaperTrigger()) }
-internal fun Modifier.pullOutAnchor(source: PullOutSource): Modifier = composed {
-    val view = LocalView.current
-    val screenLocation = remember(view) { IntArray(2) }
-    val windowLocation = remember(view) { IntArray(2) }
-    source.view = WeakReference(view)
-    // Geometry only: never record, hide or take ownership of a card's render nodes.
-    onGloballyPositioned { source.bounds = it.boundsInWindow().translate(view.paperWindowOffset(screenLocation, windowLocation)) }
-}
-/** Selection and long presses register at activation, including accessibility and held presses. */
+/** Registration is geometry only. The reference frontend has no paper-source raster path. */
+fun Modifier.pullOutAnchor(): Modifier = this
+internal fun Modifier.pullOutAnchor(source: PullOutSource): Modifier = this
+/** Selection and long presses use Compose's own gesture/accessibility path. */
 fun Modifier.pullOutSelectable(selected: Boolean, interactionSource: MutableInteractionSource?, indication: Indication?,
-    enabled: Boolean = true, role: Role? = null, onClick: () -> Unit): Modifier = composed {
-    val source = rememberPaperTrigger()
-    pullOutAnchor(source).selectable(selected, interactionSource, indication, enabled, role) { PullOutSources.activate(source); onClick() }
-}
+    enabled: Boolean = true, role: Role? = null, onClick: () -> Unit): Modifier =
+    this.selectable(selected, interactionSource, indication, enabled, role, onClick = onClick)
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun Modifier.pullOutCombinedClickable(enabled: Boolean = true, onClickLabel: String? = null, role: Role? = null,
     onLongClickLabel: String? = null, onLongClick: (() -> Unit)? = null, onDoubleClick: (() -> Unit)? = null,
-    interactionSource: MutableInteractionSource? = null, indication: Indication? = androidx.compose.foundation.LocalIndication.current, onClick: () -> Unit): Modifier {
-    val source = rememberPaperTrigger()
-    return pullOutAnchor(source).combinedClickable(interactionSource = interactionSource ?: remember { MutableInteractionSource() },
-        indication = indication, enabled = enabled, onClickLabel = onClickLabel, role = role, onLongClickLabel = onLongClickLabel,
-        onLongClick = onLongClick?.let { { PullOutSources.activate(source); it() } },
-        onDoubleClick = onDoubleClick?.let { { PullOutSources.activate(source); it() } }) { PullOutSources.activate(source); onClick() }
-}
-fun Modifier.pullOutClickable(enabled: Boolean = true, onClickLabel: String? = null, role: Role? = null, onClick: () -> Unit): Modifier = composed {
-    val source = rememberPaperTrigger()
-    pullOutAnchor(source).clickable(enabled = enabled, onClickLabel = onClickLabel, role = role) { PullOutSources.activate(source); onClick() }
-}
+    interactionSource: MutableInteractionSource? = null, indication: Indication? = androidx.compose.foundation.LocalIndication.current, onClick: () -> Unit): Modifier =
+    this.combinedClickable(interactionSource = interactionSource ?: remember { MutableInteractionSource() },
+        indication = indication, enabled = enabled, onClickLabel = onClickLabel, role = role,
+        onLongClickLabel = onLongClickLabel, onLongClick = onLongClick,
+        onDoubleClick = onDoubleClick, onClick = onClick)
+fun Modifier.pullOutClickable(enabled: Boolean = true, onClickLabel: String? = null, role: Role? = null, onClick: () -> Unit): Modifier =
+    this.clickable(enabled = enabled, onClickLabel = onClickLabel, role = role, onClick = onClick)
 fun Modifier.pullOutClickable(interactionSource: MutableInteractionSource?, indication: Indication?, enabled: Boolean = true,
-    onClickLabel: String? = null, role: Role? = null, onClick: () -> Unit): Modifier = composed {
-    val source = rememberPaperTrigger()
-    pullOutAnchor(source).clickable(interactionSource = interactionSource, indication = indication, enabled = enabled,
-        onClickLabel = onClickLabel, role = role) { PullOutSources.activate(source); onClick() }
-}
+    onClickLabel: String? = null, role: Role? = null, onClick: () -> Unit): Modifier =
+    this.clickable(interactionSource = interactionSource, indication = indication, enabled = enabled,
+        onClickLabel = onClickLabel, role = role, onClick = onClick)
 
 /** A single physical clock owns drawing, retention and action completion. No second exit timer. */
 internal class PaperLifecycle {
@@ -218,9 +203,19 @@ internal class PaperSpring {
     }
 }
 
-/** Draw state is read in the draw phase; animating a paper never recomposes its content each frame. */
+/** Reference-style lightweight reveal. No raster capture, warp mesh, or retained window. */
 @Composable
 fun PullOutVisibility(visibleState: MutableTransitionState<Boolean>, modifier: Modifier = Modifier,
+    deformContent: Boolean = true, content: @Composable AnimatedVisibilityScope.() -> Unit) {
+    val enter = fadeIn(tween(420, easing = CubicBezierEasing(.215f, .61f, .355f, 1f))) +
+        scaleIn(tween(420, easing = CubicBezierEasing(.2f, 1.08f, .34f, 1f)), initialScale = .985f)
+    val exit = fadeOut(tween(320, easing = CubicBezierEasing(.55f, .055f, .675f, .19f))) +
+        scaleOut(tween(320, easing = CubicBezierEasing(.55f, .055f, .675f, .19f)), targetScale = .985f)
+    AnimatedVisibility(visibleState, modifier, enter = enter, exit = exit, content = content)
+}
+
+@Composable
+private fun PaperVisibilityLegacy(visibleState: MutableTransitionState<Boolean>, modifier: Modifier = Modifier,
     deformContent: Boolean = true, content: @Composable AnimatedVisibilityScope.() -> Unit) {
     val life = rememberPaperLifecycle(visibleState)
     val parentPaper = LocalPaperOwner.current

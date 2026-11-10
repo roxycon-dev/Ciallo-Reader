@@ -175,13 +175,12 @@ fun DownloadGlassCard(
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     if (onDismiss != null) {
-                        PullOutIconButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "关闭",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        PullOutIconButton(
+                            icon = Icons.Default.Close,
+                            contentDescription = "关闭",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            onClick = com.example.ui.components.paperDismiss(onDismiss)
+                        )
                     }
                 }
 
@@ -240,13 +239,12 @@ fun DownloadGlassCard(
                         )
                     }
                     if (onDismiss != null) {
-                        PullOutIconButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "关闭",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        PullOutIconButton(
+                            icon = Icons.Default.Close,
+                            contentDescription = "关闭",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            onClick = com.example.ui.components.paperDismiss(onDismiss)
+                        )
                     }
                 }
 

@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.PreferencesManager
 import com.example.ui.theme.clickableWithFeedback
+import com.example.ui.wenku.rememberWenkuAccessibility
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -48,8 +49,9 @@ fun SplashScreen(
     onSplashFinished: () -> Unit
 ) {
     val context = LocalContext.current
-    val scale = remember { Animatable(1.05f) }
-    val alpha = remember { Animatable(0f) }
+    val reduceMotion = rememberWenkuAccessibility().reduceMotion
+    val scale = remember { Animatable(if (reduceMotion) 1f else 1.05f) }
+    val alpha = remember { Animatable(if (reduceMotion) 1f else 0f) }
     val splashQuotes = remember(context) {
         val array = context.resources.getStringArray(R.array.splash_quotes)
         if (array.isNotEmpty()) array else arrayOf("如果不战斗，就无法获胜！ ——《进击的巨人》")
@@ -90,7 +92,11 @@ fun SplashScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(reduceMotion) {
+        if (reduceMotion) {
+            scale.snapTo(1f)
+            return@LaunchedEffect
+        }
         try {
             scale.animateTo(
                 targetValue = 1.0f,
@@ -103,9 +109,15 @@ fun SplashScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(isPureMode, reduceMotion) {
         if (isPureMode) {
             // 纯净模式：不显示任何开屏海报，直接进入软件
+            safeOnSplashFinished()
+            return@LaunchedEffect
+        }
+        if (reduceMotion) {
+            alpha.snapTo(1f)
+            delay(400)
             safeOnSplashFinished()
             return@LaunchedEffect
         }
