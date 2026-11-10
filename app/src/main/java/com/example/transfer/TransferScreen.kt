@@ -20,9 +20,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
@@ -192,7 +194,7 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
     val activeState=localProgress?.let { TransferSessionState(it.phase,progress=it,message=it.message) }?:state
     val colors = MaterialTheme.colorScheme
     val motion = rememberWenkuAccessibility().decorativeMotion && LocalWenkuDecorativeMotion.current
-    val listState = rememberLazyListState()
+    val listState = rememberLazyGridState()
     LaunchedEffect(state.phase) {
         if (state.phase == TransferPhase.AWAITING_CONFIRMATION || state.phase == TransferPhase.RECEIVED ||
             state.phase == TransferPhase.COMPLETED) listState.scrollToItem(0)
@@ -211,9 +213,13 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                     actions={AppIconButton(icon=Icons.Default.History,contentDescription="传输记录",wenkuSymbol=WenkuSymbol.Timer,onClick={showHistory=true})})
             }
         }) { padding ->
-        LazyColumn(state = listState, modifier=Modifier.fillMaxSize().padding(padding).navigationBarsPadding().testTag("device_transfer_screen"),
-            contentPadding=PaddingValues(horizontal=D.SpacePage,vertical=D.SpaceSm),verticalArrangement=Arrangement.spacedBy(D.SpaceMd)) {
-            item(key="hero",contentType="hero") {
+        BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        val columns = if (maxWidth >= 840.dp && androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.3f) 2 else 1
+        LazyVerticalGrid(columns = GridCells.Fixed(columns), state = listState,
+            modifier = Modifier.widthIn(max = 1120.dp).fillMaxSize().padding(padding)
+                .navigationBarsPadding().testTag("device_transfer_screen"),
+            horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding=PaddingValues(horizontal=D.SpacePage,vertical=D.SpaceSm),verticalArrangement=Arrangement.spacedBy(D.SpaceMd)) {
+            item(key = "hero", span = { GridItemSpan(maxLineSpan) }, contentType = "hero") {
                 Column(Modifier.fillMaxWidth().wenkuPagePart(1),horizontalAlignment=Alignment.CenterHorizontally) {
                     TransferArtwork(activeState)
                     WenkuMorphText(
@@ -232,7 +238,7 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                     }
                 }
             }
-            if(activeState.phase==TransferPhase.AWAITING_CONFIRMATION) item(key="pair",contentType="pair") {
+            if(activeState.phase==TransferPhase.AWAITING_CONFIRMATION) item(key = "pair", span = { GridItemSpan(maxLineSpan) }, contentType = "pair") {
                 GlassCard(Modifier.fillMaxWidth()) {Column(Modifier.padding(D.SpaceXl),verticalArrangement=Arrangement.spacedBy(D.SpaceMd)) {
                     if(state.verificationCode!=null) {
                         Text("两台设备显示相同的校验码",style=MaterialTheme.typography.labelLarge)
@@ -245,7 +251,7 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                     PullOutTextButton(onClick={manager.confirm(false)}) {Text("取消")}
                 } }
             }
-            if (state.phase == TransferPhase.RECEIVED && state.incoming) item(key = "received", contentType = "received") {
+            if (state.phase == TransferPhase.RECEIVED && state.incoming) item(key = "received", span = { GridItemSpan(maxLineSpan) }, contentType = "received") {
                 WenkuLoadedContentSequence(contentKey = state.preview?.packageId) {
                     GlassCard(Modifier.fillMaxWidth().then(if (motion) Modifier.wenkuReveal(0) else Modifier)) {
                         Column(Modifier.padding(D.SpaceXl), verticalArrangement = Arrangement.spacedBy(D.SpaceMd)) {
@@ -279,7 +285,7 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                     }
                 }
             }
-            if(state.phase==TransferPhase.COMPLETED) item(key="result",contentType="result") {
+            if(state.phase==TransferPhase.COMPLETED) item(key = "result", span = { GridItemSpan(maxLineSpan) }, contentType = "result") {
                 GlassCard(Modifier.fillMaxWidth()) {Column(Modifier.padding(D.SpaceXl),verticalArrangement=Arrangement.spacedBy(D.SpaceMd)) {
                     state.result?.let { Text("新增 ${it.added} 项 · 合并 ${it.merged} 项 · 跳过 ${it.skipped} 项",style=MaterialTheme.typography.bodyMedium) }
                     if(!state.incoming)Text("对方已收到 ✓   对方已导入 ✓",color=colors.primary)
@@ -287,7 +293,7 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                     WenkuTextButton(text=if(manager.needsRestart())"完成并重新打开" else "完成",onClick={if(manager.needsRestart())restart()else {manager.reset();sending=false}})
                 } }
             }
-            if(state.phase==TransferPhase.WAITING_TO_RESUME || state.phase==TransferPhase.FAILED) item(key="retry",contentType="retry") {
+            if(state.phase==TransferPhase.WAITING_TO_RESUME || state.phase==TransferPhase.FAILED) item(key = "retry", span = { GridItemSpan(maxLineSpan) }, contentType = "retry") {
                 Column(verticalArrangement=Arrangement.spacedBy(D.SpaceSm)) {
                     WenkuTextButton(text="继续传输",onClick={manager.retry()})
                     if(state.peer?.p2pAddress!=null)PullOutTextButton(onClick={manager.retry(true)}) {Text("改用附近直连")}
@@ -295,13 +301,13 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                 }
             }
             if(!state.busy && state.phase !in setOf(TransferPhase.RECEIVED,TransferPhase.COMPLETED,TransferPhase.WAITING_TO_RESUME) && localProgress==null) {
-                item(key="actions",contentType="actions") {
+                item(key = "actions", span = { GridItemSpan(maxLineSpan) }, contentType = "actions") {
                     Row(Modifier.fillMaxWidth().wenkuPagePart(2),horizontalArrangement=Arrangement.spacedBy(D.SpaceMd)) {
                         WenkuTextButton("发送数据", onClick={discover()}, modifier=Modifier.weight(1f), selected=true, wenkuSymbol=WenkuSymbol.Upload, compact=true)
                         WenkuTextButton("接收数据", onClick={sending=false;if(!TransferDiscovery.allowed(context))permissions.launch(permissionRequests())else {manager.enable(true);manager.scan()}}, modifier=Modifier.weight(1f), wenkuSymbol=WenkuSymbol.Download, compact=true)
                     }
                 }
-                item(key="selection",contentType="selection") {
+                item(key = "selection", span = { GridItemSpan(maxLineSpan) }, contentType = "selection") {
                     GlassCard(Modifier.fillMaxWidth().wenkuPagePart(3)) {Column(Modifier.padding(D.SpaceLg)) {
                         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                             Text("传输内容",style=MaterialTheme.typography.titleMedium,modifier=Modifier.weight(1f))
@@ -347,8 +353,8 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                     } }
                 }
                 if(sending) {
-                    item(key="nearby_title",contentType="label") {Text("可发送到",style=MaterialTheme.typography.titleMedium)}
-                    itemsIndexed(peers, key = { _, peer -> peer.id }, contentType = { _, _ -> "peer" }) { order, peer ->
+                    item(key = "nearby_title", span = { GridItemSpan(maxLineSpan) }, contentType = "label") {Text("可发送到",style=MaterialTheme.typography.titleMedium)}
+                    itemsIndexed(peers, key = { _, peer -> peer.id }, span = { _, _ -> GridItemSpan(1) }, contentType = { _, _ -> "peer" }) { order, peer ->
                         GlassCard(
                             Modifier.fillMaxWidth().wenkuPagePart(3 + order.coerceAtMost(5)),
                             onClick = if (selected.categories.isNotEmpty()) {
@@ -366,17 +372,17 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                             }
                         }
                     }
-                    if(peers.isEmpty()) item(key="empty",contentType="empty") {Text("未发现设备。请打开对方的设备互传，或连接同一 Wi-Fi / 热点。",style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)}
-                    item(key="scan",contentType="scan") {PullOutTextButton(onClick={manager.scan()}) {Text("重新发现设备")}}
+                    if(peers.isEmpty()) item(key = "empty", span = { GridItemSpan(maxLineSpan) }, contentType = "empty") {Text("未发现设备。请打开对方的设备互传，或连接同一 Wi-Fi / 热点。",style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)}
+                    item(key = "scan", span = { GridItemSpan(maxLineSpan) }, contentType = "scan") {PullOutTextButton(onClick={manager.scan()}) {Text("重新发现设备")}}
                 }
-                item(key="availability",contentType="availability") {GlassCard(Modifier.fillMaxWidth().wenkuPagePart(4)) {
+                item(key = "availability", span = { GridItemSpan(maxLineSpan) }, contentType = "availability") {GlassCard(Modifier.fillMaxWidth().wenkuPagePart(4)) {
                     Row(Modifier.padding(D.SpaceLg),verticalAlignment=Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {Text("允许接收",style=MaterialTheme.typography.bodyMedium)
                             Text("${manager.deviceName} · ${if(enabled)"正在等待接收" else "尚未开启"}",style=MaterialTheme.typography.labelMedium,color=colors.onSurfaceVariant)}
                         AppSwitch(checked=enabled,onCheckedChange={if(it && !TransferDiscovery.allowed(context))permissions.launch(permissionRequests())else manager.enable(it)})
                     }
                 } }
-                if(discoveryMessage.isNotBlank())item(key="discovery_message",contentType="message") {Text(discoveryMessage,color=colors.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)}
+                if(discoveryMessage.isNotBlank())item(key = "discovery_message", span = { GridItemSpan(maxLineSpan) }, contentType = "message") {Text(discoveryMessage,color=colors.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)}
                 item(key="backup",contentType="backup") {GlassCard(Modifier.fillMaxWidth().wenkuPagePart(5)) {Column(Modifier.padding(D.SpaceLg),verticalArrangement=Arrangement.spacedBy(D.SpaceSm)) {
                     Text("备份与分享文件", style = MaterialTheme.typography.titleMedium)
                     Text("将所选书籍、阅读记录和偏好保存为 Ciallo 备份。打开已有文件后可先查看内容。",
@@ -422,12 +428,13 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
                     Text("备份内容与「保存本地备份」相同，保留最近 3 份。",style=MaterialTheme.typography.labelSmall,color=colors.onSurfaceVariant)
                 } } }
             }
-            if(state.busy && state.phase!=TransferPhase.AWAITING_CONFIRMATION)item(key="cancel",contentType="cancel") {
+            if(state.busy && state.phase!=TransferPhase.AWAITING_CONFIRMATION)item(key = "cancel", span = { GridItemSpan(maxLineSpan) }, contentType = "cancel") {
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.Center) {
                     PullOutTextButton(onClick=onBack) {Text("收起，后台继续")}
                     if(state.phase!=TransferPhase.IMPORTING)PullOutTextButton(onClick={manager.cancel()}) {Text("取消传输")}
                 }
             }
+        }
         }
     }
     }

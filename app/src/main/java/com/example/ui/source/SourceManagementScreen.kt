@@ -42,6 +42,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -57,7 +58,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -424,12 +428,17 @@ fun SourceManagementScreen(
                     }
                 },
             ) { innerPadding ->
-                LazyColumn(
+                BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                val columns = if (maxWidth >= 840.dp && androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.3f) 2 else 1
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(columns),
                     modifier = Modifier
+                        .widthIn(max = if (columns == 2) 1200.dp else 760.dp)
                         .fillMaxSize()
                         .padding(innerPadding)
                         .padding(horizontal = SourcePageMargin),
                     verticalArrangement = Arrangement.spacedBy(SourceCardGap),
+                    horizontalArrangement = Arrangement.spacedBy(SourceCardGap),
                     contentPadding = PaddingValues(
                         top = 4.dp,
                         // D 导入行之后：底部安全区（含悬浮 Tab 栏与系统导航栏）+ 24
@@ -437,7 +446,7 @@ fun SourceManagementScreen(
                     )
                 ) {
                     // ── A 快捷入口卡：Z-Library 账号 / Venera 源仓库 / 调试日志 ──
-                    item(key = "quick_tiles") {
+                    item(key = "quick_tiles", span = { GridItemSpan(maxLineSpan) }) {
                         SourceQuickTilesRow(
                             modifier = Modifier.wenkuPagePart(1),
                             hasZLibrary = zlibSource != null,
@@ -492,12 +501,13 @@ fun SourceManagementScreen(
                     }
 
                     // ── D 导入行：虚线胶囊「＋ 导入 JSON 书源」 ──
-                    item(key = "import_row") {
+                    item(key = "import_row", span = { GridItemSpan(maxLineSpan) }) {
                         SourceImportEntryRow(
                             onClick = { showImportPicker = true },
                             modifier = Modifier.wenkuPagePart(groups.size + 2)
                         )
                     }
+                }
                 }
             }
         }

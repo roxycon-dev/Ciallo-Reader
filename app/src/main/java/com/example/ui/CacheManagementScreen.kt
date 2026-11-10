@@ -30,8 +30,10 @@ import androidx.compose.foundation.clickable
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -468,13 +470,16 @@ fun CacheManagementScreen(
     }
 
     GlassManagementPage("缓存管理", "ARCHIVE / LOCAL STORAGE", onBack) { insets ->
-        Box(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
-            LazyColumn(
-                modifier = Modifier.widthIn(max = AdaptiveSpec.pageContentMaxWidth).fillMaxSize(),
+        BoxWithConstraints(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
+            val columns = if (maxWidth >= 840.dp && androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.3f) 2 else 1
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(columns),
+                modifier = Modifier.widthIn(max = if (columns == 2) 1120.dp else AdaptiveSpec.pageContentMaxWidth).fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 contentPadding = PaddingValues(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 24.dp)
             ) {
-                item(key = "overview") {
+                item(key = "overview", span = { GridItemSpan(maxLineSpan) }) {
                     GlassCard(Modifier.fillMaxWidth().wenkuPagePart(1)) {
                         Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             // 骨架 → 内容交接（loading_handoff.dart）：内容从顶部擦除揭示，
@@ -552,7 +557,7 @@ fun CacheManagementScreen(
                     }
                 }
 
-                item(key = "clear_all") {
+                item(key = "clear_all", span = { GridItemSpan(maxLineSpan) }) {
                     Column(Modifier.fillMaxWidth().wenkuPagePart(2)) {
                         val clearLabel = when {
                             isClearing -> "正在清理…"
@@ -583,7 +588,7 @@ fun CacheManagementScreen(
                     if (zoneRows.isNotEmpty()) {
                         val headerIndex = revealIndex
                         revealIndex += 1 + zoneRows.size
-                        item(key = "zone_header_$zone") {
+                        item(key = "zone_header_$zone", span = { GridItemSpan(maxLineSpan) }) {
                             Text(title, modifier = Modifier.padding(top = 2.dp).wenkuPagePart(headerIndex), fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                         }

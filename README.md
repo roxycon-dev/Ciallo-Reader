@@ -27,7 +27,7 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 **English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
 
-**1.6.0 / 259 · UI 重构与平板适配**。书架、书库、发现、统计、设置和阅读器采用统一的版式、玻璃面板与转场，文字和图标按层级浮现，保留 Ciallo 配色与 3D 书架。[Issue #7](https://github.com/roxycon-dev/Ciallo-Reader/issues/7) 带来平板宽屏布局，以及「漫画阅读器 → 设置 → 图像」中的自动预加载与自定义 0–12 张。详见[更新说明](docs/release-1.6.0-2026-11-10.md)。
+**1.6.0 / 259 · UI 重构与平板适配**。书架、书库、发现、统计、设置和阅读器采用统一的版式、玻璃面板与转场，文字和图标按层级浮现，保留 Ciallo 配色与 3D 书架。[Issue #7](https://github.com/roxycon-dev/Ciallo-Reader/issues/7) 带来全应用宽屏布局，包括侧边导航、独立搜索筛选区、分栏详情和设置面板，以及「漫画阅读器 → 设置 → 图像」中的自动预加载与自定义 0–12 张。详见[更新说明](docs/release-1.6.0-2026-11-10.md)。
 
 **1.5.16 / 258 · EPUB 连续插图修复**：修复极简渲染质量下连续几张插图全部显示第一张的问题，点开大图与正文显示终于一致；EPUB 里的小图（分隔符、装饰图）不再被拉满整栏宽度。仿真卷页、覆盖、平移、渐变、上下滚动五种翻页方式逐页核对通过，真机《无职转生 01》的 3 张彩页与 6 张连续黑白插图全部正确。详见[更新说明](docs/release-1.5.16-2026-11-07.md)。
 

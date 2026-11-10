@@ -792,8 +792,13 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            Box(modifier = Modifier.fillMaxSize()) {
-                            Box(modifier = Modifier.fillMaxSize()) {
+                            val widthClass = com.example.ui.adaptive.rememberWindowWidthClass()
+                            val rail = widthClass == com.example.ui.adaptive.WindowWidthClass.EXPANDED
+                            val homeBottomInset = if (rail) com.example.ui.theme.LocalAppBottomInsetNoTabBar.current
+                                else LocalAppBottomInset.current
+                            CompositionLocalProvider(LocalAppBottomInset provides homeBottomInset) {
+                            Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
+                            Box(Modifier.fillMaxSize().padding(start = if (rail) com.example.ui.components.AppRailWidth else 0.dp)) {
                             Scaffold(
                                 // Each tab owns its status-bar inset; applying it here too
                                 // leaves a second status-bar-sized gap above every header.
@@ -1185,29 +1190,37 @@ class MainActivity : ComponentActivity() {
                             val tabBarVisible by com.example.ui.shelf.ShelfChrome.tabBarVisible.collectAsStateWithLifecycle()
                             // 路由内的玻璃 sheet 会被 Tab 栏压住：有 sheet 打开时先让 Tab 栏让位。
                             val sheetOpen = com.example.ui.wenku.WenkuSheetRegistry.anyOpen
-                            val searchCoversDock = selectedTab == 2 && shelfSearch.mounted
+                            val searchCoversDock = !rail && selectedTab == 2 && shelfSearch.mounted
+                            val selectTab: (Int) -> Unit = { tab ->
+                                if (tab == 1) {
+                                    val now = android.os.SystemClock.elapsedRealtime()
+                                    if (lastDiscoverTap > 0L && now - lastDiscoverTap in 1..400) { discoverRefreshRequest++; lastDiscoverTap = 0L }
+                                    else lastDiscoverTap = now
+                                } else lastDiscoverTap = 0L
+                                selectedTab = tab
+                            }
                             PullOutVisibility(
                                 visible = tabBarVisible && !sheetOpen,
-                                modifier = Modifier.align(Alignment.BottomCenter)
+                                modifier = Modifier.align(if (rail) Alignment.CenterStart else Alignment.BottomCenter)
+                                    .then(if (rail) Modifier.statusBarsPadding().navigationBarsPadding() else Modifier)
                                     .then(if (searchCoversDock) Modifier
                                         .clearAndSetSemantics { }
                                         .wenkuBlockPointer()
                                         .graphicsLayer { alpha = 1f - shelfSearch.motion.value }
                                     else Modifier),
                             ) {
-                                AppBottomTabBar(
-                                    items = tabItems,
-                                    selectedIndex = selectedTab,
-                                    onTabSelected = { tab ->
-                                        if (tab == 1) {
-                                            val now = android.os.SystemClock.elapsedRealtime()
-                                            if (lastDiscoverTap > 0L && now - lastDiscoverTap in 1..400) { discoverRefreshRequest++; lastDiscoverTap = 0L }
-                                            else lastDiscoverTap = now
-                                        } else lastDiscoverTap = 0L
-                                        selectedTab = tab
-                                    },
-                                    collapseState = tabBarCollapseState,
-                                )
+                                if (rail) {
+                                    com.example.ui.components.AppNavigationRail(tabItems, selectedTab, selectTab)
+                                } else {
+                                    AppBottomTabBar(
+                                        items = tabItems,
+                                        selectedIndex = selectedTab,
+                                        onTabSelected = selectTab,
+                                        modifier = Modifier.widthIn(max = 560.dp),
+                                        collapseState = tabBarCollapseState,
+                                    )
+                                }
+                            }
                             }
                             }
                         }

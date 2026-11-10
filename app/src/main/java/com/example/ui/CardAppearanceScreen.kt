@@ -38,7 +38,9 @@ internal fun CardAppearanceScreen(
     val pressPreview = !LocalReduceMotion.current && !LocalRenderQuality.current.minimal
     GlassManagementPage("自定义卡片参数", "APPEARANCE / CARDS", onBack) { insets ->
         Box(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
-            Column(Modifier.widthIn(max = AdaptiveSpec.pageContentMaxWidth).fillMaxSize()) {
+            com.example.ui.adaptive.AdaptiveWorkspace(
+                modifier = Modifier.widthIn(max = 1040.dp).fillMaxSize(),
+                controls = { _ ->
                 // Recreate only the sample layer when its painted surface changes.
                 key(tw.cornerRadiusDp, tw.blurRadiusDp, tw.tintMix, tw.cardAlpha) {
                     CompositionLocalProvider(
@@ -68,8 +70,10 @@ internal fun CardAppearanceScreen(
                         }
                     }
                 }
+                },
+            ) { _ ->
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                     contentPadding = PaddingValues(start = 24.dp, top = 8.dp, end = 24.dp, bottom = 24.dp),
                 ) {

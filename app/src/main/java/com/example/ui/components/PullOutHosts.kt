@@ -306,6 +306,7 @@ fun PullOutBottomSheet(
     tonalElevation: Dp = DesignTokens.Zero,
     scrimColor: Color = Color.Black.copy(alpha = PullOutConfig.SCRIM),
     dragHandle: (@Composable () -> Unit)? = { BottomSheetDefaults.DragHandle() },
+    wideMaxWidth: Dp = 560.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     // R15：统一到 Wenku 玻璃 sheet（与发现页「书源加载详情」同一套宿主）。
@@ -313,7 +314,8 @@ fun PullOutBottomSheet(
     // contentColor / tonalElevation / scrimColor 不再参与绘制，外观由 WenkuTokens 决定。
     com.example.ui.wenku.WenkuSheetDialog(
         onDismissRequest = onDismissRequest,
-        grabber = dragHandle != null
+        grabber = dragHandle != null,
+        wideMaxWidth = wideMaxWidth,
     ) {
         Column(modifier.fillMaxWidth()) { content() }
     }

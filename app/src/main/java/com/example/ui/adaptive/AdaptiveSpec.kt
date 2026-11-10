@@ -3,6 +3,7 @@ package com.example.ui.adaptive
 import androidx.annotation.DimenRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,9 +14,11 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.R
@@ -180,5 +183,45 @@ fun AdaptivePageContent(
         contentAlignment = Alignment.TopCenter,
     ) {
         Box(Modifier.widthIn(max = maxInnerWidth).fillMaxSize(), content = content)
+    }
+}
+
+
+/** Keep the same compositions while controls move from above the content to its start edge. */
+@Composable
+internal fun AdaptiveWorkspace(
+    modifier: Modifier = Modifier,
+    splitAt: Dp = 720.dp,
+    sidebarWidth: Dp = 288.dp,
+    controls: @Composable (split: Boolean) -> Unit,
+    content: @Composable (split: Boolean) -> Unit,
+) {
+    BoxWithConstraints(modifier) {
+        val split = maxWidth >= splitAt
+        Layout(
+            modifier = Modifier.fillMaxSize(),
+            content = {
+                Box(Modifier.fillMaxWidth()) { controls(split) }
+                Box(Modifier.fillMaxSize()) { content(split) }
+            },
+        ) { children, constraints ->
+            val width = constraints.maxWidth
+            val height = constraints.maxHeight
+            val sidebar = if (split) sidebarWidth.roundToPx().coerceAtMost(width) else width
+            val gap = if (split) 16.dp.roundToPx().coerceAtMost(width - sidebar) else 0
+            val first = children[0].measure(
+                Constraints(minWidth = sidebar, maxWidth = sidebar, maxHeight = height)
+            )
+            val second = children[1].measure(
+                Constraints.fixed(
+                    if (split) width - sidebar - gap else width,
+                    if (split) height else height - first.height,
+                )
+            )
+            layout(width, height) {
+                first.placeRelative(0, 0)
+                second.placeRelative(if (split) sidebar + gap else 0, if (split) 0 else first.height)
+            }
+        }
     }
 }

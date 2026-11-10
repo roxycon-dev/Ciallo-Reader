@@ -28,6 +28,7 @@ import net.engawapg.lib.zoomable.toggleScale
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -1718,6 +1719,8 @@ private fun ComicVerticalList(
             userScrollEnabled = config.touchZones == null,
             state = listState,
             modifier = Modifier
+                .align(Alignment.TopCenter)
+                .widthIn(max = 820.dp)
                 .fillMaxSize()
                 .onSizeChanged { onAreaSizeChanged(Size(it.width.toFloat(), it.height.toFloat())) }
                 .touchZoneGestures(config.touchZones, { comicTurnTravel(it, density.density) }, gestureCallbacks.onZoneAction,

@@ -5,6 +5,8 @@ import com.example.ui.components.pullOutClickable
 import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.*
@@ -198,6 +200,10 @@ fun ComicChaptersScreen(
         if (sortDesc) ordered.asReversed() else ordered
     }
 
+    val split = com.example.ui.adaptive.rememberWindowWidthClass() ==
+        com.example.ui.adaptive.WindowWidthClass.EXPANDED
+    val chapterHeaderItems = if (split) LIST_HEADER_ITEMS - 1 else LIST_HEADER_ITEMS
+    val summaryScroll = rememberScrollState()
     val listState = rememberLazyListState()
     var highlightId by remember { mutableStateOf<String?>(null) }
     var selectionMode by rememberSaveable(workKey) { mutableStateOf(false) }
@@ -246,8 +252,8 @@ fun ComicChaptersScreen(
         initialPositionHandled = true
         val row = chapterId?.let(::rowIndexOf) ?: -1
         if (row >= 0) {
-            if (reduceMotion) listState.scrollToItem(row + LIST_HEADER_ITEMS)
-            else listState.animateScrollToItem(row + LIST_HEADER_ITEMS)
+            if (reduceMotion) listState.scrollToItem(row + chapterHeaderItems)
+            else listState.animateScrollToItem(row + chapterHeaderItems)
             highlightId = chapterId
         }
     }
@@ -344,6 +350,8 @@ fun ComicChaptersScreen(
                 },
                 label = "chapterSelectionFooter",
             ) { selecting ->
+                Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface), contentAlignment = Alignment.Center) {
+                Box(Modifier.widthIn(max = 760.dp).fillMaxWidth()) {
                 if (selecting) {
                     val count = effectiveSelection.size
                     val size = String.format(java.util.Locale.US, "%.1f", count * estimatedChapterSizeMb)
@@ -403,13 +411,24 @@ fun ComicChaptersScreen(
                         )
                     }
                 }
+                }
+                }
             }
         },
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             val loadingDirectory = loading && chapters.isEmpty()
             val initialDirectoryLoading = remember(workKey) { loadingDirectory }
-            Column(Modifier.fillMaxSize()) {
+            Row(
+                Modifier.align(Alignment.TopCenter).widthIn(max = 1280.dp).fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(if (split) 12.dp else 0.dp),
+            ) {
+                if (split) {
+                    Column(Modifier.width(344.dp).fillMaxHeight().verticalScroll(summaryScroll).padding(16.dp)) {
+                        ComicHeroHeader(book, textMode, onSearchText, onOpenCover, sidePane = true)
+                    }
+                }
+                Column(Modifier.weight(1f).fillMaxHeight()) {
                 if (error != null && chapters.isNotEmpty()) {
                     SourceUnavailableBanner(
                         message = "来源暂不可用（已保留缓存信息与阅读进度）",
@@ -423,7 +442,7 @@ fun ComicChaptersScreen(
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    item(key = "hero") {
+                    if (!split) item(key = "hero") {
                         ComicHeroHeader(
                             book = book,
                             textMode = textMode,
@@ -489,8 +508,8 @@ fun ComicChaptersScreen(
                                             val latest = ordered.lastOrNull()?.chapter?.id
                                             val row = latest?.let(::rowIndexOf) ?: -1
                                             if (row >= 0) scope.launch {
-                                                if (reduceMotion) listState.scrollToItem(row + LIST_HEADER_ITEMS)
-                                                else listState.animateScrollToItem(row + LIST_HEADER_ITEMS)
+                                                if (reduceMotion) listState.scrollToItem(row + chapterHeaderItems)
+                                                else listState.animateScrollToItem(row + chapterHeaderItems)
                                             }
                                         },
                                         enabled = ordered.isNotEmpty(), compact = true, wenkuSymbol = WenkuSymbol.Down,
@@ -628,6 +647,7 @@ fun ComicChaptersScreen(
                         }
                     }
                 }
+            }
             }
 
             // 下载进度悬浮窗
@@ -1147,9 +1167,10 @@ private fun ComicHeroHeader(
     textMode: Boolean,
     onTextClick: (String) -> Unit,
     onOpenCover: ((SearchBook) -> Unit)?,
+    sidePane: Boolean = false,
 ) {
     if (book == null) return
-    var descriptionExpanded by remember(book.sourceId, book.id) { mutableStateOf(false) }
+    var descriptionExpanded by rememberSaveable(book.sourceId, book.id) { mutableStateOf(false) }
     val colors = wenkuColors()
     val fontScale = LocalDensity.current.fontScale
 
@@ -1175,8 +1196,8 @@ private fun ComicHeroHeader(
                 )
             }
             val wide = maxWidth >= 650.dp
-            val stacked = fontScale >= 1.45f && !wide
-            val coverWidth = if (wide) 150.dp else 118.dp
+            val stacked = sidePane || fontScale >= 1.45f && !wide
+            val coverWidth = if (wide || sidePane) 150.dp else 118.dp
             val cover: @Composable () -> Unit = {
                 val shape = RoundedCornerShape(10.dp)
                 val coverAction = if (onOpenCover != null && !book.cover.isNullOrBlank()) {
@@ -1246,7 +1267,11 @@ private fun ComicHeroHeader(
                 }
             }
             if (stacked) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(
+                    Modifier.fillMaxWidth().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalAlignment = if (sidePane) Alignment.CenterHorizontally else Alignment.Start,
+                ) {
                     cover()
                     metadata(Modifier.fillMaxWidth())
                 }

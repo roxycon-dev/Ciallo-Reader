@@ -53,17 +53,24 @@ internal fun ThemePaletteScreen(
     val palette = MaterialTheme.colorScheme
     GlassManagementPage("主题配色方案", "APPEARANCE / PALETTE", onBack) { insets ->
         Box(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
-            LazyColumn(
-                modifier = Modifier.widthIn(max = 680.dp).fillMaxSize(),
-                contentPadding = PaddingValues(start = 24.dp, top = 12.dp, end = 24.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                item("preview") {
+            val preview: @Composable () -> Unit = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         WenkuSectionHeader("01", "TONAL PALETTE", "实时预览")
                         Box(Modifier.wenkuPagePart(1)) { ThemePalettePreview(palette) }
                     }
-                }
+            }
+            com.example.ui.adaptive.AdaptiveWorkspace(
+                modifier = Modifier.widthIn(max = 1060.dp).fillMaxSize(),
+                controls = { split ->
+                    if (split) Box(Modifier.fillMaxWidth().padding(start = 24.dp, top = 12.dp)) { preview() }
+                },
+            ) { split ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 24.dp, top = 12.dp, end = 24.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                if (!split) item("preview") { preview() }
                 item("primary") {
                     PaletteOptions(
                         "02", "PRIMARY COLOR", "主色调", BasePrimaryColors, primaryIndex,
@@ -76,6 +83,7 @@ internal fun ThemePaletteScreen(
                         Modifier.wenkuPagePart(3), onSecondaryChange,
                     )
                 }
+            }
             }
         }
     }

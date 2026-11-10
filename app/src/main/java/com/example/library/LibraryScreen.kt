@@ -8,6 +8,7 @@ package com.example.library
 
 import com.example.ui.wenku.rememberWenkuAccessibility
 import com.example.ui.wenku.WenkuMotion
+import com.example.ui.wenku.WenkuSectionHeader
 import com.example.ui.wenku.wenkuPagePart
 import com.example.ui.wenku.WenkuIconButton
 import com.example.ui.components.pullOutCombinedClickable
@@ -610,18 +611,20 @@ fun LibraryScreen(
                 }
             )
             
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(0.dp)
-                    // ── 键盘避让：用 imeAnimationTarget（动画的**目标值**）而不是 ime（逐帧插值）──
-                    // ime 在输入法升起/收起的 ~250ms 里逐帧变化，于是下方内容（检索图书插图、
-                    // 瀑布流网格）每帧都要重新测量与布局 —— 这正是"点搜索框弹键盘卡、点空白收
-                    // 键盘也卡"的根因：卡的不是玻璃，是每帧重排。
-                    // 目标值只在动画开始/结束各变一次，**最终布局与 imePadding 完全一致**
-                    // （视觉零差异），代价仅是不再跟随键盘做逐帧位移。
-                    .windowInsetsPadding(WindowInsets.imeAnimationTarget)
-            ) {
+            val toolsScroll = rememberScrollState()
+            com.example.ui.adaptive.AdaptiveWorkspace(
+                modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.imeAnimationTarget),
+                controls = { split ->
+                    Column(
+                        Modifier.fillMaxWidth().then(
+                            if (split) Modifier.verticalScroll(toolsScroll).padding(bottom = extraBottomPadding)
+                            else Modifier
+                        )
+                    ) {
+                        if (split) WenkuSectionHeader(
+                            "01", "SEARCH / SOURCES", "搜索与书源",
+                            modifier = Modifier.padding(horizontal = DesignTokens.SpacePage, vertical = 6.dp),
+                        )
                 // 一体化搜索组件：书源入口整合进搜索框左侧（任务书「删除独立书源区域+搜索框重新设计」）
                 Column(modifier = Modifier.padding(horizontal = DesignTokens.SpacePage)) {
                     UnifiedSearchField(
@@ -720,12 +723,15 @@ fun LibraryScreen(
                     )
                 }
 
+                    }
+                },
+            ) { split ->
                 val hasAggregateResults = (uiState as? LibraryUiState.AggregateResults)?.groups
                     ?.any { it.books.isNotEmpty() } == true
                 WenkuLoadingHandoff(
                     loading = isSearching,
                     contentKey = Triple(currentSource?.id, searchKeywords.firstOrNull(), hasAggregateResults),
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    modifier = Modifier.fillMaxSize(),
                     skeleton = { LibrarySearchSkeleton() }
                 ) {
                 Column(Modifier.fillMaxSize()) {
@@ -748,7 +754,7 @@ fun LibraryScreen(
                     }
                     Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                     LazyVerticalStaggeredGrid(
-                        columns = StaggeredGridCells.Fixed(
+                        columns = if (split) StaggeredGridCells.Adaptive(156.dp) else StaggeredGridCells.Fixed(
                             // 多设备一致：手机2列 / 中屏3列 / 宽屏4列，避免平板上两列被拉伸过宽。
                             // 改用全 App 统一断点体系 AdaptiveSpec（此前此处自行判断 screenWidthDp，
                             // 与 AdaptiveSpec.rememberWindowWidthClass 的 600/840 断点重复定义）。

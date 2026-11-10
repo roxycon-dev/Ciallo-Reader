@@ -234,9 +234,10 @@ private fun OnlineNovelBody(
     val input = if (active) Modifier.pullOutClickable(onClickLabel = "切换阅读控件", onClick = onToggleChrome)
         else Modifier.clearAndSetSemantics { }.wenkuBlockPointer()
     WenkuLoadedContentSequence(contentKey = page.chapter.id, modifier = Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().background(colors.background).safeDrawingPadding().then(input)) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize().background(colors.background).safeDrawingPadding().then(input),
+            modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 760.dp).fillMaxSize(),
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 80.dp, bottom = 132.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -267,6 +268,7 @@ private fun OnlineNovelBody(
                         icon = Icons.Filled.SkipNext)
                 }
             }
+        }
         }
     }
 }

@@ -21,6 +21,8 @@ data class DiscoverState(val entries: List<DiscoverEntry> = emptyList(), val loa
 class DiscoverViewModel(private val manager: SourceManager, private val store: DiscoverStore, private val partition: DiscoverPartition = DiscoverPartition.COMIC) : ViewModel() {
     private val _state = MutableStateFlow(DiscoverState())
     val state = _state.asStateFlow()
+    // Successful requests outlive the lazy item and the detail route. Keep source headers in memory only.
+    internal val coverRequests = android.util.LruCache<String, coil.request.ImageRequest>(128)
     private var job: Job? = null
     private var sources: List<BookSource> = emptyList()
     private var query = DiscoverQuery(DiscoverDimension.UPDATES, "最新")

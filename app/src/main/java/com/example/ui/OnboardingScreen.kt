@@ -99,7 +99,7 @@ fun OnboardingScreen(onFinished: () -> Unit) {
         contentAlignment = Alignment.TopCenter,
     ) {
         Column(
-            Modifier.widthIn(max = 680.dp).fillMaxSize().padding(horizontal = 22.dp),
+            Modifier.widthIn(max = 1060.dp).fillMaxSize().padding(horizontal = 22.dp),
         ) {
             Box(Modifier.fillMaxWidth().heightIn(min = 54.dp)) {
                 if (page > 0) {
@@ -171,16 +171,8 @@ private fun OnboardingStory(page: OnboardingPage, index: Int) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val viewportHeight = maxHeight
         val imageSize = (viewportHeight * .40f).coerceIn(96.dp, 190.dp)
-        Column(
-            Modifier.fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .heightIn(min = viewportHeight)
-                .padding(horizontal = 2.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
-        ) {
-            WenkuSectionHeader(
-                "0${index + 1}", page.code, page.label,
-            )
+        val wide = maxWidth >= 760.dp
+        val art: @Composable () -> Unit = {
             WenkuContentPanel(
                 Modifier.fillMaxWidth().wenkuPagePart(1).testTag("onboarding_illustration_card_$index"),
             ) {
@@ -190,20 +182,51 @@ private fun OnboardingStory(page: OnboardingPage, index: Int) {
                     modifier = Modifier.align(Alignment.CenterHorizontally).size(imageSize),
                 )
             }
+        }
+        val description: @Composable () -> Unit = {
             Text(
                 page.title,
                 modifier = Modifier.fillMaxWidth().wenkuPagePart(2),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.ExtraBold,
-                textAlign = TextAlign.Center,
+                textAlign = if (wide) TextAlign.Start else TextAlign.Center,
             )
             Text(
                 page.description,
                 modifier = Modifier.fillMaxWidth().wenkuPagePart(3),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
+                textAlign = if (wide) TextAlign.Start else TextAlign.Center,
             )
+        }
+        Column(
+            Modifier.fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = viewportHeight)
+                .padding(horizontal = 2.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
+        ) {
+            if (wide) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.weight(1f)) { art() }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            WenkuSectionHeader(
+                "0${index + 1}", page.code, page.label,
+            )
+                        description()
+                    }
+                }
+            } else {
+            WenkuSectionHeader(
+                "0${index + 1}", page.code, page.label,
+            )
+                art()
+                description()
+            }
         }
     }
 }

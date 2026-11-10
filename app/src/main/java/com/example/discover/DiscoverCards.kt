@@ -27,7 +27,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import android.util.LruCache
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.example.library.GenericCoverLoader
+import com.example.library.ZLibraryCoverLoader
+import com.example.source.BookSource
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 import com.example.source.SearchBook
 import com.example.source.isKnownComicAuthor
 import com.example.ui.feedback.*
@@ -40,7 +47,10 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
     followed: Boolean, unread: Boolean, reverseColors: Boolean, onClick: () -> Unit,
     onFollow: (Boolean) -> Unit, onBlock: () -> Unit, onMenu: (Rect) -> Unit, menuActive: Boolean,
     sourceLabel: (String) -> String, entryIndex: Int,
-    coverSource: (String) -> com.example.source.BookSource? = { null }) {
+    coverSource: BookSource?,
+    coverRequests: LruCache<String, ImageRequest>,
+    coverResumeCount: Int,
+) {
     val reduce = LocalReduceMotion.current
     val haptics = rememberAppHaptics()
     var bounds by remember { mutableStateOf(Rect.Zero) }
@@ -66,7 +76,7 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
                     val displayRank = rank ?: work.variants.firstNotNullOfOrNull { it.rank?.takeIf { _ -> it.native } }
                     Row(Modifier.fillMaxWidth().height(160.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Box(Modifier.width(120.dp).fillMaxHeight()) {
-                            Cover(work.book, Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)), work.updatedAt, false, null, null, coverSource)
+                            Cover(work.book, Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)), work.updatedAt, false, null, null, coverSource, coverRequests, coverResumeCount)
                             if (displayRank != null) SourceBadge("No.$displayRank", Modifier.align(Alignment.BottomCenter).padding(4.dp))
                         }
                         Column(Modifier.weight(1f).padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -87,7 +97,7 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
                 }
                 DiscoverLayout.GRID -> {
                     Box(Modifier.fillMaxWidth().aspectRatio(3f / 4f)) {
-                        Cover(work.book, Modifier.fillMaxSize(), work.updatedAt, unread, null, null, coverSource)
+                        Cover(work.book, Modifier.fillMaxSize(), work.updatedAt, unread, null, null, coverSource, coverRequests, coverResumeCount)
                         SourceBadge(source, Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = if ((work.updatedAt ?: 0) >= (DiscoverEngine.rangeStart("今日", System.currentTimeMillis()) ?: Long.MAX_VALUE)) 32.dp else 8.dp))
                         FollowButton(followed, true, Modifier.align(Alignment.TopEnd)) { onFollow(!followed); haptics.perform(HapticKind.SUCCESS) }
                         Box(Modifier.fillMaxWidth().fillMaxHeight(.45f).align(Alignment.BottomCenter)
@@ -107,7 +117,7 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
                 }
                 DiscoverLayout.LARGE -> {
                     Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f)) {
-                        Cover(work.book, Modifier.fillMaxSize(), work.updatedAt, unread, null, null, coverSource)
+                        Cover(work.book, Modifier.fillMaxSize(), work.updatedAt, unread, null, null, coverSource, coverRequests, coverResumeCount)
                         Box(Modifier.fillMaxWidth().fillMaxHeight(.50f).align(Alignment.BottomCenter).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .90f)))))
                         SourceBadge(source, Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = 32.dp))
                         Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
@@ -132,22 +142,82 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
 }
 
 @Composable
-private fun Cover(book: SearchBook, modifier: Modifier, updatedAt: Long?, unread: Boolean, rank: Int?, medal: Color?, source: (String) -> com.example.source.BookSource?) {
-    val context = LocalContext.current
-    var headers by remember(book.sourceId, book.cover) { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var headersReady by remember(book.sourceId, book.cover) { mutableStateOf(book.cover.isNullOrBlank()) }
-    LaunchedEffect(book.sourceId, book.cover) {
-        val url = book.cover ?: return@LaunchedEffect
-        try { headers = source(book.sourceId)?.getCoverHeaders(url).orEmpty() }
-        catch (e: kotlinx.coroutines.CancellationException) { throw e }
-        catch (_: Exception) { }
-        finally { headersReady = true }
+private fun Cover(
+    book: SearchBook,
+    modifier: Modifier,
+    updatedAt: Long?,
+    unread: Boolean,
+    rank: Int?,
+    medal: Color?,
+    source: BookSource?,
+    requests: LruCache<String, ImageRequest>,
+    resumeCount: Int,
+) {
+    val context = LocalContext.current.applicationContext
+    val url = book.cover?.takeIf(String::isNotBlank)
+    val cacheKey = url?.let { "${book.sourceId}|$it" }
+    var request by remember(cacheKey) { mutableStateOf(cacheKey?.let(requests::get)) }
+    var generation by remember(cacheKey) { mutableIntStateOf(0) }
+    var retried by remember(cacheKey) { mutableStateOf(false) }
+    var failed by remember(cacheKey) { mutableStateOf(false) }
+    var loaded by remember(cacheKey) { mutableStateOf(false) }
+    LaunchedEffect(cacheKey, source, generation) {
+        if (url == null || cacheKey == null || (generation == 0 && request != null)) return@LaunchedEffect
+        val headers = try {
+            withTimeoutOrNull(5_000) { source?.getCoverHeaders(url).orEmpty() }.orEmpty()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            emptyMap()
+        }
+        request = ImageRequest.Builder(context)
+            .data(url)
+            .memoryCacheKey(cacheKey)
+            .diskCacheKey(cacheKey)
+            .setParameter("discoverCoverAttempt", generation)
+            .apply { headers.forEach { (name, value) -> addHeader(name, value) } }
+            .build()
     }
-    val request = remember(book.cover, headers) { coil.request.ImageRequest.Builder(context).data(book.cover)
-        .apply { headers.forEach { (key, value) -> addHeader(key, value) } }.build() }
+    LaunchedEffect(failed) {
+        if (failed && !retried) {
+            delay(450)
+            retried = true
+            failed = false
+            generation++
+        }
+    }
+    LaunchedEffect(resumeCount) {
+        if (failed) {
+            retried = false
+            failed = false
+            generation++
+        }
+    }
+    val imageLoader = remember(context, book.sourceId) {
+        if (book.sourceId == "zlibrary") ZLibraryCoverLoader.get(context) else GenericCoverLoader.get(context)
+    }
     Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
-        if (headersReady) AsyncImage(request, book.title, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        if (book.cover.isNullOrBlank()) Icon(Icons.Outlined.MenuBook, null, Modifier.align(Alignment.Center).size(32.dp), tint = MaterialTheme.colorScheme.primary)
+        if (!loaded) Icon(Icons.Outlined.MenuBook, null, Modifier.align(Alignment.Center).size(32.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        request?.let { image ->
+            AsyncImage(
+                model = image,
+                imageLoader = imageLoader,
+                contentDescription = book.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                onSuccess = {
+                    loaded = true
+                    failed = false
+                    cacheKey?.let { requests.put(it, image) }
+                },
+                onError = {
+                    loaded = false
+                    failed = true
+                    cacheKey?.let { requests.remove(it) }
+                },
+            )
+        }
         if ((updatedAt ?: 0) >= (DiscoverEngine.rangeStart("今日", System.currentTimeMillis()) ?: Long.MAX_VALUE))
             Box(Modifier.align(Alignment.TopStart).padding(4.dp).size(16.dp).background(MaterialTheme.colorScheme.primary, CircleShape), contentAlignment = Alignment.Center) {
                 Text("今", fontSize = 10.sp, color = contrastInk(MaterialTheme.colorScheme.primary), fontWeight = FontWeight.Medium)

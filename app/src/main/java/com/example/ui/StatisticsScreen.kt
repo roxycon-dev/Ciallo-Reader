@@ -16,8 +16,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,6 +33,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -140,7 +143,7 @@ fun StatisticsScreen(
             )
     ) {
         // 滚动联动折叠头部：此前 LazyColumn 无 state 可挂，先补 state（代理B方案挂点）
-        val statisticsListState = rememberLazyListState()
+        val statisticsListState = rememberLazyGridState()
         val statsHeaderCollapsedSource = rememberHeaderCollapsedSource(statisticsListState)
         Scaffold(
             containerColor = Color.Transparent,
@@ -157,22 +160,25 @@ fun StatisticsScreen(
             // 性能优化（视觉零变化）：原为普通 Column+verticalScroll，
             // 5 张玻璃卡 + 3 个图表在滚动时全部参与绘制命令录制（低端机卡顿主因）。
             // 改 LazyColumn 后屏幕外的卡片/图表不再组合与绘制，布局顺序间距完全一致。
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-LazyColumn(
+            BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            val columns = if (maxWidth >= 720.dp && LocalDensity.current.fontScale < 1.3f) 2 else 1
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(columns),
                 state = statisticsListState,
                 modifier = Modifier
-                .widthIn(max = AdaptiveSpec.pageContentMaxWidth)
+                .widthIn(max = if (columns == 2) 1120.dp else AdaptiveSpec.pageContentMaxWidth)
                     .fillMaxSize()
                     .padding(padding)
                     .padding(horizontal = DesignTokens.SpacePage),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
                 // 底部避让放进 contentPadding：contentPadding 区不做裁剪，
                 // 卡片滚动到 tab 栏背后时玻璃背景/内容照常渲染（与其他页一致）。
                 // A2：原 120.dp magic number → 统一避让值
                 contentPadding = PaddingValues(top = 12.dp, bottom = LocalAppBottomInset.current)
             ) {
                 if (totalReadTimeSeconds == 0L) {
-                    item(key = "stats_empty") {
+                    item(key = "stats_empty", span = { GridItemSpan(maxLineSpan) }) {
                         com.example.ui.components.MascotEmptyState(
                             mascotResId = com.example.ui.mascot.MascotSpriteSheet.sadDrawable,
                             title = "「暂无阅读统计记录」",
@@ -184,7 +190,7 @@ LazyColumn(
                     }
                 } else {
                     // ---------- 周期总览 ----------
-                    item(key = "stats_period") {
+                    item(key = "stats_period", span = { GridItemSpan(maxLineSpan) }) {
                         Box(Modifier.fillMaxWidth().wenkuPagePart(1)) {
                             PeriodOverviewCard(
                                 dailyTotals = dailyTotals,
@@ -217,7 +223,7 @@ LazyColumn(
                     }
 
                     // ---------- 神回排行榜（核心数据卡片之后） ----------
-                    item(key = "stats_god_ranking") {
+                    item(key = "stats_god_ranking", span = { GridItemSpan(maxLineSpan) }) {
                         Box(Modifier.fillMaxWidth().wenkuPagePart(4)) {
                             com.example.god.GodRankingCard(
                                 moments = godMoments,
@@ -233,11 +239,11 @@ LazyColumn(
                     }
 
                     // ---------- 本周明细（保留原周视图 + 封面轮播/删除） ----------
-                    item(key = "stats_weekly_header") {
+                    item(key = "stats_weekly_header", span = { GridItemSpan(maxLineSpan) }) {
                         WenkuSectionHeader("03", "READING LOG", "本周阅读明细")
                     }
 
-                    item(key = "stats_weekly") {
+                    item(key = "stats_weekly", span = { GridItemSpan(maxLineSpan) }) {
                         // 2026-09-21 修复：原来两处都是无 key 的 remember，只在首次组合算一次 ——
                         // 跨过午夜/跨周后不刷新，“这周过了不重置”。改用跨天自动更新的今天。
                         val todayCal = rememberTodayCalendar()

@@ -2,8 +2,10 @@ package com.example.library
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.MaterialTheme
@@ -63,7 +65,7 @@ internal fun DownloadCenter(model: LibraryViewModel, onDismiss: () -> Unit) {
                 model::cancelDownload, { model.startDownload(it, it.format.takeIf(String::isNotBlank)) }, onDismiss,
                 comics.values.toList(), model::pauseComicChapter,
                 { id -> comics[id]?.let { model.downloadComicChapter(it.book, it.chapter) } }, model::cancelComicChapter,
-                modifier = Modifier.widthIn(max = AdaptiveSpec.pageContentMaxWidth).fillMaxSize(),
+                modifier = Modifier.widthIn(max = 1120.dp).fillMaxSize(),
                 showHeader = false,
                 sourceNames = sources.associate { it.id to it.name },
             )
@@ -97,12 +99,16 @@ internal fun NovelDownloadPanel(
     val knownIds = remember(tasks) { tasks.map { it.id }.toSet() }
     val pending = remember(preparations, knownIds) { preparations.filterKeys { it !in knownIds }.entries.toList() }
     val count = pending.size + tasks.size + comics.size
-    LazyColumn(
-        modifier = modifier.fillMaxWidth().testTag("download_task_panel"),
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+    val columns = if (maxWidth >= 840.dp && androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.3f) 2 else 1
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(columns),
+        modifier = Modifier.fillMaxWidth().testTag("download_task_panel"),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item(key = "overview") {
+        item(key = "overview", span = { GridItemSpan(maxLineSpan) }) {
             Column(Modifier.fillMaxWidth().wenkuPagePart(1)) {
                 if (showHeader) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -160,7 +166,7 @@ internal fun NovelDownloadPanel(
             )
         }
         if (count == 0) {
-            item(key = "empty") {
+            item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
                 WenkuContentPanel(Modifier.fillMaxWidth().wenkuPagePart(2)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         WenkuIcon(WenkuSymbol.CloudDownload, size = 24.dp, tint = MaterialTheme.colorScheme.primary, entrance = false)
@@ -173,6 +179,7 @@ internal fun NovelDownloadPanel(
                 }
             }
         }
+    }
     }
     deletion?.let { (title, remove) ->
         WenkuActionSheet("删除下载记录？", onDismiss = { deletion = null }) {

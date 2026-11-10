@@ -1277,6 +1277,8 @@ fun ReaderScreen(
 
             modifier = Modifier
 
+                .align(Alignment.Center)
+                .widthIn(max = 820.dp)
                 .fillMaxSize()
 
                 .graphicsLayer {

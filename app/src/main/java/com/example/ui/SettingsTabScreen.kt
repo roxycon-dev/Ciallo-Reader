@@ -23,8 +23,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -40,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -244,14 +247,15 @@ fun SettingsTabScreen(
             )
     ) {
     // 滚动联动折叠头部：state 提前声明供 topBar 与列表共用
-    val settingsListState = rememberLazyListState()
+    val settingsListState = rememberLazyGridState()
 
     // 排行榜「陈列方式」按钮跳入：动画滚动到神回设置分区。
-    // 神回 item 下标 = 前 14 个固定 item；成人源已固定启用，不再插入开关卡片。
-    // ⚠️ 在神回分区之前增删设置项时，同步更新这里的固定计数。
     LaunchedEffect(focusGodSettings) {
-        if (!focusGodSettings) return@LaunchedEffect
-        val godIndex = 1 + 14
+        if (!focusGodSettings || godSettings == null) return@LaunchedEffect
+        val appearanceItems = if (onOpenThemePalette != null || onOpenCardTweaks != null) {
+            1 + (if (onOpenThemePalette != null) 1 else 0) + (if (onOpenCardTweaks != null) 1 else 0)
+        } else 0
+        val godIndex = appearanceItems + 7
         settingsListState.animateScrollToItem(godIndex)
     }
     settingsListState.scrollTiltSource()
@@ -283,20 +287,23 @@ fun SettingsTabScreen(
                 )
             }
         ) { padding ->
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-LazyColumn(
+                        BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            val columns = if (maxWidth >= 720.dp && LocalDensity.current.fontScale < 1.3f) 2 else 1
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(columns),
                 state = settingsListState,
                 modifier = Modifier
-                .widthIn(max = AdaptiveSpec.pageContentMaxWidth)
+                .widthIn(max = if (columns == 2) 1120.dp else AdaptiveSpec.pageContentMaxWidth)
                     .fillMaxSize()
                     .padding(padding),
                 contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + extraBottomPadding),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
 
 
                 if (onOpenThemePalette != null || onOpenCardTweaks != null) {
-                    item(key = "appearance_heading") {
+                    item(key = "appearance_heading", span = { GridItemSpan(maxLineSpan) }) {
                         WenkuSectionHeader("01", "APPEARANCE", "外观与主题")
                     }
                     onOpenThemePalette?.let { open ->
@@ -328,12 +335,9 @@ LazyColumn(
                 }
 
                 // Section 1: Splash Poster
-                item {
+                item(key = "settings-开屏海报设置") {
                     SettingsSectionHeader("开屏海报设置")
-                }
-
-                item {
-                    GlassCard(
+GlassCard(
                         modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
@@ -411,12 +415,9 @@ LazyColumn(
                 }
 
                 // Section: 软件背景
-                item {
+                item(key = "settings-软件背景设置", span = { GridItemSpan(maxLineSpan) }) {
                     SettingsSectionHeader("软件背景设置")
-                }
-
-                item {
-                    GlassCard(
+GlassCard(
                         modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
@@ -552,12 +553,9 @@ LazyColumn(
                 }
 
                 // Section 2: Orientation Lock
-                item {
+                item(key = "settings-屏幕方向") {
                     SettingsSectionHeader("屏幕方向")
-                }
-
-                item {
-                    GlassCard(
+GlassCard(
                         modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
@@ -586,12 +584,9 @@ LazyColumn(
                 }
 
                 // Section 2.5: 画面与性能（渲染画质四档）
-                item {
+                item(key = "settings-画面与性能", span = { GridItemSpan(maxLineSpan) }) {
                     SettingsSectionHeader("画面与性能")
-                }
-
-                item {
-                    GlassCard(
+GlassCard(
                         modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
@@ -626,7 +621,7 @@ LazyColumn(
                 // Section 2.55: 触控反馈（触觉）总开关
                 // 此前 LocalHapticsEnabled 在 MainActivity 里恒为 true，设置页根本没有这个入口：
                 // 马达坏了 / 开会不想震动 / 省电的用户只能去系统层关触感，或者改代码。
-                item {
+                item(key = "shelf-appearance", span = { GridItemSpan(maxLineSpan) }) {
                     GlassCard(
                         modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
                         shape = RoundedCornerShape(16.dp)
@@ -657,12 +652,9 @@ LazyColumn(
                 }
 
                 // Section 3: Page Turn Effect
-                item {
+                item(key = "settings-翻页效果") {
                     SettingsSectionHeader("翻页效果")
-                }
-
-                item {
-                    GlassCard(
+GlassCard(
                         modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
@@ -689,7 +681,7 @@ LazyColumn(
                 // 神回（GodMoment）设置分组
                 // ⚠️ key 固定为 "god_settings"；focusGodSettings 滚动定位依赖它排查。
                 if (godSettings != null) {
-                    item(key = "god_settings") {
+                    item(key = "god_settings", span = { GridItemSpan(maxLineSpan) }) {
                         com.example.god.GodSettingsSection(
                             store = godSettings,
                             onOpenRanking = onOpenGodRanking,
@@ -698,12 +690,9 @@ LazyColumn(
                 }
 
                 // Section 5: Health & Eye Protection
-                item {
+                item(key = "settings-护眼与提醒", span = { GridItemSpan(maxLineSpan) }) {
                     SettingsSectionHeader("护眼与提醒")
-                }
-
-                item {
-                    GlassCard(
+GlassCard(
                         modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
@@ -870,11 +859,9 @@ LazyColumn(
                 }
 
                 // Section 5.5: 隐私与安全（第七轮第 6.4 条）
-                item {
+                item(key = "settings-隐私与安全", span = { GridItemSpan(maxLineSpan) }) {
                     SettingsSectionHeader("隐私与安全")
-                }
-                item {
-                    GlassCard(
+GlassCard(
                         modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
@@ -938,11 +925,9 @@ LazyColumn(
                 }
 
                 // Section 6: Cache Management
-                item {
+                item(key = "settings-存储管理") {
                     SettingsSectionHeader("存储管理")
-                }
-                item {
-                    onOpenCacheManager?.let { open ->
+onOpenCacheManager?.let { open ->
                         SettingsNavigationCard(
                             title = "缓存管理",
                             subtitle = "查看存储占用与离线文件",
@@ -962,12 +947,9 @@ LazyColumn(
                 }
 
                 // Section 7: Library Help & Manual
-                item {
+                item(key = "settings-帮助手册") {
                     SettingsSectionHeader("帮助手册")
-                }
-
-                item {
-                    SettingsNavigationCard(
+SettingsNavigationCard(
                         "书库使用手册", WenkuSymbol.Help,
                         modifier = Modifier.testTag("library_help_entry_card"),
                         onClick = { showHelpBottomSheet = true }
@@ -975,9 +957,9 @@ LazyColumn(
                 }
 
                 // Section 8: About
-                item { SettingsSectionHeader("关于") }
-                item {
-                    GlassCard(
+                item(key = "settings-关于", span = { GridItemSpan(maxLineSpan) }) {
+                    SettingsSectionHeader("关于")
+GlassCard(
                         modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f).testTag("software-info"),
                         shape = RoundedCornerShape(16.dp)
                     ) {

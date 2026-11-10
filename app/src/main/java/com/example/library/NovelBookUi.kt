@@ -169,10 +169,11 @@ fun NovelDetailContent(book: SearchBook, sourceName: String, imageLoader: ImageL
     loading: Boolean = false, error: String? = null, modifier: Modifier = Modifier,
     flightKey: String? = null, onOpenCover: (() -> Unit)? = null) {
     val info = book.novelInfo
-    Column(modifier.padding(horizontal = 22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+    BoxWithConstraints(modifier.padding(horizontal = 22.dp)) {
         val fontScale = LocalDensity.current.fontScale
-        BoxWithConstraints {
-            val wide = maxWidth >= 650.dp
+        val split = maxWidth >= 720.dp && fontScale < 1.45f
+        val identityPanel: @Composable () -> Unit = {
+            val wide = split
             val coverWidth = if (wide) 150.dp else 118.dp
             val coverAction = if (onOpenCover != null && !book.cover.isNullOrBlank()) {
                 Modifier.semantics { contentDescription = "查看封面" }
@@ -204,7 +205,7 @@ fun NovelDetailContent(book: SearchBook, sourceName: String, imageLoader: ImageL
                     NovelLabels(listOfNotNull(info?.status, info?.category, book.format.uppercase(), book.language))
                 }
             }
-            if (!wide && fontScale >= 1.45f) {
+            if (split || fontScale >= 1.45f) {
                 Column(verticalArrangement = Arrangement.spacedBy(22.dp)) {
                     cover()
                     identity(Modifier.fillMaxWidth())
@@ -216,6 +217,8 @@ fun NovelDetailContent(book: SearchBook, sourceName: String, imageLoader: ImageL
                 }
             }
         }
+        val information: @Composable () -> Unit = {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         if (loading) {
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 WenkuSkeletonBlock(Modifier.fillMaxWidth(.55f).height(14.dp))
@@ -275,6 +278,19 @@ fun NovelDetailContent(book: SearchBook, sourceName: String, imageLoader: ImageL
             }
         }
         Spacer(Modifier.height(8.dp))
+        }
+        }
+        if (split) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                Box(Modifier.width(270.dp)) { identityPanel() }
+                Box(Modifier.weight(1f)) { information() }
+            }
+        } else {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                identityPanel()
+                information()
+            }
+        }
     }
 }
 
@@ -287,7 +303,8 @@ fun NovelDetailSheet(book: SearchBook, sourceName: String, imageLoader: ImageLoa
     val context = LocalContext.current
     var previewBook by remember { mutableStateOf<SearchBook?>(null) }
     PullOutBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
+        containerColor = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        wideMaxWidth = 900.dp) {
         val close = com.example.ui.components.LocalOverlayClose.current
         val download = { onDownload(close) }
         val read: () -> Unit = {

@@ -105,6 +105,15 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
             @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = DiscoverViewModel(manager, store, partition) as T
         }
     })
+    var coverResumeCount by remember { mutableIntStateOf(0) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) coverResumeCount++
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
     val state by model.state.collectAsStateWithLifecycle()
     val all by manager.allSources.collectAsStateWithLifecycle()
     val enabled by manager.enabledStates.collectAsStateWithLifecycle()
@@ -216,40 +225,8 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
     val windowWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
     val gridLayout = layout == DiscoverLayout.GRID &&
         (dimension != DiscoverDimension.RANKING || nativeFeed != null || nativeCategory != null || selected.isNotEmpty())
-    val columns = when {
-        !gridLayout -> 1
-        windowWidth >= 840 -> 4
-        windowWidth >= 600 -> 3
-        else -> 2
-    }
-    val headerDistance = with(LocalDensity.current) { 150.dp.toPx() }
-    val headerFraction = remember(grid, headerDistance) { { if (grid.firstVisibleItemIndex > 0) 1f else (grid.firstVisibleItemScrollOffset / headerDistance).coerceIn(0f, 1f) } }
-    Box(Modifier.fillMaxSize().testTag("discover_screen").onGloballyPositioned { screenOffset = it.positionInRoot() }) {
-        Column(Modifier.align(Alignment.TopCenter).widthIn(max = if (gridLayout) 1040.dp else 760.dp).fillMaxSize()) {
-            CollapsingTabScreenHeader(fractionSource = headerFraction, modifier = Modifier.statusBarsPadding(), title = "发现", subtitle = "DISCOVER",
-                onTitleClick = { scope.launch { if (reduce) grid.scrollToItem(0) else grid.animateScrollToItem(0) } },
-                titleColor = glassTitleColor(), trailing = {
-                    Row {
-                        downloadEntry()
-                        PullOutIconButton(
-                            icon = Icons.Outlined.Tune,
-                            contentDescription = "发现设置",
-                            onClick = { showSettings = true }
-                        )
-                    }
-                })
-            PullToRefreshBox(isRefreshing = state.loading && state.entries.isNotEmpty(), onRefresh = { light(); model.refresh() }, modifier = Modifier.weight(1f),
-                ) {
-                WenkuLoadedContentSequence(
-                    contentKey = viewportKey,
-                    loading = state.loading && rows.isEmpty(),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                com.example.ui.wenku.WenkuReflowScope(state = discoverReflow, trigger = dimension to (selected.toList() to nativeFeed), modifier = Modifier.fillMaxSize()) {
-                LazyVerticalGrid(columns = GridCells.Fixed(columns), state = grid,
-                    modifier = Modifier.fillMaxSize().testTag("discover_content"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = LocalAppBottomInset.current + 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    item(key = "partition", span = { GridItemSpan(maxLineSpan) }) {
+    val browseControls: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(
                             Modifier.fillMaxWidth().wenkuTabTitle(1, strength = .55f).testTag("discover_partition"),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -263,8 +240,6 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                                 )
                             }
                         }
-                    }
-                    item(span = { GridItemSpan(maxLineSpan) }) {
                         val native = nativeFeed != null || nativeCategory != null
                         val feeds = if (nativeFeed != null && sourceId != "aggregate") currentCatalogs.flatMap { it.feeds }.distinctBy { it.id } else emptyList()
                         val ranges = if (!native && availableRanges.size > 1) availableRanges else emptyList()
@@ -284,6 +259,57 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                             statuses = if (statusKnown && statusScope.showStatusChoices) listOf("全部", "连载", "完结") + (if (state.entries.any { serialLabel(it.book.discoverStatus) == "停更" }) listOf("停更") else emptyList()) + (if (unknownStatus) listOf("状态未知") else emptyList()) else emptyList(),
                             status = effectiveStatus, statusHint = statusScope.hint, onStatus = { light(); statusFilter = it })
                         }
+        }
+    }
+    val filtersScroll = rememberScrollState()
+    val headerDistance = with(LocalDensity.current) { 150.dp.toPx() }
+    val headerFraction = remember(grid, headerDistance) { { if (grid.firstVisibleItemIndex > 0) 1f else (grid.firstVisibleItemScrollOffset / headerDistance).coerceIn(0f, 1f) } }
+    Box(Modifier.fillMaxSize().testTag("discover_screen").onGloballyPositioned { screenOffset = it.positionInRoot() }) {
+        Column(Modifier.align(Alignment.TopCenter).widthIn(max = if (windowWidth >= 840) 1360.dp else 1040.dp).fillMaxSize()) {
+            CollapsingTabScreenHeader(fractionSource = headerFraction, modifier = Modifier.statusBarsPadding(), title = "发现", subtitle = "DISCOVER",
+                onTitleClick = { scope.launch { if (reduce) grid.scrollToItem(0) else grid.animateScrollToItem(0) } },
+                titleColor = glassTitleColor(), trailing = {
+                    Row {
+                        downloadEntry()
+                        PullOutIconButton(
+                            icon = Icons.Outlined.Tune,
+                            contentDescription = "发现设置",
+                            onClick = { showSettings = true }
+                        )
+                    }
+                })
+            com.example.ui.adaptive.AdaptiveWorkspace(
+                modifier = Modifier.fillMaxSize(),
+                controls = { split ->
+                    if (split) Column(
+                        Modifier.fillMaxWidth().verticalScroll(filtersScroll)
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        WenkuSectionHeader("01", "DISCOVER / FILTERS", "浏览筛选")
+                        browseControls()
+                    }
+                },
+            ) { split ->
+                val cells = when {
+                    !gridLayout -> GridCells.Fixed(1)
+                    split -> GridCells.Adaptive(152.dp)
+                    windowWidth >= 600 -> GridCells.Fixed(3)
+                    else -> GridCells.Fixed(2)
+                }
+            PullToRefreshBox(isRefreshing = state.loading && state.entries.isNotEmpty(), onRefresh = { light(); model.refresh() }, modifier = Modifier.fillMaxSize(),
+                ) {
+                WenkuLoadedContentSequence(
+                    contentKey = viewportKey,
+                    loading = state.loading && rows.isEmpty(),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                com.example.ui.wenku.WenkuReflowScope(state = discoverReflow, trigger = dimension to (selected.toList() to nativeFeed), modifier = Modifier.fillMaxSize()) {
+                LazyVerticalGrid(columns = cells, state = grid,
+                    modifier = Modifier.fillMaxSize().testTag("discover_content"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = LocalAppBottomInset.current + 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (!split) item(key = "partition", span = { GridItemSpan(maxLineSpan) }) {
+                        browseControls()
                     }
                     if (sourceId == "aggregate" || rows.isNotEmpty()) {
                         item(key = "discover_results_heading", span = { GridItemSpan(maxLineSpan) }) {
@@ -338,7 +364,10 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                             onFollow = { follow(work, it) }, onBlock = { block(work) },
                             onMenu = { menuWork = work; menuBounds = it }, menuActive = menuWork?.key == work.key,
                             sourceLabel = { id -> sources.firstOrNull { it.id == id }?.name ?: id }, entryIndex = index,
-                            coverSource = { manager.getSource(it) })
+                            coverSource = manager.getSource(work.book.sourceId),
+                            coverRequests = model.coverRequests,
+                            coverResumeCount = coverResumeCount,
+                        )
                     }
                     }
                     if (state.loading) items(if (rows.isEmpty()) 6 else 2) {
@@ -350,6 +379,7 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                 }
                 }
                 }
+            }
             }
         }
         choice?.let { work ->

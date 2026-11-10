@@ -866,6 +866,33 @@ fun HomeScreen(
                             onFavoriteClick = { item -> dismissSearchKeyboard(); onOpenFavorite(item) },
                             modifier = Modifier.weight(1f)
                         ) {
+                        val shelfToolsScroll = rememberScrollState()
+                        com.example.ui.adaptive.AdaptiveWorkspace(
+                            modifier = Modifier.fillMaxSize(),
+                            splitAt = 728.dp,
+                            sidebarWidth = 224.dp,
+                            controls = { split ->
+                                if (split) Column(
+                                    Modifier.fillMaxWidth().verticalScroll(shelfToolsScroll)
+                                        .padding(start = 16.dp, top = 12.dp, bottom = LocalAppBottomInset.current),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    WenkuSectionHeader("00", "READING SPACE", "阅读空间")
+                                    GlassCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp)) {
+                                        TodayReadTimeText(todayReadSecondsFlow)
+                                        Text("连续阅读 ${streakDays} 天", style = MaterialTheme.typography.labelMedium)
+                                    }
+                                    WenkuTextButton("导入书籍", { onImportClick(com.example.data.DEFAULT_CATEGORY) },
+                                        Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.FolderOpen)
+                                    WenkuTextButton("在线书库", onNavigateToShelf, Modifier.fillMaxWidth(),
+                                        wenkuSymbol = WenkuSymbol.Search)
+                                    WenkuTextButton("阅读统计", onNavigateToStats, Modifier.fillMaxWidth(),
+                                        wenkuSymbol = WenkuSymbol.Waveform)
+                                }
+                            },
+                        ) { split ->
+                        BoxWithConstraints(Modifier.fillMaxSize()) {
+                        val shelfWidth = maxWidth
                         Column(Modifier.fillMaxSize()) {
                         Spacer(modifier = Modifier.height(12.dp))
 
@@ -918,7 +945,7 @@ fun HomeScreen(
                             }
                         } else {
                             // RICH PREMIUM CONTENT STATE
-                            val screenWidthDp = LocalConfiguration.current.screenWidthDp
+                            val screenWidthDp = shelfWidth.value.toInt()
                             // 多设备一致：按宽度自适应列数（手机3列 / 折叠展开与小平板4列 / 宽平板最多6列），
                             // 不再只有 3/4 两档——宽屏拉伸大卡片的问题源头
                             val cols = ((screenWidthDp + 24) / 150).coerceIn(3, 6)
@@ -1899,7 +1926,8 @@ fun HomeScreen(
                                     // 4. BOTTOM INFO CARD: READING STATISTICS PREVIEW
                                     // A2：原 24.dp 完全不足以躲开悬浮 Tab 栏 + 系统导航栏，
                                     // 改用全 App 统一的下发值
-                                    Column(modifier = Modifier.padding(bottom = LocalAppBottomInset.current)) {
+                                    if (split) Spacer(Modifier.height(LocalAppBottomInset.current))
+                                    else Column(modifier = Modifier.padding(bottom = LocalAppBottomInset.current)) {
                                         Text(
                                             text = "阅读统计",
                                             fontSize = 20.sp,
@@ -2071,6 +2099,8 @@ fun HomeScreen(
                                 }
                             }
                             }
+                            }
+                        }
                         }
                         }
 

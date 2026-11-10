@@ -386,6 +386,7 @@ fun WenkuSheetHost(
     viewportContent: Boolean = false,
     dismissGesturesEnabled: Boolean = true,
     additionalBottomInsetPx: Int = 0,
+    wideMaxWidth: Dp = 560.dp,
     content: @Composable () -> Unit
 ) {
     val a11y = rememberWenkuAccessibility()
@@ -544,7 +545,11 @@ fun WenkuSheetHost(
         ) { measurables, constraints ->
             // app_ui.dart:2465-2494：宽度 min(440, safe.width - 24)，下沿贴锚点底边。
             val safe = wenkuSafeRect(constraints, insets, this, layoutDirection)
-            val cap = if (safe.width >= 600.dp.toPx()) 560.dp else 440.dp
+            val cap = when {
+                safe.width >= 840.dp.toPx() -> wideMaxWidth
+                safe.width >= 600.dp.toPx() -> 560.dp
+                else -> 440.dp
+            }
             val widthPx = min(cap.toPx(), max(0f, safe.width - 24.dp.toPx()))
             val bottomEdge = if (anchorBounds != null) min(anchorBounds.bottom, safe.bottom) else safe.bottom - 8.dp.toPx()
             val maxHeightPx = max(0f, bottomEdge - safe.top - 22.dp.toPx())
@@ -1033,6 +1038,7 @@ fun WenkuSheetDialog(
     dismissGesturesEnabled: Boolean = true,
     fitKeyboard: Boolean = false,
     requestDismiss: Boolean = false,
+    wideMaxWidth: Dp = 560.dp,
     content: @Composable () -> Unit
 ) {
     var dismissRequested by remember { mutableStateOf(false) }
@@ -1077,6 +1083,7 @@ fun WenkuSheetDialog(
             dismissRequested = dismissRequested || requestDismiss,
             dismissGesturesEnabled = dismissGesturesEnabled,
             additionalBottomInsetPx = bottomInset,
+            wideMaxWidth = wideMaxWidth,
             modifier = Modifier.fillMaxSize()
         ) {
             content()
