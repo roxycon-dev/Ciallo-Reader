@@ -223,7 +223,11 @@ fun TouchZoneEditor(
             .acrylicPanel(RoundedCornerShape(DesignTokens.RadiusLg), surfaceAlpha = .92f)
             .padding(horizontal = DesignTokens.SpaceMd), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (!trying) PullOutIconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "取消编辑") }
+                if (!trying) PullOutIconButton(
+                    icon = Icons.Default.Close,
+                    contentDescription = "取消编辑",
+                    onClick = onDismiss
+                )
                 Column(Modifier.weight(1f).padding(vertical = DesignTokens.SpaceSm)) {
                     Text(if (trying) "正在真实试读" else "自定义触控分区", style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
                     Text(if (trying) "使用未保存的分区，可直接翻页" else if (calibrating) "试着用自己最舒适的方式滑动一页"
@@ -243,7 +247,11 @@ fun TouchZoneEditor(
                 PullOutTextButton(onClick = { val added = TouchZone(); draft = visible + added; selectedId = added.id; startCalibration() }, enabled = visible.size < 64) { Text("添加分区") }
                 PullOutTextButton(onClick = { controlsExpanded = !controlsExpanded }) { Text(if (controlsExpanded) "收起工具" else "设置功能") }
                 PullOutTextButton(onClick = { calibrating = false; controlsExpanded = false; trying = true }) { Text("试读") }
-                PullOutIconButton(onClick = { toolsAtTop = !toolsAtTop }) { Icon(Icons.Default.SwapVert, "工具移到另一侧") }
+                PullOutIconButton(
+                                    icon = Icons.Default.SwapVert,
+                                    contentDescription = "工具移到另一侧",
+                                    onClick = { toolsAtTop = !toolsAtTop }
+                                )
             }
             com.example.ui.components.PullOutVisibility(visible = controlsExpanded) {
                 Column(Modifier.fillMaxWidth().heightIn(max = this@BoxWithConstraints.maxHeight * .52f).verticalScroll(rememberScrollState()),
@@ -252,7 +260,11 @@ fun TouchZoneEditor(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("分区 ${visible.indexOf(selected) + 1}", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                             PullOutTextButton(onClick = { draft = visible.filterNot { it.id == selected.id } + selected }) { Text("置顶") }
-                            PullOutIconButton(onClick = { draft = visible.filterNot { it.id == selected.id }; selectedId = draft?.lastOrNull()?.id; calibrating = false }) { Icon(Icons.Default.DeleteOutline, "删除分区") }
+                            PullOutIconButton(
+                                icon = Icons.Default.DeleteOutline,
+                                contentDescription = "删除分区",
+                                onClick = { draft = visible.filterNot { it.id == selected.id }; selectedId = draft?.lastOrNull()?.id; calibrating = false }
+                            )
                         }
                         Text("点击行为", style = MaterialTheme.typography.labelLarge)
                         ActionChoices(TouchAction.entries.filter { !comic || it != TouchAction.LISTEN }, selected.tap, { it.label }) { edit(selected.copy(tap = it)) }

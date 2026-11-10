@@ -18,7 +18,7 @@ import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.*
@@ -31,6 +31,7 @@ import coil.compose.AsyncImage
 import com.example.source.SearchBook
 import com.example.source.isKnownComicAuthor
 import com.example.ui.feedback.*
+import com.example.ui.wenku.wenkuReveal
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -43,17 +44,14 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
     val reduce = LocalReduceMotion.current
     val haptics = rememberAppHaptics()
     var bounds by remember { mutableStateOf(Rect.Zero) }
-    var entered by remember { mutableStateOf(reduce || entryIndex >= 6) }
-    LaunchedEffect(Unit) { if (!entered) { delay(entryIndex * 30L); entered = true } }
-    val alpha by animateFloatAsState(if (entered) 1f else 0f, tween(if (reduce) 0 else 160), label = "discoverEnter")
     val scale by animateFloatAsState(if (menuActive) .97f else 1f, tween(if (reduce) 0 else 120), label = "discoverPress")
     val primary = MaterialTheme.colorScheme.primary
     val sourceCount = work.variants.map { it.book.sourceId }.distinct().size
     val source = if (sourceCount > 1) "$sourceCount 个源可读" else sourceLabel(work.book.sourceId)
     val medal = rank?.takeIf { it in 1..3 }?.let { DiscoverMedals[it - 1] }
     val shape = RoundedCornerShape(if (layout == DiscoverLayout.LARGE) 24.dp else if (layout == DiscoverLayout.GRID) 16.dp else 20.dp)
-    Box(Modifier.fillMaxWidth().alpha(alpha).graphicsLayer { scaleX = scale; scaleY = scale }
-        .onGloballyPositioned { bounds = it.boundsInRoot() }) {
+    Box(Modifier.fillMaxWidth().wenkuReveal(entryIndex).graphicsLayer { scaleX = scale; scaleY = scale }
+        .onGloballyPositioned { bounds = it.boundsInWindow() }) {
         val cardModifier = Modifier.fillMaxWidth()
             .then(if (rank == 1 && medal != null) Modifier.shadow(8.dp, shape, ambientColor = medal.copy(alpha = .16f), spotColor = medal.copy(alpha = .24f)) else Modifier)
             .then(if (medal != null) Modifier.border(if (rank == 1) 1.5.dp else 1.dp, Brush.linearGradient(listOf(medal.copy(alpha = .40f), medal, medal.copy(alpha = .56f))), shape) else Modifier)

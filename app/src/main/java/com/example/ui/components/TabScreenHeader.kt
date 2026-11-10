@@ -3,6 +3,7 @@ package com.example.ui.components
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
@@ -32,6 +33,8 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.layout
 import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import com.example.ui.wenku.wenkuTabTitle
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -145,7 +148,9 @@ fun TabScreenHeader(
     titleColor: Color = Color.Unspecified,
     titleVisible: Boolean = true,
     leading: (@Composable RowScope.() -> Unit)? = null,
-    trailing: (@Composable RowScope.() -> Unit)? = null
+    trailing: (@Composable RowScope.() -> Unit)? = null,
+    titleOpacity: () -> Float = { 1f },
+    overlay: (@Composable androidx.compose.foundation.layout.BoxScope.(compactFraction: Float) -> Unit)? = null
 ) {
     // 折叠态在头部作用域内求值：lambda 版只让头部订阅，页面体零订阅。
     // derivedStateOf 保证滚动过程中仅在布尔翻转时重组一次头部（逐帧零开销）。
@@ -155,7 +160,8 @@ fun TabScreenHeader(
 
     CollapsingTabScreenHeader(fractionSource = { if (collapsedNow) 1f else 0f }, focusDriven = true,
         modifier = modifier, title = title.orEmpty(), subtitle = subtitle, titleColor = titleColor,
-        titleVisible = titleVisible && title != null, leading = leading, trailing = trailing)
+        titleVisible = titleVisible && title != null, leading = leading, trailing = trailing,
+        titleOpacity = titleOpacity, overlay = overlay)
 }
 
 /**
@@ -185,7 +191,9 @@ fun CollapsingTabScreenHeader(
     titleVisible: Boolean = true,
     leading: (@Composable RowScope.() -> Unit)? = null,
     onTitleClick: (() -> Unit)? = null,
-    trailing: (@Composable RowScope.() -> Unit)? = null
+    trailing: (@Composable RowScope.() -> Unit)? = null,
+    titleOpacity: () -> Float = { 1f },
+    overlay: (@Composable androidx.compose.foundation.layout.BoxScope.(compactFraction: Float) -> Unit)? = null
 ) {
     val target = fractionSource()
     val reduce = com.example.ui.feedback.LocalReduceMotion.current || LocalRenderQuality.current.minimal
@@ -220,45 +228,50 @@ fun CollapsingTabScreenHeader(
                 val placeable = measurable.measure(constraints)
                 val h = (placeable.height * (1f - collapse)).roundToInt()
                 layout(constraints.maxWidth, h) {
-                    placeable.placeRelative(0, 0)
+                    if (h > 0) placeable.placeRelative(0, 0)
                 }
             }
             .alpha(1f - fade)
             .clipToBounds(),
         shape = RoundedCornerShape(24.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = innerV).heightIn(min = 48.dp * (1f - compact)),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            leading?.invoke(this)
-            if (titleVisible) Column(Modifier.weight(1f).then(if (onTitleClick != null) Modifier.pullOutClickable(onClick = onTitleClick) else Modifier)) {
-                Text(
-                    text = title,
-                    fontSize = titleSize.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = titleColor,
-                    fontFamily = AppFonts.Serif,
-                    maxLines = 1
-                )
-                if (subtitle != null) {
+        Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = innerV)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp * (1f - compact)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                leading?.invoke(this)
+                if (titleVisible) Column(Modifier.weight(1f).graphicsLayer { alpha = titleOpacity() }.then(if (onTitleClick != null) Modifier.pullOutClickable(onClick = onTitleClick) else Modifier)) {
                     Text(
-                        text = subtitle,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = titleColor.copy(alpha = 0.75f),
-                        letterSpacing = 1.5.sp,
-                        maxLines = 1,
-                        modifier = Modifier
-                            .height(subH)
-                            .alpha(subAlpha)
-                            .clipToBounds()
+                        text = title,
+                        fontSize = titleSize.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = titleColor,
+                        fontFamily = AppFonts.Serif,
+                        modifier = Modifier.wenkuTabTitle(0),
+                        maxLines = 1
                     )
+                    if (subtitle != null) {
+                        Text(
+                            text = subtitle,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = titleColor.copy(alpha = 0.75f),
+                            letterSpacing = 1.5.sp,
+                            maxLines = 1,
+                            modifier = Modifier
+                                .height(subH)
+                                .alpha(subAlpha)
+                                .wenkuTabTitle(1)
+                                .clipToBounds()
+                        )
+                    }
                 }
+                trailing?.invoke(this)
             }
-            trailing?.invoke(this)
+            overlay?.invoke(this, compact)
         }
     }
 }

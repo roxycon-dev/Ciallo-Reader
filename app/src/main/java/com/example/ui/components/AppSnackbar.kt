@@ -154,14 +154,13 @@ fun AppToastSnackbar(
             }
 
             if (onDismissClick != null) {
-                PullOutIconButton(onClick = onDismissClick, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = "关闭",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
+                PullOutIconButton(
+                    icon = Icons.Filled.Close,
+                    contentDescription = "关闭",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    glyphSize = 16.dp,
+                    onClick = onDismissClick, modifier = Modifier.size(28.dp)
+                )
             }
         }
     }

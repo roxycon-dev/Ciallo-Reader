@@ -41,15 +41,19 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.example.ui.components.LocalGlassBackdrop
+import com.example.ui.components.LocalCardTweaks
 import com.example.ui.components.LocalRenderQuality
 import com.example.ui.components.liquidGlass
+import com.example.ui.components.scaledCardCorners
 import com.example.ui.components.supportsRealtimeBlur
+import com.example.ui.feedback.LocalReduceMotion
 import com.kashif_e.backdrop.Backdrop
 import com.kashif_e.backdrop.backdrops.layerBackdrop
 import com.kashif_e.backdrop.backdrops.rememberLayerBackdrop
@@ -76,7 +80,7 @@ import me.trishiraj.shadowglow.consistentShadow
  * 与既有那套的差别（可感知的）：
  *  1. 形状是**连续曲率圆角**（squircle），不是普通圆角矩形；
  *  2. 边缘有真正的**透镜折射**（lens，API 33+，低版本库自动跳过）+ 方向性高光；
- *  3. 着色只用中性白 / 中性深，**不使用强调色**，也不使用渐变着色；
+ *  3. 着色由中性白 / 中性深底色与应用主题色混合；
  *  4. 轮廓只有库自带高光这一圈，不再叠第二圈描边。
  *
  * ══════════════════════════════════════════════════════════════════════════ */
@@ -328,8 +332,12 @@ fun GlassKitCard(
     lightweight: Boolean = false,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val cs = androidx.compose.material3.MaterialTheme.colorScheme
+    val tweaks = LocalCardTweaks.current
+    val effectiveShape = remember(shape, tweaks.cornerRadiusDp) { shape.scaledCardCorners(tweaks.cornerRadiusDp) }
     if (LocalRenderQuality.current.minimal) {
-        Column(modifier.clip(shape).background(androidx.compose.material3.MaterialTheme.colorScheme.surface)
+        val flatTint = lerp(cs.surface, cs.primary, tweaks.tintMix).copy(alpha = tweaks.cardAlpha)
+        Column(modifier.clip(effectiveShape).background(flatTint)
             .then(if (onClick != null) Modifier.pullOutClickable(onClick = onClick) else Modifier), content = content)
         return
     }
@@ -338,13 +346,13 @@ fun GlassKitCard(
     val backdrop = kitBackdrop ?: fallbackBackdrop
     val quality = LocalRenderQuality.current
     val reduce = rememberReduceTransparency()
-    val cs = androidx.compose.material3.MaterialTheme.colorScheme
     val dark = cs.surface.luminance() < 0.5f
+    val reduceMotion = LocalReduceMotion.current
 
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val press by animateFloatAsState(
-        targetValue = if (pressed) 0.98f else 1f,
+        targetValue = if (pressed && !reduceMotion) 1f - 0.02f * tweaks.pressStrength else 1f,
         animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
         label = "glass_press"
     )
@@ -360,7 +368,7 @@ fun GlassKitCard(
         }
     }
 
-    val tint = if (reduce) {
+    val baseTint = if (reduce) {
         if (dark) cs.surface.copy(alpha = GlassTokens.TintReduce)
         else Color.White.copy(alpha = GlassTokens.TintReduce)
     } else if (dark) {
@@ -369,21 +377,23 @@ fun GlassKitCard(
         Color.White.copy(alpha = GlassTokens.TintLight)
     }
     // API 31 以下不支持模糊：回退为近乎不透明的纯色底（文档 §9）
-    val solidTint = if (dark) cs.surface.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.78f)
+    val solidBase = if (dark) cs.surface.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.78f)
+    val tint = lerp(baseTint, cs.primary, tweaks.tintMix).let { it.copy(alpha = it.alpha * tweaks.cardAlpha) }
+    val solidTint = lerp(solidBase, cs.primary, tweaks.tintMix).let { it.copy(alpha = it.alpha * tweaks.cardAlpha) }
 
     val overlay = com.example.ui.components.LocalPaperOwner.current != null
     val realtime = backdrop != null && quality.realtimeGlass && supportsRealtimeBlur
     val glassModifier = if (realtime) {
         Modifier.drawBackdrop(
             backdrop = backdrop!!,
-            shape = { shape },
+            shape = { effectiveShape },
             effects = {
                 if (lightweight) {
                     // 动画中的帧：一个 shader 就够（lens 与 vibrancy 静止后再回来）
-                    blur(GlassTokens.BlurLightweight.toPx())
+                    blur((tweaks.blurRadiusDp.dp * 0.5f).toPx())
                 } else {
                     vibrancy()
-                    blur(GlassTokens.Blur.toPx())
+                    blur(tweaks.blurRadiusDp.dp.toPx())
                     if (!reduce) {
                         lens(
                             refractionHeight = GlassTokens.LensHeight.toPx(),
@@ -401,16 +411,17 @@ fun GlassKitCard(
                 {
                     val p = pressPoint
                     if (p != Offset.Unspecified) {
-                        val outline = shape.createOutline(size, layoutDirection, this)
+                        val outline = effectiveShape.createOutline(size, layoutDirection, this)
                         val path = Path().apply { addOutline(outline) }
+                        val radius = size.minDimension * 0.5f * tweaks.pressRadius
                         clipPath(path) {
                             drawCircle(
                                 brush = Brush.radialGradient(
-                                    colors = listOf(Color.White.copy(alpha = 0.20f), Color.Transparent),
+                                    colors = listOf(Color.White.copy(alpha = 0.16f * tweaks.pressStrength), Color.Transparent),
                                     center = p,
-                                    radius = size.minDimension * 0.55f
+                                    radius = radius
                                 ),
-                                radius = size.minDimension * 0.55f,
+                                radius = radius,
                                 center = p,
                                 blendMode = BlendMode.Screen
                             )
@@ -423,11 +434,11 @@ fun GlassKitCard(
         Modifier
             .consistentShadow(
                 elevation = 2.dp,
-                shape = shape,
+                shape = effectiveShape,
                 ambientColor = Color.Black.copy(alpha = 0.06f),
                 spotColor = Color.Black.copy(alpha = 0.12f)
             )
-            .clip(shape)
+            .clip(effectiveShape)
             .background(solidTint)
             .graphicsLayer { scaleX = press; scaleY = press }
     }

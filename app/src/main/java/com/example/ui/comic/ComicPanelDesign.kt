@@ -10,6 +10,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -38,6 +40,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -51,6 +55,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.pointerInput
@@ -70,6 +75,12 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import com.example.ui.reader.readingGlass
 import com.example.ui.feedback.AppMotion
+import com.example.ui.wenku.LocalWenkuIconContact
+import com.example.ui.wenku.WenkuIcon
+import com.example.ui.wenku.WenkuIconContact
+import com.example.ui.wenku.WenkuMotion
+import com.example.ui.wenku.WenkuSymbol
+import com.example.ui.wenku.rememberWenkuAccessibility
 
 /* ══════════════ 漫画面板设计系统（第七轮第 3 条） ══════════════
  *
@@ -126,7 +137,7 @@ internal fun PanelSectionCard(
 }
 
 /** Tab 定义（图标 + 文字） */
-internal data class PanelTabData(val label: String, val icon: ImageVector)
+internal data class PanelTabData(val label: String, val icon: WenkuSymbol)
 
 /**
  * 图标 Tab 导航行：作为完整导航区域设计——图标在上文字在下，统一高度与间距，
@@ -148,42 +159,11 @@ internal fun PanelTabRow(
             .padding(DesignTokens.SpaceXs),
         horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceXs)
     ) {
-        tabs.forEachIndexed { i, tab ->
-            val active = i == selected
-            val tint by animateColorAsState(if (active) selectedBg() else Color.Transparent, label = "panelTabTint")
-            Column(
-                Modifier
-                    .width(58.dp)
-                    .readingGlass(RoundedCornerShape(DesignTokens.RadiusControl))
-                    .background(tint)
-                    .border(
-                        0.5.dp,
-                        if (active) selectedStroke() else Color.Transparent,
-                        RoundedCornerShape(DesignTokens.RadiusControl)
-                    )
-                    .selectable(active, role = Role.Tab) { onSelect(i) }
-                    .padding(vertical = DesignTokens.SpaceTight),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    tab.icon,
-                    contentDescription = tab.label,
-                    tint = if (active) MintPrimary else TextSecondary,
-                    modifier = Modifier.size(19.dp)
-                )
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    tab.label,
-                    color = if (active) MintPrimary else TextSecondary,
-                    fontSize = DesignTokens.TypeCaption,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                    maxLines = 1
-                )
-            }
+        tabs.forEachIndexed { index, tab ->
+            PanelTab(tab, index == selected, { onSelect(index) }, Modifier.width(58.dp), compact = true)
         }
     }
 }
-
 /** Read-only status is text, never a switch that cannot be operated. */
 @Composable
 internal fun PanelHint(text: String) {
@@ -197,20 +177,56 @@ internal fun PanelTabRail(tabs: List<PanelTabData>, selected: Int, onSelect: (In
     Column(modifier.width(92.dp).verticalScroll(rememberScrollState()).selectableGroup(),
         verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceXs)) {
         tabs.forEachIndexed { index, tab ->
-            val active = index == selected
-            val tint by animateColorAsState(if (active) selectedBg() else Color.Transparent, label = "railTint")
-            Column(Modifier.fillMaxWidth().readingGlass(RoundedCornerShape(DesignTokens.RadiusNavigation)).background(tint)
-                .selectable(active, role = Role.Tab) { onSelect(index) }.padding(vertical = DesignTokens.SpaceSm),
-                horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(tab.icon, null, tint = if (active) MintPrimary else TextSecondary, modifier = Modifier.size(21.dp))
-                Spacer(Modifier.height(DesignTokens.SpaceCompact))
-                Text(tab.label, color = if (active) MintPrimary else TextSecondary, fontSize = DesignTokens.TypeLabel,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal)
-            }
+            PanelTab(tab, index == selected, { onSelect(index) }, Modifier.fillMaxWidth(), compact = false)
         }
     }
 }
 
+@Composable
+private fun PanelTab(tab: PanelTabData, active: Boolean, onSelect: () -> Unit, modifier: Modifier, compact: Boolean) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    var activation by remember { mutableIntStateOf(0) }
+    val animate = rememberWenkuAccessibility().decorativeMotion
+    val press = animateFloatAsState(
+        targetValue = if (animate && pressed) .96f else 1f,
+        animationSpec = if (pressed) WenkuMotion.contactSpec() else WenkuMotion.settleSpec(),
+        label = "comicSettingsTabPress"
+    )
+    val background by animateColorAsState(
+        targetValue = if (active) selectedBg() else Color.Transparent,
+        animationSpec = tween(if (animate) 160 else 0),
+        label = "comicSettingsTabTint"
+    )
+    val tint = if (active) MintPrimary else TextSecondary
+    val shape = RoundedCornerShape(if (compact) DesignTokens.RadiusControl else DesignTokens.RadiusNavigation)
+    Column(
+        modifier
+            .selectable(active, interactionSource = interaction, indication = null, role = Role.Tab) {
+                activation++
+                onSelect()
+            }
+            .graphicsLayer { scaleX = press.value; scaleY = press.value }
+            .readingGlass(shape)
+            .background(background)
+            .then(if (compact && active) Modifier.border(.5.dp, selectedStroke(), shape) else Modifier)
+            .padding(vertical = if (compact) DesignTokens.SpaceTight else DesignTokens.SpaceSm),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        val size = if (compact) 19.dp else 21.dp
+        CompositionLocalProvider(LocalWenkuIconContact provides WenkuIconContact(pressed, activation)) {
+            WenkuIcon(tab.icon, size = size, tint = tint, active = active, animated = animate, entrance = false)
+        }
+        Spacer(Modifier.height(if (compact) 3.dp else DesignTokens.SpaceCompact))
+        Text(
+            tab.label,
+            color = tint,
+            fontSize = if (compact) DesignTokens.TypeCaption else DesignTokens.TypeLabel,
+            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1
+        )
+    }
+}
 /**
  * 面板统一滑条（自绘）：细玻璃轨道 + 薄荷填充 + 白色圆钮（轻按压光环）。
  * 全面板唯一的滑条样式（纸纹/间距/滤镜/增强强度等共用），与 FluidSlider 的

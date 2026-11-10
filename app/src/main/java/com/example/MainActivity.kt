@@ -2,13 +2,17 @@ package com.example
 
 import com.example.ui.components.openPaperPage
 import com.example.discover.discoverUsesNovelDetails
-import com.example.ui.components.pullOutPage
 import com.example.ui.components.paperComposable
+import com.example.ui.wenku.wenkuBlockPointer
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.example.ui.components.dismissPaperPage
 import com.example.ui.components.replacePaperPage
 import com.example.ui.components.PullOutVisibility
 import android.net.Uri
+import com.example.ui.reader.coverGalleryDestination
+import com.example.ui.reader.openCoverGallery
 import android.os.Bundle
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -43,6 +47,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Density
@@ -63,6 +68,7 @@ import com.example.ui.components.LocalLiquidGlassState
 import com.example.ui.components.LocalGlassBackdrop
 import com.example.ui.components.CardTweaks
 import com.example.ui.components.LocalCardTweaks
+import com.example.ui.components.writeCardTweaks
 import com.example.ui.components.readCardTweaks
 import com.example.ui.components.AppBottomTabBar
 import com.example.ui.components.AppTabItem
@@ -309,6 +315,23 @@ class MainActivity : ComponentActivity() {
                     com.example.ui.components.LocalRenderQuality provides renderQuality,
                     com.example.ui.components.LocalScrollTilt provides scrollTilt
                 ) {
+                    // 文档 §12.2：帧率降级。Compose 没有 Flutter 的 TickerMode 全局帧率，
+                    // 这里用系统窗口首选刷新率表达同一意图：极简/流畅 → 60，均衡 → 90，
+                    // 高/极致 → 由设备决定。仅作请求，OEM 可选择忽略。
+                    DisposableEffect(renderQuality) {
+                        val preferred = when (renderQuality) {
+                            com.example.ui.components.RenderQuality.MINIMAL,
+                            com.example.ui.components.RenderQuality.LOW -> 60f
+                            com.example.ui.components.RenderQuality.MID -> 90f
+                            else -> 0f
+                        }
+                        runCatching {
+                            val attrs = window.attributes
+                            attrs.preferredRefreshRate = preferred
+                            window.attributes = attrs
+                        }
+                        onDispose { }
+                    }
                     AppUpdateDialogHost()
                     Surface(
                         modifier = Modifier
@@ -329,10 +352,11 @@ class MainActivity : ComponentActivity() {
                     ) {
                         val bgConfig by AppBackgroundController.config.collectAsStateWithLifecycle()
                         val backgroundRequested = bgConfig.mode == 1 && !bgConfig.uri.isNullOrBlank()
-                        // 渲染画质档位：设置页可调，主要影响玻璃效果强度与动效数量。
-                        // "高"为默认，与历史版本视觉完全一致；低于"高"不挂 backdrop 捕获层。
-                        val glassEnabled = renderQuality.realtimeGlass
                         val bgActive = backgroundRequested && !renderQuality.minimal
+                        // Sample only the wallpaper. Capturing live tab content adds work to
+                        // every animation frame and can create a backdrop feedback loop.
+                        val wallpaperGlass = bgActive && renderQuality.realtimeGlass &&
+                            android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
                         // 滚动惯性倾斜帧循环：仅 MAX 档挂载（该档本就常驻极光等无限动效；
                         // 低档不再引入常驻 ticker，保住「流畅」档的帧空闲与省电）
                         if (renderQuality == com.example.ui.components.RenderQuality.MAX) {
@@ -376,7 +400,7 @@ class MainActivity : ComponentActivity() {
                                     .then(if (liquidGlass != null) Modifier.liquidGlassProvider(liquidGlass) else Modifier)
                                     .background(MaterialTheme.colorScheme.background)
                                     .then(
-                                        if (glassEnabled) Modifier.layerBackdrop(bgBackdrop) else Modifier
+                                        if (wallpaperGlass) Modifier.layerBackdrop(bgBackdrop) else Modifier
                                     )
                             ) {
                                 if (bgActive) {
@@ -407,7 +431,7 @@ class MainActivity : ComponentActivity() {
                                 // 否则操作栏与放置坞会在底部凭空空出 92dp。
                                 com.example.ui.theme.LocalAppBottomInsetNoTabBar provides (navBarBottom + 8.dp),
                                 LocalBackgroundTone provides bgTone,
-                                LocalGlassBackdrop provides (bgBackdrop.takeIf { glassEnabled }),
+                                LocalGlassBackdrop provides (bgBackdrop.takeIf { wallpaperGlass }),
                                 com.example.ui.components.LocalRenderQuality provides renderQuality,
                                 LocalCardTweaks provides cardTweaks.value,
                                 // 「我喜欢的」交互：动效与触觉统一开关（系统"减少动态效果"自动降级）
@@ -421,6 +445,8 @@ class MainActivity : ComponentActivity() {
                                     else com.example.ui.feedback.MutingHapticFeedback),
                             ) {
                         val navController = rememberNavController()
+                    // 每个 Tab 自己的 saveable 状态（滚动位置 / 3D-列表 / 筛选…）
+                    val tabStateHolder = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
                         val transferManager = remember { com.example.transfer.TransferManager.get(this@MainActivity) }
                         val transferOpen by transferManager.openPage.collectAsStateWithLifecycle()
                         LaunchedEffect(transferOpen) {
@@ -562,14 +588,8 @@ class MainActivity : ComponentActivity() {
                         viewModel.importBooks(uris, selectedCategoryForImport)
                     }
 
-                    var showDownloadCenter by rememberSaveable { mutableStateOf(false) }
-                    if (showDownloadCenter) {
-                        com.example.ui.components.AcrylicBottomOverlay(onDismissRequest={showDownloadCenter=false}, decoratePanel=false, uniformScrim=true) {
-                            val close=com.example.ui.components.LocalOverlayClose.current
-                            com.example.library.DownloadCenter(libraryViewModel) { close {} }
-                        }
-                    }
                     var selectedTab by rememberSaveable { mutableIntStateOf(2) }
+                    val shelfSearch = com.example.ui.shelf.rememberShelfSearchState()
                     var discoverRefreshRequest by rememberSaveable { mutableIntStateOf(0) }
                     var lastDiscoverTap by remember { mutableLongStateOf(0L) }
                     val favoriteAddRequest by viewModel.favoriteAddRequest.collectAsStateWithLifecycle()
@@ -596,14 +616,23 @@ class MainActivity : ComponentActivity() {
                     var shelfCategory by rememberSaveable { mutableStateOf(com.example.data.DEFAULT_CATEGORY) }
                     val sharedLibraryViewModel = libraryViewModel
 
-                    val navigationReduceMotion = com.example.ui.feedback.LocalReduceMotion.current
+                    val navigationReduceMotion by rememberUpdatedState(com.example.ui.feedback.LocalReduceMotion.current)
                     SharedTransitionLayout { CompositionLocalProvider(LocalSharedTransitionScope provides this) { NavHost(
                         navController = navController,
                         startDestination = "splash",
-                        enterTransition = { com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion) },
-                        exitTransition = { androidx.compose.animation.ExitTransition.None },
-                        popEnterTransition = { androidx.compose.animation.EnterTransition.None },
-                        popExitTransition = { com.example.ui.feedback.NavigationMotion.returnLeave(navigationReduceMotion) }
+                        enterTransition = {
+                            when (initialState.destination.route) {
+                                "splash" -> com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion)
+                                else -> com.example.ui.components.paperPageEnter(navigationReduceMotion)
+                            }
+                        },
+                        exitTransition = {
+                            com.example.ui.components.paperPageExit(
+                                navigationReduceMotion || initialState.destination.route == "splash"
+                            )
+                        },
+                        popEnterTransition = { com.example.ui.components.paperPagePopEnter(navigationReduceMotion) },
+                        popExitTransition = { com.example.ui.components.paperPagePopExit(navigationReduceMotion) }
                     ) {
                         composable("splash") {
                             SplashScreen(
@@ -620,7 +649,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        composable("onboarding") {
+                        paperComposable("onboarding", navController, revealContent = true) {
                             com.example.ui.OnboardingScreen(
                                 onFinished = {
                                     viewModel.prefs.hasSeenOnboarding = true
@@ -651,7 +680,7 @@ class MainActivity : ComponentActivity() {
                             }
                             var discoveredNovel by remember { mutableStateOf<com.example.source.SearchBook?>(null) }
                             com.example.discover.DiscoverNovelDetails(discoveredNovel, libraryViewModel,
-                                onOpenDownloads = { showDownloadCenter=true },
+                                onOpenDownloads = { navController.openPaperPage("downloads") },
                                 onDismiss = { discoveredNovel = null }, onRead = { book ->
                                     viewModel.selectBook(book); navController.openPaperPage("reader")
                                 })
@@ -662,27 +691,23 @@ class MainActivity : ComponentActivity() {
                                一旦神回侧有任何问题，表现就是"一打开就闪退"。
                                挪进各 Tab 内部后，默认 Tab（书架）完全不碰神回。 */
                             val tabBarCollapseState = rememberTabBarCollapseState()
-                            // Tab 栏专用背景采样（书源选择弹窗同款手法）：
-                            // layerBackdrop 捕获页面真实内容，Tab 栏 drawBackdrop 模糊它。
-                            // 画质档位低于"高"时不捕获（底栏走半透明底），滚动零捕获开销。
-                            val tabBackdrop = rememberLayerBackdrop()
-                            // 底栏玻璃只采样底部条带，捕获层裁剪到该区域（topLeft 保持坐标系不变），
-                            // 滚动时不再对整页内容做全屏重录与重栅格化。
-                            // 高度覆盖底栏最大高度(68dp)+导航栏内缩+模糊/阴影外扩，取 150dp 富余。
-                            val stripDensity = LocalDensity.current
-                            SideEffect {
-                                if (renderQuality.realtimeGlass) {
-                                    tabBackdrop.captureStripHeightPx = with(stripDensity) { 150.dp.toPx().toInt() }
-                                }
+                            val tabFocusManager = androidx.compose.ui.platform.LocalFocusManager.current
+                            LaunchedEffect(selectedTab) {
+                                tabFocusManager.clearFocus()
+                                if (selectedTab != 2) shelfSearch.close()
                             }
-
                             val tabItems = remember {
                                 listOf(
-                                    AppTabItem("书库", Icons.Outlined.Search, Icons.Filled.Search),
-                                    AppTabItem("发现", Icons.Outlined.Explore, Icons.Filled.Explore),
-                                    AppTabItem("书架", Icons.Outlined.BookmarkBorder, Icons.Filled.Bookmark),
-                                    AppTabItem("统计", Icons.Outlined.BarChart, Icons.Filled.BarChart),
-                                    AppTabItem("设置", Icons.Outlined.Settings, Icons.Filled.Settings)
+                                    AppTabItem("书库", Icons.Outlined.Search, Icons.Filled.Search,
+                                        wenkuSymbol = com.example.ui.wenku.WenkuSymbol.Search),
+                                    AppTabItem("发现", Icons.Outlined.Explore, Icons.Filled.Explore,
+                                        wenkuSymbol = com.example.ui.wenku.WenkuSymbol.Discover),
+                                    AppTabItem("书架", Icons.Outlined.BookmarkBorder, Icons.Filled.Bookmark,
+                                        wenkuSymbol = com.example.ui.wenku.WenkuSymbol.Shelf),
+                                    AppTabItem("统计", Icons.Outlined.BarChart, Icons.Filled.BarChart,
+                                        wenkuSymbol = com.example.ui.wenku.WenkuSymbol.Waveform),
+                                    AppTabItem("设置", Icons.Outlined.Settings, Icons.Filled.Settings,
+                                        wenkuSymbol = com.example.ui.wenku.WenkuSymbol.Settings)
                                 )
                             }
 
@@ -768,16 +793,7 @@ class MainActivity : ComponentActivity() {
                             }
 
                             Box(modifier = Modifier.fillMaxSize()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .then(
-                                        if (renderQuality.realtimeGlass) {
-                                            Modifier.layerBackdrop(tabBackdrop)
-                                        }
-                                        else Modifier
-                                    )
-                            ) {
+                            Box(modifier = Modifier.fillMaxSize()) {
                             Scaffold(
                                 // Each tab owns its status-bar inset; applying it here too
                                 // leaves a second status-bar-sized gap above every header.
@@ -822,27 +838,15 @@ class MainActivity : ComponentActivity() {
                                         .padding(top = innerPadding.calculateTopPadding())
                                         .nestedScroll(tabBarCollapseState.connection())
                                 ) {
-                                    val tabSaveableState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
-                                    AnimatedContent(
+                                    com.example.ui.wenku.WenkuPlaneTabSwitcher(
                                         targetState = selectedTab,
-                                        transitionSpec = {
-                                            // Material 3 的 fade-through：出场先走（90ms），
-                                            // 入场等 90ms 再淡入（210ms）。
-                                            // 关键收益：**两页永远不会同时可见**，因此不会出现
-                                            // 「两张半透明页面叠在一起发灰」的中间帧
-                                            // （旧实现是横向各滑 1/3 屏 + 交叉淡化，中间帧必然重影）。
-                                            fadeIn(
-                                                animationSpec = tween(durationMillis = if (navigationReduceMotion) 0 else 180, delayMillis = if (navigationReduceMotion) 0 else 70),
-                                            ).togetherWith(
-                                                fadeOut(animationSpec = tween(durationMillis = if (navigationReduceMotion) 0 else 70)),
-                                            )
-                                        },
-                                        label = "TabSwitch"
+                                        modifier = Modifier.fillMaxSize(),
+                                        direction = { from, to -> if (to >= from) 1 else -1 }
                                     ) { tab ->
-                                        tabSaveableState.SaveableStateProvider(tab) {
+                                        tabStateHolder.SaveableStateProvider(tab) {
                                         when (tab) {
                                                 0 -> com.example.library.LibraryScreen(
-                                                    onOpenDownloads = { showDownloadCenter = true },
+                                                    onOpenDownloads = { navController.openPaperPage("downloads") },
                                                     viewModel = libraryViewModel,
                                                     onBookImported = { 
                                                         selectedTab = 2
@@ -869,7 +873,11 @@ class MainActivity : ComponentActivity() {
                                             1 -> {
                                                 val readingTitles by viewModel.readingTitles.collectAsStateWithLifecycle()
                                                 com.example.discover.DiscoverScreen(
-                                                downloadEntry = { com.example.library.DownloadCenterEntry(libraryViewModel) { showDownloadCenter=true } },
+                                                downloadEntry = {
+                                                    com.example.library.DownloadCenterEntry(libraryViewModel) {
+                                                        navController.openPaperPage("downloads")
+                                                    }
+                                                },
                                                 readingTitles = readingTitles,
                                                 manager = libraryViewModel.sourceManager,
                                                 refreshRequest = discoverRefreshRequest,
@@ -886,6 +894,7 @@ class MainActivity : ComponentActivity() {
                                             )
                                             }
                                             2 -> HomeScreen(
+                                                search = shelfSearch,
                                                 books = visibleBooks,
                                                 categories = categories,
                                                 shelfCategory = shelfCategory,
@@ -1134,16 +1143,16 @@ class MainActivity : ComponentActivity() {
                                                 onBlueLightFilterChange = { viewModel.updateBlueLightFilter(it) },
                                                 blueLightAlphaVal = blueLightAlpha,
                                                 onBlueLightAlphaChange = { viewModel.updateBlueLightAlpha(it) },
-                                                colorPrimaryIndexVal = colorPrimaryIndex,
-                                                colorSecondaryIndexVal = colorSecondaryIndex,
-                                                onColorThemeChange = { p, s -> viewModel.updateColorTheme(p, s) },
+
+                                                onOpenThemePalette = { navController.openPaperPage("theme_palette") },
                                                 orientationLockVal = orientationLock,
                                                 onOrientationLockChange = { viewModel.updateScreenOrientationLock(it) },
                                                 hapticsEnabledVal = hapticsEnabled,
                                                 onHapticsChange = { viewModel.updateHapticsEnabled(it) },
                                                 renderQualityVal = renderQualityIdx,
                                                 onRenderQualityChange = { viewModel.updateRenderQuality(it) },
-                                                cardTweaksState = cardTweaks,
+                                                onOpenCardTweaks = { navController.openPaperPage("card_appearance") },
+                                                onOpenCacheManager = { navController.openPaperPage("cache_management") },
                                                 /* ── 隐私模式（第七轮第 6.4 条；第八轮审查修复：
                                                     底部 Tab 的设置页此前漏传隐私参数，全部落到默认
                                                     { false }——隐私模式在 Tab 设置页永远无法开启） ── */
@@ -1167,15 +1176,24 @@ class MainActivity : ComponentActivity() {
                                             )
                                         }
                                         }
-                                    }
+                                        }
                                 }
                             }
                             }
+
                             // 底部 Tab 栏：多选态下被悬浮操作栏"替换"（弹簧滑出）
                             val tabBarVisible by com.example.ui.shelf.ShelfChrome.tabBarVisible.collectAsStateWithLifecycle()
+                            // 路由内的玻璃 sheet 会被 Tab 栏压住：有 sheet 打开时先让 Tab 栏让位。
+                            val sheetOpen = com.example.ui.wenku.WenkuSheetRegistry.anyOpen
+                            val searchCoversDock = selectedTab == 2 && shelfSearch.mounted
                             PullOutVisibility(
-                                visible = tabBarVisible,
-                                modifier = Modifier.align(Alignment.BottomCenter),
+                                visible = tabBarVisible && !sheetOpen,
+                                modifier = Modifier.align(Alignment.BottomCenter)
+                                    .then(if (searchCoversDock) Modifier
+                                        .clearAndSetSemantics { }
+                                        .wenkuBlockPointer()
+                                        .graphicsLayer { alpha = 1f - shelfSearch.motion.value }
+                                    else Modifier),
                             ) {
                                 AppBottomTabBar(
                                     items = tabItems,
@@ -1189,13 +1207,12 @@ class MainActivity : ComponentActivity() {
                                         selectedTab = tab
                                     },
                                     collapseState = tabBarCollapseState,
-                                    backdrop = tabBackdrop.takeIf { renderQuality.realtimeGlass },
                                 )
                             }
                             }
                         }
  }
-                        paperComposable("settings", navController) {
+                        paperComposable("settings", navController, revealContent = true) {
                             val categories by viewModel.allCategories.collectAsStateWithLifecycle()
                             // 排行榜陈列方式按钮的跳转信标：读一次即清空
                             val focusGodSettings = remember {
@@ -1224,16 +1241,16 @@ class MainActivity : ComponentActivity() {
                                 onBlueLightFilterChange = { viewModel.updateBlueLightFilter(it) },
                                 blueLightAlphaVal = blueLightAlpha,
                                 onBlueLightAlphaChange = { viewModel.updateBlueLightAlpha(it) },
-                                colorPrimaryIndexVal = colorPrimaryIndex,
-                                colorSecondaryIndexVal = colorSecondaryIndex,
-                                onColorThemeChange = { p, s -> viewModel.updateColorTheme(p, s) },
+
+                                onOpenThemePalette = { navController.openPaperPage("theme_palette") },
                                 orientationLockVal = orientationLock,
                                 onOrientationLockChange = { viewModel.updateScreenOrientationLock(it) },
                                 hapticsEnabledVal = hapticsEnabled,
                                 onHapticsChange = { viewModel.updateHapticsEnabled(it) },
                                 renderQualityVal = renderQualityIdx,
                                 onRenderQualityChange = { viewModel.updateRenderQuality(it) },
-                                cardTweaksState = cardTweaks,
+                                onOpenCardTweaks = { navController.openPaperPage("card_appearance") },
+                                onOpenCacheManager = { navController.openPaperPage("cache_management") },
                                 /* ── 隐私模式（第七轮第 6.4 条） ── */
                                 privacyModeEnabled = viewModel.privacyModeEnabled.collectAsStateWithLifecycle().value,
                                 onEnablePrivacyMode = { pin -> viewModel.enablePrivacyMode(pin) },
@@ -1256,7 +1273,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         /* ── 神回排行榜（全屏完整版） ── */
-                        paperComposable("god_ranking", navController) {
+                        paperComposable("god_ranking", navController, revealContent = true) {
                             com.example.god.GodRankingScreen(
                                 moments = viewModel.godMoments.collectAsStateWithLifecycle().value,
                                 style = viewModel.godSettings.rankingStyle
@@ -1326,7 +1343,7 @@ class MainActivity : ComponentActivity() {
                             com.example.god.GodMomentEditHost(binding = binding, onSaved = { })
                         }
 
-                        paperComposable("reader", navController) { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null) {
+                        paperComposable("reader", navController) { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null, com.example.ui.wenku.LocalWenkuMainSurface provides false) {
                             val selectedBook by viewModel.selectedBook.collectAsStateWithLifecycle()
                             val chapters by viewModel.chapters.collectAsStateWithLifecycle()
                             val readerLoading by viewModel.readerLoading.collectAsStateWithLifecycle()
@@ -1392,7 +1409,7 @@ class MainActivity : ComponentActivity() {
                             com.example.library.NovelUpdatePanel(libraryViewModel, selectedBook)
                         }
  }
-                        paperComposable("comic_reader", navController) { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null) {
+                        paperComposable("comic_reader", navController) { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null, com.example.ui.wenku.LocalWenkuMainSurface provides false) {
                             val selectedBook by viewModel.selectedBook.collectAsStateWithLifecycle()
                             val chapters by viewModel.chapters.collectAsStateWithLifecycle()
                             val libraryBooks by viewModel.allBooks.collectAsStateWithLifecycle()
@@ -1433,34 +1450,42 @@ class MainActivity : ComponentActivity() {
                             )
                         } }
 
-                        paperComposable(LIBRARY_SEARCH_ROUTE, navController) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null) {
+                        paperComposable(LIBRARY_SEARCH_ROUTE, navController, revealContent = true) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null) {
                             val searchViewModel = remember(entry, sharedLibraryViewModel) {
                                 librarySearchViewModel(entry, sharedLibraryViewModel)
                             }
                             val sessionId = entry.arguments?.getString(LIBRARY_SESSION_ARGUMENT)
                             val favoriteKeys by viewModel.favoriteKeys.collectAsStateWithLifecycle()
-                            com.example.library.LibraryScreen(
-                                                    onOpenDownloads = { showDownloadCenter = true },
-                                viewModel = searchViewModel,
-                                onBookImported = { selectedTab = 2 },
-                                onOpenSourceManagement = { navController.openPaperPage("source_management") },
-                                onImportLocalBook = {
-                                    selectedCategoryForImport = "全部"
-                                    fileLauncher.launch(arrayOf("*/*"))
-                                },
-                                favoriteKeys = favoriteKeys,
-                                onToggleFavorite = { book, next -> viewModel.toggleFavorite(book, next) },
-                                onOpenComic = { book ->
-                                    searchViewModel.openComic(book)
-                                    navController.navigate(libraryDestinationRoute("comic_chapters", sessionId))
-                                },
-                                onOpenLocalNovel = { book -> viewModel.selectBook(book); navController.navigate("reader") },
-                                extraBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
-                                onBack = { navController.dismissPaperPage() },
-                            )
+                            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                                val wallpaper = AppBackgroundController.config.collectAsStateWithLifecycle().value
+                                if (wallpaper.mode != 0 && wallpaper.uri != null) {
+                                    Image(rememberAsyncImagePainter(wallpaper.uri), null,
+                                        modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = wallpaper.dim / 100f)))
+                                }
+                                com.example.library.LibraryScreen(
+                                                        onOpenDownloads = { navController.openPaperPage("downloads") },
+                                    viewModel = searchViewModel,
+                                    onBookImported = { selectedTab = 2 },
+                                    onOpenSourceManagement = { navController.openPaperPage("source_management") },
+                                    onImportLocalBook = {
+                                        selectedCategoryForImport = "全部"
+                                        fileLauncher.launch(arrayOf("*/*"))
+                                    },
+                                    favoriteKeys = favoriteKeys,
+                                    onToggleFavorite = { book, next -> viewModel.toggleFavorite(book, next) },
+                                    onOpenComic = { book ->
+                                        searchViewModel.openComic(book)
+                                        navController.navigate(libraryDestinationRoute("comic_chapters", sessionId))
+                                    },
+                                    onOpenLocalNovel = { book -> viewModel.selectBook(book); navController.navigate("reader") },
+                                    extraBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+                                    onBack = { navController.dismissPaperPage() },
+                                )
+                            }
                         } }
 
-                        paperComposable("comic_chapters?$LIBRARY_SESSION_ARGUMENT={$LIBRARY_SESSION_ARGUMENT}", navController, arguments = librarySessionArguments()) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null) {
+                        paperComposable("comic_chapters?$LIBRARY_SESSION_ARGUMENT={$LIBRARY_SESSION_ARGUMENT}", navController, arguments = librarySessionArguments(), revealContent = true) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null) {
                             val librarySessionId = entry.arguments?.getString(LIBRARY_SESSION_ARGUMENT)
                             val libraryViewModel = remember(entry, sharedLibraryViewModel) {
                                 libraryViewModelForSession(navController, librarySessionId, sharedLibraryViewModel)
@@ -1479,15 +1504,18 @@ class MainActivity : ComponentActivity() {
                             /* ── 「我喜欢的」与阅读进度（与是否下载无关） ── */
                             val comicSourceId = comicBook?.sourceId ?: ""
                             val comicId = comicBook?.id ?: ""
-                            val chapterReadEntities by remember(comicSourceId, comicId) {
-                                viewModel.favoriteRepository.chapterStatesFlow(comicSourceId, comicId)
-                            }.collectAsStateWithLifecycle(emptyList())
-                            val chapterReadStates = remember(chapterReadEntities) {
-                                chapterReadEntities.associateBy { it.chapterId }
-                            }
-                            val comicProgress by remember(comicSourceId, comicId) {
-                                viewModel.favoriteRepository.progressFlow(comicSourceId, comicId)
-                            }.collectAsStateWithLifecycle(null)
+                            val comicReadingKey = comicSourceId to comicId
+                            val readingSnapshot by remember(comicReadingKey) {
+                                combine(
+                                    viewModel.favoriteRepository.chapterStatesFlow(comicSourceId, comicId),
+                                    viewModel.favoriteRepository.progressFlow(comicSourceId, comicId),
+                                ) { states, progress ->
+                                    Triple(comicReadingKey, states.associateBy { it.chapterId }, progress)
+                                }
+                            }.collectAsStateWithLifecycle(initialValue = null)
+                            val readingState = readingSnapshot?.takeIf { it.first == comicReadingKey }
+                            val chapterReadStates = readingState?.second.orEmpty()
+                            val comicProgress = readingState?.third
                             val comicFavoriteKeys by viewModel.favoriteKeys.collectAsStateWithLifecycle()
                             val comicFavorite = comicFavoriteKeys.contains("$comicSourceId::$comicId")
                             val comicFavoriteCategories by viewModel.favoriteCategories.collectAsStateWithLifecycle()
@@ -1629,10 +1657,16 @@ class MainActivity : ComponentActivity() {
                                 onSearchText = { keyword ->
                                     navController.openDetailSearch(keyword, comicIsTextMode)
                                 },
+                                onOpenCover = { book ->
+                                    book.cover?.let { cover ->
+                                        val kind = if (comicIsTextMode) "小说封面" else "漫画封面"
+                                        navController.openCoverGallery(cover, book.title, kind)
+                                    }
+                                },
                                 chapters = comicChapters,
                                 loading = comicChaptersLoading,
                                 error = comicChaptersError,
-                                bookmarkedChapterIds = chapterReadEntities.filter { it.bookmarked }.map { it.chapterId }.toSet(),
+                                bookmarkedChapterIds = chapterReadStates.values.filter { it.bookmarked }.map { it.chapterId }.toSet(),
                                 onSetChapterBookmark = { chapterId, chapterIndex, bookmarked ->
                                     // 神回章节不可加书签（定稿）：写入回调这层兜底拦掉
                                     // 神回 map 加载窗口期的滑动，不写库也不弹提示
@@ -1689,6 +1723,7 @@ class MainActivity : ComponentActivity() {
                                 chapterStates = chapterReadStates,
                                 downloadedChapterIds = downloadedChapterIds,
                                 progress = comicProgress,
+                                readingStateReady = readingState != null,
                                 onReadChapterAt = { chapter, page ->
                                     startPage = page
                                     ComicJumpState.startPage = page
@@ -1752,7 +1787,7 @@ class MainActivity : ComponentActivity() {
                             )
                         } }
 
-                        paperComposable("comic_reader_online?$LIBRARY_SESSION_ARGUMENT={$LIBRARY_SESSION_ARGUMENT}", navController, arguments = librarySessionArguments()) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null) {
+                        paperComposable("comic_reader_online?$LIBRARY_SESSION_ARGUMENT={$LIBRARY_SESSION_ARGUMENT}", navController, arguments = librarySessionArguments()) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null, com.example.ui.wenku.LocalWenkuMainSurface provides false) {
                             val librarySessionId = entry.arguments?.getString(LIBRARY_SESSION_ARGUMENT)
                             val libraryViewModel = remember(entry, sharedLibraryViewModel) {
                                 libraryViewModelForSession(navController, librarySessionId, sharedLibraryViewModel)
@@ -1876,29 +1911,24 @@ class MainActivity : ComponentActivity() {
                             )
                         } }
 
-                        paperComposable("novel_reader_online?$LIBRARY_SESSION_ARGUMENT={$LIBRARY_SESSION_ARGUMENT}", navController, arguments = librarySessionArguments()) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null) {
+                        paperComposable("novel_reader_online?$LIBRARY_SESSION_ARGUMENT={$LIBRARY_SESSION_ARGUMENT}", navController, arguments = librarySessionArguments()) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null, com.example.ui.wenku.LocalWenkuMainSurface provides false) {
                             val librarySessionId = entry.arguments?.getString(LIBRARY_SESSION_ARGUMENT)
                             val libraryViewModel = remember(entry, sharedLibraryViewModel) {
                                 libraryViewModelForSession(navController, librarySessionId, sharedLibraryViewModel)
                             }
                             val comicBook by libraryViewModel.comicBook.collectAsStateWithLifecycle()
-                            val novelChapter by libraryViewModel.activeNovelChapter.collectAsStateWithLifecycle()
-                            val novelText by libraryViewModel.novelChapterText.collectAsStateWithLifecycle()
-                            val novelLoading by libraryViewModel.novelChapterLoading.collectAsStateWithLifecycle()
-                            val novelError by libraryViewModel.novelChapterError.collectAsStateWithLifecycle()
+                            val chapterState by libraryViewModel.onlineNovelChapter.collectAsStateWithLifecycle()
                             val chapters by libraryViewModel.comicChapters.collectAsStateWithLifecycle()
+                            val novelChapter = chapterState.page?.chapter ?: chapterState.requested
                             val idx = chapters.indexOfFirst { it.id == novelChapter?.id }
 
                             com.example.ui.NovelReaderScreen(
                                 bookTitle = comicBook?.title,
-                                chapter = novelChapter,
-                                text = novelText,
-                                loading = novelLoading,
-                                error = novelError,
+                                state = chapterState,
                                 hasPrevChapter = idx > 0,
                                 hasNextChapter = idx >= 0 && idx < chapters.size - 1,
                                 onBack = { navController.dismissPaperPage() },
-                                onRetry = { novelChapter?.let { libraryViewModel.loadChapterText(it) } },
+                                onRetry = { chapterState.requested?.let(libraryViewModel::loadChapterText) },
                                 onLoadPrev = {
                                     if (idx > 0) {
                                         libraryViewModel.loadChapterText(chapters[idx - 1])
@@ -1919,23 +1949,75 @@ class MainActivity : ComponentActivity() {
                             )
                         } }
 
-                        pullOutPage("source_management", onDismiss = { navController.popBackStack() }) { close ->
-                            com.example.ui.source.SourceManagementScreen(
-                                viewModel = sourceViewModel,
-                                onBack = close
+                        coverGalleryDestination(navController)
+
+                        paperComposable("downloads", navController, revealContent = true) {
+                            com.example.library.DownloadCenter(libraryViewModel) { navController.dismissPaperPage() }
+                        }
+
+                        paperComposable("cache_management", navController, revealContent = true) {
+                            com.example.ui.CacheManagementScreen(onBack = { navController.dismissPaperPage() })
+                        }
+
+                        paperComposable("theme_palette", navController, revealContent = true) {
+                            com.example.ui.ThemePaletteScreen(
+                                primaryIndex = colorPrimaryIndex,
+                                secondaryIndex = colorSecondaryIndex,
+                                onPrimaryChange = { viewModel.updateColorTheme(it, viewModel.colorSecondaryIndex.value) },
+                                onSecondaryChange = { viewModel.updateColorTheme(viewModel.colorPrimaryIndex.value, it) },
+                                onBack = { navController.dismissPaperPage() },
                             )
                         }
 
-                        paperComposable("device_transfer", navController) {
+                        paperComposable("card_appearance", navController, revealContent = true) {
+                            com.example.ui.CardAppearanceScreen(
+                                tw = cardTweaks.value,
+                                updateCardTweaks = { update ->
+                                    viewModel.prefs.writeCardTweaks(update(cardTweaks.value))
+                                    cardTweaks.value = viewModel.prefs.readCardTweaks()
+                                },
+                                onBack = { navController.dismissPaperPage() },
+                            )
+                        }
+
+                        paperComposable("source_management", navController, revealContent = true) {
+                            com.example.ui.source.SourceManagementScreen(
+                                viewModel = sourceViewModel,
+                                onBack = { navController.dismissPaperPage() },
+                                onOpenNodeManagement = { navController.openPaperPage("source_nodes") }
+                            )
+                        }
+
+                        paperComposable("source_nodes", navController, revealContent = true) {
+                            com.example.ui.source.ZLibraryNodeManagementScreen(
+                                onBack = { navController.dismissPaperPage() }
+                            )
+                        }
+
+                        paperComposable("device_transfer", navController, revealContent = true) {
                             DisposableEffect(Unit) { onDispose { transferManager.hide() } }
-                            com.example.transfer.TransferScreen(transferManager,viewModel.backupManager,viewModel::enablePrivacyMode, onBack = { navController.dismissPaperPage() })
+                            androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.background) {
+                                com.example.transfer.TransferScreen(
+                                    transferManager,
+                                    viewModel.backupManager,
+                                    viewModel::enablePrivacyMode,
+                                    onBack = { navController.dismissPaperPage() }
+                                )
+                            }
                         }
 
                     }
                 }
             }
+                        com.example.ui.shelf.ShelfSearchBackHandler(
+                            state = shelfSearch,
+                            active = selectedTab == 2 && sharedEntry?.destination?.route == "home"
+                        )
                         com.example.ui.mascot.MascotOverlay()
                     }
+                            // R14：封面飞行覆盖层必须挂在根部（NavHost 之外）。
+                            // 之前挂在 home 路由里，跳到阅读器时整块被移出组合，纸刚起飞就消失。
+                            com.example.ui.wenku.WenkuFlightOverlay(Modifier.fillMaxSize())
                 }
             }
         }

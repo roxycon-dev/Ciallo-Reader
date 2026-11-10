@@ -1,52 +1,42 @@
 package com.example.ui.source
 
-import com.example.ui.components.PullOutTextButton
-import com.example.ui.components.PullOutAlertDialog
-import com.example.ui.components.PullOutVisibility
 import android.widget.Toast
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.library.ZLibraryNodeManager
 import com.example.source.SearchBook
 import com.example.source.zlibrary.ZLibraryCredentialStorage
 import com.example.source.zlibrary.ZLibraryWebViewHelper
 import com.example.source.zlibrary.network.ZLibraryHttpClient
 import com.example.source.zlibrary.parser.ZLibraryParserManager
-import com.example.ui.components.AppActionButton
 import com.example.ui.components.AppIconButton
-import com.example.ui.components.AppButtonSize
-import com.example.ui.components.AppIconButton
-import com.example.ui.components.AppButtonVariant
-import com.example.ui.components.AppIconButton
-import com.example.ui.components.DialogLiquidGlass
-import com.example.ui.components.AppIconButton
-import com.example.ui.theme.MintPrimary
-import kotlinx.coroutines.launch
+import com.example.ui.components.paperDismiss
+import com.example.ui.glasskit.GlassKitCard
+import com.example.ui.glasskit.GlassKitHost
+import com.example.ui.glasskit.GlassManagementTopBar
+import com.example.ui.glasskit.GlassTopBarStrip
+import com.example.ui.wenku.WenkuActionSheet
+import com.example.ui.wenku.WenkuSymbol
+import com.example.ui.wenku.WenkuTextButton
+import com.example.ui.wenku.wenkuPagePart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URLEncoder
 
@@ -66,9 +56,6 @@ fun ZLibraryNodeManagementScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-
-    var contentVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { contentVisible = true }
 
     var scrapedNodes by remember { mutableStateOf(ZLibraryNodeManager.getScrapedNodes(context)) }
     var customNodes by remember { mutableStateOf(ZLibraryNodeManager.getCustomNodes(context)) }
@@ -196,22 +183,22 @@ fun ZLibraryNodeManagementScreen(
     val builtinNodes = (listOf(defaultNode) + scrapedNodes).distinct()
     val customNodeList = customNodes.filterNot { it in builtinNodes }
 
-    PullOutVisibility(
-        visible = contentVisible,
-        modifier = Modifier.fillMaxSize()) {
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val headerHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 48.dp
+    val headerTravel = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() }
+
+    GlassKitHost(topGradientHeight = headerHeight + 24.dp) {
         Scaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            containerColor = Color.Transparent,
             topBar = {
-                TopAppBar(
-                    title = { Text("节点管理", fontWeight = FontWeight.Bold) },
-                    navigationIcon = {
-                        AppIconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface
+                Box {
+                    GlassTopBarStrip(
+                        collapsedFraction = (-scrollBehavior.state.contentOffset / headerTravel).coerceIn(0f, 1f),
+                        modifier = Modifier.fillMaxWidth().height(headerHeight)
                     )
-                )
+                    GlassManagementTopBar("节点管理", "LIBRARY / NODES", scrollBehavior, onBack)
+                }
             },
         ) { innerPadding ->
             LazyColumn(
@@ -224,22 +211,15 @@ fun ZLibraryNodeManagementScreen(
                 contentPadding = PaddingValues(vertical = 16.dp)
             ) {
                 item {
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+                    GlassKitCard(modifier = Modifier.fillMaxWidth().wenkuPagePart(1)) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(
                                     "当前节点：$selectedNode",
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
+                                    style = MaterialTheme.typography.titleSmall
                                 )
-                                Spacer(modifier = Modifier.weight(1f))
-                                AppActionButton(
+                                WenkuTextButton(
                                     text = if (scraping) "扒取中…" else "扒取节点",
                                     onClick = {
                                         scope.launch {
@@ -254,17 +234,16 @@ fun ZLibraryNodeManagementScreen(
                                             }
                                         }
                                     },
-                                    variant = AppButtonVariant.Primary,
-                                    buttonSize = AppButtonSize.Medium,
-                                    icon = Icons.Default.Refresh,
-                                    enabled = !scraping,
-                                    loading = scraping
+                                    selected = true,
+                                    compact = true,
+                                    wenkuSymbol = WenkuSymbol.Refresh,
+                                    enabled = !scraping
                                 )
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 "从 zlib.wwkejishe.top 抓取全部官方入口（优先尝试/备用/中文），检测后点“使用”切换，立即生效。",
-                                fontSize = 12.sp,
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -274,13 +253,14 @@ fun ZLibraryNodeManagementScreen(
                 item {
                     Text(
                         "节点列表",
-                        fontSize = 14.sp,
+                        modifier = Modifier.wenkuPagePart(2),
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
 
-                items(builtinNodes, key = { it }) { node ->
+                itemsIndexed(builtinNodes, key = { _, node -> node }) { index, node ->
                     val isDefault = node == defaultNode
                     val verifiedLive = node in ZLibraryNodeManager.VERIFIED_LIVE_NODES
                     val label = when {
@@ -296,6 +276,7 @@ fun ZLibraryNodeManagementScreen(
                         status = statuses[node] ?: "未测试",
                         isTesting = testingNode == node,
                         canDelete = false,
+                        modifier = Modifier.wenkuPagePart(index + 3),
                         onTest = { testNode(node) },
                         onSelect = { selectNode(node) },
                         onDelete = {
@@ -311,13 +292,14 @@ fun ZLibraryNodeManagementScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         "自定义节点",
-                        fontSize = 14.sp,
+                        modifier = Modifier.wenkuPagePart(builtinNodes.size + 3),
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
 
-                items(customNodeList, key = { it }) { node ->
+                itemsIndexed(customNodeList, key = { _, node -> node }) { index, node ->
                     NodeCard(
                         node = node,
                         label = "自定义节点",
@@ -325,6 +307,7 @@ fun ZLibraryNodeManagementScreen(
                         status = statuses[node] ?: "未测试",
                         isTesting = testingNode == node,
                         canDelete = true,
+                        modifier = Modifier.wenkuPagePart(builtinNodes.size + index + 4),
                         onTest = { testNode(node) },
                         onSelect = { selectNode(node) },
                         onDelete = {
@@ -338,7 +321,8 @@ fun ZLibraryNodeManagementScreen(
 
                 item {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().wenkuPagePart(builtinNodes.size + customNodeList.size + 4),
+                        verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         OutlinedTextField(
@@ -349,7 +333,7 @@ fun ZLibraryNodeManagementScreen(
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp)
                         )
-                                                AppActionButton(
+                        WenkuTextButton(
                             text = "添加",
                             onClick = {
                                 if (ZLibraryNodeManager.addCustomNode(context, customInput)) {
@@ -360,9 +344,9 @@ fun ZLibraryNodeManagementScreen(
                                     AppToast.makeText(context, "请输入有效的域名", Toast.LENGTH_SHORT).show()
                                 }
                             },
-                            variant = AppButtonVariant.Secondary,
-                            buttonSize = AppButtonSize.Small,
-                            icon = Icons.Default.Add
+                            compact = true,
+                            wenkuSymbol = WenkuSymbol.Add,
+                            enabled = customInput.isNotBlank()
                         )
                     }
                 }
@@ -371,38 +355,24 @@ fun ZLibraryNodeManagementScreen(
     }
 
     if (showReplaceDialog) {
-        PullOutAlertDialog(
-            onDismissRequest = { showReplaceDialog = false },
-            title = { Text("找到 ${foundNodes.size} 个节点") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("是否合并以下节点？（内置已验证节点会保留）")
-                    foundNodes.forEach { node ->
-                        Text("•  $node", fontWeight = FontWeight.Medium)
-                    }
-                }
-            },
-            confirmButton = {
-                DialogLiquidGlass(fillMaxSize = false) {
-                    AppActionButton(
-                        text = "合并",
-                        onClick = {
-                            ZLibraryNodeManager.saveScrapedNodes(context, foundNodes)
-                            scrapedNodes = ZLibraryNodeManager.getScrapedNodes(context)
-                            showReplaceDialog = false
-                            AppToast.makeText(context, "已合并节点", Toast.LENGTH_SHORT).show()
-                        },
-                        variant = AppButtonVariant.Primary,
-                        buttonSize = AppButtonSize.Small
-                    )
-                }
-            },
-            dismissButton = {
-                PullOutTextButton(onClick = { showReplaceDialog = false }) {
-                    Text("取消")
-                }
+        WenkuActionSheet("找到 ${foundNodes.size} 个节点", onDismiss = { showReplaceDialog = false }) {
+            Text("是否合并以下节点？内置已验证节点会保留。")
+            foundNodes.forEach { node ->
+                Text(node, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace)
             }
-        )
+            WenkuTextButton(
+                "合并",
+                onClick = paperDismiss {
+                    ZLibraryNodeManager.saveScrapedNodes(context, foundNodes)
+                    scrapedNodes = ZLibraryNodeManager.getScrapedNodes(context)
+                    AppToast.makeText(context, "已合并节点", Toast.LENGTH_SHORT).show()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                selected = true,
+                wenkuSymbol = WenkuSymbol.Check
+            )
+            WenkuTextButton("取消", onClick = paperDismiss {}, modifier = Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Close)
+        }
     }
 }
 
@@ -416,37 +386,28 @@ private fun NodeCard(
     canDelete: Boolean,
     onTest: () -> Unit,
     onSelect: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val isOk = status.startsWith("可用") || status.startsWith("站点可达")
     val isFail = status == "不可用" || status.startsWith("需验证") || status == "初始化失败"
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = when {
-                isSelected -> MintPrimary.copy(alpha = 0.15f)
-                isOk -> MintPrimary.copy(alpha = 0.10f)
-                isFail -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
-                else -> MaterialTheme.colorScheme.surfaceVariant
-            }
-        ),
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    val colors = MaterialTheme.colorScheme
+    GlassKitCard(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(node, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(node, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleSmall, fontFamily = FontFamily.Monospace)
                         if (isSelected) {
                             Spacer(modifier = Modifier.width(6.dp))
                             Surface(
-                                color = MintPrimary.copy(alpha = 0.2f),
+                                color = colors.primary.copy(alpha = 0.2f),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text(
                                     "当前使用",
-                                    color = MintPrimary,
-                                    fontSize = 11.sp,
+                                    color = colors.primary,
+                                    style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
@@ -459,45 +420,45 @@ private fun NodeCard(
                             com.example.ui.components.AppProgressIndicator(
                                 modifier = Modifier.size(14.dp),
                                 strokeWidth = 2.dp,
-                                color = MintPrimary
+                                color = colors.primary
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                         } else if (isOk) {
-                            Icon(Icons.Default.CheckCircle, null, tint = MintPrimary, modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.CheckCircle, null, tint = colors.primary, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                         } else if (isFail) {
                             Icon(Icons.Default.ErrorOutline, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                         }
-                        Text("$label · $status", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("$label · $status", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
                     }
                 }
             }
             Spacer(modifier = Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                AppActionButton(
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                WenkuTextButton(
                     text = "检测",
                     onClick = onTest,
                     enabled = !isTesting,
-                    variant = AppButtonVariant.Secondary,
-                    buttonSize = AppButtonSize.Small,
-                    icon = Icons.Default.PlayArrow
+                    compact = true,
+                    wenkuSymbol = WenkuSymbol.Search
                 )
-                                AppActionButton(
+                WenkuTextButton(
                     text = if (isSelected) "使用中" else "使用",
                     onClick = onSelect,
-                    variant = AppButtonVariant.Secondary,
-                    buttonSize = AppButtonSize.Small
+                    selected = isSelected,
+                    compact = true,
+                    wenkuSymbol = if (isSelected) WenkuSymbol.Selected else WenkuSymbol.Circle
                 )
                 if (canDelete) {
                     Spacer(modifier = Modifier.weight(1f))
-                    AppIconButton(onClick = onDelete) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "删除节点",
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
+                    AppIconButton(
+                        icon = Icons.Default.Delete,
+                        contentDescription = "删除节点",
+                        onClick = onDelete,
+                        tint = MaterialTheme.colorScheme.error,
+                        glyphSize = 22.dp
+                    )
                 }
             }
         }

@@ -179,3 +179,35 @@ fun BookCompleteAnimation(onComplete: () -> Unit) {
         }
     }
 }
+
+
+/** One-shot GIF backed by the platform decoder; keep the original artwork as a static fallback. */
+@Composable
+internal fun RoxyCelebrationImage(modifier: Modifier = Modifier, contentDescription: String = "Roxy 庆祝") {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val reduced = com.example.ui.wenku.rememberWenkuAccessibility().reduceMotion
+    val animated = remember(context, reduced) {
+        if (reduced || android.os.Build.VERSION.SDK_INT < 28) null else runCatching {
+            android.graphics.ImageDecoder.decodeDrawable(
+                android.graphics.ImageDecoder.createSource(context.resources, com.example.R.raw.roxy_celebration)
+            ) as? android.graphics.drawable.AnimatedImageDrawable
+        }.getOrNull()
+    }
+    if (animated == null) {
+        Image(painterResource(MascotSpriteSheet.celebrateDrawable), contentDescription, modifier = modifier)
+    } else {
+        androidx.compose.ui.viewinterop.AndroidView(
+            factory = { viewContext ->
+                android.widget.ImageView(viewContext).apply {
+                    scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                    this.contentDescription = contentDescription
+                    setImageDrawable(animated)
+                    animated.repeatCount = 0
+                    animated.start()
+                }
+            },
+            modifier = modifier,
+        )
+        DisposableEffect(animated) { onDispose { animated.stop() } }
+    }
+}

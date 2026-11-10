@@ -107,6 +107,13 @@ fun PageTurnContainer(
     val touchDensity = androidx.compose.ui.platform.LocalDensity.current.density
     val minimalMode = com.example.ui.components.LocalRenderQuality.current.minimal
     val minimalDistance = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() }
+    val turnDurationMs = when (PageTurnType.entries.firstOrNull { it.id == pageTurnMode } ?: PageTurnType.SIMULATE) {
+        PageTurnType.SIMULATE -> com.example.ui.wenku.WenkuMotion.PAGE_CLOCK_MS
+        PageTurnType.COVER -> com.example.ui.wenku.WenkuMotion.COVER_TURN_MS
+        PageTurnType.SLIDE -> com.example.ui.wenku.WenkuMotion.SLIDE_TURN_MS
+        PageTurnType.FADE -> com.example.ui.wenku.WenkuMotion.FADE_TURN_MS
+        PageTurnType.SCROLL -> 0
+    }
     var touchOrigin by remember { mutableStateOf(Offset.Zero) }
     val zoneModifier = Modifier.onGloballyPositioned { touchOrigin = it.positionInWindow(); touchBinding.onViewport(androidx.compose.ui.geometry.Rect(touchOrigin, androidx.compose.ui.geometry.Size(it.size.width.toFloat(), it.size.height.toFloat()))) }.touchZoneGestures(touchBinding.zones, { if (minimalMode) minimalDistance else it * .15f }, touchBinding.onAction,
         enabled = pageTurnMode != PageTurnType.SCROLL.id,
@@ -171,7 +178,7 @@ fun PageTurnContainer(
                 zoneTurnJob?.cancel()
                 zoneTurnJob = coroutineScope.launch {
                     try {
-                        dragOffset.animateTo(if (action == TouchAction.NEXT) -zoneWidth else zoneWidth, tween(180))
+                        dragOffset.animateTo(if (action == TouchAction.NEXT) -zoneWidth else zoneWidth, tween(turnDurationMs))
                         if (action == TouchAction.NEXT) latestOnNextPage() else latestOnPrevPage()
                     } finally { withContext(NonCancellable) { dragOffset.snapTo(0f); dragOffsetY.snapTo(0f) } }
                 }
@@ -315,20 +322,23 @@ fun PageTurnContainer(
                             }
                         } else if (activeMode == 1 && mode != PageTurnType.SCROLL) {
                             val currentVal = dragOffset.value
-                            val threshold = screenWidth * 0.15f
 
                             coroutineScope.launch {
                                 dragOffsetY.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
                             }
 
                             val releaseVelocity = velocity.calculateVelocity()
-                            val commit = !cancelled && com.example.ui.reader.fastPageCommit(zone?.distanceDp,
-                                releasePosition - down.position, Offset(releaseVelocity.x, releaseVelocity.y), touchDensity, abs(currentVal) > threshold)
+                            val commit = !cancelled && com.example.ui.wenku.WenkuReaderPhysics.commit(
+                                viewportPx = screenWidth,
+                                deltaPx = releasePosition - down.position,
+                                velocityPx = Offset(releaseVelocity.x, releaseVelocity.y),
+                                density = touchDensity
+                            )
                             if (commit) {
                                 turnJob = coroutineScope.launch {
                                     try {
                                         val target = if (currentVal < 0) -screenWidth else screenWidth
-                                        dragOffset.animateTo(target, tween(180))
+                                        dragOffset.animateTo(target, tween(turnDurationMs))
                                         if (currentVal < 0) {
                                             latestOnNextPage()
                                         } else {
@@ -357,8 +367,8 @@ fun PageTurnContainer(
                         } else {
                         com.example.ui.components.recordPaperTouch(down.position + containerOffsetInWindow, density)
                         val tapX = down.position.x
-                        val leftZone = screenWidth * 0.35f
-                        val rightZone = screenWidth * 0.65f
+                        val leftZone = screenWidth * 0.28f
+                        val rightZone = screenWidth * 0.72f
 
                         when {
                             tapX < leftZone -> {
@@ -371,8 +381,8 @@ fun PageTurnContainer(
                                 } else {
                                     turnJob = coroutineScope.launch {
                                         try {
-                                            dragOffset.animateTo(-screenWidth * 0.05f, tween(60))
-                                            dragOffset.animateTo(screenWidth, tween(180))
+                                            dragOffset.animateTo(-screenWidth * 0.05f, tween(com.example.ui.wenku.WenkuMotion.CONTACT_MS))
+                                            dragOffset.animateTo(screenWidth, tween(turnDurationMs))
                                             latestOnPrevPage()
                                         } finally {
                                             withContext(NonCancellable) {
@@ -392,8 +402,8 @@ fun PageTurnContainer(
                                 } else {
                                     turnJob = coroutineScope.launch {
                                         try {
-                                            dragOffset.animateTo(screenWidth * 0.05f, tween(60))
-                                            dragOffset.animateTo(-screenWidth, tween(180))
+                                            dragOffset.animateTo(screenWidth * 0.05f, tween(com.example.ui.wenku.WenkuMotion.CONTACT_MS))
+                                            dragOffset.animateTo(-screenWidth, tween(turnDurationMs))
                                             latestOnNextPage()
                                         } finally {
                                             withContext(NonCancellable) {

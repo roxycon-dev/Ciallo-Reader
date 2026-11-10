@@ -508,22 +508,51 @@ class TransferManager private constructor(private val context:Context) {
         mutableState.value=TransferSessionState(TransferPhase.CANCELLED,message="传输已取消，本机原有数据保留")
         stopServiceIfIdle()
     }
+    @Synchronized
     fun openShared(uri:Uri) {
-        if(state.value.busy || claimed) { show(); return }
+        if(state.value.busy || claimed || state.value.phase == TransferPhase.RECEIVED) { show(); return }
         show()
-        task=scope.launch { try {
-            change(TransferPhase.VERIFYING,"正在识别分享的数据")
-            val target=File(directory,"shared_${UUID.randomUUID()}.ciallo")
-            context.contentResolver.openInputStream(uri)?.use { input -> target.outputStream().use { output -> com.example.data.ArchiveBudget(MAX_ARCHIVE_BYTES,MAX_ARCHIVE_BYTES,1).copyEntry(input,output) } }?:error("无法打开分享文件")
-            val preview=backup.inspectArchive(target)
-            importDecision=CompletableDeferred()
-            mutableState.value=TransferSessionState(TransferPhase.RECEIVED,incoming=true,preview=preview,message="已识别 Ciallo 数据，请选择合并或整机迁移")
-            val mode=importDecision!!.await(); startService()
-            val result=backup.importArchive(target,mode) { p -> mutableState.update { it.copy(phase=p.phase,progress=p) } }
-            receiveMode=mode
-            mutableState.update { it.copy(phase=TransferPhase.COMPLETED,result=result,message=if(mode==ImportMode.REPLACE)"迁移完成，重新打开后应用设置" else "数据已合并到本机") }
-            target.delete(); history("文件导入完成","分享文件")
-        } catch(e:Exception) { if(e !is CancellationException)fail(e) } finally { importDecision=null; stopServiceIfIdle() } }
+        change(TransferPhase.VERIFYING, "正在识别分享的数据")
+        task = scope.launch {
+            val target = File(directory, "shared_${UUID.randomUUID()}.ciallo")
+            val decision = CompletableDeferred<ImportMode>()
+            try {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        target.outputStream().use { output ->
+                            com.example.data.ArchiveBudget(MAX_ARCHIVE_BYTES, MAX_ARCHIVE_BYTES, 1).copyEntry(input, output)
+                        }
+                    } ?: error("无法打开分享文件")
+                }
+                val preview = withContext(Dispatchers.IO) { backup.inspectArchive(target) }
+                importDecision = decision
+                mutableState.value = TransferSessionState(
+                    TransferPhase.RECEIVED, incoming = true, preview = preview,
+                    message = "已识别 Ciallo 数据，请选择合并或整机迁移"
+                )
+                val mode = decision.await()
+                startService()
+                val result = backup.importArchive(target, mode) { progress ->
+                    mutableState.update { it.copy(phase = progress.phase, progress = progress) }
+                }
+                receiveMode = mode
+                mutableState.update {
+                    it.copy(
+                        phase = TransferPhase.COMPLETED, result = result,
+                        message = if (mode == ImportMode.REPLACE) "迁移完成，重新打开后应用设置" else "数据已合并到本机"
+                    )
+                }
+                history("文件导入完成", "分享文件")
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                fail(error)
+            } finally {
+                target.delete()
+                if (importDecision === decision) importDecision = null
+                stopServiceIfIdle()
+            }
+        }
     }
     fun importShared(mode:ImportMode) { importDecision?.complete(mode) }
     fun reset() { if(!state.value.busy && !claimed) mutableState.value=TransferSessionState() }

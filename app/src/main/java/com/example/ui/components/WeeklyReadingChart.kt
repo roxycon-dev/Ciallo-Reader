@@ -2,6 +2,7 @@ package com.example.ui.components
 
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -23,6 +24,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -38,6 +43,7 @@ import com.example.data.Book
 import com.example.data.ReadingRecord
 import com.example.ui.components.AcrylicDialog
 import com.example.ui.feedback.LocalReduceMotion
+import com.example.ui.wenku.WenkuMotion
 import com.example.ui.theme.MintGold
 import com.example.ui.theme.MintPrimary
 import com.example.ui.theme.MintSecondary
@@ -88,27 +94,12 @@ fun WeeklyReadingChart(
             ?.takeIf { minutesPerDay.getOrElse(it) { 0 } > 0 }
     }
 
-    // Staggered entrance animation factors for 7 bars
-    val barAnimatables = remember { List(7) { Animatable(0f) } }
-
-    LaunchedEffect(minutesPerDay, lowQuality, reduceMotion) {
-        if (lowQuality || reduceMotion) {
-            // 流畅档 / 系统关掉动画：跳过生长动画，直接定格终态
-            barAnimatables.forEachIndexed { _, animatable -> animatable.snapTo(1f) }
-            return@LaunchedEffect
-        }
-        // Defer chart bar growth animation until page switch transition completes (250-300ms)
-        delay(320L)
-        barAnimatables.forEachIndexed { index, animatable ->
-            delay((index * 40).toLong())
-            animatable.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(
-                    durationMillis = 400,
-                    easing = FastOutSlowInEasing
-                )
-            )
-        }
+    val animateBars = !lowQuality && !reduceMotion
+    val entrance = remember { Animatable(if (animateBars) 0f else 1f) }
+    LaunchedEffect(animateBars) {
+        if (animateBars && entrance.value < 1f) {
+            entrance.animateTo(1f, tween(WenkuMotion.ENTER_MS, easing = LinearEasing))
+        } else entrance.snapTo(1f)
     }
 
     GlassCard(
@@ -187,21 +178,18 @@ fun WeeklyReadingChart(
                     val isSelected = index == selectedDayIndex
                     
                     val rawFraction = if (maxMinutes <= 0 || mins <= 0) 0f else (mins.toFloat() / maxMinutes.toFloat()).coerceIn(0.04f, 1f)
-                    // B4：原先只有一个入场遮罩（barAnimatables 跑一次到 1f 就再也不动），
-                    // 之后当天阅读时长实时增长时柱子直接重绘、毫无过渡。
-                    // 拆成两层：本层负责「数值变化」的过渡，入场遮罩仍由 barAnimatables 负责。
-                    val animatedRaw by animateFloatAsState(
+                    val animatedRaw = animateFloatAsState(
                         targetValue = rawFraction,
-                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                        animationSpec = tween(if (animateBars) 450 else 0, easing = FastOutSlowInEasing),
                         label = "barValue_$index"
                     )
-                    val animatedFraction = animatedRaw * barAnimatables[index].value
-
-                    val scaleState by animateFloatAsState(
+                    val scaleState = animateFloatAsState(
                         targetValue = if (isSelected) 1.08f else 1.0f,
-                        animationSpec = tween(durationMillis = 150),
+                        animationSpec = tween(if (animateBars) 150 else 0),
                         label = "barScale"
                     )
+                    val from = WenkuMotion.listStart(index)
+                    val to = WenkuMotion.listEnd(index)
 
                     val barGradient = when {
                         isToday || isSelected -> listOf(chartSecondary, chartPrimary)
@@ -271,11 +259,9 @@ fun WeeklyReadingChart(
                             )
 
                             // Animated bar inside 100dp container
-                            if (animatedFraction > 0.01f) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .fillMaxHeight(animatedFraction.coerceAtLeast(0.04f))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
                                         .then(
                                             if (isSelected) {
                                                 Modifier.consistentShadow(
@@ -289,13 +275,14 @@ fun WeeklyReadingChart(
                                             }
                                         )
                                         .graphicsLayer {
-                                            scaleX = scaleState
+                                            val phase = ((entrance.value - from) / (to - from)).coerceIn(0f, 1f)
+                                            scaleX = scaleState.value
+                                            scaleY = animatedRaw.value * WenkuMotion.ease.transform(phase)
                                             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
                                         }
                                         .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
                                         .background(brush = Brush.verticalGradient(colors = barGradient))
-                                )
-                            }
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -457,10 +444,13 @@ private fun DayCoverCard(
     val recordBook = recordBooks[record.id]?.takeIf { it.sourceId.isNotBlank() }
     var showMenu by remember { mutableStateOf(false) }
     var showDetail by remember { mutableStateOf(false) }
+    val cardCoordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    var menuAnchor by remember { mutableStateOf<Rect?>(null) }
     val remoteCover = recordBook?.cover ?: recordCovers[record.id]
     Column(
         modifier = Modifier
             .width(84.dp)
+            .onGloballyPositioned { cardCoordinates[0] = it }
             .pullOutCombinedClickable(
                 onClick = {
                     when {
@@ -469,7 +459,10 @@ private fun DayCoverCard(
                         else -> showDetail = true
                     }
                 },
-                onLongClick = { showMenu = true }
+                onLongClick = {
+                    menuAnchor = cardCoordinates[0]?.takeIf { it.isAttached }?.boundsInWindow()
+                    showMenu = true
+                }
             )
     ) {
         Box(
@@ -548,59 +541,30 @@ private fun DayCoverCard(
         )
     }
 
-    if (showMenu) {
-        AcrylicDialog(
-            onDismissRequest = { showMenu = false },
-            title = {
-                Text(
-                    text = record.bookTitle,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            },
-            text = {
-                val closeMenu = LocalOverlayClose.current
-                Column {
-                    MenuActionRow(
-                        label = "前往阅读",
-                        enabled = book != null || recordBook != null,
-                        onClick = { closeMenu {
-                            showMenu = false
-                            if (book != null) onOpenBook(book)
-                            else if (recordBook != null) onOpenRecordDetail(recordBook)
-                        } }
-                    )
-                    HorizontalDivider(
-                        thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                    )
-                    MenuActionRow(
-                        label = "阅读详情",
-                        onClick = { closeMenu {
-                            showMenu = false
-                            showDetail = true
-                        } }
-                    )
-                    HorizontalDivider(
-                        thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                    )
-                    MenuActionRow(
-                        label = "删除阅读历史",
-                        destructive = true,
-                        onClick = { closeMenu {
-                            showMenu = false
-                            onDeleteRecord(record)
-                        } }
-                    )
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                PullOutTextButton(onClick = { closeOverlay { showMenu = false } }) { Text("取消") }
+    com.example.ui.components.PullOutDropdownMenu(
+        expanded = showMenu,
+        onDismissRequest = { showMenu = false },
+        anchorInWindow = menuAnchor
+    ) {
+        com.example.ui.components.PullOutDropdownMenuItem(
+            text = { Text("前往阅读") },
+            leadingIcon = { com.example.ui.wenku.WenkuIcon(com.example.ui.wenku.WenkuSymbol.Book, entrance = false) },
+            enabled = book != null || recordBook != null,
+            onClick = com.example.ui.components.paperOpen {
+                if (book != null) onOpenBook(book)
+                else if (recordBook != null) onOpenRecordDetail(recordBook)
             }
+        )
+        com.example.ui.components.PullOutDropdownMenuItem(
+            text = { Text("阅读详情") },
+            leadingIcon = { com.example.ui.wenku.WenkuIcon(com.example.ui.wenku.WenkuSymbol.Info, entrance = false) },
+            onClick = com.example.ui.components.paperOpen { showDetail = true }
+        )
+        com.example.ui.components.PullOutDropdownMenuItem(
+            text = { Text("删除阅读历史", color = MaterialTheme.colorScheme.error) },
+            leadingIcon = { com.example.ui.wenku.WenkuIcon(com.example.ui.wenku.WenkuSymbol.Delete,
+                tint = MaterialTheme.colorScheme.error, entrance = false) },
+            onClick = com.example.ui.components.paperDismiss { onDeleteRecord(record) }
         )
     }
 
@@ -634,34 +598,6 @@ private fun DayCoverCard(
                 val closeOverlay = com.example.ui.components.LocalOverlayClose.current
                 PullOutTextButton(onClick = { closeOverlay { showDetail = false } }) { Text("关闭") }
             }
-        )
-    }
-}
-
-@Composable
-private fun MenuActionRow(
-    label: String,
-    onClick: () -> Unit,
-    enabled: Boolean = true,
-    destructive: Boolean = false
-) {
-    val color = when {
-        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-        destructive -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.onSurface
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pullOutClickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            color = color
         )
     }
 }

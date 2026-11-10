@@ -36,7 +36,7 @@ class PrivacyPinOverlayTest {
         rule.setContent {
             PrivacyPinOverlay(
                 mode = PinEntryMode.SETUP,
-                onPinSet = { setPin = it },
+                onPinSet = { setPin = it; true },
                 onPinVerified = { false },
                 onDismiss = { },
             )
@@ -57,7 +57,7 @@ class PrivacyPinOverlayTest {
         rule.setContent {
             PrivacyPinOverlay(
                 mode = PinEntryMode.SETUP,
-                onPinSet = { setPin = it },
+                onPinSet = { setPin = it; true },
                 onPinVerified = { false },
                 onDismiss = { },
             )
@@ -85,7 +85,7 @@ class PrivacyPinOverlayTest {
         rule.setContent {
             PrivacyPinOverlay(
                 mode = PinEntryMode.VERIFY,
-                onPinSet = { },
+                onPinSet = { false },
                 onPinVerified = { it == "135790" },
                 onDismiss = { dismissed = true },
             )
@@ -106,7 +106,7 @@ class PrivacyPinOverlayTest {
         rule.setContent {
             PrivacyPinOverlay(
                 mode = PinEntryMode.VERIFY,
-                onPinSet = { },
+                onPinSet = { false },
                 onPinVerified = { it == "135790" },
                 onDismiss = { dismissed = true },
             )

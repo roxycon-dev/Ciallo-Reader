@@ -1,5 +1,11 @@
 package com.example.ui
 
+import androidx.compose.material.icons.filled.AddCircleOutline
+import androidx.compose.material.icons.filled.RemoveCircleOutline
+import com.example.ui.wenku.WenkuTextButton
+import com.example.ui.wenku.WenkuSymbol
+import com.example.ui.wenku.WenkuIconButton
+import com.example.ui.wenku.WenkuIcon
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.pullOutClickable
 import androidx.compose.animation.core.Spring
@@ -48,6 +54,8 @@ import com.example.ui.components.GlassCard
 import com.example.ui.components.SegmentedPillSelector
 import com.example.ui.components.TabScreenHeader
 import com.example.ui.components.rememberHeaderCollapsedSource
+import com.example.ui.wenku.WenkuSectionHeader
+import com.example.ui.wenku.wenkuPagePart
 import com.example.ui.components.ReadingCalendarCard
 import com.example.ui.components.ReadingTrendCard
 import com.example.ui.components.WeeklyReadingChart
@@ -177,54 +185,56 @@ LazyColumn(
                 } else {
                     // ---------- 周期总览 ----------
                     item(key = "stats_period") {
-                        PeriodOverviewCard(
-                            dailyTotals = dailyTotals,
-                            books = books,
-                            finishedCount = finishedCount,
-                            dailyGoalMinutes = dailyGoalMinutes,
-                            onGoalChange = onGoalChange
-                        )
-                    }
-
-                    // ---------- 神回排行榜（核心数据卡片之后） ----------
-                    item(key = "stats_god_ranking") {
-                        com.example.god.GodRankingCard(
-                            moments = godMoments,
-                            style = godStyle,
-                            gyroEnabled = godGyroEnabled,
-                            reduceMotion = com.example.god.rememberReduceMotion(),
-                            onOpenAll = onOpenGodRanking,
-                            onItemClick = onGodMomentClick,
-                            onEdit = onEditGodMoment,
-                            onDelete = onDeleteGodMoment,
-                        )
+                        Box(Modifier.fillMaxWidth().wenkuPagePart(1)) {
+                            PeriodOverviewCard(
+                                dailyTotals = dailyTotals,
+                                books = books,
+                                finishedCount = finishedCount,
+                                dailyGoalMinutes = dailyGoalMinutes,
+                                onGoalChange = onGoalChange
+                            )
+                        }
                     }
 
                     // ---------- 日历视图 ----------
                     item(key = "stats_calendar") {
-                        ReadingCalendarCard(
-                            dailyTotals = dailyTotals,
-                            onDayClick = { selectedDate = it }
-                        )
+                        Box(Modifier.fillMaxWidth().wenkuPagePart(2)) {
+                            ReadingCalendarCard(
+                                dailyTotals = dailyTotals,
+                                onDayClick = { selectedDate = it }
+                            )
+                        }
                     }
 
                     // ---------- 趋势图表 ----------
                     item(key = "stats_trend") {
-                        ReadingTrendCard(
-                            dailyTotals = dailyTotals,
-                            sessions = readingSessions
-                        )
+                        Box(Modifier.fillMaxWidth().wenkuPagePart(3)) {
+                            ReadingTrendCard(
+                                dailyTotals = dailyTotals,
+                                sessions = readingSessions
+                            )
+                        }
+                    }
+
+                    // ---------- 神回排行榜（核心数据卡片之后） ----------
+                    item(key = "stats_god_ranking") {
+                        Box(Modifier.fillMaxWidth().wenkuPagePart(4)) {
+                            com.example.god.GodRankingCard(
+                                moments = godMoments,
+                                style = godStyle,
+                                gyroEnabled = godGyroEnabled,
+                                reduceMotion = com.example.god.rememberReduceMotion(),
+                                onOpenAll = onOpenGodRanking,
+                                onItemClick = onGodMomentClick,
+                                onEdit = onEditGodMoment,
+                                onDelete = onDeleteGodMoment,
+                            )
+                        }
                     }
 
                     // ---------- 本周明细（保留原周视图 + 封面轮播/删除） ----------
                     item(key = "stats_weekly_header") {
-                        Text(
-                            text = "本周阅读明细",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = adaptiveTitleColor(),
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
+                        WenkuSectionHeader("03", "READING LOG", "本周阅读明细")
                     }
 
                     item(key = "stats_weekly") {
@@ -385,28 +395,57 @@ private fun PeriodOverviewCard(
     val periodName = listOf("本周", "本月", "今年")[period]
     val prevName = listOf("上周", "上月", "去年")[period]
 
+    val shareCtx = androidx.compose.ui.platform.LocalContext.current
+    val shareLabel = when (period) { 0 -> "周"; 1 -> "月"; else -> "年" }
+    val shareReport: () -> Unit = {
+        val shareText = buildString {
+            appendLine("📚 我的阅读${shareLabel}报 · Ciallo Reader")
+            appendLine("────────────────────")
+            if (periodTotal > 0) {
+                appendLine("⏱ ${periodName}阅读 ${formatReadDuration(periodTotal)}（日均 ${if (avgDaily in 1..59) "不足1分钟" else formatShortDuration(avgDaily)}）")
+            } else {
+                appendLine("⏱ ${periodName}暂无阅读记录，从一页开始 ✨")
+            }
+            appendLine("🎯 每日目标 ${dailyGoalMinutes} 分钟 · 完成 ${(animatedGoal * 100).toInt()}%")
+            if (streak > 0) appendLine("🔥 连续阅读 $streak 天")
+            if (daysRead > 0) appendLine("📖 ${periodName}阅读 $daysRead 天 · 读完 $finishedCount 本")
+            appendLine("━━━━━━━━━━━━━━━━")
+            appendLine("Ciallo Reader · Roxy 陪伴 ✨")
+        }
+        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+        }
+        shareCtx.startActivity(android.content.Intent.createChooser(intent, "分享阅读报告"))
+    }
+
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MintPrimary.copy(alpha = 0.15f),
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.Timer, contentDescription = null, tint = MintPrimary, modifier = Modifier.size(28.dp))
-                    }
-                }
-                Spacer(modifier = Modifier.width(16.dp))
+            WenkuSectionHeader("01", "READING OVERVIEW", "阅读总览", trailing = {
+                WenkuIconButton(
+                    Icons.Filled.Share, "分享${periodName}阅读报告", shareReport,
+                    wenkuSymbol = WenkuSymbol.Share,
+                )
+            })
+            Spacer(Modifier.height(6.dp))
+            SegmentedPillSelector(
+                options = listOf(0 to "周", 1 to "月", 2 to "年"),
+                selected = period,
+                onSelect = { period = it },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("${periodName}阅读时长", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = formatReadDuration(animatedPeriodTotal.toLong()),
-                        fontSize = 26.sp,
+                        fontSize = 30.sp,
+                        fontFamily = com.example.ui.theme.AppFonts.Serif,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -426,6 +465,7 @@ private fun PeriodOverviewCard(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
+                WenkuIcon(WenkuSymbol.Timer, size = 32.dp, tint = MintPrimary, entrance = false)
             }
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -470,94 +510,22 @@ private fun PeriodOverviewCard(
                             color = MintPrimary
                         )
                     }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Text("每日目标", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.weight(1f))
-                    Surface(
-                        onClick = { if (dailyGoalMinutes > 15) onGoalChange(dailyGoalMinutes - 15) },
-                        shape = androidx.compose.foundation.shape.CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.size(24.dp).semantics { contentDescription = "减少目标15分钟" }
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text("−", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("每日目标", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${dailyGoalMinutes} 分钟", style = MaterialTheme.typography.titleSmall, color = MintPrimary)
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("${dailyGoalMinutes}分钟", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MintPrimary)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Surface(
-                        onClick = { if (dailyGoalMinutes < 480) onGoalChange(dailyGoalMinutes + 15) },
-                        shape = androidx.compose.foundation.shape.CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.size(24.dp).semantics { contentDescription = "增加目标15分钟" }
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text("+", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
+                    WenkuIconButton(
+                        Icons.Filled.RemoveCircleOutline, "减少目标15分钟",
+                        { onGoalChange(dailyGoalMinutes - 15) },
+                        enabled = dailyGoalMinutes > 15, wenkuSymbol = WenkuSymbol.RemoveCircle,
+                    )
+                    WenkuIconButton(
+                        Icons.Filled.AddCircleOutline, "增加目标15分钟",
+                        { onGoalChange(dailyGoalMinutes + 15) },
+                        enabled = dailyGoalMinutes < 480, wenkuSymbol = WenkuSymbol.AddCircle,
+                    )
                 }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // ── Block 3: 分享本周/月/年阅读报告（替换原周条形图）──
-                val shareCtx = androidx.compose.ui.platform.LocalContext.current
-                val shareLabel = if (period == 0) "周" else if (period == 1) "月" else "年"
-                Surface(
-                    onClick = {
-                        val shareText = buildString {
-                            appendLine("📚 我的阅读${shareLabel}报 · Ciallo Reader")
-                            appendLine("────────────────────")
-                            if (periodTotal > 0) {
-                                appendLine("⏱ ${periodName}阅读 ${formatReadDuration(periodTotal)}（日均 ${if (avgDaily in 1..59) "不足1分钟" else formatShortDuration(avgDaily)}）")
-                            } else {
-                                appendLine("⏱ ${periodName}暂无阅读记录，从一页开始 ✨")
-                            }
-                            appendLine("🎯 每日目标 ${dailyGoalMinutes} 分钟 · 完成 ${(animatedGoal * 100).toInt()}%")
-                            if (streak > 0) appendLine("🔥 连续阅读 $streak 天")
-                            if (daysRead > 0) appendLine("📖 ${periodName}阅读 $daysRead 天 · 读完 $finishedCount 本")
-                            appendLine("━━━━━━━━━━━━━━━━")
-                            appendLine("Ciallo Reader · Roxy 陪伴 ✨")
-                        }
-                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(android.content.Intent.EXTRA_TEXT, shareText)
-                        }
-                        shareCtx.startActivity(android.content.Intent.createChooser(intent, "分享阅读报告"))
-                    },
-                    shape = RoundedCornerShape(14.dp),
-                    color = MintPrimary.copy(alpha = 0.10f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MintPrimary.copy(alpha = 0.35f)),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.Share,
-                            contentDescription = null,
-                            tint = MintPrimary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            "分享${periodName}阅读报告",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MintPrimary
-                        )
-                    }
-                }
-            Spacer(modifier = Modifier.height(12.dp))
-
-            SegmentedPillSelector(
-                options = listOf(0 to "周", 1 to "月", 2 to "年"),
-                selected = period,
-                onSelect = { period = it },
-                modifier = Modifier.fillMaxWidth()
-            )
 
             Spacer(modifier = Modifier.height(14.dp))
 

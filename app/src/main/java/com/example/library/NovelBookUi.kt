@@ -1,5 +1,24 @@
 package com.example.library
 
+import com.example.ui.wenku.wenkuReveal
+import com.example.ui.wenku.wenkuPagePart
+import com.example.ui.wenku.WenkuTextButton
+import com.example.ui.wenku.WenkuSymbol
+import com.example.ui.wenku.WenkuSkeletonBlock
+import com.example.ui.wenku.WenkuSectionHeader
+import com.example.ui.wenku.WenkuRevealAxis
+import com.example.ui.wenku.WenkuLoadedContentSequence
+import com.example.ui.wenku.WenkuIconButton
+import com.example.ui.components.GlassCard
+import com.example.ui.components.AppIconButton
+import androidx.compose.ui.platform.LocalDensity
+import com.example.ui.reader.ImageGalleryDialog
+import com.example.ui.reader.CoverImageGallery
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
+import com.example.ui.theme.clickableWithFeedback
+
 import com.example.ui.components.PullOutButton
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutOutlinedButton
@@ -23,6 +42,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,8 +73,12 @@ internal fun novelActionColors(): ButtonColors {
 }
 
 @Composable
-private fun NovelCover(book: SearchBook, loader: ImageLoader, modifier: Modifier) {
-    Box(modifier.clip(RoundedCornerShape(12.dp)).background(Brush.linearGradient(listOf(
+private fun NovelCover(book: SearchBook, loader: ImageLoader, modifier: Modifier, flightKey: String? = null) {
+    Box(modifier.clip(RoundedCornerShape(12.dp))
+        .then(if (flightKey != null) Modifier.onGloballyPositioned {
+            com.example.ui.wenku.WenkuFlightSources.put(flightKey, it.boundsInRoot())
+        } else Modifier)
+        .background(Brush.linearGradient(listOf(
         MaterialTheme.colorScheme.primary.copy(alpha = .22f), MaterialTheme.colorScheme.secondaryContainer)))) {
         @Composable fun Placeholder() {
             Column(Modifier.fillMaxSize().padding(10.dp), verticalArrangement = Arrangement.SpaceBetween) {
@@ -67,7 +92,13 @@ private fun NovelCover(book: SearchBook, loader: ImageLoader, modifier: Modifier
         if (book.cover.isNullOrBlank()) Placeholder() else SubcomposeAsyncImage(
             model = request, imageLoader = loader, contentDescription = book.title,
             modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
-        ) { if (painter.state is AsyncImagePainter.State.Success) SubcomposeAsyncImageContent() else Placeholder() }
+        ) {
+            if (painter.state is AsyncImagePainter.State.Success) {
+                // 详情面板的「阅读」要飞这一张：把已解码的 painter 登记成飞行贴图。
+                if (flightKey != null) com.example.ui.wenku.WenkuCoverSnapshot(flightKey, painter)
+                SubcomposeAsyncImageContent()
+            } else Placeholder()
+        }
     }
 }
 
@@ -96,7 +127,7 @@ fun NovelSearchCard(book: SearchBook, sourceName: String, imageLoader: ImageLoad
     state: DownloadState = DownloadState.Idle, downloaded: Boolean = false,
     onClick: () -> Unit, modifier: Modifier = Modifier) {
     val info = book.novelInfo
-    Surface(modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).pullOutClickable(onClick = onClick),
+    Surface(modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickableWithFeedback(onClick = onClick),
         shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .45f))) {
         Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -135,25 +166,69 @@ fun NovelSearchCard(book: SearchBook, sourceName: String, imageLoader: ImageLoad
 
 @Composable
 fun NovelDetailContent(book: SearchBook, sourceName: String, imageLoader: ImageLoader,
-    loading: Boolean = false, error: String? = null, modifier: Modifier = Modifier) {
+    loading: Boolean = false, error: String? = null, modifier: Modifier = Modifier,
+    flightKey: String? = null, onOpenCover: (() -> Unit)? = null) {
     val info = book.novelInfo
     Column(modifier.padding(horizontal = 22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            NovelCover(book, imageLoader, Modifier.width(106.dp).height(150.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(book.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                if (book.author.isNotBlank()) Text(book.author, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(sourceName, fontSize = 12.sp, color = novelAccentColor())
-                NovelLabels(listOfNotNull(info?.status, info?.category, book.format.uppercase(), book.language))
+        val fontScale = LocalDensity.current.fontScale
+        BoxWithConstraints {
+            val wide = maxWidth >= 650.dp
+            val coverWidth = if (wide) 150.dp else 118.dp
+            val coverAction = if (onOpenCover != null && !book.cover.isNullOrBlank()) {
+                Modifier.semantics { contentDescription = "查看封面" }
+                    .pullOutClickable(role = Role.Button, onClick = onOpenCover)
+            } else {
+                Modifier
+            }
+            val cover: @Composable () -> Unit = {
+                NovelCover(book, imageLoader, Modifier.size(coverWidth, coverWidth * 1.4f).then(coverAction), flightKey)
+            }
+            val identity: @Composable (Modifier) -> Unit = { identityModifier ->
+                Column(identityModifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        book.title,
+                        modifier = Modifier.wenkuReveal(0, axis = WenkuRevealAxis.Horizontal),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontSize = if (wide) 28.sp else 24.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                    )
+                    if (book.author.isNotBlank()) {
+                        Text(
+                            book.author,
+                            modifier = Modifier.wenkuReveal(1, axis = WenkuRevealAxis.Horizontal),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(sourceName, fontSize = 12.sp, color = novelAccentColor())
+                    NovelLabels(listOfNotNull(info?.status, info?.category, book.format.uppercase(), book.language))
+                }
+            }
+            if (!wide && fontScale >= 1.45f) {
+                Column(verticalArrangement = Arrangement.spacedBy(22.dp)) {
+                    cover()
+                    identity(Modifier.fillMaxWidth())
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(if (wide) 28.dp else 20.dp)) {
+                    cover()
+                    identity(Modifier.weight(1f))
+                }
             }
         }
-        if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (loading) {
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                WenkuSkeletonBlock(Modifier.fillMaxWidth(.55f).height(14.dp))
+                WenkuSkeletonBlock(Modifier.fillMaxWidth().height(14.dp))
+                WenkuSkeletonBlock(Modifier.fillMaxWidth(.78f).height(14.dp))
+            }
+        }
         if (error != null) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         val facts = listOfNotNull(
             info?.wordCount?.let { "字数" to it }, info?.chapterCount?.let { "源站目录" to "$it 章" },
             info?.volumeCount?.let { "收录卷数" to "$it 卷" }, book.size?.let { "下载大小" to "%.1f MB".format(it / 1024.0 / 1024) },
             info?.publisher?.let { "出版社" to it }, info?.translation?.let { "阅读版本" to it })
-        if (facts.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(16.dp)) {
+        if (facts.isNotEmpty()) GlassCard(Modifier.wenkuPagePart(2)) {
             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 facts.chunked(2).forEach { row -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     row.forEach { (label, value) -> Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -179,10 +254,17 @@ fun NovelDetailContent(book: SearchBook, sourceName: String, imageLoader: ImageL
         if (!synopsis.isNullOrBlank()) {
             var expanded by remember(book.id, book.sourceId) { mutableStateOf(false) }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("作品简介", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                WenkuSectionHeader("01", "SYNOPSIS", "作品简介", Modifier.wenkuPagePart(3))
                 Text(synopsis, style = MaterialTheme.typography.bodyMedium, lineHeight = 23.sp,
                     maxLines = if (expanded) Int.MAX_VALUE else 7, overflow = TextOverflow.Ellipsis)
-                if (synopsis.length > 180) PullOutTextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(0.dp)) { Text(if (expanded) "收起简介" else "展开完整简介") }
+                if (synopsis.length > 180) {
+                    WenkuTextButton(
+                        if (expanded) "收起简介" else "展开完整简介",
+                        onClick = { expanded = !expanded },
+                        compact = true,
+                        wenkuSymbol = if (expanded) WenkuSymbol.Up else WenkuSymbol.Down,
+                    )
+                }
             }
         }
         info?.notice?.takeIf(String::isNotBlank)?.let { notice ->
@@ -199,39 +281,114 @@ fun NovelDetailContent(book: SearchBook, sourceName: String, imageLoader: ImageL
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NovelDetailSheet(book: SearchBook, sourceName: String, imageLoader: ImageLoader, loading: Boolean,
-    error: String?, state: DownloadState, hasLocal: Boolean = false, onDismiss: () -> Unit, onDownload: () -> Unit,
-    onRead: () -> Unit, onPause: () -> Unit, onResume: () -> Unit, onCancel: () -> Unit) {
+    error: String?, state: DownloadState, hasLocal: Boolean = false, onDismiss: () -> Unit, onDownload: (close: (() -> Unit) -> Unit) -> Unit,
+    onRead: () -> Unit, onPause: () -> Unit, onResume: () -> Unit, onCancel: () -> Unit,
+    flightKey: String? = null) {
+    val context = LocalContext.current
+    var previewBook by remember { mutableStateOf<SearchBook?>(null) }
     PullOutBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
-        val read = com.example.ui.components.paperDismiss(onRead)
+        val close = com.example.ui.components.LocalOverlayClose.current
+        val download = { onDownload(close) }
+        val read: () -> Unit = {
+            val bounds = flightKey?.let(com.example.ui.wenku.WenkuFlightSources::get)
+            val image = flightKey?.let(com.example.ui.wenku.WenkuCoverSnapshots::get)
+            close {
+                if (flightKey != null && bounds != null) {
+                    com.example.ui.wenku.WenkuFlightBridge.begin(flightKey, bounds, image, radius = 12.dp)
+                }
+                onRead()
+            }
+        }
         Column(Modifier.fillMaxWidth().fillMaxHeight(.94f)) {
-            NovelDetailContent(book, sourceName, imageLoader, loading, error,
-                Modifier.weight(1f).verticalScroll(rememberScrollState()))
-            Surface(shadowElevation = 8.dp, color = MaterialTheme.colorScheme.surface) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 12.dp)) {
+                WenkuIconButton(
+                    Icons.Default.Close,
+                    "关闭小说详情",
+                    onClick = { close {} },
+                    modifier = Modifier.align(Alignment.CenterStart),
+                )
+                Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("小说详情", style = MaterialTheme.typography.titleSmall)
+                    Text("ARCHIVE / DETAIL", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            WenkuLoadedContentSequence(
+                contentKey = book.sourceId to book.id,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            ) {
+                NovelDetailContent(
+                    book, sourceName, imageLoader, loading, error,
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = 12.dp),
+                    flightKey,
+                    onOpenCover = { previewBook = book },
+                )
+            }
+            Surface(color = MaterialTheme.colorScheme.surface) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     when (state) {
-                        is DownloadState.Downloading -> {
-                            LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
+                        DownloadState.Pending, is DownloadState.Downloading -> {
+                            val transfer = state as? DownloadState.Downloading
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("整本下载 ${(state.progress * 100).toInt()}%", Modifier.weight(1f), fontSize = 13.sp)
-                                PullOutTextButton(onClick = onPause) { Text("暂停") }; PullOutTextButton(onClick = onCancel) { Text("取消") }
+                                Text(
+                                    if (transfer == null) "准备整本文件…" else downloadStatusLabel(transfer),
+                                    Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                if (transfer != null) {
+                                    val known = transfer.totalBytes > 0 || transfer.progress > 0f
+                                    AppIconButton(
+                                        Icons.Default.Pause,
+                                        "暂停",
+                                        onClick = onPause,
+                                        modifier = Modifier.downloadRing(transfer.progress.takeIf { known }),
+                                        glyphSize = 16.dp,
+                                        wenkuSymbol = WenkuSymbol.Pause,
+                                    )
+                                }
+                                WenkuIconButton(Icons.Default.Close, "取消", onClick = onCancel)
                             }
                         }
-                        is DownloadState.Pending -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("准备整本文件…", fontSize = 12.sp); PullOutTextButton(onClick = onCancel) { Text("取消") } }
-                        is DownloadState.Paused -> PullOutButton(onClick = onResume, colors = novelActionColors(), modifier = Modifier.fillMaxWidth()) { Text("继续整本下载") }
-                        is DownloadState.Success -> PullOutButton(onClick = if (hasLocal) read else onDownload, colors = novelActionColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = RoundedCornerShape(14.dp)) { Icon(Icons.Default.MenuBook, null); Spacer(Modifier.width(8.dp)); Text(if (hasLocal) "打开书架里的小说" else "整本下载到书架") }
+                        is DownloadState.Paused -> WenkuTextButton(
+                            "继续整本下载", onResume, Modifier.fillMaxWidth(),
+                            selected = true, wenkuSymbol = WenkuSymbol.Play,
+                        )
+                        is DownloadState.Success -> WenkuTextButton(
+                            if (hasLocal) "打开书架里的小说" else "整本下载到书架",
+                            if (hasLocal) read else download,
+                            Modifier.fillMaxWidth(), selected = true,
+                            wenkuSymbol = if (hasLocal) WenkuSymbol.Book else WenkuSymbol.Download,
+                        )
                         else -> {
-                            if (state is DownloadState.Error) Text(state.message, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
-                            PullOutButton(onClick = onDownload, enabled = !loading, colors = novelActionColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = RoundedCornerShape(14.dp)) {
-                                Icon(Icons.Default.Download, null); Spacer(Modifier.width(8.dp)); Text(if (state is DownloadState.Error) "重试整本下载" else "整本下载到书架")
+                            if (state is DownloadState.Error) {
+                                Text(state.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                             }
+                            WenkuTextButton(
+                                if (state is DownloadState.Error) "重试整本下载" else "整本下载到书架",
+                                download,
+                                Modifier.fillMaxWidth(), selected = true, enabled = !loading,
+                                wenkuSymbol = if (state is DownloadState.Error) WenkuSymbol.Refresh else WenkuSymbol.Download,
+                            )
                         }
                     }
-                    if (hasLocal && state !is DownloadState.Success) PullOutOutlinedButton(onClick = read, modifier = Modifier.fillMaxWidth()) { Text("阅读已下载版本") }
+                    if (hasLocal && state !is DownloadState.Success) {
+                        WenkuTextButton("阅读已下载版本", read, Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Book)
+                    }
                 }
             }
         }
     }
+    previewBook?.let { preview ->
+        val request = remember(context, preview) { novelCoverRequest(context, preview) }
+        ImageGalleryDialog(onDismiss = { previewBook = null }) { closeGallery ->
+            CoverImageGallery("小说封面", preview.title, request, imageLoader, closeGallery)
+        }
+    }
+
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

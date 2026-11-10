@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -190,18 +191,20 @@ private const val DENT_LIGHT_AGLS = """
  * 默认锚点 16dp，滑到 2dp 所有卡片趋近直角，48dp 明显圆润；
  * 显式传 shape 的调用方（如 24dp 顶栏）按同比例缩放，保证整页联动。
  */
-private fun rescaleCorners(shape: Shape?, cornerRadiusDp: Float): Shape {
+internal fun CornerBasedShape.scaledCardCorners(cornerRadiusDp: Float): CornerBasedShape {
     val factor = cornerRadiusDp / 16f
-    return when (shape) {
-        null -> RoundedCornerShape(cornerRadiusDp.dp)
-        is RoundedCornerShape -> if (factor == 1f) shape else shape.copy(
-            topStart = ScaledCornerSize(shape.topStart, factor),
-            topEnd = ScaledCornerSize(shape.topEnd, factor),
-            bottomEnd = ScaledCornerSize(shape.bottomEnd, factor),
-            bottomStart = ScaledCornerSize(shape.bottomStart, factor)
-        )
-        else -> shape
-    }
+    return if (factor == 1f) this else copy(
+        topStart = ScaledCornerSize(topStart, factor),
+        topEnd = ScaledCornerSize(topEnd, factor),
+        bottomEnd = ScaledCornerSize(bottomEnd, factor),
+        bottomStart = ScaledCornerSize(bottomStart, factor)
+    )
+}
+
+private fun rescaleCorners(shape: Shape?, cornerRadiusDp: Float): Shape = when (shape) {
+    null -> RoundedCornerShape(cornerRadiusDp.dp)
+    is RoundedCornerShape -> shape.scaledCardCorners(cornerRadiusDp)
+    else -> shape
 }
 
 private fun DrawScope.glassDecoKey(
@@ -267,15 +270,30 @@ fun GlassCard(
     val paperSource = if (onClick != null) rememberPaperTrigger() else null
     val anchoredModifier = if (paperSource != null) modifier.pullOutAnchor(paperSource) else modifier
     val paperAction: () -> Unit = if (paperSource != null) ({ PullOutSources.activate(paperSource); onClick?.invoke() }) else ({})
+    val tweaks = LocalCardTweaks.current
+    val primary = MaterialTheme.colorScheme.primary
+    val effectiveShape = remember(shape, tweaks.cornerRadiusDp) { rescaleCorners(shape, tweaks.cornerRadiusDp) }
     if (LocalRenderQuality.current.minimal) {
-        val flatShape = shape ?: RoundedCornerShape(16.dp)
-        Column(anchoredModifier.clip(flatShape).background(MaterialTheme.colorScheme.surface)
+        val flatTint = lerp(MaterialTheme.colorScheme.surface, primary, tweaks.tintMix)
+        Column(anchoredModifier.clip(effectiveShape).background(flatTint.copy(alpha = tweaks.cardAlpha))
             .then(if (onClick != null) Modifier.clickable(onClick = paperAction) else Modifier)
             .padding(contentPadding), content = content)
         return
     }
-    val tweaks = LocalCardTweaks.current
-    val primary = MaterialTheme.colorScheme.primary
+    if (com.example.ui.wenku.LocalWenkuMainSurface.current) {
+        val themedTint = lerp(tint, primary, tweaks.tintMix)
+        com.example.ui.wenku.WenkuGlassSurface(
+            modifier = anchoredModifier,
+            shape = effectiveShape,
+            tint = themedTint.copy(alpha = themedTint.alpha * tweaks.cardAlpha),
+            blur = tweaks.blurRadiusDp.dp,
+            cardTweaks = tweaks,
+            contentPadding = contentPadding,
+            onClick = if (onClick != null) paperAction else null,
+            content = content
+        )
+        return
+    }
     val secondary = MaterialTheme.colorScheme.secondary
     // 任务书二：白色半透明基底叠加低透明度主题色调（默认 8%，滑块 0~30% 可调）
     val themedTint = remember(tint, primary, tweaks.tintMix) {
@@ -292,8 +310,6 @@ fun GlassCard(
     val cardBlurRadiusPx = remember(glassDensity, tweaks.blurRadiusDp) {
         with(glassDensity) { tweaks.blurRadiusDp.dp.toPx() }
     }
-
-    val effectiveShape = remember(shape, tweaks.cornerRadiusDp) { rescaleCorners(shape, tweaks.cornerRadiusDp) }
 
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by if (onClick != null) interactionSource.collectIsPressedAsState() else remember { mutableStateOf(false) }

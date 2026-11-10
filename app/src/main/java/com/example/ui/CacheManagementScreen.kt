@@ -6,11 +6,6 @@
 package com.example.ui
 
 import com.example.ui.components.pullOutClickable
-import com.example.ui.components.PullOutButton
-import com.example.ui.components.PullOutTextButton
-import com.example.ui.components.PullOutAlertDialog
-import com.example.ui.components.PullOutBottomSheet
-import com.example.ui.components.paperSheetDragHandle
 import com.example.ui.components.PullOutVisibility
 import android.os.StatFs
 import android.os.Build
@@ -36,12 +31,10 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.*
@@ -76,6 +69,14 @@ import com.example.ui.design.DesignTokens
 
 
 import com.example.ui.components.AppToast
+import com.example.ui.components.GlassCard
+import com.example.ui.components.paperDismiss
+import com.example.ui.glasskit.GlassManagementPage
+import com.example.ui.wenku.WenkuActionSheet
+import com.example.ui.wenku.WenkuIcon
+import com.example.ui.wenku.WenkuSymbol
+import com.example.ui.wenku.WenkuTextButton
+import com.example.ui.wenku.wenkuPagePart
 
 /** 四类书籍封面目录（漫画/EPUB/FB2/MOBI 解析产物）。 */
 private val COVER_DIRS = listOf("comic_covers", "epub_covers", "fb2_covers", "mobi_covers")
@@ -260,7 +261,7 @@ fun CacheManagementScreen(
                 // B1：清理成功不再只弹 Toast，改为播放「打勾 + 释放量」动画
                 val msg = when {
                     freed < 0 -> "检测到下载正在进行，已取消删除"
-                    freed > 0 -> { successFreed = freed; com.example.ui.mascot.MascotAnimationController.play(com.example.ui.mascot.MascotEvent.CleanComplete); "" }
+                    freed > 0 -> { successFreed = freed; "" }
                     else -> "没有可释放的内容"
                 }
                 if (msg.isNotEmpty()) AppToast.makeText(context, msg, Toast.LENGTH_SHORT).show()
@@ -287,7 +288,6 @@ fun CacheManagementScreen(
                 // B1：同上，成功走动画
                 val msg = if (freed > 0) {
                     successFreed = freed
-                    com.example.ui.mascot.MascotAnimationController.play(com.example.ui.mascot.MascotEvent.CleanComplete)
                     ""
                 } else "没有可释放的内容"
                 if (msg.isNotEmpty()) AppToast.makeText(context, msg, Toast.LENGTH_SHORT).show()
@@ -467,71 +467,24 @@ fun CacheManagementScreen(
         )
     }
 
-    // 与「书库使用手册」一致的 ModalBottomSheet 结构与观感
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    PullOutBottomSheet(
-        onDismissRequest = onBack,
-        sheetState = sheetState,
-        dragHandle = null,
-        containerColor = MaterialTheme.colorScheme.surface,
-        modifier = Modifier
-            .fillMaxHeight(0.9f)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(24.dp)
-    ) {
-                Column(Modifier.fillMaxSize().navigationBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize()) {
-            // 顶部标题栏（同手册页：64dp + 图标 + 标题 + 关闭）
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp)
-                    .paperSheetDragHandle()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))
+    GlassManagementPage("缓存管理", "ARCHIVE / LOCAL STORAGE", onBack) { insets ->
+        Box(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
+            LazyColumn(
+                modifier = Modifier.widthIn(max = AdaptiveSpec.pageContentMaxWidth).fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                contentPadding = PaddingValues(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 24.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = DesignTokens.SpacePage),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Filled.CleaningServices,
-                            contentDescription = "缓存管理",
-                            tint = MintPrimary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("缓存管理", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
-                    }
-                    AppIconButton(onClick = com.example.ui.components.paperDismiss {}) {
-                        Icon(Icons.Default.Close, "关闭", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-                LazyColumn(
-                modifier = Modifier
-                .widthIn(max = AdaptiveSpec.pageContentMaxWidth).fillMaxSize().padding(horizontal = DesignTokens.SpacePage),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(vertical = 16.dp)
-                ) {
                 item(key = "overview") {
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+                    GlassCard(Modifier.fillMaxWidth().wenkuPagePart(1)) {
                         Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            if (isScanning) {
-                                // B1：原先只有一个转圈 + 一行字，扫描期间整块空白。
-                                // 改成骨架屏，形状与目标内容一一对应，扫描完直接"长"出来。
-                                ScanningSkeleton()
-                            } else {
+                            // 骨架 → 内容交接（loading_handoff.dart）：内容从顶部擦除揭示，
+                            // 骨架只留在未揭示的那一段下面，内容晚到一帧也不会露白。
+                            com.example.ui.wenku.WenkuLoadingHandoff(
+                                loaded = !isScanning,
+                                modifier = Modifier.fillMaxWidth(),
+                                skeleton = { ScanningSkeleton() }
+                            ) {
+                                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                                 // B1：数字从 0 滚动到实测值
                                 Text(
                                     formatSize(totalAnim.value.toLong().coerceAtLeast(0L)),
@@ -594,58 +547,52 @@ fun CacheManagementScreen(
                                     }
                                 }
                             }
+                                }
                         }
                     }
                 }
 
                 item(key = "clear_all") {
-                    PullOutButton(
-                        onClick = { clearAllCache() },
-                        enabled = !isScanning && !isClearing && cacheTotal > 0,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
+                    Column(Modifier.fillMaxWidth().wenkuPagePart(2)) {
+                        val clearLabel = when {
+                            isClearing -> "正在清理…"
+                            cacheTotal > 0 -> "清理可再生缓存 · 约 ${formatSize(cacheTotal)}"
+                            else -> "清理可再生缓存"
+                        }
+                        WenkuTextButton(
+                            clearLabel,
+                            onClick = { clearAllCache() },
+                            enabled = !isScanning && !isClearing && cacheTotal > 0,
+                            modifier = Modifier.fillMaxWidth(),
+                            selected = true,
+                            wenkuSymbol = WenkuSymbol.Delete,
+                        )
                         if (isClearing) {
-                            // B1：正在清理 → 文件飞进垃圾桶的粒子动画，
-                            // 取代原来一个 18dp 转圈（完全看不出在"清理垃圾"）
-                            FileSweepIndicator(tint = MaterialTheme.colorScheme.onPrimary)
-                            Spacer(Modifier.width(10.dp))
-                            Text("正在清理…", fontWeight = FontWeight.SemiBold)
-                        } else {
-                            Text(
-                                if (cacheTotal > 0) "清理可再生缓存 · 约 ${formatSize(cacheTotal)}" else "清理可再生缓存",
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
+                                FileSweepIndicator(tint = MaterialTheme.colorScheme.primary)
+                            }
                         }
                     }
                 }
 
                 // 三个分区：可再生缓存 → 按需管理与离线内容 → 核心数据；空区整段隐藏
                 val zoneMeta = listOf(0 to "可清理缓存", 1 to "离线内容与个人文件", 2 to "应用与设置")
+                var revealIndex = 3
                 zoneMeta.forEach { (zone, title) ->
                     val zoneRows = storageRows.filter { it.zone == zone && it.size > 0 }
                     if (zoneRows.isNotEmpty()) {
+                        val headerIndex = revealIndex
+                        revealIndex += 1 + zoneRows.size
                         item(key = "zone_header_$zone") {
-                            Text(title, modifier = Modifier.padding(top = 2.dp), fontSize = 14.sp,
+                            Text(title, modifier = Modifier.padding(top = 2.dp).wenkuPagePart(headerIndex), fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                         }
-                        items(zoneRows, key = { it.key }) { row ->
-                            Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    // B1：清理后本行内容会变（尺寸/文案），
-                                    // 加 animateContentSize 让变化平滑，不再瞬间跳
-                                    .animateContentSize(
-                                        androidx.compose.animation.core.spring(
-                                            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
-                                        )
-                                    )
-                                    .then(
-                                        if (targetsFor(row.key).isNotEmpty()) Modifier.pullOutClickable { detailRow = row }
-                                        else Modifier
-                                    )
+                        itemsIndexed(zoneRows, key = { _, row -> row.key }) { index, row ->
+                            val hasDetails = targetsFor(row.key).isNotEmpty()
+                            GlassCard(
+                                modifier = Modifier.fillMaxWidth().wenkuPagePart(headerIndex + 1 + index)
+                                    .animateContentSize(spring(stiffness = Spring.StiffnessMediumLow)),
+                                onClick = if (hasDetails) ({ detailRow = row }) else null,
                             ) {
                                 Row(
                                     Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
@@ -667,68 +614,52 @@ fun CacheManagementScreen(
                                     if (row.deletable) {
                                         Spacer(Modifier.width(12.dp))
                                         AppIconButton(
+                                            icon = Icons.Default.Delete,
+                                            contentDescription = "清理${row.name}",
                                             onClick = {
                                                 if (row.key in setOf("downloads", "imports", "comics", "covers")) detailRow = row
                                                 else if (row.confirmTip != null) confirmRow = row
                                                 else clearRow(row.key)
                                             },
-                                            enabled = !isScanning && !isClearing
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Delete, "清理${row.name}",
-                                                // 颜色语言：缓存=中性灰（随便删），用户数据=警示红（需确认）
-                                                tint = when {
-                                                    row.zone == 0 -> MaterialTheme.colorScheme.onSurfaceVariant
-                                                    else -> MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-                                                },
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
+                                            enabled = !isScanning && !isClearing,
+                                            tint = if (row.zone == 0) MaterialTheme.colorScheme.onSurfaceVariant
+                                                else MaterialTheme.colorScheme.error,
+                                            glyphSize = 20.dp,
+                                        )
+                                    } else if (hasDetails) {
+                                        Spacer(Modifier.width(8.dp))
+                                        WenkuIcon(WenkuSymbol.Forward, size = 16.dp,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant, entrance = false)
                                     }
                                 }
                             }
                         }
                     }
                 }
-                }
-                // ── B1 清理成功动画：打勾 + 释放量，弹簧弹出后自动消失 ──
-                // 单独包一层居中 Box：不依赖外层 Box 的 align 重载，
-                // 也不影响 LazyColumn 自身的 TopCenter 排布。
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    PullOutVisibility(
-                        visible = successFreed != null) {
-                        CleanSuccessBadge(freedText = formatSize(successFreed ?: 0L))
-                    }
+            }
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                PullOutVisibility(visible = successFreed != null) {
+                    CleanSuccessBadge(freedText = formatSize(successFreed ?: 0L))
                 }
             }
-        }
         }
     }
 
-    // 用户数据删除确认：一句话说清删什么、多少、多大、后果
     confirmRow?.let { row ->
-        PullOutAlertDialog(
-            onDismissRequest = { confirmRow = null },
-            title = { Text("删除「${row.name}」") },
-            text = {
-                val countPart = row.countLabel?.let { "$it，" } ?: ""
-                Text("将删除「${row.name}」${countPart}约 ${formatSize(row.size)}。\n\n${row.confirmTip}")
-            },
-            confirmButton = {
-                // 有下载进行中时不允许删除对应离线内容，避免与写入中的文件竞态（执行前还有二次复核兜底）
-                val deleteEnabled = !((row.key == "downloads" && hasActiveDownload) ||
-                    (row.key == "comics" && hasActiveComicDownload))
-                PullOutTextButton(
-                    onClick = { confirmRow = null; clearRow(row.key) },
-                    enabled = deleteEnabled
-                ) {
-                    Text("删除", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
-                }
-            },
-            dismissButton = {
-                PullOutTextButton(onClick = { confirmRow = null }) { Text("取消") }
-            }
-        )
+        WenkuActionSheet("删除「${row.name}」", onDismiss = { confirmRow = null }) {
+            val countPart = row.countLabel?.let { "$it，" } ?: ""
+            Text("将删除「${row.name}」${countPart}约 ${formatSize(row.size)}。")
+            Text(row.confirmTip.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val deleteEnabled = !((row.key == "downloads" && hasActiveDownload) ||
+                (row.key == "comics" && hasActiveComicDownload))
+            WenkuTextButton(
+                "删除", onClick = paperDismiss { clearRow(row.key) },
+                enabled = deleteEnabled, modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.error, wenkuSymbol = WenkuSymbol.Delete,
+            )
+            WenkuTextButton("取消", onClick = paperDismiss {},
+                modifier = Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Close)
+        }
     }
 }
 

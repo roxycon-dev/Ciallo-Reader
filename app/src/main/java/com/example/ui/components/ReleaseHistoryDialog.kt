@@ -8,17 +8,28 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.BuildConfig
+import com.example.ui.wenku.WenkuIconButton
+import com.example.ui.wenku.WenkuSectionHeader
+import com.example.ui.wenku.WenkuSheetDialog
+import com.example.ui.wenku.WenkuTextButton
 
 internal data class ReleaseSummary(val version: String, val date: String, val summary: String)
 internal val releaseHistory = listOf(
+    ReleaseSummary("1.6.0", "11-10", "Wenku8 UI · 平板布局 · 漫画预加载数量 · Roxy 动画"),
+    ReleaseSummary("1.5.16", "11-07", "EPUB 连续插图修复 · 保留插图原始尺寸"),
+    ReleaseSummary("1.5.15", "11-06", "Alice's Library · 自动备份"),
     ReleaseSummary("1.5.2", "10-26", "动效计算与缓冲复用 · 折叠分页保持 · 成人源固定启用"),
     ReleaseSummary("1.5.1", "10-23", "平板性能优化 · 滚动与章节复用 · 缓存预算"),
     ReleaseSummary("1.5.0", "10-21", "移除内置阅读指南 · 书架多选不再触发抽纸"),
@@ -74,11 +85,26 @@ internal val releaseHistory = listOf(
 /** Uses the common animated entrance/exit and follows reduced motion/minimal rendering. */
 @Composable
 internal fun ReleaseHistoryDialog(onDismiss: () -> Unit) {
-    AcrylicDialog(onDismissRequest = onDismiss,
-        modifier = Modifier.testTag("release-history"),
-        title = { Text("更新目录", style = MaterialTheme.typography.titleLarge) },
-        text = {
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 400.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    WenkuSheetDialog(onDismissRequest = onDismiss) {
+        val close = LocalOverlayClose.current
+        Column(
+            Modifier.fillMaxWidth().heightIn(max = 520.dp).padding(horizontal = 20.dp).testTag("release-history"),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("更新目录", style = MaterialTheme.typography.titleMedium)
+                    Text("SYSTEM / RELEASES", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                WenkuIconButton(Icons.Default.Close, "关闭更新目录", onClick = { close {} })
+            }
+            Text("已安装版本 ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.labelMedium)
+            WenkuSectionHeader("01", "RELEASE NOTES", "版本记录")
+            LazyColumn(
+                Modifier.weight(1f, fill = false).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 items(releaseHistory, key = { it.version }) { release ->
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -90,8 +116,7 @@ internal fun ReleaseHistoryDialog(onDismiss: () -> Unit) {
                     }
                 }
             }
-        }, confirmButton = {
-            val close = LocalOverlayClose.current
-            PullOutTextButton(onClick = { close {} }) { Text("关闭") }
-        })
+            WenkuTextButton("关闭", { close {} }, Modifier.fillMaxWidth().padding(bottom = 6.dp))
+        }
+    }
 }

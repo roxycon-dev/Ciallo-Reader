@@ -1,6 +1,5 @@
 package com.example.ui.comic
 
-import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.runtime.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -34,7 +33,7 @@ class ComicChromePerformanceTest {
                 CompositionLocalProvider(LocalRenderQuality provides quality, LocalReduceMotion provides true) {
                     MyApplicationTheme {
                         ComicReaderChrome(
-                            visible = true, panel = ComicPanel.NONE, panelVisibility = remember { MutableTransitionState(false) },
+                            visible = true, panel = ComicPanel.NONE,
                             onPanelChange = {}, title = "性能回归漫画", chapterTitle = "第一话", currentPage = 1,
                             totalPages = 5000, spreadCount = 5000, currentSpread = 0, config = config, store = store,
                             perBookConfig = false, onPerBookConfigChange = {}, onConfigChange = {},

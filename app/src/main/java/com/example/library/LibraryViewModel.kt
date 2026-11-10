@@ -54,6 +54,15 @@ internal val READER_UNSUPPORTED_FORMATS = setOf("kfx", "djvu", "doc", "rtf", "ch
 internal fun filterReadableFormats(formats: List<BookFormat>): List<BookFormat> =
     formats.filter { it.format.trim().lowercase() !in READER_UNSUPPORTED_FORMATS }
 
+internal data class OnlineNovelPage(val chapter: ComicChapter, val text: String, val direction: Int)
+
+internal data class OnlineNovelChapterState(
+    val page: OnlineNovelPage? = null,
+    val requested: ComicChapter? = null,
+    val loading: Boolean = false,
+    val error: String? = null
+)
+
 class LibraryViewModel private constructor(
     application: Application,
     private val sharedLibrary: LibraryViewModel?,
@@ -165,18 +174,8 @@ class LibraryViewModel private constructor(
     private val _comicIsTextMode = MutableStateFlow(false)
     val comicIsTextMode: StateFlow<Boolean> = _comicIsTextMode.asStateFlow()
 
-    private val _novelChapterText = MutableStateFlow("")
-    val novelChapterText: StateFlow<String> = _novelChapterText.asStateFlow()
-
-    private val _novelChapterLoading = MutableStateFlow(false)
-    val novelChapterLoading: StateFlow<Boolean> = _novelChapterLoading.asStateFlow()
-
-    private val _novelChapterError = MutableStateFlow<String?>(null)
-    val novelChapterError: StateFlow<String?> = _novelChapterError.asStateFlow()
-
-    private val _activeNovelChapter = MutableStateFlow<ComicChapter?>(null)
-    val activeNovelChapter: StateFlow<ComicChapter?> = _activeNovelChapter.asStateFlow()
-
+    private val _onlineNovelChapter = MutableStateFlow(OnlineNovelChapterState())
+    internal val onlineNovelChapter = _onlineNovelChapter.asStateFlow()
     private val _comicChapters = MutableStateFlow<List<ComicChapter>>(emptyList())
     val comicChapters: StateFlow<List<ComicChapter>> = _comicChapters.asStateFlow()
 
@@ -308,7 +307,7 @@ class LibraryViewModel private constructor(
         novelRequestSeq++
         novelLoadJob?.cancel()
         novelPrefetchJob?.cancel()
-        _novelChapterLoading.value = false
+        _onlineNovelChapter.value = OnlineNovelChapterState()
         imagesRequestSeq++
         comicPrefetchJobs.values.forEach { it.cancel() }
         comicPrefetchJobs.clear()
@@ -321,58 +320,65 @@ class LibraryViewModel private constructor(
         _comicChapterImages.value = emptyList()
         _comicChapterHeaders.value = emptyMap()
         _comicChapterError.value = null
-        _novelChapterText.value = ""
-        _novelChapterError.value = null
-        _activeNovelChapter.value = null
         loadChapters(book)
     }
 
     /** 文本小说源：加载章节正文 */
     fun loadChapterText(chapter: ComicChapter) {
+        val previous = _onlineNovelChapter.value
+        if (previous.loading && previous.requested?.id == chapter.id) return
         val request = ++novelRequestSeq
         novelLoadJob?.cancel()
         novelPrefetchJob?.cancel()
         val book = _comicBook.value
         val source = sourceManager.availableSources.value
             .firstOrNull { it.id == book?.sourceId } as? ComicSource
-        if (source == null) {
-            _novelChapterError.value = "当前书源不可用"
-            _novelChapterLoading.value = false
-            return
-        }
-        _activeNovelChapter.value = chapter
-        _novelChapterLoading.value = true
-        _novelChapterError.value = null
-        _novelChapterText.value = ""
+        val pending = OnlineNovelChapterState(
+            page = previous.page,
+            requested = chapter,
+            loading = source != null,
+            error = if (source == null) "当前书源不可用" else null
+        )
+        _onlineNovelChapter.value = pending
+        if (source == null) return
+
+        val chapters = _comicChapters.value
+        val index = chapters.indexOfFirst { it.id == chapter.id }
+        val previousIndex = chapters.indexOfFirst { it.id == previous.page?.chapter?.id }
+        val direction = if (index >= 0 && previousIndex > index) -1 else 1
         novelLoadJob = viewModelScope.launch {
             try {
                 val result = source.getChapterText(chapter.id)
                 if (request != novelRequestSeq || _comicBook.value != book) return@launch
                 when (result) {
                     is SourceResult.Success -> {
-                        _novelChapterText.value = result.data
+                        _onlineNovelChapter.value = pending.copy(
+                            page = OnlineNovelPage(chapter, result.data, direction),
+                            loading = false
+                        )
                         // The source owns a bounded text cache. Cancel this one next-chapter
                         // request on navigation so prefetch never blocks the selected chapter.
-                        if (source is com.example.source.impl.AutoNovelSource) {
-                            val index = _comicChapters.value.indexOfFirst { it.id == chapter.id }
-                            val next = if (index >= 0) _comicChapters.value.getOrNull(index + 1) else null
-                            if (next != null) novelPrefetchJob = viewModelScope.launch(Dispatchers.IO) {
-                                source.getChapterText(next.id)
-                            }
+                        val next = if (index >= 0) chapters.getOrNull(index + 1) else null
+                        if (source is com.example.source.impl.AutoNovelSource && next != null) {
+                            novelPrefetchJob = viewModelScope.launch(Dispatchers.IO) { source.getChapterText(next.id) }
                         }
                     }
-                    is SourceResult.Error -> _novelChapterError.value = result.exception.message ?: "章节加载失败"
+                    is SourceResult.Error -> {
+                        _onlineNovelChapter.value = pending.copy(
+                            loading = false,
+                            error = result.exception.message ?: "章节加载失败"
+                        )
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                if (request == novelRequestSeq) _novelChapterError.value = e.message ?: "章节加载失败"
-            } finally {
-                if (request == novelRequestSeq) _novelChapterLoading.value = false
+                if (request == novelRequestSeq) {
+                    _onlineNovelChapter.value = pending.copy(loading = false, error = e.message ?: "章节加载失败")
+                }
             }
         }
     }
-
     private val _aggregateMode = MutableStateFlow(true)
     val aggregateMode: StateFlow<Boolean> = _aggregateMode.asStateFlow()
 

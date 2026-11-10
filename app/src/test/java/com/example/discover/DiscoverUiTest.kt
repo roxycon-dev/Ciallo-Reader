@@ -301,7 +301,7 @@ class DiscoverUiTest {
                 CompositionLocalProvider(LocalDensity provides Density(density.density, 1.3f),
                     LocalReduceMotion provides true, LocalRenderQuality provides RenderQuality.MID) {
                     Surface(Modifier.fillMaxSize()) {
-                        DiscoverSourceStatusSheet(sources, emptyList(),
+                        DiscoverSourceStatusSheet(true, sources, emptyList(),
                             DiscoverState(errors = mapOf("22" to "源站限制了当前地区的访问（HTTP 451）")),
                             "全部", {}, {})
                     }

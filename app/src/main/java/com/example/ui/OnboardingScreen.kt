@@ -1,257 +1,209 @@
 package com.example.ui
 
-import com.example.ui.components.PullOutTextButton
-import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material3.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.R
 import com.example.ui.mascot.MascotSpriteSheet
-import com.example.ui.components.AppActionButton
-import com.example.ui.components.AppButtonSize
-import com.example.ui.components.AppButtonVariant
-import com.example.ui.theme.MintPrimary
-import me.trishiraj.shadowglow.consistentShadow
+import com.example.ui.wenku.WenkuContentPanel
+import com.example.ui.wenku.WenkuIconButton
+import com.example.ui.wenku.WenkuMotion
+import com.example.ui.wenku.WenkuPlaneTabSwitcher
+import com.example.ui.wenku.WenkuSectionHeader
+import com.example.ui.wenku.WenkuSymbol
+import com.example.ui.wenku.WenkuTextButton
+import com.example.ui.wenku.rememberWenkuAccessibility
+import com.example.ui.wenku.wenkuColors
+import com.example.ui.wenku.wenkuPagePart
 
-data class OnboardingPage(
+private data class OnboardingPage(
     val title: String,
     val description: String,
     val imageRes: Int,
-    val badgeText: String
+    val label: String,
+    val code: String,
 )
 
-@OptIn(ExperimentalAnimationApi::class)
-@Composable
-fun OnboardingScreen(
-    onFinished: () -> Unit
-) {
-    val diagnosticContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
-    var currentPage by remember { mutableIntStateOf(0) }
+private val onboardingPages = listOf(
+    OnboardingPage(
+        "欢迎来到 Ciallo Reader",
+        "把喜欢的小说和漫画收进书架，按自己的节奏阅读。",
+        MascotSpriteSheet.idleDrawable,
+        "阅读空间",
+        "WELCOME",
+    ),
+    OnboardingPage(
+        "书库与自定义书源",
+        "通过书库搜索在线作品，也可以导入自定义书源，或将本地文件加入书架。",
+        MascotSpriteSheet.moveDrawable,
+        "找书与导入",
+        "LIBRARY",
+    ),
+    OnboardingPage(
+        "按你的方式阅读",
+        "选择仿真翻页或连续滚动，调整配色、夜间模式和护眼设置。",
+        MascotSpriteSheet.readingDrawable,
+        "阅读外观",
+        "READING",
+    ),
+    OnboardingPage(
+        "和 Roxy 一起阅读",
+        "添加书签或整理书架时，Roxy 会用不同的动作回应你。",
+        MascotSpriteSheet.happyDrawable,
+        "书架伙伴",
+        "ROXY",
+    ),
+)
 
-    val pages = remember {
-        listOf(
-            OnboardingPage(
-    title = "欢迎来到 Ciallo Reader",
-                description = "这是一款专为阅读爱好者打造的沉浸式小说与网络文学阅读器。高颜值、极速、无广告，带给您最纯粹的阅读享受。",
-                imageRes = MascotSpriteSheet.idleDrawable,
-                badgeText = "全新体验"
-            ),
-            OnboardingPage(
-                title = "海量书库，源于自由",
-                description = "支持自定义书源导入、网络书源搜索、JSON标准格式配置，更无缝集成 Z-Library 等云端书库，让好书无处遁形。",
-                imageRes = MascotSpriteSheet.moveDrawable,
-                badgeText = "强大书源"
-            ),
-            OnboardingPage(
-                title = "极致交互，沉浸阅读",
-                description = "搭载 3D 仿真翻页 (PageCurl)、平滑覆盖滚动等多种翻页效果，支持防蓝光护眼模式与自动夜间主题，守护您的双眼。",
-                imageRes = MascotSpriteSheet.readingDrawable,
-                badgeText = "个性定制"
-            ),
-            OnboardingPage(
-                title = "Roxy 灵动吉祥物",
-                description = "Roxy 将在您的阅读旅程中时刻陪伴！当您添加书签、归档或删除书籍时，Roxy 都会用俏皮的肢体动画给您最生动的反馈。",
-                imageRes = MascotSpriteSheet.happyDrawable,
-                badgeText = "趣味交互"
-            )
-        )
+@Composable
+fun OnboardingScreen(onFinished: () -> Unit) {
+    var page by rememberSaveable { mutableIntStateOf(0) }
+    var finishing by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val colors = wenkuColors()
+    val reduceMotion = rememberWenkuAccessibility().reduceMotion
+
+    fun finish() {
+        if (finishing) return
+        finishing = true
+        com.example.data.StartupDiagnostics.breadcrumb(context, "onboarding:finish")
+        onFinished()
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize().testTag("onboarding_screen"),
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            MaterialTheme.colorScheme.background
-                        )
-                    )
-                )
+    BackHandler(enabled = page > 0 && !finishing) { page-- }
+    Box(
+        Modifier.fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .safeDrawingPadding()
+            .testTag("onboarding_screen"),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Column(
+            Modifier.widthIn(max = 680.dp).fillMaxSize().padding(horizontal = 22.dp),
         ) {
-            // "Skip" button on top-right
-            PullOutTextButton(
-                onClick = {
-                    com.example.data.StartupDiagnostics.breadcrumb(diagnosticContext, "onboarding:skip")
-                    onFinished()
-                },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp)
-                    .testTag("onboarding_skip_button")
-            ) {
-                Text(
-                    text = "跳过",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
+            Box(Modifier.fillMaxWidth().heightIn(min = 54.dp)) {
+                if (page > 0) {
+                    WenkuIconButton(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        "上一步",
+                        onClick = { if (!finishing && page > 0) page-- },
+                        modifier = Modifier.align(Alignment.CenterStart),
+                        enabled = !finishing,
+                        wenkuSymbol = WenkuSymbol.Back,
+                    )
+                }
+                WenkuTextButton(
+                    "跳过",
+                    ::finish,
+                    Modifier.align(Alignment.CenterEnd).testTag("onboarding_skip_button"),
+                    compact = true,
+                    enabled = !finishing,
+                    wenkuSymbol = WenkuSymbol.Forward,
                 )
             }
 
-            // Main Content Area with slide transitions
-            AnimatedContent(
-                targetState = currentPage,
-                transitionSpec = {
-                    if (targetState > initialState) {
-                        slideInHorizontally(animationSpec = tween(300)) { width -> width } + fadeIn() with
-                                slideOutHorizontally(animationSpec = tween(300)) { width -> -width } + fadeOut()
-                    } else {
-                        slideInHorizontally(animationSpec = tween(300)) { width -> -width } + fadeIn() with
-                                slideOutHorizontally(animationSpec = tween(300)) { width -> width } + fadeOut()
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.Center)
-                    .padding(horizontal = 24.dp)
-                    .testTag("onboarding_content_container")
-            ) { pageIndex ->
-                val page = pages[pageIndex]
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    // Badge
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(MintPrimary.copy(alpha = 0.15f))
-                            .padding(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = page.badgeText,
-                            color = MintPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Mascot illustration Card
-                    Card(
-                        modifier = Modifier
-                            .size(200.dp)
-                            .testTag("onboarding_illustration_card_${pageIndex}")
-                            .consistentShadow(4.dp, RoundedCornerShape(24.dp)),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                painter = painterResource(id = page.imageRes),
-                                contentDescription = "Onboarding illustration",
-                                modifier = Modifier
-                                    .size(140.dp)
-                                    .padding(8.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    // Title
-                    Text(
-                        text = page.title,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Description
-                    Text(
-                        text = page.description,
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 22.sp,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                }
+            WenkuPlaneTabSwitcher(
+                targetState = page,
+                modifier = Modifier.weight(1f).fillMaxWidth()
+                    .testTag("onboarding_content_container").wenkuPagePart(1),
+                direction = { from, to -> to - from },
+            ) { index ->
+                OnboardingStory(onboardingPages[index], index)
             }
 
-            // Bottom controls: Indicators and Action Button
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // Page Indicator Dots
                 Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 24.dp)
+                    modifier = Modifier.semantics { contentDescription = "第 ${page + 1} 步，共 ${onboardingPages.size} 步" },
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    pages.forEachIndexed { index, _ ->
-                        val isSelected = index == currentPage
-                        Box(
-                            modifier = Modifier
-                                .padding(horizontal = 4.dp)
-                                .size(width = if (isSelected) 18.dp else 8.dp, height = 8.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isSelected) MintPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                                )
+                    onboardingPages.indices.forEach { index ->
+                        val width by animateFloatAsState(
+                            if (index == page) 22f else 7f,
+                            if (reduceMotion) snap() else WenkuMotion.settleSpec(),
+                            label = "onboardingStep",
                         )
+                        Box(Modifier.size(width.dp, 5.dp).background(
+                            if (index == page) MaterialTheme.colorScheme.primary else colors.outline,
+                            CircleShape,
+                        ))
                     }
                 }
-
-                // Action Button
-                AppActionButton(
-                    text = if (currentPage == pages.lastIndex) "立即开启阅读之旅" else "下一步",
-                    onClick = {
-                        com.example.data.StartupDiagnostics.breadcrumb(diagnosticContext,
-                            if (currentPage == pages.lastIndex) "onboarding:finish" else "onboarding:next:$currentPage")
-                        if (currentPage < pages.lastIndex) {
-                            currentPage++
-                        } else {
-                            onFinished()
-                        }
-                    },
-                    variant = AppButtonVariant.Primary,
-                    buttonSize = AppButtonSize.Large,
-                    fullWidth = true,
-                    icon = if (currentPage < pages.lastIndex) {
-                        Icons.AutoMirrored.Filled.ArrowForward
-                    } else {
-                        null
-                    },
-                    modifier = Modifier.testTag("onboarding_action_button")
+                val last = page == onboardingPages.lastIndex
+                WenkuTextButton(
+                    if (last) "立即开启阅读之旅" else "下一步",
+                    onClick = { if (!finishing) { if (last) finish() else page++ } },
+                    modifier = Modifier.fillMaxWidth().testTag("onboarding_action_button"),
+                    selected = true,
+                    enabled = !finishing,
+                    wenkuSymbol = if (last) WenkuSymbol.Book else WenkuSymbol.Forward,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingStory(page: OnboardingPage, index: Int) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val viewportHeight = maxHeight
+        val imageSize = (viewportHeight * .40f).coerceIn(96.dp, 190.dp)
+        Column(
+            Modifier.fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = viewportHeight)
+                .padding(horizontal = 2.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
+        ) {
+            WenkuSectionHeader(
+                "0${index + 1}", page.code, page.label,
+            )
+            WenkuContentPanel(
+                Modifier.fillMaxWidth().wenkuPagePart(1).testTag("onboarding_illustration_card_$index"),
+            ) {
+                Image(
+                    painterResource(page.imageRes),
+                    contentDescription = null,
+                    modifier = Modifier.align(Alignment.CenterHorizontally).size(imageSize),
+                )
+            }
+            Text(
+                page.title,
+                modifier = Modifier.fillMaxWidth().wenkuPagePart(2),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                page.description,
+                modifier = Modifier.fillMaxWidth().wenkuPagePart(3),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }

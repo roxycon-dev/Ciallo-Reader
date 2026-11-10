@@ -1,11 +1,14 @@
 package com.example.ui.shelf
 
 
-import com.example.ui.components.PullOutBottomSheet
 import com.example.ui.components.pullOutClickable
 import androidx.activity.compose.BackHandler
 import kotlin.math.roundToInt
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
@@ -19,11 +22,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,19 +39,19 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.SelectAll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
@@ -77,13 +79,18 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.AppIconButton
+import com.example.ui.components.paperDismiss
 import com.example.ui.components.LocalGlassBackdrop
 import com.example.ui.components.LocalRenderQuality
 import com.example.ui.components.RenderQuality
@@ -97,6 +104,14 @@ import com.example.ui.feedback.rememberAppHaptics
 import com.example.ui.theme.LocalAppBottomInset
 import com.example.ui.theme.LocalAppBottomInsetNoTabBar
 import com.example.ui.theme.MintPrimary
+import com.example.ui.wenku.LocalWenkuIconContact
+import com.example.ui.wenku.WenkuActionSheet
+import com.example.ui.wenku.WenkuIcon
+import com.example.ui.wenku.WenkuIconContact
+import com.example.ui.wenku.WenkuMotion
+import com.example.ui.wenku.WenkuSymbol
+import com.example.ui.wenku.WenkuTextButton
+import com.example.ui.wenku.wenkuSymbolOrNull
 import com.kashif_e.backdrop.Backdrop
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -128,6 +143,7 @@ private const val EDGE_TICK_MS = 80L
 
 /** 手指进入边缘感应带后要停留多久才开始真正滚动（只是路过不算）。 */
 private const val EDGE_ARM_NS = 200_000_000L
+private const val SHELF_ACTION_EXIT_MS = 180
 
 /**
  * 「我喜欢的」条目在多选 / 拖拽体系里的 key 前缀。
@@ -191,9 +207,11 @@ fun ShelfSelectBadge(
     modifier: Modifier = Modifier,
     indexLabel: String? = null,
 ) {
+    val colors = MaterialTheme.colorScheme
+    val reduce = LocalReduceMotion.current
     val scale by animateFloatAsState(
         targetValue = if (selected) 1f else 0.7f,
-        animationSpec = AppMotion.springDefault,
+        animationSpec = if (reduce) tween(0) else AppMotion.springDefault,
         label = "select_badge",
     )
     Box(
@@ -201,7 +219,7 @@ fun ShelfSelectBadge(
             .size(22.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(CircleShape)
-            .background(if (selected) MintPrimary else Color.White.copy(alpha = 0.85f))
+            .background(if (selected) colors.primary else colors.surface.copy(alpha = 0.90f))
             // 选中态用**白色**描边：书封多是深色（MURAKAMI、Neuromancer…），
             // 绿色填充 + 绿色边框会在深色封面上糊成一团；白边在任何封面上都能把
             // 徽章从背景里分离出来（iOS 多选标记的做法）。
@@ -217,12 +235,7 @@ fun ShelfSelectBadge(
         contentAlignment = Alignment.Center,
     ) {
         if (selected) {
-            Icon(
-                Icons.Filled.Check,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(14.dp),
-            )
+            WenkuIcon(WenkuSymbol.Check, size = 14.dp, tint = colors.onPrimary)
         }
     }
 }
@@ -359,10 +372,11 @@ fun MultiSelectTopBar(
     onClose: () -> Unit,
     onToggleAll: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
-    val animatedCount by animateIntAsState(targetValue = count, animationSpec = tween(220), label = "count_roll")
+    val animatedCount by animateIntAsState(targetValue = count, animationSpec = tween(if (LocalReduceMotion.current) 0 else 220), label = "count_roll")
     val shape = RoundedCornerShape(50)
-    val primary = MintPrimary
+    val primary = MaterialTheme.colorScheme.primary
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -381,17 +395,8 @@ fun MultiSelectTopBar(
                 .padding(horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-                    .semantics { contentDescription = "退出多选" }
-                    .pullOutClickable { onClose() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Filled.Close, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
-            }
+            AppIconButton(Icons.Filled.Close, "退出多选", onClick = onClose,
+                enabled = enabled, wenkuSymbol = WenkuSymbol.Close)
             Spacer(modifier = Modifier.width(10.dp))
             // 「已选择」退成次级信息，把视觉重心让给数字徽标
             Text(
@@ -412,7 +417,7 @@ fun MultiSelectTopBar(
                     text = "$animatedCount",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onPrimary,
                 )
             }
             Spacer(modifier = Modifier.width(6.dp))
@@ -423,37 +428,11 @@ fun MultiSelectTopBar(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f),
             )
             Spacer(modifier = Modifier.weight(1f))
-            // 两态给**填充**差异，不只是换个图标：未全选=玻璃空心，已全选=主色实心
-            val pillFill = if (allSelected) primary else Color.White.copy(alpha = 0.10f)
-            val pillInk = if (allSelected) Color.White else primary
-            Box(
-                modifier = Modifier
-                    .clip(shape)
-                    .background(pillFill)
-                    .border(
-                        width = 1.dp,
-                        color = if (allSelected) primary else primary.copy(alpha = 0.38f),
-                        shape = shape,
-                    )
-                    .pullOutClickable { onToggleAll() }
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        if (allSelected) Icons.Filled.Close else Icons.Filled.SelectAll,
-                        contentDescription = null,
-                        tint = pillInk,
-                        modifier = Modifier.size(15.dp),
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = if (allSelected) "取消全选" else "全选",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = pillInk,
-                    )
-                }
-            }
+            WenkuTextButton(
+                if (allSelected) "取消全选" else "全选",
+                onClick = onToggleAll, selected = allSelected, compact = true, enabled = enabled,
+                wenkuSymbol = if (allSelected) WenkuSymbol.Selected else WenkuSymbol.Circle,
+            )
         }
     }
 }
@@ -478,15 +457,18 @@ fun MultiSelectActionBar(
     hint: String? = null,
 ) {
     val shape = RoundedCornerShape(26.dp)
-    val primary = MintPrimary
+    val primary = MaterialTheme.colorScheme.primary
+    val reduce = LocalReduceMotion.current
+    var outgoingActions by remember { mutableStateOf(actions) }
+    SideEffect { if (visible) outgoingActions = actions }
     AnimatedVisibility(
         visible = visible,
         modifier = modifier,
-        enter = slideInVertically(
+        enter = if (reduce) EnterTransition.None else slideInVertically(
             animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
             initialOffsetY = { it },
         ) + fadeIn(animationSpec = tween(140)),
-        exit = slideOutVertically(animationSpec = tween(180), targetOffsetY = { it }) + fadeOut(animationSpec = tween(120)),
+        exit = if (reduce) ExitTransition.None else slideOutVertically(animationSpec = tween(SHELF_ACTION_EXIT_MS), targetOffsetY = { it }) + fadeOut(animationSpec = tween(120)),
     ) {
         Column(
             modifier = Modifier
@@ -516,31 +498,43 @@ fun MultiSelectActionBar(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                actions.forEach { action ->
-                    val alpha = if (action.enabled) 1f else 0.35f
+                (if (visible) actions else outgoingActions).forEach { action ->
+                    val enabled = action.enabled && visible
+                    val ink = if (action.destructive) MaterialTheme.colorScheme.error else primary
+                    val interaction = remember { MutableInteractionSource() }
+                    val pressed by interaction.collectIsPressedAsState()
+                    var activation by remember { mutableIntStateOf(0) }
+                    val scale by animateFloatAsState(
+                        if (pressed && !reduce && enabled) .95f else 1f,
+                        animationSpec = if (pressed) WenkuMotion.contactSpec() else WenkuMotion.settleSpec(),
+                        label = "shelfActionPress"
+                    )
                     Column(
                         modifier = Modifier
                             .weight(1f)
+                            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (action.enabled) 1f else .35f }
                             .clip(RoundedCornerShape(16.dp))
-                            .pullOutClickable(enabled = action.enabled) { action.onClick() }
-                            .graphicsLayer { this.alpha = alpha }
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                            .semantics { contentDescription = action.label }
+                            .pullOutClickable(interaction, null, enabled = enabled, role = Role.Button) {
+                                activation++
+                                action.onClick()
+                            }
+                            .sizeIn(minHeight = 48.dp)
+                            .padding(horizontal = 4.dp, vertical = 4.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
                     ) {
-                        Icon(
-                            action.icon,
-                            contentDescription = action.label,
-                            tint = if (action.destructive) MaterialTheme.colorScheme.error else MintPrimary,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = action.label,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = if (action.destructive) MaterialTheme.colorScheme.error
-                            else MaterialTheme.colorScheme.onSurface,
-                        )
+                        val symbol = action.icon.wenkuSymbolOrNull()
+                        if (symbol != null) {
+                            CompositionLocalProvider(LocalWenkuIconContact provides WenkuIconContact(pressed && enabled, activation)) {
+                                WenkuIcon(symbol, size = 20.dp, tint = ink, entrance = false)
+                            }
+                        } else {
+                            Icon(action.icon, contentDescription = null, tint = ink, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(Modifier.height(2.dp))
+                        Text(action.label, fontSize = 10.sp, fontWeight = FontWeight.Medium,
+                            color = if (action.destructive) ink else MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }
@@ -548,104 +542,69 @@ fun MultiSelectActionBar(
     }
 }
 
-/** 「更多」Sheet：两栏各自的附加操作。 */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoreActionSheet(
-    titles: List<String>,
+    actions: List<Pair<String, WenkuSymbol>>,
     onPick: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    PullOutBottomSheet(onDismissRequest = onDismiss) {
-        val close = com.example.ui.components.LocalOverlayClose.current
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Text("更多操作", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-            titles.forEach { title ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .pullOutClickable { close { onPick(title) } }
-                        .padding(vertical = 14.dp),
-                ) {
-                    Text(title, fontSize = 14.sp)
-                }
-            }
-            Spacer(modifier = Modifier.height(20.dp))
+    WenkuActionSheet("更多操作", onDismiss) {
+        actions.forEach { (title, symbol) ->
+            WenkuTextButton(title, onClick = paperDismiss { onPick(title) },
+                modifier = Modifier.fillMaxWidth(), wenkuSymbol = symbol,
+                color = if (symbol == WenkuSymbol.Delete) MaterialTheme.colorScheme.error else Color.Unspecified)
         }
     }
 }
 
-/** 分类选择 Sheet（操作栏「移动」与拖拽落到「＋新建分类」共用）。 */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryPickerSheet(
     categories: List<String>,
     title: String,
     onPick: (String) -> Unit,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-    allowCreate: Boolean = true,
     onCreate: ((String) -> Unit)? = null,
 ) {
     var newName by remember { mutableStateOf("") }
     var creating by remember { mutableStateOf(false) }
-    PullOutBottomSheet(onDismissRequest = onDismiss, modifier = modifier) {
-        val close = com.example.ui.components.LocalOverlayClose.current
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-            categories.forEach { name ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .pullOutClickable { close { onPick(name) } }
-                        .padding(vertical = 13.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(name, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                    Icon(Icons.Filled.Check, contentDescription = null, tint = MintPrimary, modifier = Modifier.size(16.dp))
-                }
-            }
-            if (allowCreate) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .pullOutClickable { creating = true }
-                        .padding(vertical = 13.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = null, tint = MintPrimary, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("＋新建分类", fontSize = 14.sp, color = MintPrimary)
-                }
-                if (creating) {
-                    OutlinedTextField(
-                        value = newName,
-                        onValueChange = { newName = it },
-                        label = { Text("分类名称") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    // 底部弹窗是独立窗口，按钮不能复用主窗口的玻璃坐标。
-                    com.example.ui.components.DialogLiquidGlass(fillMaxSize = false) {
-                        com.example.ui.components.AppActionButton(
-                            text = "创建并放入",
-                            onClick = {
-                                if (newName.isNotBlank()) {
-                                    val name = newName.trim()
-                                    close { onCreate?.invoke(name) }
-                                }
-                            },
-                            enabled = newName.isNotBlank(),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+    val reduce = LocalReduceMotion.current
+    WenkuActionSheet(title, onDismiss, fitKeyboard = onCreate != null) {
+        categories.forEach { name ->
+            WenkuTextButton(name, onClick = paperDismiss { onPick(name) },
+                modifier = Modifier.fillMaxWidth(), compact = true, wenkuSymbol = WenkuSymbol.Folder)
+        }
+        if (onCreate != null) {
+            WenkuTextButton(
+                if (creating) "收起新建分类" else "新建分类",
+                onClick = { creating = !creating },
+                modifier = Modifier.fillMaxWidth(), compact = true, selected = creating,
+                wenkuSymbol = if (creating) WenkuSymbol.Up else WenkuSymbol.Add,
+            )
+            AnimatedVisibility(
+                visible = creating,
+                enter = if (reduce) EnterTransition.None else expandVertically(tween(WenkuMotion.ENTER_MS, easing = WenkuMotion.ease)) + fadeIn(),
+                exit = if (reduce) ExitTransition.None else shrinkVertically(tween(WenkuMotion.EXIT_MS, easing = WenkuMotion.ease)) + fadeOut(),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val keyboard = LocalSoftwareKeyboardController.current
+                    val close = paperDismiss { onCreate(newName.trim()) }
+                    val submit = {
+                        if (newName.isNotBlank()) {
+                            keyboard?.hide()
+                            close()
+                        }
                     }
+                    OutlinedTextField(newName, { newName = it }, Modifier.fillMaxWidth(),
+                        label = { Text("分类名称") }, singleLine = true, shape = RoundedCornerShape(16.dp),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { submit() }))
+                    WenkuTextButton(
+                        "创建并放入", onClick = submit,
+                        modifier = Modifier.fillMaxWidth(), enabled = newName.isNotBlank(),
+                        selected = true, wenkuSymbol = WenkuSymbol.Check,
+                    )
                 }
             }
-            Spacer(modifier = Modifier.height(20.dp))
         }
     }
 }
@@ -682,6 +641,11 @@ fun ShelfSelectionHost(
     favoriteCategories: List<String> = emptyList(),
     /** 命中兜底：卡片坐标回调不可靠时，按列表真实布局信息兜住点击/长按 */
     fallbackHit: (androidx.compose.ui.geometry.Offset) -> String? = { null },
+    /**
+     * 3D 书架接管手势时关闭宿主手势。否则父级 pointerInput 会先截获 tap，
+     * 子级书架永远收不到打开/居中动作。
+     */
+    gesturesEnabled: Boolean = true,
     content: @Composable (itemBounds: @Composable (String) -> Modifier) -> Unit,
 ) {
     val haptics = rememberAppHaptics()
@@ -876,7 +840,10 @@ fun ShelfSelectionHost(
     }
 
     // 多选态隐藏底部 Tab 栏（悬浮操作栏替换）
-    LaunchedEffect(state.phase) {
+    LaunchedEffect(state.phase, reduceMotion) {
+        if (state.phase == ShelfPhase.BROWSE && !reduceMotion && !ShelfChrome.tabBarVisible.value) {
+            delay(SHELF_ACTION_EXIT_MS.toLong())
+        }
         ShelfChrome.setTabBarVisible(state.phase == ShelfPhase.BROWSE)
     }
     androidx.compose.runtime.DisposableEffect(Unit) {
@@ -906,7 +873,7 @@ fun ShelfSelectionHost(
     gestureSink.hostTop = { hostTop }
     gestureSink.hostBottom = { hostBottom }
     gestureSink.haptic = { haptics.perform(it) }
-    gestureSink.enabled = { true }
+    gestureSink.enabled = { gesturesEnabled }
     gestureSink.onTap = onTapItem
 
     Box(
@@ -918,12 +885,16 @@ fun ShelfSelectionHost(
                 hostTop = c.positionInRoot().y
                 hostBottom = c.positionInRoot().y + c.size.height
             }
-            .shelfGestures(
-                state = state,
-                touchSlop = touchSlop,
-                sink = gestureSink,
-                dropSink = dropSink,
-                density = density.density,
+            .then(
+                if (gesturesEnabled) {
+                    Modifier.shelfGestures(
+                        state = state,
+                        touchSlop = touchSlop,
+                        sink = gestureSink,
+                        dropSink = dropSink,
+                        density = density.density,
+                    )
+                } else Modifier
             ),
     ) {
         content { key ->

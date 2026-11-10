@@ -93,15 +93,12 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize
                         )
                     }
                     AppIconButton(
+                        icon = Icons.Default.Close,
+                        contentDescription = "关闭帮助",
                         onClick = close,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.testTag("close_help_bottom_sheet_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "关闭帮助",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    )
                 }
             }
 

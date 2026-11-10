@@ -74,24 +74,45 @@ fun MyApplicationTheme(
         label = "themeSecondary"
     )
 
+    // Wenku8 论文纸 / 中性炭黑层级。主题色仍由用户选择，只承担强调与选中。
     val lightColorScheme = lightColorScheme(
         primary = primaryColor,
         secondary = secondaryColor,
         tertiary = primaryColor,
-        background = LightBg,
-        surface = PureWhite,
-        onBackground = DarkCharcoal,
-        onSurface = DarkCharcoal
+        background = com.example.ui.wenku.WenkuTokens.PaperLight,
+        surface = com.example.ui.wenku.WenkuTokens.PanelLight,
+        surfaceVariant = Color(0xFFF0EDE5),
+        surfaceTint = Color.Transparent,
+        onBackground = com.example.ui.wenku.WenkuTokens.InkLight,
+        onSurface = com.example.ui.wenku.WenkuTokens.InkLight,
+        onSurfaceVariant = com.example.ui.wenku.WenkuTokens.InkSecondaryLight,
+        outline = Color(0xFFB9B4A8),
+        outlineVariant = Color(0xFFDAD5C9),
+        surfaceContainerLowest = Color(0xFFFFFEFA),
+        surfaceContainerLow = Color(0xFFFAF8F2),
+        surfaceContainer = Color(0xFFF4F2EB),
+        surfaceContainerHigh = Color(0xFFEDEAE2),
+        surfaceContainerHighest = Color(0xFFE5E1D7)
     )
 
     val darkColorScheme = darkColorScheme(
         primary = primaryColor,
         secondary = secondaryColor,
         tertiary = primaryColor,
-        background = DarkCharcoal,
-        surface = Color(0xFF222428),
-        onBackground = NightText,
-        onSurface = NightText
+        background = com.example.ui.wenku.WenkuTokens.PaperDark,
+        surface = com.example.ui.wenku.WenkuTokens.PanelDark,
+        surfaceVariant = com.example.ui.wenku.WenkuTokens.RaisedDark,
+        surfaceTint = Color.Transparent,
+        onBackground = com.example.ui.wenku.WenkuTokens.InkDark,
+        onSurface = com.example.ui.wenku.WenkuTokens.InkDark,
+        onSurfaceVariant = com.example.ui.wenku.WenkuTokens.InkSecondaryDark,
+        outline = com.example.ui.wenku.WenkuTokens.OutlineDark,
+        outlineVariant = com.example.ui.wenku.WenkuTokens.RaisedHighDark,
+        surfaceContainerLowest = Color(0xFF151515),
+        surfaceContainerLow = Color(0xFF1D1D1D),
+        surfaceContainer = Color(0xFF242424),
+        surfaceContainerHigh = Color(0xFF2D2D2D),
+        surfaceContainerHighest = Color(0xFF3A3A3A)
     )
 
     val themeProgress by animateFloatAsState(if (darkTheme) 1f else 0f, tween(if (reduceMotion) 0 else 240, easing = IosMotion.EaseOut), label = "dayNightTheme")
@@ -102,6 +123,9 @@ fun MyApplicationTheme(
     fun containerInk(light: Color, dark: Color, lightPaper: Color, darkPaper: Color) =
         legibleThemeInk(light, dark, mix(lightPaper, darkPaper), themeProgress)
     val colorScheme = lightColorScheme.copy(
+        primary = primaryColor,
+        secondary = secondaryColor,
+        tertiary = primaryColor,
         background = paper,
         surface = surface,
         onBackground = legibleThemeInk(lightColorScheme.onBackground, darkColorScheme.onBackground, paper, themeProgress),

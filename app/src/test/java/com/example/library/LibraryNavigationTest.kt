@@ -199,7 +199,7 @@ class LibraryNavigationTest {
         }
         compose.onNodeWithText("$route:nested").assertIsDisplayed()
         compose.waitUntil(10_000) {
-            if (textMode) model.novelChapterText.value == "text:nested-1"
+            if (textMode) model.onlineNovelChapter.value.page?.text == "text:nested-1"
             else model.comicChapterImages.value == listOf("image:nested-1")
         }
         compose.runOnIdle {

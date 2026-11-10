@@ -1,20 +1,16 @@
 package com.example.ui.components
 
-
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -35,87 +31,66 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.ContentDrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.platform.testTag
+import com.example.ui.components.LocalRenderQuality
 import com.example.ui.theme.onColor
+import com.example.ui.wenku.WenkuMotion
+import com.example.ui.wenku.WenkuTokens
+import com.example.ui.wenku.wenkuGlassBlur
+import com.example.ui.wenku.rememberWenkuAccessibility
+import com.example.ui.wenku.wenkuColors
 import com.kashif_e.backdrop.Backdrop
-import me.trishiraj.shadowglow.consistentShadow
-
-/**
- * 苹果 Liquid Glass 风格底部标签栏（上一版结构 + 真实验证参数增强）。
- *
- * 背景采用书源选择弹窗同款手法：MainActivity 用 layerBackdrop 捕获页面真实内容，
- * Tab 栏作为兄弟节点用 drawBackdrop(blur) 采样，得到真实 Gaussian Blur 磨砂。
- *
- * ── 本次样式升级（2026-09）────────────────────────────────────────────
- * 旧观感是「一根纯色药丸」：玻璃底之上只平铺了一层 `primary.copy(alpha=0.30f)`
- * 的单色，把玻璃的层次全盖掉了。本次分层为：
- *   ① 竖向渐变（顶部高光 → 主色淡染 → 底部略深）替代单层均色；
- *   ② 顶部 1dp 内高光 + 外圈细描边（与虹彩描边叠加，不冲突）；
- *   ③ 顶部 3dp 指示线按等宽槽位弹簧移动，收缩时保持对齐；
- *   ④ Badge 加与栏体同色的描边、排版更圆润。
- * 功能与弹簧手感（DampingRatioMediumBouncy + StiffnessLow）全部保留。
- */
-
-/* ── 稳定常量 ────────────────────────────────────────────────────────────
- * 提到文件级：避免每次重组重新构造 Color / Shape 实例。
- * 这不仅省分配，更关键的是让 Modifier 元素的 equals 成立 —— Compose 复用
- * 相等元素的绘制节点，等价 ⇒ 不重建绘制缓存（极致档的开销大头就在这）。 */
-private val TabBarShape: RoundedCornerShape = RoundedCornerShape(50)
-private val TabBarAmbientShadowColor: Color = Color.Black.copy(alpha = 0.16f)
-private val TabBarContactShadowColor: Color = Color.Black.copy(alpha = 0.20f)
-private val TabBarLowOutlineColor: Color = Color.White.copy(alpha = 0.15f)
-/** 中性细描边：替代原来的主色虹彩描边（去绿）。 */
-private val TabBarNeutralOutlineColor: Color = Color.White.copy(alpha = 0.22f)
-
-/** 未选中项文字/图标的透明度：0.55 → 0.48，让选中项更突出。 */
-private const val TAB_UNSELECTED_ALPHA = 0.48f
-
-/**
- * 滚动收缩弹簧（栏高 68↔52；横向框架固定，保证图标与指示条对齐）。
- *
- * 原来是 `DampingRatioMediumBouncy`(0.55) + `StiffnessLow`(200) —— 阻尼比 0.55 的过冲约
- * **12.6%**，配合最软的刚度，一上下滑整条栏就大幅摆动，设置页那种长列表里尤其明显。
- * 这里只"收紧"、不去掉弹簧感：
- *  · 阻尼比 0.55 → 0.70（过冲 ≈4.6%，仍有回弹，但不会甩出去）
- *  · 刚度 StiffnessLow(200) → StiffnessMediumLow(700)（收敛更快，摆动能被立刻拉住）
- * 想更硬就把阻尼比往 1.0 调、刚度往 StiffnessMedium(1500) 调；想更弹就反向调。
- */
-private const val TAB_COLLAPSE_DAMPING = 0.70f
-private const val TAB_COLLAPSE_STIFFNESS = Spring.StiffnessMediumLow
+import com.kashif_e.backdrop.drawBackdrop
+import com.kashif_e.backdrop.effects.blur
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 data class AppTabItem(
     val label: String,
-    val icon: ImageVector,
-    val selectedIcon: ImageVector = icon,
-    val badgeCount: Int? = null
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val selectedIcon: androidx.compose.ui.graphics.vector.ImageVector = icon,
+    val badgeCount: Int? = null,
+    /** Wenku ArchiveSymbol：非空时 Dock 用参考仓库的手绘纸张图标（自带入场致意 + 按压手势）。 */
+    val wenkuSymbol: com.example.ui.wenku.WenkuSymbol? = null,
+    val wenkuSelectedSymbol: com.example.ui.wenku.WenkuSymbol? = wenkuSymbol
 )
 
 /** 滚动收缩状态：由外部列表的 NestedScrollConnection 驱动，多个 Tab 页共享一份。 */
@@ -137,6 +112,19 @@ class TabBarCollapseState {
 @Composable
 fun rememberTabBarCollapseState(): TabBarCollapseState = remember { TabBarCollapseState() }
 
+/**
+ * Wenku8 玻璃 Dock。
+ *
+ * 文档 §5.3 的交互全部落在这里：
+ * - 按下立即响应（120ms）；
+ * - 跟手 80%；
+ * - 形变 `speed * .028` clamp ±24，lerp .55，100ms 无输入回 0；
+ * - 松手投射 `velocity * .055` clamp ±.22；
+ * - 胶囊 `translate(flow*.16, -pressure*.6)`，`scaleX = 1 + p*.022 + |flow|*.00125`；
+ * - 玻璃厚度 16 + pressure*2。
+ *
+ * 逐帧值只在 graphicsLayer / draw 阶段读取，不重建 Tab 内容。
+ */
 @Composable
 fun AppBottomTabBar(
     items: List<AppTabItem>,
@@ -146,220 +134,233 @@ fun AppBottomTabBar(
     collapseState: TabBarCollapseState = rememberTabBarCollapseState(),
     backdrop: Backdrop? = null
 ) {
-    if (LocalRenderQuality.current.minimal) {
-        Row(modifier.fillMaxWidth().navigationBarsPadding().background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    val a11y = rememberWenkuAccessibility()
+    val colors = wenkuColors()
+    if (LocalRenderQuality.current.minimal || a11y.highContrast) {
+        Row(
+            modifier.fillMaxWidth().navigationBarsPadding()
+                .background(colors.panel)
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             items.forEachIndexed { index, item ->
-                Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
-                    .background(if (index == selectedIndex) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-                    .pullOutClickable { onTabSelected(index) }.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box {
-                        com.example.ui.components.AnimatedStateIcon(if (index == selectedIndex) item.selectedIcon else item.icon, null, modifier = Modifier.size(24.dp))
-                        item.badgeCount?.takeIf { it > 0 }?.let { Text(it.toString(), fontSize = 9.sp, modifier = Modifier.align(Alignment.TopEnd)) }
-                    }
-                    Text(item.label, fontSize = 11.sp)
+                Column(
+                    Modifier.weight(1f).clip(RoundedCornerShape(4.dp))
+                        .background(if (index == selectedIndex) colors.raised else Color.Transparent)
+                        .pullOutClickable { onTabSelected(index) }
+                        .padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        if (index == selectedIndex) item.selectedIcon else item.icon,
+                        item.label,
+                        modifier = Modifier.size(22.dp),
+                        tint = colors.ink
+                    )
+                    Text(item.label, fontSize = 10.sp, color = colors.ink)
                 }
             }
         }
         return
     }
-    val colors = rememberAppButtonColors()
-    // 主题色跟随设置主色调平滑过渡（不固化在 remember 里）
-    val animatedPrimary by animateColorAsState(
-        targetValue = colors.primary,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "tabBarPrimary"
-    )
-    val animatedAccent by animateColorAsState(
-        targetValue = colors.accent,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "tabBarAccent"
-    )
-    // 根据 Tab 栏“有效底色”（内容面 + 6% 主题色）自动取对比色，
-    // 并用与全软件一致的弹簧动画过渡。
-    //
-    // 新规范：玻璃保持中性，着色 ≤6%。原先这里是 30% 主题色混色，
-    // 整条栏读起来是“绿药丸”，且绿色面积远超 10% 上限。
-    // 对比色**算法本身一行未改**，只是把混色比例压到 6%。
-    val barBase = lerp(MaterialTheme.colorScheme.surface, animatedPrimary, 0.06f)
-    val contrast by animateColorAsState(
-        targetValue = barBase.onColor(),
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "tabBarContrast"
-    )
+
+    val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
+    val layoutDirection = LocalLayoutDirection.current
+    val density = LocalDensity.current
+    val selected by rememberUpdatedState(selectedIndex)
+    val latestSelect by rememberUpdatedState(onTabSelected)
+    val targetIndicator = selectedIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0)).toFloat()
+    val indicator = remember { Animatable(targetIndicator) }
+    val dockDragging = remember { mutableStateOf(false) }
+    LaunchedEffect(targetIndicator, items.size) {
+        if (!dockDragging.value) {
+            indicator.animateTo(targetIndicator, WenkuMotion.spring())
+        }
+    }
+    val press = remember { Animatable(0f) }
+    val stretch = remember { Animatable(0f) }
+    var fingerSlot by remember { mutableFloatStateOf(targetIndicator) }
+    var resetJob by remember { mutableStateOf<Job?>(null) }
 
     val collapseProgress by animateFloatAsState(
         targetValue = if (collapseState.collapsed) 1f else 0f,
-        animationSpec = spring(dampingRatio = TAB_COLLAPSE_DAMPING, stiffness = TAB_COLLAPSE_STIFFNESS),
-        label = "tabBarCollapse"
+        animationSpec = WenkuMotion.spring(),
+        label = "wenkuDockCollapse"
     )
     val labelFraction = 1f - collapseProgress.coerceIn(0f, 1f)
-    val barHeight = 52.dp + 16.dp * labelFraction
-    // Keep the bar's horizontal frame fixed while a list scrolls. Animating the
-    // outer margin changed the Row width and made the selected black indicator
-    // visibly drift left/right on every vertical gesture.
-    val horizontalMargin = 16.dp
+    val barHeight = 56.dp - 4.dp * collapseProgress.coerceIn(0f, 1f)
+    val selectedColor = colors.ink
+    val shape = RoundedCornerShape(28.dp)
 
-    val shape = TabBarShape
-    val quality = LocalRenderQuality.current
-
-    /* ── ① 玻璃底：中性分层 + 顶部内高光 + 外圈细描边 ──────────────────
-     *
-     * 新规范：玻璃是「容器」不是「装饰」——保持中性白 / 中性深，**着色 ≤6%**，
-     * 绿色只留给开关开启态 / 选中态 / 主按钮 / 小标签文字 / 对勾。
-     * 原先的 22%~28% 主色渐变会把整条栏染成“绿药丸”，这里压到 5%，
-     * 主色只通过【选中项图标+文字】表达。
-     *
-     * 流畅档（LOW）**不引入**任何新渐变层：维持单层近实心底 + 中性描边。 */
-    val glassTintModifier = if (quality <= RenderQuality.LOW) {
-        Modifier.background(animatedPrimary.copy(alpha = 0.06f), shape)
-    } else {
-        Modifier.tabBarGlassTint(primary = animatedPrimary)
-    }
-
-    // Animate in slot units rather than measured pixels: a resize or collapse
-    // cannot detach the line from its equal-width icon slot. Read only in drawing.
-    val indicatorSlot = remember { Animatable(selectedIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0)).toFloat()) }
-    LaunchedEffect(selectedIndex, items.size) {
-        indicatorSlot.animateTo(selectedIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0)).toFloat(),
-            spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow))
-    }
-    val selectionIndicator = Modifier.drawWithCache {
-        val barTopPx = 2.dp.toPx()
-        val barHeightPx = 3.dp.toPx()
-        val barRadius = CornerRadius(barHeightPx / 2f)
-        val slotWidth = size.width / items.size.coerceAtLeast(1)
-        val barWidth = slotWidth * 0.40f
-        onDrawWithContent {
-            if (items.isNotEmpty()) {
-                val slot = if (layoutDirection == LayoutDirection.Rtl) items.lastIndex - indicatorSlot.value else indicatorSlot.value
-                val barLeft = slot * slotWidth + (slotWidth - barWidth) / 2f
-                drawRoundRect(
-                    color = contrast,
-                    topLeft = Offset(barLeft, barTopPx),
-                    size = Size(barWidth, barHeightPx),
-                    cornerRadius = barRadius
-                )
-            }
-            drawContent()
-        }
-    }
-    // 虹彩描边配色：remember 住，避免每次重组生成新 List 导致
-    // iridescentBorder 元素不等、绘制缓存被重建（主题切换时每帧一次）
-    val iridescentColors = remember(animatedPrimary, animatedAccent) {
-        listOf(animatedPrimary, animatedAccent, animatedPrimary)
-    }
-
-    // 主题 key：主题色变化时强制重建玻璃样式/着色器。
-    // 修复：原先 key 用的是 animatedPrimary/animatedAccent（弹簧动画的**当前帧值**），
-    // 主题切换动画期间每帧都在变 → 每帧销毁重建整条 Tab 栏，掉帧并丢失
-    // tabPositions（指示条位置）与按压状态。改用动画的**目标值** colors.primary/accent，
-    // 只在用户真正换主题时重建一次。
-    key(colors.primary, colors.accent) {
+    // 安全区 + 6dp 外缩，浮在内容之上。
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .navigationBarsPadding()
+    ) {
         Box(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = horizontalMargin, vertical = 12.dp)
-                // A2：让开系统导航栏。手势导航高度为 0（无影响），
-                // 三键导航约 48dp——此前没有这行，Tab 栏会被压在导航栏后面截掉一截。
-                .navigationBarsPadding()
+                .height(barHeight)
+                .graphicsLayer {
+                    val pressure = press.value
+                    val flow = stretch.value
+                    translationX = flow * .16f
+                    translationY = -pressure * .6f
+                    scaleX = 1f + pressure * .022f + abs(flow) * .00125f
+                    scaleY = 1f + pressure * .065f - abs(flow) * .0006f
+                }
+                .testTag("app_tab_bar_surface")
+                .pointerInput(items.size, layoutDirection) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        val tracker = VelocityTracker()
+                        tracker.addPosition(down.uptimeMillis, down.position)
+                        val width = size.width.toFloat().coerceAtLeast(1f)
+                        val slotWidth = width / items.size.coerceAtLeast(1)
+                        val rawSlot = down.position.x / slotWidth - .5f
+                        val touchSlot = if (layoutDirection == LayoutDirection.Rtl) {
+                            items.lastIndex - rawSlot
+                        } else rawSlot
+                        fingerSlot = touchSlot.roundToIntCompat().coerceIn(0, items.lastIndex.coerceAtLeast(0)).toFloat()
+                        dockDragging.value = true
+                        scope.launch {
+                            press.animateTo(1f, tween(WenkuMotion.CONTACT_MS, easing = WenkuMotion.ease))
+                        }
+                        scope.launch {
+                            indicator.animateTo(fingerSlot, WenkuMotion.spring())
+                        }
+                        var pointerDown = true
+                        var moved = false
+                        var lastX = down.position.x
+                        var lastUptime = down.uptimeMillis
+                        while (pointerDown) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) {
+                                if (moved) change.consume()
+                                pointerDown = false
+                                tracker.addPosition(change.uptimeMillis, change.position)
+                                break
+                            }
+                            val dx = change.position.x - lastX
+                            val dt = (change.uptimeMillis - lastUptime).coerceAtLeast(1L)
+                            val vx = dx / (dt / 1000f)
+                            lastX = change.position.x
+                            lastUptime = change.uptimeMillis
+                            tracker.addPosition(change.uptimeMillis, change.position)
+                            if (!moved && abs(change.position.x - down.position.x) > viewConfiguration.touchSlop) {
+                                moved = true
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                            if (!moved) continue
+                            change.consume()
+                            val target = (vx * WenkuMotion.DOCK_STRETCH_FACTOR)
+                                .coerceIn(-WenkuMotion.DOCK_STRETCH_LIMIT, WenkuMotion.DOCK_STRETCH_LIMIT)
+                            scope.launch {
+                                stretch.snapTo(stretch.value + (target - stretch.value) * WenkuMotion.DOCK_STRETCH_LERP)
+                            }
+                            val raw = change.position.x / slotWidth - .5f
+                            val slot = if (layoutDirection == LayoutDirection.Rtl) items.lastIndex - raw else raw
+                            fingerSlot = slot.coerceIn(0f, items.lastIndex.coerceAtLeast(0).toFloat())
+                            scope.launch {
+                                indicator.snapTo(indicator.value + (fingerSlot - indicator.value) * WenkuMotion.DOCK_FOLLOW)
+                            }
+                            resetJob?.cancel()
+                            resetJob = scope.launch {
+                                delay(WenkuMotion.DOCK_IDLE_MS)
+                                stretch.animateTo(0f, WenkuMotion.spring())
+                            }
+                        }
+                        val velocity = tracker.calculateVelocity().x
+                        val projected = fingerSlot + (velocity * WenkuMotion.DOCK_PROJECT / slotWidth)
+                            .coerceIn(-WenkuMotion.DOCK_PROJECT_LIMIT, WenkuMotion.DOCK_PROJECT_LIMIT)
+                        val target = projected.roundToIntCompat().coerceIn(0, items.lastIndex.coerceAtLeast(0))
+                        resetJob?.cancel()
+                        scope.launch { stretch.animateTo(0f, WenkuMotion.spring()) }
+                        scope.launch { press.animateTo(0f, WenkuMotion.spring()) }
+                        dockDragging.value = false
+                        if (moved && target != selected) {
+                            latestSelect(target)
+                        } else {
+                            scope.launch {
+                                indicator.animateTo(selected.toFloat(), WenkuMotion.spring())
+                            }
+                        }
+                    }
+                }
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(barHeight)
+            // 玻璃单独一层 layer：指示条/按压缩放这些逐帧变化只重绘自己的层，
+            // 不会把 drawBackdrop 的整屏采样 + 模糊一起重录（点 Tab 卡顿的主因）。
+            Box(
+                Modifier.matchParentSize().graphicsLayer { }
                     .then(
-                        if (quality <= RenderQuality.LOW) {
-                            // 流畅档：单层阴影
-                            Modifier.consistentShadow(
-                                elevation = 8.dp,
-                                shape = shape,
-                                ambientColor = TabBarAmbientShadowColor,
-                                spotColor = TabBarAmbientShadowColor
-                            )
+                        if (backdrop != null && a11y.blurEnabled) {
+                            remember(backdrop, shape, colors.isDark, colors.panel, colors.ink) {
+                                Modifier.drawBackdrop(
+                                    backdrop = backdrop!!,
+                                    shape = { shape },
+                                    effects = { wenkuGlassBlur(16.dp.toPx()) },
+                                    highlight = { null },
+                                    shadow = { null },
+                                    onDrawSurface = {
+                                        drawRect(
+                                            if (colors.isDark) colors.panel.copy(alpha = 0.78f)
+                                            else colors.panel.copy(alpha = 0.70f)
+                                        )
+                                    },
+                                    onDrawFront = {
+                                        drawRoundRect(
+                                            color = colors.ink.copy(alpha = 0.12f),
+                                            cornerRadius = CornerRadius(size.height / 2f),
+                                            style = androidx.compose.ui.graphics.drawscope.Stroke(0.7.dp.toPx())
+                                        )
+                                    }
+                                )
+                            }
                         } else {
                             Modifier
-                                // 环境层：品牌色宽域柔光
-                                .consistentShadow(
-                                    elevation = 24.dp,
-                                    shape = shape,
-                                    ambientColor = animatedPrimary.copy(alpha = 0.18f),
-                                    spotColor = animatedPrimary.copy(alpha = 0.18f)
-                                )
-                                // 接触层：近距离暗部
-                                .consistentShadow(
-                                    elevation = 8.dp,
-                                    shape = shape,
-                                    ambientColor = TabBarContactShadowColor,
-                                    spotColor = TabBarContactShadowColor
-                                )
+                                .clip(shape)
+                                .background(colors.panel.copy(alpha = 0.96f))
+                                .border(0.7.dp, colors.ink.copy(alpha = 0.12f), shape)
                         }
                     )
-                    .clip(shape)
-                    .then(
-                        when {
-                            // 高/极致：实时毛玻璃（真实内容采样）；极致档底更透（不加厚模糊——
-                            // 同样避免任何链式着色器/大采样风险，稳定性优先）
-                            backdrop != null && quality.realtimeGlass -> Modifier.liquidGlass(
-                                backdrop = backdrop,
-                                shape = shape,
-                                surfaceColor = MaterialTheme.colorScheme.surface.copy(
-                                    alpha = if (quality == RenderQuality.MAX) 0.36f else 0.45f
-                                ),
-                                blurRadius = 8.dp,
-                                refraction = false
-                            )
-                            // 均衡：半透明底替代毛玻璃
-                            quality == RenderQuality.MID ->
-                                Modifier.background(MaterialTheme.colorScheme.surface.copy(alpha = 0.78f), shape)
-                            // 流畅：近实心底
-                            else ->
-                                Modifier.background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f), shape)
-                        }
+            )
+            // 指示条 + 手指高亮：同样独占一层，弹簧每帧只重绘这一层。
+            Box(
+                Modifier.matchParentSize().graphicsLayer { }.drawWithContent {
+                    val slotWidth = size.width / items.size.coerceAtLeast(1)
+                    val slot = indicator.value.coerceIn(0f, (items.size - 1).coerceAtLeast(0).toFloat())
+                    val slotX = if (layoutDirection == LayoutDirection.Rtl) {
+                        size.width - (slot + .5f) * slotWidth
+                    } else {
+                        (slot + .5f) * slotWidth
+                    }
+                    val height = size.height - 8.dp.toPx()
+                    val width = (slotWidth - 8.dp.toPx()).coerceAtMost(52.dp.toPx()).coerceAtLeast(1f)
+                    val pressure = press.value.coerceIn(0f, 1f)
+                    drawRoundRect(
+                        color = colors.ink.copy(alpha = .07f + .045f * pressure),
+                        topLeft = Offset(slotX - width / 2f, (size.height - height) / 2f),
+                        size = Size(width, height),
+                        cornerRadius = CornerRadius(height / 2f)
                     )
-                    // ① 玻璃底分层（渐变 / 顶部高光 / 外圈细描边）
-                    .then(glassTintModifier)
-                    .then(
-                        if (quality > RenderQuality.LOW) {
-                            // 主色虹彩描边加回（与 tint 的主色混色配套）
-                            Modifier.iridescentBorder(
-                                shape = shape,
-                                colors = iridescentColors,
-                                width = if (quality == RenderQuality.MAX) 2.dp else 1.5.dp,
-                                alpha = if (quality == RenderQuality.MAX) 0.60f else 0.45f
-                            )
-                        } else {
-                            Modifier.border(1.dp, TabBarLowOutlineColor, shape)
-                        }
-                    )
-                    .then(selectionIndicator)
-                    .testTag("app_tab_bar_surface"),
+                }
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Start,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 items.forEachIndexed { index, item ->
-                    // Keep every tab in an equal-width slot. The indicator is
-                    // drawn from the same slot geometry, so it stays centered
-                    // over the icon while the list scrolls or labels collapse.
-                    Box(
-                        modifier = Modifier.weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        TabIcon(
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        DockTab(
                             item = item,
                             selected = index == selectedIndex,
                             labelFraction = labelFraction,
-                            contrast = contrast,
-                            ringColor = barBase,
+                            ink = selectedColor,
                             onClick = { onTabSelected(index) }
                         )
                     }
@@ -369,171 +370,129 @@ fun AppBottomTabBar(
     }
 }
 
-/**
- * 栏体的玻璃质感分层（替代原先平铺的单层主色）。
- *
- * 三段：顶部高光 → 主色淡染 → 底部略深，再叠顶部 1dp 内高光与外圈细描边。
- * 调用处已 `.clip(shape)`，这里直接按整块矩形绘制即可（会被裁到胶囊形）。
- */
-private fun Modifier.tabBarGlassTint(primary: Color): Modifier = this.drawWithCache {
-    // 主色混色（用户要求加回）：顶部高光 → 主色淡染 → 底部略深。
-    // 2026-09-24 曾压到 5%/4% 做"中性化"，用户明确要求把原来的强调色混色加回来。
-    val fill = Brush.verticalGradient(
-        colorStops = arrayOf(
-            0.00f to Color.White.copy(alpha = 0.20f),
-            0.22f to primary.copy(alpha = 0.28f),
-            0.62f to primary.copy(alpha = 0.22f),
-            1.00f to Color.Black.copy(alpha = 0.10f)
-        )
-    )
-    val radius = CornerRadius(size.height / 2f, size.height / 2f)
-    val outline = Stroke(width = 1.dp.toPx())
-    val outlineBrush = Brush.verticalGradient(
-        colors = listOf(
-            Color.White.copy(alpha = 0.34f),
-            Color.White.copy(alpha = 0.10f)
-        )
-    )
-    val glint = Stroke(width = 1.dp.toPx())
-    val glintBrush = Brush.horizontalGradient(
-        colors = listOf(
-            Color.Transparent,
-            Color.White.copy(alpha = 0.38f),
-            Color.Transparent
-        )
-    )
-    val glintY = 1.5.dp.toPx()
-    onDrawBehind {
-        // 主渐变
-        drawRect(brush = fill)
-        // 顶部 1dp 内高光
-        drawLine(
-            brush = glintBrush,
-            start = Offset(size.width * 0.14f, glintY),
-            end = Offset(size.width * 0.86f, glintY),
-            strokeWidth = glint.width
-        )
-        // 外圈细描边（与虹彩描边叠加，提供清晰的边缘）
-        drawRoundRect(
-            brush = outlineBrush,
-            cornerRadius = radius,
-            style = outline
-        )
-    }
-}
-
-/**
- * ④ 角标：与栏体同色的描边 + 更圆润的排版。
- * 数字格式化逻辑（`count > 99 → "99+"`）保持原样不动。
- */
 @Composable
-private fun TabBadge(count: Int, ringColor: Color, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .size(if (count > 0) 18.dp else 9.dp)
-            .background(Color(0xFFE5484D), shape = CircleShape)
-            .border(1.5.dp, ringColor, CircleShape),
-        contentAlignment = Alignment.Center
-    ) {
-        if (count > 0) {
-            Text(
-                text = if (count > 99) "99+" else count.toString(),
-                fontSize = 9.sp,
-                color = Color.White,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                letterSpacing = 0.sp
-            )
-        }
-    }
-}
-
-@Composable
-private fun TabIcon(
+private fun DockTab(
     item: AppTabItem,
     selected: Boolean,
     labelFraction: Float,
-    contrast: Color,
-    ringColor: Color,
+    ink: Color,
     onClick: () -> Unit
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    // B7：Tab 此前 indication = null 且无任何按压缩放/触觉，点下去完全没有手感。
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
-        targetValue = if (isPressed) com.example.ui.feedback.AppMotion.CONTROL_PRESS_SCALE else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessHigh
-        ),
-        label = "tabPressScale"
-    )
-    val labelLineHeight = MaterialTheme.typography.labelSmall.lineHeight
-    val labelHeight = with(LocalDensity.current) { labelLineHeight.toDp() } + 2.dp
+    val colors = wenkuColors()
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
     val haptics = LocalHapticFeedback.current
-    // 只在「未按下 -> 按下」跳变时振一次；写在组合期会随重组重复触发
-    LaunchedEffect(isPressed) {
-        if (isPressed) {
-            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-        }
-    }
-
     val iconScale by animateFloatAsState(
-        targetValue = if (selected) 1.06f else 1f,
-        animationSpec = com.example.ui.feedback.AppMotion.settle(),
-        label = "tabIconScale"
+        targetValue = if (selected) 1.10f else 1f,
+        animationSpec = WenkuMotion.spring(),
+        label = "dockIconScale"
     )
-    // ③ 未选中项压到 0.48（原 0.55），让选中项更突出；
-    //    barBase / contrast 的自动对比色算法完全不变。
-    val iconColor = if (selected) contrast else contrast.copy(alpha = TAB_UNSELECTED_ALPHA)
-
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) .97f else 1f,
+        animationSpec = if (pressed) tween(120, easing = WenkuMotion.ease) else WenkuMotion.spring(),
+        label = "dockPress"
+    )
+    var activation by remember { mutableIntStateOf(0) }
+    LaunchedEffect(pressed) {
+        if (pressed) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+    // 颜色变化改成 alpha 动画，并且在 graphicsLayer 里读：换 Tab 时 DockTab 不再逐帧重组
+    // （颜色动画走 composition，一帧一次重组 × 5 个 Tab 是点按卡顿的另一半原因）。
+    val iconAlpha = animateFloatAsState(
+        targetValue = if (selected) 1f else .46f,
+        animationSpec = tween(220, easing = WenkuMotion.ease),
+        label = "dockIconAlpha"
+    )
+    val labelAlpha = animateFloatAsState(
+        targetValue = if (selected) .88f else .42f,
+        animationSpec = tween(220, easing = WenkuMotion.ease),
+        label = "dockLabelAlpha"
+    )
+    val labelHeight = 14.dp
     Column(
         modifier = Modifier
-            .graphicsLayer {
-                scaleX = pressScale
-                scaleY = pressScale
+            .fillMaxWidth()
+            .height(56.dp)
+            .semantics(mergeDescendants = true) {
+                role = Role.Tab
+                this.selected = selected
+                contentDescription = item.label
             }
             .pullOutClickable(
-                interactionSource = interactionSource,
+                interactionSource = interaction,
                 indication = null,
-                onClick = onClick
+                role = Role.Tab,
+                onClick = { activation++; onClick() }
             )
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(top = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Box {
-            com.example.ui.components.AnimatedStateIcon(
-                imageVector = if (selected) item.selectedIcon else item.icon,
-                contentDescription = item.label,
-                tint = iconColor,
-                modifier = Modifier
-                    .size(22.dp)
-                    .graphicsLayer {
-                        scaleX = iconScale
-                        scaleY = iconScale
-                    }
-            )
-            item.badgeCount?.let { count ->
-                TabBadge(
-                    count = count,
-                    ringColor = ringColor,
-                    modifier = Modifier.align(Alignment.TopEnd)
+        Box(
+            modifier = Modifier.graphicsLayer {
+                scaleX = pressScale * iconScale
+                scaleY = scaleX
+                alpha = iconAlpha.value
+            },
+            contentAlignment = Alignment.Center
+        ) {
+            val wenkuSymbol = if (selected) item.wenkuSelectedSymbol else item.wenkuSymbol
+            if (wenkuSymbol != null) {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.example.ui.wenku.LocalWenkuIconContact provides com.example.ui.wenku.WenkuIconContact(pressed, activation)
+                ) {
+                    com.example.ui.wenku.WenkuIcon(
+                        symbol = wenkuSymbol,
+                        size = 21.dp,
+                        tint = ink,
+                        active = selected,
+                        entrance = false
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = if (selected) item.selectedIcon else item.icon,
+                    contentDescription = null,
+                    tint = ink,
+                    modifier = Modifier.size(21.dp)
                 )
             }
+            item.badgeCount?.takeIf { it > 0 }?.let { count ->
+                Box(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .size(13.dp)
+                        .background(MaterialTheme.colorScheme.error, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (count > 99) "99+" else count.toString(),
+                        color = Color.White,
+                        fontSize = 7.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
-
-        // Keep one label node: its reserved space and the bar use the same clock.
-        // Removing AnimatedVisibility at exit used to move all five icons in one frame.
-        Box(Modifier.height(labelHeight * labelFraction).clipToBounds()
-            .graphicsLayer { alpha = labelFraction }, contentAlignment = Alignment.TopCenter) {
+        Box(
+            Modifier
+                .height(labelHeight * labelFraction)
+                .clipToBounds()
+                .graphicsLayer { alpha = labelFraction * labelAlpha.value },
+            contentAlignment = Alignment.TopCenter
+        ) {
             Text(
                 text = item.label,
-                fontSize = 10.sp,
-                lineHeight = labelLineHeight,
-                color = iconColor,
+                fontSize = 9.sp,
+                lineHeight = 12.sp,
+                color = ink,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                 maxLines = 1,
                 softWrap = false,
-                modifier = Modifier.wrapContentHeight(unbounded = true).padding(top = 2.dp)
+                modifier = Modifier.wrapContentHeight(unbounded = true).padding(top = 1.dp)
             )
         }
     }
 }
+
+private fun Float.roundToIntCompat(): Int = kotlin.math.round(this).toInt()

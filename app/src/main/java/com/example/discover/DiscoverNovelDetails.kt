@@ -36,7 +36,13 @@ internal fun DiscoverNovelDetails(book: SearchBook?, model: LibraryViewModel,
     LaunchedEffect(book.sourceId, book.id, state is DownloadState.Success) { local = model.localNovel(book) }
     NovelDetailSheet(detail, sources.firstOrNull { it.id == book.sourceId }?.name.orEmpty(),
         coil.Coil.imageLoader(context), loading, error, state, hasLocal = local != null,
-        onDismiss = onDismiss, onDownload = { model.startDownload(detail, detail.format); onDismiss(); onOpenDownloads() },
+        onDismiss = onDismiss, onDownload = { close ->
+            close {
+                model.startDownload(detail, detail.format)
+                onOpenDownloads()
+            }
+        },
         onRead = { local?.let(onRead) },
+        flightKey = local?.id?.toString(),
         onPause = { model.pauseDownload(task) }, onResume = { model.resumeDownload(task) }, onCancel = { onDismiss(); onOpenDownloads() })
 }

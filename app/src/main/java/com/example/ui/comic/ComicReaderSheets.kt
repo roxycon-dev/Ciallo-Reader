@@ -2,6 +2,8 @@
 
 package com.example.ui.comic
 
+import androidx.compose.material3.MaterialTheme
+
 import com.example.ui.components.paperSurface
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutFilledTonalButton
@@ -16,6 +18,7 @@ import com.example.ui.reader.readingGlass
 import com.example.ui.feedback.LocalReduceMotion
 import com.example.ui.design.DesignTokens
 import com.example.ui.design.ReadingPalette
+import com.example.ui.wenku.WenkuSymbol
 
 import com.example.ui.components.overlayTouchShield
 
@@ -29,8 +32,10 @@ import androidx.compose.ui.semantics.disabled
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -178,13 +183,13 @@ private val AccentColor = ReadingPalette.WarmAccent
 // 第七轮第 3 条：Tab 增加简洁线性图标（书页/眼睛/图片/调色板/时钟/手掌），
 // 作为完整导航区域设计——图标+文字+统一高度+明确但克制的选中反馈。
 private val SettingsTabs = listOf(
-    PanelTabData("翻页", Icons.AutoMirrored.Filled.MenuBook),
-    PanelTabData("显示", Icons.Filled.Visibility),
-    PanelTabData("图像", Icons.Filled.Image),
-    PanelTabData("翻译", Icons.Filled.Translate),
-    PanelTabData("主题", Icons.Filled.Palette),
-    PanelTabData("自动", Icons.Filled.Schedule),
-    PanelTabData("手势", Icons.Filled.PanTool),
+    PanelTabData("翻页", WenkuSymbol.Book),
+    PanelTabData("显示", WenkuSymbol.Eye),
+    PanelTabData("图像", WenkuSymbol.Image),
+    PanelTabData("翻译", WenkuSymbol.Language),
+    PanelTabData("主题", WenkuSymbol.Sliders),
+    PanelTabData("自动", WenkuSymbol.Timer),
+    PanelTabData("手势", WenkuSymbol.Touch),
 )
 
 @Composable
@@ -241,7 +246,12 @@ internal fun ComicSettingsSheet(
                     Text("阅读设置", color = TextPrimary, fontSize = DesignTokens.TypeTitle, fontWeight = FontWeight.SemiBold)
                     Text("${config.mode.label} · ${config.direction.label}", color = TextSecondary, fontSize = DesignTokens.TypeCaption)
                 }
-                PullOutIconButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Icon(Icons.Filled.Close, "关闭阅读设置", tint = TextSecondary) }
+                PullOutIconButton(
+                    icon = Icons.Filled.Close,
+                    contentDescription = "关闭阅读设置",
+                    tint = TextSecondary,
+                    onClick = com.example.ui.components.paperDismiss(onDismiss)
+                )
             }
             Row(Modifier.fillMaxWidth().weight(1f)) {
                 if (rail) PanelTabRail(SettingsTabs, tab, { tab = it }, Modifier.padding(start = DesignTokens.SpaceMd, top = DesignTokens.SpaceSm))
@@ -249,7 +259,15 @@ internal fun ComicSettingsSheet(
                     if (!rail) PanelTabRow(SettingsTabs, tab, { tab = it }, Modifier.padding(horizontal = DesignTokens.SpaceMd))
                     AnimatedContent(
                         targetState = tab,
-                        transitionSpec = { fadeIn(tween(if (reduceMotion) 0 else 180, delayMillis = if (reduceMotion) 0 else 60)) togetherWith fadeOut(tween(if (reduceMotion) 0 else 90)) },
+                        transitionSpec = {
+                            if (reduceMotion) EnterTransition.None togetherWith ExitTransition.None
+                            else {
+                                val direction = if (targetState > initialState) 1 else -1
+                                val easing = com.example.ui.wenku.WenkuMotion.plane
+                                slideInHorizontally(tween(280, easing = easing)) { it * direction } togetherWith
+                                    slideOutHorizontally(tween(280, easing = easing)) { -it * direction }
+                            }
+                        },
                         label = "comicSettingsTab",
                         modifier = Modifier.fillMaxWidth().weight(1f),
                     ) { selectedTab ->
@@ -922,6 +940,27 @@ private fun ImageTab(
     bookState: ComicBookState,
     onBookStateChange: (ComicBookState) -> Unit,
 ) {
+    PanelSectionCard("图片预加载", Icons.Filled.Image) {
+        SegmentRow(
+            "预加载模式",
+            listOf(0 to "自动", 1 to "自定义"),
+            if (config.imagePreloadCount < 0) 0 else 1,
+        ) { mode -> update { it.copy(imagePreloadCount = if (mode == 0) -1 else 4) } }
+        if (config.imagePreloadCount >= 0) {
+            SliderRow(
+                "提前加载图片数",
+                config.imagePreloadCount.toFloat(),
+                0f..12f,
+                steps = 11,
+                format = { if (it < .5f) "关闭" else "${kotlin.math.round(it).toInt()} 张" },
+            ) { count -> update { it.copy(imagePreloadCount = kotlin.math.round(count).toInt()) } }
+        }
+        Text(
+            "翻页和滚动共用。关闭后只加载当前图片，预加载仍受设备内存限制。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
     PanelSectionCard("裁边", Icons.Filled.Crop) {
         SegmentRow(
             "自动裁边",
@@ -1715,12 +1754,18 @@ internal fun ComicPresetSheet(
                             Icon(Icons.Filled.ContentCopy, "复制", tint = TextSecondary, modifier = Modifier.size(15.dp))
                         }
                         if (!preset.builtIn) {
-                            PullOutIconButton(onClick = {
+                            PullOutIconButton(
+                                    icon = Icons.Filled.Save,
+                                    contentDescription = "用当前设置更新预设",
+                                    onClick = {
                                 store.updatePreset(preset.id, config = currentConfig)
                                 refresh()
                                 android.widget.Toast.makeText(context,
                                     "已更新预设", android.widget.Toast.LENGTH_SHORT).show()
-                            }) { Icon(Icons.Filled.Save, "用当前设置更新预设", tint = TextSecondary, modifier = Modifier.size(DesignTokens.SpaceLg)) }
+                            },
+                                    tint = TextSecondary,
+                                    glyphSize = DesignTokens.SpaceLg
+                                )
                             Box(
                                 Modifier
                                     .size(48.dp)

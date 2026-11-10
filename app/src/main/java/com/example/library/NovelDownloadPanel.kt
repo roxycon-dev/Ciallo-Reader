@@ -1,23 +1,35 @@
 package com.example.library
 
-import com.example.ui.components.PullOutTextButton
-import com.example.ui.glasskit.GlassKitCard
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.download.*
 import com.example.source.SearchBook
+import com.example.ui.adaptive.AdaptiveSpec
+import com.example.ui.components.AppIconButton
+import com.example.ui.components.GlassCard
+import com.example.ui.components.paperDismiss
+import com.example.ui.feedback.LocalReduceMotion
+import com.example.ui.glasskit.GlassManagementPage
+import com.example.ui.wenku.*
 import java.util.Locale
 
 internal fun downloadBytes(bytes: Long): String = when {
@@ -28,120 +40,235 @@ internal fun downloadBytes(bytes: Long): String = when {
 }
 
 internal fun downloadStatusLabel(state: DownloadState): String = when (state) {
-    DownloadState.Pending -> "准备中"
-    is DownloadState.Downloading -> if (state.progress >= 1f) "校验入库…"
-        else if (state.totalBytes > 0 || state.progress > 0) "下载中 · ${(state.progress * 100).toInt()}%" else "下载中"
+    DownloadState.Pending -> "准备下载 · 获取文件与可用线路"
+    is DownloadState.Downloading -> if (state.progress >= 1f) "校验文件并存入书架…"
+        else if (state.totalBytes > 0 || state.progress > 0) "下载中 · ${(state.progress * 100).toInt()}%" else "下载中 · 总大小未知"
     is DownloadState.Paused -> "已暂停"
-    is DownloadState.Success -> "已完成"
+    is DownloadState.Success -> "已完成 · 已存入书架"
     is DownloadState.Error -> "下载失败"
-    DownloadState.Idle -> "等待中"
+    DownloadState.Idle -> "等待下载"
 }
 
 @Composable
 internal fun DownloadCenter(model: LibraryViewModel, onDismiss: () -> Unit) {
-    val tasks by model.allDownloadTasks.collectAsStateWithLifecycle()
+    val tasks by model.allDownloadTasks.collectAsStateWithLifecycle(emptyList())
     val preparing by model.preparingDownloads.collectAsStateWithLifecycle()
     val states by model.downloadStates.collectAsStateWithLifecycle()
     val comics by model.comicDownloadTasks.collectAsStateWithLifecycle()
     val sources by model.availableSources.collectAsStateWithLifecycle()
-    NovelDownloadPanel(tasks, preparing, states, model::pauseDownload, model::resumeDownload,
-        model::cancelDownload, { model.startDownload(it, it.format.takeIf(String::isNotBlank)) }, onDismiss,
-        comics.values.toList(), model::pauseComicChapter,
-        { id -> comics[id]?.let { model.downloadComicChapter(it.book,it.chapter) } }, model::cancelComicChapter, sources.associate { it.id to it.name })
+    GlassManagementPage("下载任务", "ARCHIVE / TRANSFERS", onDismiss) { insets ->
+        Box(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
+            NovelDownloadPanel(
+                tasks, preparing, states, model::pauseDownload, model::resumeDownload,
+                model::cancelDownload, { model.startDownload(it, it.format.takeIf(String::isNotBlank)) }, onDismiss,
+                comics.values.toList(), model::pauseComicChapter,
+                { id -> comics[id]?.let { model.downloadComicChapter(it.book, it.chapter) } }, model::cancelComicChapter,
+                modifier = Modifier.widthIn(max = AdaptiveSpec.pageContentMaxWidth).fillMaxSize(),
+                showHeader = false,
+                sourceNames = sources.associate { it.id to it.name },
+            )
+        }
+    }
 }
 
 @Composable
 internal fun NovelDownloadPanel(
-    tasks: List<DownloadTaskEntity>, preparations: Map<String, LibraryViewModel.DownloadPreparation>,
-    states: Map<String, DownloadState>, onPause: (String) -> Unit, onResume: (String) -> Unit,
-    onCancel: (String) -> Unit, onRetry: (SearchBook) -> Unit,
-    onDismiss: () -> Unit, comics: List<ComicDownloadTask> = emptyList(),
-    onComicPause: (String) -> Unit = {}, onComicResume: (String) -> Unit = {}, onComicDelete: (String) -> Unit = {}, sourceNames: Map<String,String> = emptyMap()
+    tasks: List<DownloadTaskEntity>,
+    preparations: Map<String, LibraryViewModel.DownloadPreparation>,
+    states: Map<String, DownloadState>,
+    onPause: (String) -> Unit,
+    onResume: (String) -> Unit,
+    onCancel: (String) -> Unit,
+    onRetry: (SearchBook) -> Unit,
+    onDismiss: () -> Unit,
+    comics: List<ComicDownloadTask> = emptyList(),
+    onComicPause: (String) -> Unit = {},
+    onComicResume: (String) -> Unit = {},
+    onComicDelete: (String) -> Unit = {},
+    modifier: Modifier = Modifier,
+    showHeader: Boolean = true,
+    sourceNames: Map<String, String> = emptyMap(),
 ) {
     var deletion by remember { mutableStateOf<Pair<String, () -> Unit>?>(null) }
-    val maxHeight = LocalConfiguration.current.screenHeightDp.dp * .8f
-    GlassKitCard(shape = MaterialTheme.shapes.extraLarge, modifier=Modifier.fillMaxWidth()) {
-        Column(Modifier.fillMaxWidth().heightIn(max = maxHeight).padding(horizontal=16.dp).testTag("download_task_panel")) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("下载", style=MaterialTheme.typography.titleLarge, modifier=Modifier.weight(1f))
-                PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Text("收起") }
+    val sortedTasks = remember(tasks) {
+        tasks.sortedWith(compareBy<DownloadTaskEntity> { it.status == DownloadStatus.COMPLETED }
+            .thenByDescending { it.updatedAt })
+    }
+    val knownIds = remember(tasks) { tasks.map { it.id }.toSet() }
+    val pending = remember(preparations, knownIds) { preparations.filterKeys { it !in knownIds }.entries.toList() }
+    val count = pending.size + tasks.size + comics.size
+    LazyColumn(
+        modifier = modifier.fillMaxWidth().testTag("download_task_panel"),
+        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item(key = "overview") {
+            Column(Modifier.fillMaxWidth().wenkuPagePart(1)) {
+                if (showHeader) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("下载任务", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                        AppIconButton(Icons.Default.Close, "收起", onClick = onDismiss)
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("离线任务", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold)
+                    Text("$count 项", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                }
+                Text("任务在后台继续，完成后可在书架阅读。", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
             }
-            LazyColumn(Modifier.fillMaxWidth().weight(1f, fill=false), contentPadding=PaddingValues(vertical=12.dp)) {
-                val keys = tasks.map { it.id }.toSet()
-                items(preparations.filterKeys { it !in keys }.entries.toList(), key={ "prep:"+it.key }) { (key, prep) ->
-                    DownloadTaskRow(prep.book.title, sourceNames[prep.book.sourceId] ?: prep.book.sourceId, prep.state,
-                        { onPause(key) }, { onResume(key) }, { deletion=prep.book.title to { onCancel(key) } }, { onRetry(prep.book) })
-                }
-                items(tasks.sortedWith(compareBy<DownloadTaskEntity> { it.status==DownloadStatus.COMPLETED }.thenByDescending { it.updatedAt }),key={it.id}) { t ->
-                    val key=DownloadManager.taskId(t.sourceId,DownloadManager.originalBookId(t.id,t.sourceId))
-                    val state=states[key] ?: when(t.status) {
-                        DownloadStatus.COMPLETED -> DownloadState.Success(t.filePath)
-                        DownloadStatus.FAILED -> DownloadState.Error(t.errorMessage ?: "下载失败")
-                        DownloadStatus.PAUSED -> DownloadState.Paused(t.downloadedBytes,t.totalBytes)
-                        DownloadStatus.DOWNLOADING -> DownloadState.Downloading(t.downloadedBytes,t.totalBytes,t.progress)
-                        else -> DownloadState.Pending
+        }
+        itemsIndexed(pending, key = { _, entry -> "prep:${entry.key}" }) { index, (id, prep) ->
+            DownloadTaskRow(
+                prep.book.title, sourceNames[prep.book.sourceId] ?: prep.book.sourceId, prep.state,
+                { onPause(id) }, { onResume(id) }, { deletion = prep.book.title to { onCancel(id) } }, { onRetry(prep.book) },
+                modifier = Modifier.wenkuPagePart(index + 2),
+            )
+        }
+        itemsIndexed(sortedTasks, key = { _, task -> "novel:${task.id}" }) { index, task ->
+            val originalId = DownloadManager.originalBookId(task.id, task.sourceId)
+            val id = DownloadManager.taskId(task.sourceId, originalId)
+            val state = states[id] ?: when (task.status) {
+                DownloadStatus.COMPLETED -> DownloadState.Success(task.filePath)
+                DownloadStatus.FAILED -> DownloadState.Error(task.errorMessage ?: "下载失败")
+                DownloadStatus.PAUSED -> DownloadState.Paused(task.downloadedBytes, task.totalBytes)
+                DownloadStatus.DOWNLOADING -> DownloadState.Downloading(task.downloadedBytes, task.totalBytes, task.progress)
+                else -> DownloadState.Pending
+            }
+            val book = SearchBook(id = originalId, sourceId = task.sourceId, title = task.title,
+                author = task.author, format = task.format)
+            DownloadTaskRow(
+                task.title, "${task.format.uppercase(Locale.ROOT)} · ${sourceNames[task.sourceId] ?: task.sourceId}", state,
+                { onPause(id) }, { onResume(id) }, { deletion = task.title to { onCancel(id) } }, { onRetry(book) },
+                modifier = Modifier.wenkuPagePart(pending.size + index + 2),
+            )
+        }
+        itemsIndexed(comics, key = { _, task -> "comic:${ComicDownloadManager.taskId(task.book, task.chapterId)}" }) { index, task ->
+            val id = ComicDownloadManager.taskId(task.book, task.chapterId)
+            val state = when (task.status) {
+                ComicDownloadStatus.DOWNLOADING -> DownloadState.Downloading(0, 0, task.progress)
+                ComicDownloadStatus.PAUSED -> DownloadState.Paused(0, 0)
+                ComicDownloadStatus.FAILED -> DownloadState.Error(task.error ?: "下载失败")
+                ComicDownloadStatus.SUCCESS -> DownloadState.Success("")
+            }
+            DownloadTaskRow(
+                task.book.title, "${task.chapter.title} · ${sourceNames[task.book.sourceId] ?: task.book.sourceId}", state,
+                { onComicPause(id) }, { onComicResume(id) }, { deletion = task.book.title to { onComicDelete(id) } },
+                { onComicResume(id) }, modifier = Modifier.wenkuPagePart(pending.size + tasks.size + index + 2),
+                completionLabel = "已完成 · 漫画章节可离线阅读",
+            )
+        }
+        if (count == 0) {
+            item(key = "empty") {
+                WenkuContentPanel(Modifier.fillMaxWidth().wenkuPagePart(2)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        WenkuIcon(WenkuSymbol.CloudDownload, size = 24.dp, tint = MaterialTheme.colorScheme.primary, entrance = false)
+                        Column {
+                            Text("暂无下载任务", style = MaterialTheme.typography.titleSmall)
+                            Text("从书库或漫画章节开始下载。", style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
-                    val book=SearchBook(id=DownloadManager.originalBookId(t.id,t.sourceId),sourceId=t.sourceId,title=t.title,author=t.author,format=t.format)
-                    DownloadTaskRow(t.title,"${t.format.uppercase()} · ${sourceNames[t.sourceId] ?: t.sourceId}",state,
-                        {onPause(key)},{onResume(key)},{deletion=t.title to {onCancel(key)}},{onRetry(book)})
                 }
-                items(comics, key={ComicDownloadManager.taskId(it.book,it.chapterId)}) { t ->
-                    val id=ComicDownloadManager.taskId(t.book,t.chapterId)
-                    val state=when(t.status) {
-                        ComicDownloadStatus.DOWNLOADING -> DownloadState.Downloading(0,0,t.progress)
-                        ComicDownloadStatus.PAUSED -> DownloadState.Paused(0,0)
-                        ComicDownloadStatus.FAILED -> DownloadState.Error(t.error ?: "下载失败")
-                        ComicDownloadStatus.SUCCESS -> DownloadState.Success("")
-                    }
-                    DownloadTaskRow(t.book.title,"${t.chapter.title} · ${sourceNames[t.book.sourceId] ?: t.book.sourceId}",state,
-                        {onComicPause(id)},{onComicResume(id)},{deletion=t.book.title to {onComicDelete(id)}},{onComicResume(id)})
-                }
-                if(tasks.isEmpty() && preparations.isEmpty() && comics.isEmpty()) item { Text("暂无下载任务",Modifier.padding(vertical=24.dp)) }
             }
         }
     }
-    deletion?.let { pending ->
-        AlertDialog(onDismissRequest={deletion=null}, title={Text("删除记录？")},
-            text={Text("未完成任务会停止，书架文件保留。")},
-            confirmButton={TextButton(onClick={deletion=null;pending.second()}) {Text("删除")}},
-            dismissButton={TextButton(onClick={deletion=null}) {Text("取消")}})
+    deletion?.let { (title, remove) ->
+        WenkuActionSheet("删除下载记录？", onDismiss = { deletion = null }) {
+            Text("“$title”的下载记录将被移除。未完成的任务会停止，已存入书架的书籍保留。")
+            WenkuTextButton(
+                "删除", onClick = paperDismiss(remove), modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.error, wenkuSymbol = WenkuSymbol.Delete,
+            )
+            WenkuTextButton(
+                "保留", onClick = paperDismiss {}, modifier = Modifier.fillMaxWidth(),
+                wenkuSymbol = WenkuSymbol.Close,
+            )
+        }
     }
 }
 
 @Composable
-private fun DownloadTaskRow(title:String, subtitle:String, state:DownloadState,
-    onPause:()->Unit,onResume:()->Unit,onDelete:()->Unit,onRetry:()->Unit) {
-    Column(Modifier.fillMaxWidth().padding(vertical=10.dp)) {
-        Row(verticalAlignment=Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(title,maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.titleSmall)
-                Text(subtitle,maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            val action = when (state) {
-                is DownloadState.Downloading -> Triple(Icons.Default.Pause, "暂停", onPause)
-                is DownloadState.Paused -> Triple(Icons.Default.PlayArrow, "继续", onResume)
-                is DownloadState.Error -> Triple(Icons.Default.Refresh, "重新获取并重试", onRetry)
-                else -> null
-            }
-            action?.let { (icon, description, click) ->
-                com.example.ui.components.PullOutIconButton(onClick = click) {
-                    com.example.ui.components.AnimatedStateIcon(icon, description)
+private fun DownloadTaskRow(
+    title: String,
+    subtitle: String,
+    state: DownloadState,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onDelete: () -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+    completionLabel: String = "已完成 · 已存入书架",
+) {
+    val colors = MaterialTheme.colorScheme
+    GlassCard(modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(title, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+                Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall,
+                    color = colors.onSurfaceVariant)
+                Text(if (state is DownloadState.Success) completionLabel else downloadStatusLabel(state),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (state is DownloadState.Error) colors.error else colors.primary)
+                when (state) {
+                    is DownloadState.Downloading -> if (state.downloadedBytes > 0) {
+                        val total = if (state.totalBytes > 0) downloadBytes(state.totalBytes) else "未知大小"
+                        Text("${downloadBytes(state.downloadedBytes)} / $total", style = MaterialTheme.typography.labelSmall)
+                    }
+                    is DownloadState.Error -> Text(com.example.download.DownloadWorker.failureMessage(state.message), style = MaterialTheme.typography.labelSmall, color = colors.error)
+                    else -> Unit
                 }
             }
-            com.example.ui.components.PullOutIconButton(onClick = onDelete) { Icon(Icons.Default.Close, "删除记录") }
-        }
-        Text(if(state is DownloadState.Error) DownloadWorker.failureMessage(state.message) else downloadStatusLabel(state),maxLines=2,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodySmall,
-            color=if(state is DownloadState.Error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
-        when(state) {
-            DownloadState.Pending -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(top=6.dp))
-            is DownloadState.Downloading -> {
-                if(state.totalBytes>0 || state.progress>0) LinearProgressIndicator(progress={state.progress.coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth().padding(top=6.dp))
-                else LinearProgressIndicator(Modifier.fillMaxWidth().padding(top=6.dp))
-                if(state.downloadedBytes>0) Text("${downloadBytes(state.downloadedBytes)} / ${if(state.totalBytes>0) downloadBytes(state.totalBytes) else "未知大小"}",style=MaterialTheme.typography.labelSmall)
+            when (state) {
+                DownloadState.Pending -> Spacer(Modifier.size(48.dp).downloadRing(0f))
+                is DownloadState.Downloading -> {
+                    val known = state.totalBytes > 0 || state.progress > 0f
+                    AppIconButton(
+                        Icons.Default.Pause, "暂停", onClick = onPause,
+                        modifier = Modifier.downloadRing(state.progress.takeIf { known }),
+                        wenkuSymbol = WenkuSymbol.Pause, glyphSize = 16.dp,
+                    )
+                }
+                is DownloadState.Paused -> AppIconButton(Icons.Default.PlayArrow, "继续", onClick = onResume,
+                    wenkuSymbol = WenkuSymbol.Play)
+                is DownloadState.Error -> AppIconButton(Icons.Default.Refresh, "重新获取并重试", onClick = onRetry,
+                    wenkuSymbol = WenkuSymbol.Refresh)
+                is DownloadState.Success -> Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                    WenkuIcon(WenkuSymbol.Check, size = 20.dp, tint = colors.primary)
+                }
+                DownloadState.Idle -> Unit
             }
-            is DownloadState.Error -> Unit
-            else -> Unit
+            AppIconButton(Icons.Default.Delete, "删除记录", onClick = onDelete, wenkuSymbol = WenkuSymbol.Delete)
         }
     }
-    HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.4f))
+}
+
+@Composable
+internal fun Modifier.downloadRing(progress: Float?): Modifier {
+    val reduceMotion = LocalReduceMotion.current
+    val color = MaterialTheme.colorScheme.primary
+    val fill = animateFloatAsState(
+        targetValue = (progress ?: 0f).coerceIn(0f, 1f),
+        animationSpec = tween(if (reduceMotion) 0 else 240, easing = EaseOutCubic),
+        label = "downloadRingFill",
+    )
+    val turn = if (progress == null && !reduceMotion) {
+        rememberInfiniteTransition(label = "downloadRingTurn").animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing)),
+            label = "downloadRingAngle",
+        )
+    } else null
+    return drawBehind {
+        val diameter = 25.dp.toPx()
+        val topLeft = center - Offset(diameter / 2, diameter / 2)
+        val stroke = Stroke(1.65.dp.toPx(), cap = StrokeCap.Round)
+        val size = Size(diameter, diameter)
+        drawArc(color.copy(alpha = .18f), -84f, 348f, false, topLeft, size, style = stroke)
+        val sweep = if (progress == null) 80f else 348f * fill.value
+        if (sweep > 0f) drawArc(color, -84f + (turn?.value ?: 0f), sweep, false, topLeft, size, style = stroke)
+    }
 }

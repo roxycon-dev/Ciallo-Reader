@@ -1,5 +1,9 @@
 package com.example.god
 
+import com.example.ui.wenku.wenkuTabTitle
+import com.example.ui.wenku.wenkuPagePart
+import com.example.ui.wenku.WenkuSymbol
+import com.example.ui.wenku.WenkuIcon
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutIconButton
 import androidx.compose.animation.AnimatedContent
@@ -202,22 +206,23 @@ fun GodRankingScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             "神回排行榜",
+                            modifier = Modifier.wenkuTabTitle(0),
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             color = MaterialTheme.colorScheme.onBackground,
                         )
                         Spacer(Modifier.width(8.dp))
-                        GodCountPill(count = moments.size)
+                        Box(Modifier.wenkuTabTitle(1)) { GodCountPill(count = moments.size) }
                     }
                 },
                 navigationIcon = {
-                    PullOutIconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
-                            tint = MaterialTheme.colorScheme.onBackground,
-                        )
-                    }
+                    PullOutIconButton(
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "返回",
+                        onClick = onBack,
+                        tint = MaterialTheme.colorScheme.onBackground,
+                        glyphSize = 22.dp
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -242,14 +247,13 @@ fun GodRankingScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item(key = "hero") {
-                GodRankingHero(
-                    leader = ranked.first().entity,
-                    count = ranked.size,
-                )
+                Box(Modifier.fillMaxWidth().wenkuPagePart(1)) {
+                    GodRankingHero(leader = ranked.first().entity, count = ranked.size)
+                }
             }
             item(key = "style") {
                 GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().wenkuPagePart(2),
                     shape = RoundedCornerShape(18.dp),
                     tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.68f),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
@@ -261,7 +265,7 @@ fun GodRankingScreen(
                         Text(style.label, color = GodGold.LightEnd, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         if (onOpenStyleSettings != null) {
                             Spacer(Modifier.width(5.dp))
-                            Text("↗", color = GodGold.LightEnd, fontSize = 13.sp)
+                            WenkuIcon(WenkuSymbol.Forward, size = 16.dp, tint = GodGold.LightEnd, entrance = false)
                         }
                     }
                 }
@@ -269,6 +273,7 @@ fun GodRankingScreen(
             item(key = "body") {
                 AnimatedContent(
                     targetState = style,
+                    modifier = Modifier.wenkuPagePart(3),
                     transitionSpec = {
                         if (reduce) fadeIn(tween(140)) togetherWith fadeOut(tween(140))
                         else (fadeIn(tween(280)) + scaleIn(tween(280), initialScale = 0.97f)) togetherWith

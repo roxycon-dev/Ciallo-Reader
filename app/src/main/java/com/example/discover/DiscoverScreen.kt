@@ -1,5 +1,10 @@
 package com.example.discover
 
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import com.example.ui.wenku.WenkuSymbol
+import com.example.ui.wenku.WenkuTextButton
+import com.example.ui.wenku.WenkuSectionHeader
 import com.example.ui.components.pullOutClickable
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutIconButton
@@ -62,6 +67,8 @@ import com.example.ui.feedback.LocalReduceMotion
 import com.example.ui.feedback.LocalHapticsEnabled
 import com.example.ui.theme.LocalAppBottomInset
 import com.example.ui.theme.glassTitleColor
+import com.example.ui.wenku.WenkuLoadedContentSequence
+import com.example.ui.wenku.wenkuReveal
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -73,11 +80,16 @@ fun DiscoverScreen(manager: SourceManager, favorites: List<FavoriteItem>, favori
     onLatest: (SearchBook) -> Unit, onSourceManagement: () -> Unit, readingTitles: Set<String> = emptySet(), refreshRequest: Int = 0, downloadEntry: @Composable () -> Unit = {}) {
     var partition by rememberSaveable { mutableStateOf(DiscoverPartition.COMIC) }
     val holder = rememberSaveableStateHolder()
-    holder.SaveableStateProvider(partition.name) {
-        DiscoverPartitionContent(manager, favorites, favoriteKeys, onFollow, onOpen, onLatest,
-            onSourceManagement, readingTitles, refreshRequest, partition, { partition = it }, downloadEntry)
+    com.example.ui.wenku.WenkuPlaneTabSwitcher(
+        targetState = partition,
+        modifier = Modifier.fillMaxSize(),
+        direction = { from, to -> to.ordinal - from.ordinal }
+    ) { displayed ->
+        holder.SaveableStateProvider(displayed.name) {
+            DiscoverPartitionContent(manager, favorites, favoriteKeys, onFollow, onOpen, onLatest,
+                onSourceManagement, readingTitles, refreshRequest, displayed, { partition = it }, downloadEntry)
+        }
     }
-
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -120,6 +132,8 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val grid = rememberLazyGridState()
+    // library_reflow.dart: content re-ordering keeps each card position-anchored (420ms).
+    val discoverReflow = com.example.ui.wenku.rememberWenkuReflowState()
     val reduce = LocalReduceMotion.current
     val haptics = LocalHapticFeedback.current
     val hapticsEnabled = LocalHapticsEnabled.current
@@ -198,27 +212,56 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
             if (availableRanges.isNotEmpty()) range = availableRanges.first() else nativeFeed = "native"
         }
     }
+    val windowWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+    val gridLayout = layout == DiscoverLayout.GRID &&
+        (dimension != DiscoverDimension.RANKING || nativeFeed != null || nativeCategory != null || selected.isNotEmpty())
+    val columns = when {
+        !gridLayout -> 1
+        windowWidth >= 840 -> 4
+        windowWidth >= 600 -> 3
+        else -> 2
+    }
     val headerDistance = with(LocalDensity.current) { 150.dp.toPx() }
     val headerFraction = remember(grid, headerDistance) { { if (grid.firstVisibleItemIndex > 0) 1f else (grid.firstVisibleItemScrollOffset / headerDistance).coerceIn(0f, 1f) } }
     Box(Modifier.fillMaxSize().testTag("discover_screen").onGloballyPositioned { screenOffset = it.positionInRoot() }) {
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.align(Alignment.TopCenter).widthIn(max = if (gridLayout) 1040.dp else 760.dp).fillMaxSize()) {
             CollapsingTabScreenHeader(fractionSource = headerFraction, modifier = Modifier.statusBarsPadding(), title = "发现", subtitle = "DISCOVER",
                 onTitleClick = { scope.launch { if (reduce) grid.scrollToItem(0) else grid.animateScrollToItem(0) } },
                 titleColor = glassTitleColor(), trailing = {
                     Row {
                         downloadEntry()
-                        PullOutIconButton(onClick = { showSettings = true }) { Icon(Icons.Outlined.Tune, "发现设置") }
+                        PullOutIconButton(
+                            icon = Icons.Outlined.Tune,
+                            contentDescription = "发现设置",
+                            onClick = { showSettings = true }
+                        )
                     }
                 })
             PullToRefreshBox(isRefreshing = state.loading && state.entries.isNotEmpty(), onRefresh = { light(); model.refresh() }, modifier = Modifier.weight(1f),
                 ) {
-                LazyVerticalGrid(columns = GridCells.Fixed(if (layout == DiscoverLayout.GRID && (dimension != DiscoverDimension.RANKING || nativeFeed != null || nativeCategory != null || selected.isNotEmpty())) 2 else 1), state = grid,
+                WenkuLoadedContentSequence(
+                    contentKey = viewportKey,
+                    loading = state.loading && rows.isEmpty(),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                com.example.ui.wenku.WenkuReflowScope(state = discoverReflow, trigger = dimension to (selected.toList() to nativeFeed), modifier = Modifier.fillMaxSize()) {
+                LazyVerticalGrid(columns = GridCells.Fixed(columns), state = grid,
                     modifier = Modifier.fillMaxSize().testTag("discover_content"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = LocalAppBottomInset.current + 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     item(key = "partition", span = { GridItemSpan(maxLineSpan) }) {
-                        LiquidSegmentedSelector(DiscoverPartition.entries.map { LiquidSegmentOption(it.ordinal, it.label) },
-                            partition.ordinal, { onPartition(DiscoverPartition.entries[it]) },
-                            modifier = Modifier.testTag("discover_partition"), fontSp = 14f)
+                        Row(
+                            Modifier.fillMaxWidth().testTag("discover_partition"),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            DiscoverPartition.entries.forEach { option ->
+                                WenkuTextButton(
+                                    option.label, { onPartition(option) },
+                                    modifier = Modifier.weight(1f).semantics { this.selected = partition == option },
+                                    selected = partition == option,
+                                    wenkuSymbol = if (option == DiscoverPartition.COMIC) WenkuSymbol.Image else WenkuSymbol.Book,
+                                )
+                            }
+                        }
                     }
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         val native = nativeFeed != null || nativeCategory != null
@@ -239,21 +282,38 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                             statuses = if (statusKnown && statusScope.showStatusChoices) listOf("全部", "连载", "完结") + (if (state.entries.any { serialLabel(it.book.discoverStatus) == "停更" }) listOf("停更") else emptyList()) + (if (unknownStatus) listOf("状态未知") else emptyList()) else emptyList(),
                             status = effectiveStatus, statusHint = statusScope.hint, onStatus = { light(); statusFilter = it })
                     }
-                    if (sourceId == "aggregate") item(span = { GridItemSpan(maxLineSpan) }) {
-                        Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
-                            val participants = rows.flatMap { it.variants }.map { it.book.sourceId }.distinct()
-                            PullOutTextButton(onClick = { noticesExpanded = true }) {
-                                Text("当前结果 ${participants.size} 个源 · 已请求 ${activeSources.size} 个源" + if (state.loading) " · 加载中" else " · 查看来源", style = MaterialTheme.typography.labelMedium)
+                    if (sourceId == "aggregate" || rows.isNotEmpty()) {
+                        item(key = "discover_results_heading", span = { GridItemSpan(maxLineSpan) }) {
+                            val sourceProgress: (@Composable () -> Unit)? = if (sourceId == "aggregate") {
+                                val participantCount = rows.flatMap { it.variants }.map { it.book.sourceId }.distinct().size
+                                val action: @Composable () -> Unit = {
+                                    WenkuTextButton(
+                                        "来源 $participantCount / ${activeSources.size}",
+                                        { noticesExpanded = true },
+                                        compact = true,
+                                        wenkuSymbol = if (state.loading) WenkuSymbol.Sync else WenkuSymbol.Info,
+                                    )
+                                }
+                                action
+                            } else null
+                            if (rows.isEmpty()) {
+                                sourceProgress?.invoke()
+                            } else {
+                                WenkuSectionHeader("01", "BROWSE / CATALOGUE", "浏览结果", trailing = sourceProgress)
                             }
                         }
                     }
-                    if (state.errors.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
-                        GlassCard(contentPadding = PaddingValues(12.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(if (rows.isEmpty()) "暂时连接不上，已保留上次内容" else "${state.errors.size} 个书源暂时连接不上", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                                PullOutTextButton(onClick = model::retry) { Text("重试") }
+                    if (state.errors.isNotEmpty()) item(key = "discover_error_summary", span = { GridItemSpan(maxLineSpan) }) {
+                        GlassCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(start = 12.dp, end = 4.dp)) {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    if (rows.isEmpty()) "连接中断，已保留上次内容" else "${state.errors.size} 个书源暂时连接不上",
+                                    Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                PullOutIconButton(Icons.Outlined.Refresh, "重试", onClick = model::retry, glyphSize = 18.dp)
+                                PullOutIconButton(Icons.Outlined.Info, "查看详情", onClick = { noticesExpanded = true }, glyphSize = 18.dp)
                             }
-                            PullOutTextButton(onClick = { noticesExpanded = true }) { Text("查看详情") }
                         }
                     }
                     if (rows.isEmpty() && !state.loading) item(span = { GridItemSpan(maxLineSpan) }) {
@@ -266,6 +326,7 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                         }
                     }
                     itemsIndexed(rows, key = { _, w -> w.key }) { index, work ->
+                        com.example.ui.wenku.WenkuReflowItem(key = work.key, state = discoverReflow, order = index) {
                         DiscoverCard(work, dimension, if (dimension == DiscoverDimension.RANKING && nativeFeed == null && nativeCategory == null && selected.isEmpty()) DiscoverLayout.LIST else layout,
                             rank = if (dimension == DiscoverDimension.RANKING && nativeFeed == null && nativeCategory == null && selected.isEmpty()) { if (sourceId == "aggregate") index + 1 else work.variants.first().rank ?: index + 1 } else null,
                             followed = work.variants.any { favoriteKey(it.book.sourceId, it.book.id) in favoriteKeys },
@@ -276,12 +337,15 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                             sourceLabel = { id -> sources.firstOrNull { it.id == id }?.name ?: id }, entryIndex = index,
                             coverSource = { manager.getSource(it) })
                     }
+                    }
                     if (state.loading) items(if (rows.isEmpty()) 6 else 2) {
                         DiscoverSkeleton(if (dimension == DiscoverDimension.RANKING) DiscoverLayout.LIST else layout)
                     }
                     if (!state.loading && state.more.isEmpty() && rows.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
                         Text("已看完当前书源的可用内容 · 换个维度继续发现", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(16.dp))
                     }
+                }
+                }
                 }
             }
         }
@@ -302,7 +366,11 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
             }
         }
         menuWork?.let { work ->
-            com.example.ui.components.PullOutDropdownMenu(expanded = true, onDismissRequest = { menuWork = null }) {
+            com.example.ui.components.PullOutDropdownMenu(
+                expanded = true,
+                onDismissRequest = { menuWork = null },
+                anchorInWindow = menuBounds.takeUnless { it == Rect.Zero }
+            ) {
                 val followed = work.variants.any { favoriteKey(it.book.sourceId, it.book.id) in favoriteKeys }
                 val actions = listOf(Triple(Icons.Outlined.FavoriteBorder, if (followed) "取消喜欢" else "加入我喜欢的", { follow(work, !followed) }),
                     Triple(Icons.Outlined.VisibilityOff, "不感兴趣", { block(work) }), Triple(Icons.Outlined.Share, "分享", { share(work) }))
@@ -310,11 +378,12 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                     com.example.ui.components.PullOutDropdownMenuItem(
                         text = { Text(action.second, color = if (index == 1) DiscoverRise else discoverInk()) },
                         leadingIcon = { Icon(action.first, null, tint = if (index == 1) DiscoverRise else discoverInk()) },
-                        onClick = { menuWork = null; action.third() })
+                        onClick = com.example.ui.components.paperDismiss(action.third))
                 }
             }
         }
-        if (noticesExpanded) DiscoverSourceStatusSheet(activeSources, rows, state, effectiveStatus,
+        // 常驻组合、只翻 visible：WenkuSheetHost 需要看到 visible 从 true 变 false 才有退场。
+        DiscoverSourceStatusSheet(visible = noticesExpanded, activeSources, rows, state, effectiveStatus,
             onRetry = model::retry, onDismiss = { noticesExpanded = false })
         if (showSettings) DiscoverSettings(partition) { showSettings = false }
         if (showSources) DiscoverSourcePicker(sources, enabled, sourceId, { id ->
@@ -335,7 +404,7 @@ internal fun DiscoverChip(label: String, selected: Boolean, onClick: () -> Unit,
     visualHeight: Int = 32, dimmed: Boolean = false, icon: ImageVector? = null, outlined: Boolean = false, modifier: Modifier = Modifier) {
     val primary = MaterialTheme.colorScheme.primary
     Box(modifier.heightIn(min = 48.dp).widthIn(min = 48.dp).alpha(if (dimmed) .5f else 1f)
-        .pullOutSelectable(selected, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, role = Role.Checkbox, onClick = onClick), contentAlignment = Alignment.Center) {
+        .discoverPressSelect(selected, role = Role.Checkbox, onClick = onClick), contentAlignment = Alignment.Center) {
         Row(Modifier.heightIn(min = visualHeight.dp).clip(CircleShape)
             .background(if (selected) { if (solid) primary else discoverTint() } else if (solid) MaterialTheme.colorScheme.surface.copy(alpha = .40f) else Color.Transparent)
             .then(if (outlined) Modifier.border(1.dp, if (selected) primary else discoverInk().copy(alpha = .12f), CircleShape) else Modifier)
