@@ -227,7 +227,7 @@ On Windows, use gradlew.bat :app:assembleDebug. For bugs and feature requests, o
 
 ## Contributors and thanks
 
-Thanks to [mikufoxxx and the Wenku8 Flutter contributors](https://github.com/mikufoxxx/Wenku8_Flutter) for sharing their UI, interaction design, and motion work. Their editorial layouts, glass overlays, and coordinated transitions guided this redesign. Thanks to [qianyunli114514](https://github.com/qianyunli114514) for requesting tablet support and configurable manga image preloading in [Issue #7](https://github.com/roxycon-dev/Ciallo-Reader/issues/7).
+Thanks to [mikufoxxx and the Wenku8 Flutter contributors](https://github.com/mikufoxxx/Wenku8_Flutter) for sharing their UI, interaction design, and motion work. Their editorial layouts, glass overlays, and coordinated transitions guided this redesign. 
 
 Many changes in this project come from issues: bug reports, new sources, and reports about layout or compatibility problems. Below are the people who filed them, with their issue numbers.
 
