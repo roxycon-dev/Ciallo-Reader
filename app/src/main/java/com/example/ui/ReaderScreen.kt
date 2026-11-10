@@ -3312,7 +3312,8 @@ fun ReaderScreen(
                                                 PullOutDropdownMenu(
                                                     expanded = showReaderMoreMenu,
                                                     onDismissRequest = { showReaderMoreMenu = false },
-                                                    anchorInWindow = moreAnchor
+                                                    anchorInWindow = moreAnchor,
+                                                    borderless = true,
                                                 ) {
                                                     PullOutDropdownMenuItem(
                                                         text = { Text("全文搜索") },

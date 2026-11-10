@@ -346,6 +346,7 @@ fun PullOutDropdownMenu(
     offset: DpOffset = DpOffset.Zero,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
     anchorInWindow: androidx.compose.ui.geometry.Rect? = null,
+    borderless: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     var retained by remember { mutableStateOf(expanded) }
@@ -368,13 +369,15 @@ fun PullOutDropdownMenu(
             sourceRadius = DesignTokens.SpaceXxl,
             onDismiss = onDismissRequest,
             dismissRequested = dismissRequested,
-            onHidden = { retained = false }
+            onHidden = { retained = false },
+            borderlessSurface = containerColor.takeIf { borderless },
         ) {
             Column(
                 modifier = Modifier
                     .widthIn(min = 180.dp, max = 360.dp)
-                    .clip(RoundedCornerShape(DesignTokens.SpaceXl))
-                    .background(containerColor)
+                    .then(if (borderless) Modifier else Modifier
+                        .clip(RoundedCornerShape(DesignTokens.SpaceXl))
+                        .background(containerColor))
                     .padding(vertical = DesignTokens.SpaceSm)
             ) {
                 content()

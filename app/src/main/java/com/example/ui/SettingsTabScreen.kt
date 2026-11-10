@@ -70,7 +70,7 @@ import com.example.ui.theme.clickableWithFeedback
 import com.example.ui.wenku.WenkuIcon
 import com.example.ui.wenku.WenkuSymbol
 import com.example.ui.wenku.WenkuSectionHeader
-import com.example.ui.wenku.wenkuPagePart
+import com.example.ui.wenku.wenkuTabTitle
 import com.example.ui.wenku.WenkuTextButton
 import com.example.ui.theme.onColor
 import com.example.ui.theme.glassTitleColor
@@ -303,7 +303,6 @@ LazyColumn(
                         item(key = "theme_palette") {
                             SettingsNavigationCard(
                                 "主题配色方案", WenkuSymbol.Brightness,
-                                modifier = Modifier.wenkuPagePart(1),
                                 subtitle = "预览和调整主色调与强调色", onClick = open,
                             )
                         }
@@ -312,7 +311,6 @@ LazyColumn(
                         item(key = "card_appearance") {
                             SettingsNavigationCard(
                                 "自定义卡片参数", WenkuSymbol.Layers,
-                                modifier = Modifier.wenkuPagePart(2),
                                 subtitle = "调整玻璃、圆角与按压反馈", onClick = open,
                             )
                         }
@@ -324,7 +322,6 @@ LazyColumn(
                     SettingsNavigationCard(
                         title = "发现设置",
                         symbol = WenkuSymbol.Discover,
-                        modifier = Modifier.wenkuPagePart(3),
                         subtitle = "浏览布局、推荐偏好与屏蔽管理",
                         onClick = { showDiscoverSettings = true }
                     )
@@ -337,7 +334,7 @@ LazyColumn(
 
                 item {
                     GlassCard(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -420,7 +417,7 @@ LazyColumn(
 
                 item {
                     GlassCard(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -561,7 +558,7 @@ LazyColumn(
 
                 item {
                     GlassCard(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -595,7 +592,7 @@ LazyColumn(
 
                 item {
                     GlassCard(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -631,7 +628,7 @@ LazyColumn(
                 // 马达坏了 / 开会不想震动 / 省电的用户只能去系统层关触感，或者改代码。
                 item {
                     GlassCard(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -666,7 +663,7 @@ LazyColumn(
 
                 item {
                     GlassCard(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(
@@ -707,7 +704,7 @@ LazyColumn(
 
                 item {
                     GlassCard(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -878,7 +875,7 @@ LazyColumn(
                 }
                 item {
                     GlassCard(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Row(
@@ -981,7 +978,7 @@ LazyColumn(
                 item { SettingsSectionHeader("关于") }
                 item {
                     GlassCard(
-                        modifier = Modifier.fillMaxWidth().testTag("software-info"),
+                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f).testTag("software-info"),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(
@@ -1202,7 +1199,7 @@ private fun SettingsNavigationCard(
     onClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
-    GlassCard(modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), onClick = onClick) {
+    GlassCard(modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f), shape = RoundedCornerShape(16.dp), onClick = onClick) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             WenkuIcon(symbol, size = 24.dp, tint = colors.primary, entrance = false)
             Spacer(Modifier.width(12.dp))
@@ -1222,6 +1219,7 @@ private fun SettingsSectionHeader(text: String) {
     // 一屏十几个分组时整页“全是标题”，层级糊成一片。
     Text(
         text = text,
+        modifier = Modifier.wenkuTabTitle(1, strength = .6f),
         fontWeight = FontWeight.SemiBold,
         fontSize = 13.sp,
         letterSpacing = 0.1.sp,

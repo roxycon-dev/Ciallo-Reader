@@ -1,5 +1,6 @@
 package com.example.ui.wenku
 
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
@@ -21,6 +22,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -29,7 +31,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -78,6 +79,8 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private val LocalWenkuSequence = staticCompositionLocalOf<State<Float>?> { null }
+private val LocalWenkuSceneSequence = staticCompositionLocalOf<State<Float>?> { null }
+internal val LocalWenkuPaneVisible = compositionLocalOf { true }
 
 /**
   * 详见 docs/wenku8-ui-port-plan.md
@@ -112,7 +115,11 @@ fun WenkuLoadedContentSequence(
 
 @Composable
 internal fun WenkuContentClock(progress: State<Float>, content: @Composable () -> Unit) {
-    CompositionLocalProvider(LocalWenkuSequence provides progress, content = content)
+    CompositionLocalProvider(
+        LocalWenkuSequence provides progress,
+        LocalWenkuSceneSequence provides progress,
+        content = content,
+    )
 }
 
 enum class WenkuRevealAxis { Vertical, Horizontal }
@@ -165,8 +172,8 @@ internal fun Modifier.wenkuArchivePart(
         }
 }
 
-fun Modifier.wenkuTabTitle(order: Int): Modifier = composed {
-    val sequence = LocalWenkuSequence.current ?: return@composed this
+fun Modifier.wenkuTabTitle(order: Int, strength: Float = 1f): Modifier = composed {
+    val sequence = LocalWenkuSceneSequence.current ?: LocalWenkuSequence.current ?: return@composed this
     val reduce = LocalWenkuReduceMotion.current || com.example.ui.feedback.LocalReduceMotion.current
     if (reduce) return@composed this
     graphicsLayer {
@@ -177,8 +184,8 @@ fun Modifier.wenkuTabTitle(order: Int): Modifier = composed {
         val landing = 1f - WenkuMotion.settle.transform(phase)
         // Use the source's finite jelly wave for the final contact, keeping the baseline crisp.
         val rebound = WenkuMotion.jelly(((phase - .40f) / .60f).coerceIn(0f, 1f))
-        translationY = ((if (order == 0) 12f else 7f) * landing - 2.6f * rebound) * density
-        translationX = (1.5f * rebound) * density
+        translationY = ((if (order == 0) 12f else 7f) * landing - 2.6f * rebound) * density * strength
+        translationX = (1.5f * rebound) * density * strength
         alpha = p
     }
 }
@@ -200,32 +207,39 @@ fun <T : Any> WenkuPlaneTabSwitcher(
     content: @Composable (T) -> Unit
 ) {
     val reduceMotion = rememberWenkuAccessibility().reduceMotion
-    var displayed by remember { mutableStateOf(targetState) }
-    var outgoing by remember { mutableStateOf<T?>(null) }
-    var switchDirection by remember { mutableIntStateOf(1) }
+    var settled by remember { mutableStateOf(targetState) }
+    var transition by remember { mutableStateOf<WenkuTabTransition<T>?>(null) }
     var visited by remember { mutableStateOf(setOf(targetState)) }
-    val progress = remember { Animatable(1f) }
 
     LaunchedEffect(targetState, reduceMotion) {
-        if (targetState != displayed) {
-            if (!reduceMotion && outgoing != null) {
-                // Finish the currently visible cut before using that pane as the next source.
-                progress.animateTo(1f, tween(72, easing = LinearEasing))
-            }
-            outgoing = null
-            switchDirection = if (direction(displayed, targetState) >= 0) 1 else -1
-            progress.snapTo(if (reduceMotion) 1f else 0f)
-            outgoing = displayed.takeUnless { reduceMotion }
+        if (reduceMotion) {
             visited = visited + targetState
-            displayed = targetState
+            settled = targetState
+            transition = null
+            return@LaunchedEffect
         }
-        if (reduceMotion) progress.snapTo(1f)
-        // ArchivePlaneRender owns the bezier. Applying it here too front-loads the cut
-        // and makes the labels finish before the incoming pane has settled.
-        else if (outgoing != null) {
-            progress.animateTo(1f, tween(WenkuMotion.ENTER_MS, easing = LinearEasing))
+
+        val running = transition
+        if (running != null && targetState != running.from && targetState != running.to) {
+            // A third tab starts from a complete pane; keep both current planes until then.
+            running.progress.animateTo(1f, tween(72, easing = LinearEasing))
+            settled = running.to
+            transition = null
         }
-        outgoing = null
+
+        val current = transition ?: run {
+            if (targetState == settled) return@LaunchedEffect
+            visited = visited + targetState
+            WenkuTabTransition(settled, targetState, direction(settled, targetState))
+                .also { transition = it }
+        }
+        // When the user taps the previous tab, reverse the existing cut in place. No pane
+        // swaps roles, goes offstage, or borrows the old animation's clock between frames.
+        val end = if (targetState == current.to) 1f else 0f
+        val duration = (WenkuMotion.ENTER_MS * abs(end - current.progress.value)).roundToInt()
+        current.progress.animateTo(end, tween(duration, easing = LinearEasing))
+        settled = targetState
+        transition = null
     }
 
     val tabBackground = if (com.example.ui.LocalAppBackgroundActive.current) Color.Transparent
@@ -233,19 +247,27 @@ fun <T : Any> WenkuPlaneTabSwitcher(
     Box(modifier.clipToBounds()) {
         // Like RetainedPane in ui_notifiers.dart: keep the same keyed subtree for
         // each visited tab and give layout/paint to the two transition planes only.
+        val current = transition
+        val focused = when {
+            current == null -> settled
+            targetState == current.from -> current.from
+            else -> current.to
+        }
         for (tab in visited) key(tab) {
-            val active = tab == displayed
-            val leaving = tab == outgoing
-            val visible = active || leaving
-            val animateContent = rememberUpdatedState(active && outgoing != null && !reduceMotion)
-            val sequence = remember(progress) {
-                derivedStateOf { if (animateContent.value) progress.value else 1f }
-            }
+            val active = tab == focused
+            val leaving = current != null && tab == current.from
+            val entering = current != null && tab == current.to
+            val visible = active || leaving || entering
+            val phase = rememberUpdatedState(if (entering) current?.progress else null)
+            val sequence = remember { derivedStateOf { phase.value?.value ?: 1f } }
             val plane = when {
+                current == null -> Modifier
                 leaving -> Modifier.wenkuPlaneLayer(
-                    { progress.value }, incoming = false, dir = switchDirection, occludeOutgoing = true
+                    { current.progress.value }, incoming = false, dir = current.direction, occludeOutgoing = true
                 )
-                active && outgoing != null -> Modifier.wenkuPlaneLayer({ progress.value }, incoming = true, dir = switchDirection)
+                entering -> Modifier.wenkuPlaneLayer(
+                    { current.progress.value }, incoming = true, dir = current.direction
+                )
                 else -> Modifier
             }
             RetainedPaneLifecycle(active) {
@@ -253,7 +275,7 @@ fun <T : Any> WenkuPlaneTabSwitcher(
                     Modifier
                         .wenkuRetainedLayout(visible)
                         .fillMaxSize()
-                        .zIndex(if (active) 1f else 0f)
+                        .zIndex(if (entering) 1f else 0f)
                         .then(if (active) Modifier else Modifier
                             .clearAndSetSemantics { }
                             .focusProperties { canFocus = false }
@@ -261,14 +283,21 @@ fun <T : Any> WenkuPlaneTabSwitcher(
                         .then(plane)
                         .background(tabBackground)
                 ) {
-                    CompositionLocalProvider(LocalWenkuSequence provides sequence) {
-                        content(tab)
+                    CompositionLocalProvider(LocalWenkuPaneVisible provides visible) {
+                        WenkuContentClock(sequence) { content(tab) }
                     }
                 }
             }
         }
     }
 }
+
+private class WenkuTabTransition<T>(
+    val from: T,
+    val to: T,
+    val direction: Int,
+    val progress: Animatable<Float, AnimationVector1D> = Animatable(0f),
+)
 
 /** Stop measuring and drawing a covered pane while preserving its composition and scroll state. */
 internal fun Modifier.wenkuRetainedLayout(visible: Boolean): Modifier = layout { measurable, constraints ->

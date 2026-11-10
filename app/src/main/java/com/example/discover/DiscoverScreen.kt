@@ -69,6 +69,7 @@ import com.example.ui.theme.LocalAppBottomInset
 import com.example.ui.theme.glassTitleColor
 import com.example.ui.wenku.WenkuLoadedContentSequence
 import com.example.ui.wenku.wenkuReveal
+import com.example.ui.wenku.wenkuTabTitle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -250,7 +251,7 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                     verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     item(key = "partition", span = { GridItemSpan(maxLineSpan) }) {
                         Row(
-                            Modifier.fillMaxWidth().testTag("discover_partition"),
+                            Modifier.fillMaxWidth().wenkuTabTitle(1, strength = .55f).testTag("discover_partition"),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             DiscoverPartition.entries.forEach { option ->
@@ -270,6 +271,7 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                         val statusKnown = currentCatalogs.any { c -> c.statuses.isNotEmpty() || c.categories.any { serialLabel(it.label) in setOf("连载", "完结") } } ||
                             state.entries.any { e -> activeSources.any { it.id == e.book.sourceId } && serialLabel(e.book.discoverStatus) in setOf("连载", "完结") }
                         val unknownStatus = state.entries.any { serialLabel(it.book.discoverStatus) == "状态未知" }
+                        Box(Modifier.wenkuTabTitle(2, strength = .55f)) {
                         DiscoverFilters(
                             tabs = listOf("推荐" to native) + availableDimensions.map { it.label to (!native && dimension == it) },
                             onTab = { index -> if (index == 0) { light(); nativeFeed = store.string("native_feed_$sourceId", "native"); nativeCategory = null } else switch(availableDimensions[index - 1]) },
@@ -281,6 +283,7 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                             onSort = { index -> light(); if (feeds.isNotEmpty()) { nativeFeed = feeds[index].id; nativeCategory = null; statusFilter = "全部" } else { range = ranges[index]; statusFilter = "全部" } },
                             statuses = if (statusKnown && statusScope.showStatusChoices) listOf("全部", "连载", "完结") + (if (state.entries.any { serialLabel(it.book.discoverStatus) == "停更" }) listOf("停更") else emptyList()) + (if (unknownStatus) listOf("状态未知") else emptyList()) else emptyList(),
                             status = effectiveStatus, statusHint = statusScope.hint, onStatus = { light(); statusFilter = it })
+                        }
                     }
                     if (sourceId == "aggregate" || rows.isNotEmpty()) {
                         item(key = "discover_results_heading", span = { GridItemSpan(maxLineSpan) }) {

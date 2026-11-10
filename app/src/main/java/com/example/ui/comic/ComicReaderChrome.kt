@@ -481,6 +481,7 @@ private fun ComicTopBar(
                     onDismissRequest = { menuOpen = false },
                     containerColor = ReadingPalette.DialogSurface,
                     anchorInWindow = menuAnchor,
+                    borderless = true,
                 ) {
                     PullOutDropdownMenuItem(
                         text = { Text("临时合页 / 取消", color = TextPrimary) },

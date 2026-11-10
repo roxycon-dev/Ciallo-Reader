@@ -767,13 +767,19 @@ fun WenkuSectionHeader(
         ) {
             Text(
                 text = title,
-                modifier = Modifier.weight(1f).wenkuArchivePart(.16f, .82f),
+                modifier = Modifier.weight(1f).wenkuTabTitle(1, strength = .6f),
                 color = colors.ink,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.SemiBold,
                 fontFamily = AppFonts.Serif,
             )
-            trailing?.invoke()
+            if (trailing != null) {
+                Row(
+                    Modifier.wenkuTabTitle(1, strength = .6f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) { trailing() }
+            }
         }
     }
 }

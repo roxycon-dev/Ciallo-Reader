@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -82,8 +83,14 @@ internal fun GlassManagementTopBar(
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         },
-        navigationIcon = { AppIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", onClick = onBack) },
-        actions = actions,
+        navigationIcon = {
+            Box(Modifier.wenkuTabTitle(0, strength = .55f)) {
+                AppIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", onClick = onBack)
+            }
+        },
+        actions = {
+            Row(Modifier.wenkuTabTitle(0, strength = .55f), verticalAlignment = Alignment.CenterVertically, content = actions)
+        },
         scrollBehavior = scrollBehavior,
         expandedHeight = 48.dp,
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent, scrolledContainerColor = Color.Transparent),

@@ -1,6 +1,7 @@
 package com.example.ui
 
 import com.example.ui.wenku.wenkuPagePart
+import com.example.ui.wenku.wenkuTabTitle
 import com.example.ui.wenku.WenkuSectionHeader
 import com.example.ui.components.pullOutCombinedClickable
 import com.example.ui.components.PullOutTextButton
@@ -910,7 +911,7 @@ fun HomeScreen(
                     
                                 PullOutTextButton(
                                     onClick = { onImportClick(com.example.data.DEFAULT_CATEGORY) },
-                                    modifier = Modifier.testTag("empty_bookshelf_import_button")
+                                    modifier = Modifier.wenkuTabTitle(2, strength = .7f).testTag("empty_bookshelf_import_button")
                                 ) {
                                     Text("或者 导入本地 TXT / EPUB / Comic 文件", color = MintPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
@@ -2308,11 +2309,10 @@ private fun ShelfRegionHeading(
         WenkuSectionHeader(index, code, title, trailing = {
             Text(
                 count,
-                modifier = Modifier.wenkuPagePart(1),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Box(Modifier.wenkuPagePart(1)) { actions() }
+            actions()
         })
     }
 }

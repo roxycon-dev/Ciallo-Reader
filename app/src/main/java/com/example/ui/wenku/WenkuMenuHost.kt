@@ -238,6 +238,7 @@ fun WenkuMenuHost(
     modifier: Modifier = Modifier,
     dismissRequested: Boolean = false,
     onHidden: () -> Unit = {},
+    borderlessSurface: Color? = null,
     content: @Composable () -> Unit
 ) {
     val a11y = rememberWenkuAccessibility()
@@ -305,6 +306,7 @@ fun WenkuMenuHost(
                     anchor = { anchorBounds ?: geometry.target },
                     target = { geometry.target },
                     sourceRadiusPx = sourceRadiusPx,
+                    borderlessSurface = borderlessSurface,
                     modifier = Modifier.fillMaxWidth()
                         .then(if (open) Modifier else Modifier.clearAndSetSemantics { }.wenkuBlockPointer())
                 ) {
@@ -659,6 +661,7 @@ private fun WenkuMenuStretchCore(
     target: () -> Rect,
     sourceRadiusPx: Float,
     modifier: Modifier = Modifier,
+    borderlessSurface: Color? = null,
     content: @Composable () -> Unit
 ) {
     val a11y = rememberWenkuAccessibility()
@@ -718,16 +721,18 @@ private fun WenkuMenuStretchCore(
                     translate(0f, (viewportHeight - size.height) / 2f)
                 }) {
                     clipPath(path) {
-                        drawRect(colors.panel, topLeft = Offset.Zero, size = Size(viewportWidth, viewportHeight))
+                        drawRect(borderlessSurface ?: colors.panel, topLeft = Offset.Zero, size = Size(viewportWidth, viewportHeight))
                         // 嵌套在 DrawScope(lambda) 里必须显式取回 ContentDrawScope 接收者。
                         this@drawWithContent.drawContent()
                     }
                     // 材质描边（LiquidGlass hairline；不使用 blur/backdrop）。
-                    drawPath(
-                        path,
-                        colors.outline.copy(alpha = if (colors.isDark) 0.55f else 0.42f),
-                        style = Stroke(hairlinePx)
-                    )
+                    if (borderlessSurface == null) {
+                        drawPath(
+                            path,
+                            colors.outline.copy(alpha = if (colors.isDark) 0.55f else 0.42f),
+                            style = Stroke(hairlinePx)
+                        )
+                    }
                 }
             }
             // GlassMenuStretchRender.hitTest：progress < .15 时不参与命中（motion_ui.dart:860）。
