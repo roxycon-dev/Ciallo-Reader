@@ -11,7 +11,7 @@
 
 [🌐 产品主页](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.5.16 更新说明](docs/release-1.5.16-2026-11-07.md) ·
+[1.6.0 更新说明](docs/release-1.6.0-2026-11-10.md) ·
 [查看截图](#界面预览) ·
 [全部功能](#功能亮点) ·
 [提交问题或建议](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -26,6 +26,8 @@
 Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电子书阅读器**。你可以导入本地书籍，也可以通过内置或自定义书源搜索内容、下载到书架，再使用可调排版、翻页和阅读进度继续阅读。
 
 **English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
+
+**1.6.0 / 259 · UI 重构与平板适配**。书架、书库、发现、统计、设置和阅读器采用统一的版式、玻璃面板与转场，文字和图标按层级浮现，保留 Ciallo 配色与 3D 书架。[Issue #7](https://github.com/roxycon-dev/Ciallo-Reader/issues/7) 带来平板宽屏布局，以及「漫画阅读器 → 设置 → 图像」中的自动预加载与自定义 0–12 张。详见[更新说明](docs/release-1.6.0-2026-11-10.md)。
 
 **1.5.16 / 258 · EPUB 连续插图修复**：修复极简渲染质量下连续几张插图全部显示第一张的问题，点开大图与正文显示终于一致；EPUB 里的小图（分隔符、装饰图）不再被拉满整栏宽度。仿真卷页、覆盖、平移、渐变、上下滚动五种翻页方式逐页核对通过，真机《无职转生 01》的 3 张彩页与 6 张连续黑白插图全部正确。详见[更新说明](docs/release-1.5.16-2026-11-07.md)。
 
@@ -206,7 +208,7 @@ Novelia、Wenku8 Library、爱下电子书继续提供中文轻小说或网文�
 
 - **系统要求：** Android 7.0（API 24）及以上。
 - **当前 Release：** 提供 arm64-v8a APK，适用于大多数 Android 手机和平板；Release 暂不包含 x86_64 模拟器版本。
-- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.4.12](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.12/Ciallo-Reader-v1.4.12.apk)。
+- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。
 - 下载后按 Android 提示允许安装该来源的应用，再打开 APK 安装。
 
 ## 快速开始
@@ -252,6 +254,8 @@ Windows 可使用 gradlew.bat :app:assembleDebug。遇到问题或想提出功�
 
 ## 贡献者与致谢
 
+特别感谢 [mikufoxxx 与 Wenku8 Flutter 的贡献者](https://github.com/mikufoxxx/Wenku8_Flutter) 开源分享 UI、人机交互和动效实现。档案式排版、玻璃浮层、连续转场和图标反馈为这次重构提供了参考与灵感。感谢 [qianyunli114514](https://github.com/qianyunli114514) 在 [Issue #7](https://github.com/roxycon-dev/Ciallo-Reader/issues/7) 提出平板适配和漫画图片预加载数量自定义的建议。
+
 项目里的不少改动来自 Issues：报告故障、补充书源、指出排版与兼容性问题。下面是反馈过问题的用户，编号对应各自提出的 issue。
 
 <table>
@@ -273,6 +277,9 @@ Windows 可使用 gradlew.bat :app:assembleDebug。遇到问题或想提出功�
     </td>
     <td align="center" width="112">
       <a href="https://github.com/jesonab"><img src="https://github.com/jesonab.png" width="64" height="64" alt="jesonab 的头像" /><br /><sub><b>jesonab</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/6">#6</a></sub>
+    </td>
+    <td align="center" width="112">
+      <a href="https://github.com/qianyunli114514"><img src="https://github.com/qianyunli114514.png" width="64" height="64" alt="qianyunli114514 的头像" /><br /><sub><b>qianyunli114514</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/7">#7</a></sub>
     </td>
   </tr>
 </table>

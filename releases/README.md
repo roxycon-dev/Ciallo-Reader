@@ -1,5 +1,7 @@
 # releases
 
+**1.6.0 / 259** · [更新说明](../docs/release-1.6.0-2026-11-10.md) · [SHA-256](SHA256SUMS-v1.6.0.txt)。UI 与交互重构、平板宽屏布局、漫画图片预加载数量自定义。
+
 **1.5.14 / 256**：[GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.14) · [更新说明](../docs/release-1.5.14-2026-11-05.md)。下载入口状态纠正、数量徽标完整显示；统一高频状态图标、加载和按压反馈。
 
 **1.5.13 / 255**：[GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.13) · [下载 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.5.13/Ciallo-Reader-v1.5.13.apk) · [发布说明](../docs/release-1.5.13-2026-11-05.md)。
