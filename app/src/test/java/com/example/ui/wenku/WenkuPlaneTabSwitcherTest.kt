@@ -45,22 +45,26 @@ class WenkuPlaneTabSwitcherTest {
             }
         }
 
+        compose.waitForIdle()
         compose.mainClock.autoAdvance = false
-        fun select(tab: Int, elapsedMillis: Long) {
+        fun select(tab: Int, frames: Int) {
             compose.runOnIdle { target.value = tab }
-            compose.mainClock.advanceTimeBy(elapsedMillis)
-            compose.waitForIdle()
+            repeat(frames) {
+                compose.mainClock.advanceTimeByFrame()
+                compose.waitForIdle()
+            }
         }
-        select(1, 144)
+        select(1, 10)
+        compose.runOnIdle { assertEquals(mapOf(0 to true, 1 to true), visible) }
         repeat(8) { index ->
-            select(index % 2, 64)
+            select(index % 2, 4)
             compose.runOnIdle {
                 assertEquals(mapOf(0 to true, 1 to true), visible)
                 assertEquals(1, lifecycles.values.count { it.currentState.isAtLeast(Lifecycle.State.STARTED) })
             }
         }
         // A third target can arrive before the reversal completes.
-        select(2, 640)
+        select(2, 40)
         compose.onNodeWithText("Pane 2").assertExists()
         compose.runOnIdle {
             assertEquals(mapOf(0 to false, 1 to false, 2 to true), visible)
