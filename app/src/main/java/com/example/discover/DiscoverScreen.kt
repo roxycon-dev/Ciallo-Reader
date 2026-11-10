@@ -279,6 +279,11 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                     }
                 })
             com.example.ui.adaptive.AdaptiveWorkspace(
+                // 只有内容实宽 >=960dp 才分栏：840dp 平板减去导航栏后不再被侧栏挤压，
+                // 分栏后结果区仍 >=600dp；侧栏固定 300dp 给筛选控件留位。
+                splitAt = 960.dp,
+                sidebarWidth = 300.dp,
+                landscapeOnly = true,
                 modifier = Modifier.fillMaxSize(),
                 controls = { split ->
                     if (split) Column(
@@ -291,10 +296,11 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                     }
                 },
             ) { split ->
+                // 列数只看结果区实宽：Adaptive 让封面保持稳定尺寸，
+                // 不再用整屏 Configuration 宽算 Fixed 列（840dp 减导航后会把封面放大）。
                 val cells = when {
                     !gridLayout -> GridCells.Fixed(1)
-                    split -> GridCells.Adaptive(152.dp)
-                    windowWidth >= 600 -> GridCells.Fixed(3)
+                    split || windowWidth >= 600 -> GridCells.Adaptive(156.dp)
                     else -> GridCells.Fixed(2)
                 }
             PullToRefreshBox(isRefreshing = state.loading && state.entries.isNotEmpty(), onRefresh = { light(); model.refresh() }, modifier = Modifier.fillMaxSize(),

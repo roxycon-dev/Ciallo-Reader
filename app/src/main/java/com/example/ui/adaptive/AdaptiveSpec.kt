@@ -6,19 +6,23 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.R
@@ -193,34 +197,51 @@ internal fun AdaptiveWorkspace(
     modifier: Modifier = Modifier,
     splitAt: Dp = 720.dp,
     sidebarWidth: Dp = 288.dp,
+    landscapeOnly: Boolean = false,
     controls: @Composable (split: Boolean) -> Unit,
     content: @Composable (split: Boolean) -> Unit,
 ) {
+    val latestControls = rememberUpdatedState(controls)
+    val latestContent = rememberUpdatedState(content)
+    // 两槽各建一份「可搬迁」的组合实体：跨断点 / 旋转 / 分屏时只换父容器，不 dispose 重建，
+    // 列表滚动位置、查询输入、焦点都原样带走。搬迁后的 lambda 本身必须稳定，最新内容由
+    // rememberUpdatedState 提供，所以 split 变化仍然能正确传给槽内内容。
+    val controlsSlot = remember {
+        movableContentOf<Boolean> { split -> latestControls.value(split) }
+    }
+    val contentSlot = remember {
+        movableContentOf<Boolean> { split -> latestContent.value(split) }
+    }
+
     BoxWithConstraints(modifier) {
-        val split = maxWidth >= splitAt
-        Layout(
-            modifier = Modifier.fillMaxSize(),
-            content = {
-                Box(Modifier.fillMaxWidth()) { controls(split) }
-                Box(Modifier.fillMaxSize()) { content(split) }
-            },
-        ) { children, constraints ->
-            val width = constraints.maxWidth
-            val height = constraints.maxHeight
-            val sidebar = if (split) sidebarWidth.roundToPx().coerceAtMost(width) else width
-            val gap = if (split) 16.dp.roundToPx().coerceAtMost(width - sidebar) else 0
-            val first = children[0].measure(
-                Constraints(minWidth = sidebar, maxWidth = sidebar, maxHeight = height)
-            )
-            val second = children[1].measure(
-                Constraints.fixed(
-                    if (split) width - sidebar - gap else width,
-                    if (split) height else height - first.height,
-                )
-            )
-            layout(width, height) {
-                first.placeRelative(0, 0)
-                second.placeRelative(if (split) sidebar + gap else 0, if (split) 0 else first.height)
+        // Let standard layouts bound the remaining space during live resize.
+        val boundedHeight = maxHeight.value.isFinite()
+        val split = maxWidth.value.isFinite() && maxWidth >= splitAt && maxWidth > sidebarWidth &&
+            (!landscapeOnly || maxWidth > maxHeight)
+        if (split) {
+            Row(Modifier.fillMaxSize()) {
+                Column(Modifier.width(sidebarWidth).fillMaxHeight()) {
+                    controlsSlot(true)
+                }
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    contentSlot(true)
+                }
+            }
+        } else {
+            Column(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxWidth()) {
+                    controlsSlot(false)
+                }
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (boundedHeight) Modifier.weight(1f) else Modifier
+                        )
+                ) {
+                    contentSlot(false)
+                }
             }
         }
     }

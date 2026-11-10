@@ -53,7 +53,14 @@ internal class GithubUpdateChecker(
 ) {
     private class CheckFailure(val reason: String) : Exception(reason)
 
-    suspend fun check(currentVersion: String): UpdateCheckResult = withContext(Dispatchers.IO) {
+    /**
+     * Startup and manual checks share a single request. The caller still gets the
+     * full result (success or failure message), so Settings keeps its behaviour.
+     */
+    suspend fun check(currentVersion: String): UpdateCheckResult =
+        UpdateCheckCoordination.run("$apiUrl|$currentVersion") { checkNetwork(currentVersion) }
+
+    private suspend fun checkNetwork(currentVersion: String): UpdateCheckResult = withContext(Dispatchers.IO) {
         val proxy = SystemProxyResolver.resolve(context?.applicationContext)
         val transport = client.newBuilder().apply { if (proxy != null) proxy(proxy) }.build()
         val release = try { apiRelease(transport) }

@@ -11,7 +11,7 @@
 
 [🌐 产品主页](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.6.0 更新说明](docs/release-1.6.0-2026-11-10.md) ·
+[1.6.1 更新说明](docs/release-1.6.1-2026-11-10.md) ·
 [查看截图](#界面预览) ·
 [全部功能](#功能亮点) ·
 [提交问题或建议](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -26,6 +26,8 @@
 Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电子书阅读器**。你可以导入本地书籍，也可以通过内置或自定义书源搜索内容、下载到书架，再使用可调排版、翻页和阅读进度继续阅读。
 
 **English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
+
+**1.6.1 / 260 · 平板排版与更新检测**：平板设置的标题与内容按组呈现，书库和发现按可用宽度组织结果，书架移除重复的阅读空间；旋转、分屏和窗口尺寸变化后重新布局。更新检测支持启动静默检查与设置手动检查；下载使用 GitHub 官方发布或显式选择的 HTTPS 镜像，继续校验官方签名，镜像仅在官方 SHA-256 可用时提供。设计约定见[界面动效与交互规范](docs/UI_MOTION_INTERACTION_GUIDE.md)，完整说明见[1.6.1 更新说明](docs/release-1.6.1-2026-11-10.md)。
 
 **1.6.0 / 259 · UI 重构与平板适配**。书架、书库、发现、统计、设置和阅读器采用统一的版式、玻璃面板与转场，文字和图标按层级浮现，保留 Ciallo 配色与 3D 书架。[Issue #7](https://github.com/roxycon-dev/Ciallo-Reader/issues/7) 带来全应用宽屏布局，包括侧边导航、独立搜索筛选区、分栏详情和设置面板，以及「漫画阅读器 → 设置 → 图像」中的自动预加载与自定义 0–12 张。详见[更新说明](docs/release-1.6.0-2026-11-10.md)。
 
@@ -207,8 +209,8 @@ Novelia、Wenku8 Library、爱下电子书继续提供中文轻小说或网文�
 ## 安装
 
 - **系统要求：** Android 7.0（API 24）及以上。
-- **当前 Release：** 提供 arm64-v8a APK，适用于大多数 Android 手机和平板；Release 暂不包含 x86_64 模拟器版本。
-- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。
+- **当前 Release：** 1.6.1（260）提供 arm64-v8a APK，适用于大多数 Android 手机和平板；Release 暂不包含 x86_64 模拟器版本。
+- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK，并在同一 Release 核对 `SHA256SUMS.txt`。
 - 下载后按 Android 提示允许安装该来源的应用，再打开 APK 安装。
 
 ## 快速开始
@@ -248,6 +250,7 @@ Windows 可使用 gradlew.bat :app:assembleDebug。遇到问题或想提出功�
 调试版使用独立包名，可与正式版并存。正式发布必须沿用固定签名密钥，禁止用临时调试签名发布；构建、备份与覆盖升级校验见 [签名说明](docs/app-signing.md)。
 
 - [发布版本与更新记录](CHANGELOG.md)
+- [界面动效与交互规范（开发者）](docs/UI_MOTION_INTERACTION_GUIDE.md)
 - [v1.4.1 更新说明与验证记录](docs/release-1.4.1-2026-10-15.md)
 - [v1.3.6 发布说明与验证记录](docs/release-1.3.6-2026-10-12.md)
 - [第三方组件与模型许可说明](docs/vendor-licenses/README.md)

@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.io.File
 
+internal enum class AppUpdateSource { GITHUB, MIRROR }
+
 internal enum class AppUpdateStage { AVAILABLE, DOWNLOADING, VERIFYING, READY, NEED_PERMISSION, INSTALLING, FAILED }
 
 internal data class AppUpdateState(
@@ -28,6 +30,7 @@ internal data class AppUpdateState(
     val total: Long? = null,
     val message: String? = null,
     val autoInstall: Boolean = false,
+    val source: AppUpdateSource = AppUpdateSource.GITHUB,
 ) {
     val transferring get() = stage == AppUpdateStage.DOWNLOADING || stage == AppUpdateStage.VERIFYING
     val hasPackage get() = stage in setOf(AppUpdateStage.READY, AppUpdateStage.NEED_PERMISSION, AppUpdateStage.INSTALLING)
@@ -64,6 +67,8 @@ internal class AppUpdateManager(
 
     fun offer(release: UpdateRelease) = scope.launch {
         initialized.await()
+        // Never cover the installer while it is in the foreground.
+        if (state.value.stage == AppUpdateStage.INSTALLING) return@launch
         val old = state.value
         if (old.transferring || old.hasPackage && old.release?.tag == release.tag) {
             mutableState.update { it.copy(visible = true) }
@@ -72,27 +77,40 @@ internal class AppUpdateManager(
         }
     }
 
+    /**
+     * Startup path: present only a newer release, and only when no dialog,
+     * transfer or verified package is already active. Errors never surface here.
+     */
+    fun offerAuto(release: UpdateRelease) = scope.launch {
+        initialized.await()
+        val old = state.value
+        if (old.visible || old.transferring || old.hasPackage || old.stage == AppUpdateStage.INSTALLING) return@launch
+        mutableState.value = AppUpdateState(release = release, visible = true)
+    }
+
     fun show() { mutableState.update { it.copy(visible = it.release != null) } }
     fun hide() { mutableState.update { it.copy(visible = false, autoInstall = false) } }
     fun cancelDownload() { transfer?.cancel() }
     fun consumeAutoInstall() { mutableState.update { it.copy(autoInstall = false) } }
     suspend fun awaitInitialization() { initialized.await() }
 
-    fun startDownload() {
+    fun startDownload(source: AppUpdateSource = AppUpdateSource.GITHUB) {
         if (transfer?.isActive == true) return
         val release = state.value.release ?: return
         val asset = release.apk ?: return
+        if (source == AppUpdateSource.MIRROR && mirrorDownloadUrl(release.tag, asset) == null) return
         mutableState.update { it.copy(stage = AppUpdateStage.DOWNLOADING, downloaded = 0, total = asset.size,
-            visible = true, message = null, autoInstall = false) }
+            visible = true, message = null, autoInstall = false, source = source) }
         transfer = scope.launch {
             var temporary: File? = null
             var committed = false
             try {
                 val file = withContext(Dispatchers.IO) { store.newTransferFile() }
                 temporary = file
-                downloader.download(asset, release.tag, file) { received, total ->
-                    mutableState.update { it.copy(downloaded = received, total = total) }
-                }
+                downloader.download(asset, release.tag, file, source = source,
+                    onProgress = { received, total ->
+                        mutableState.update { it.copy(downloaded = received, total = total) }
+                    })
                 mutableState.update { it.copy(stage = AppUpdateStage.VERIFYING) }
                 val pending = withContext(Dispatchers.IO) {
                     val code = verify(file, release)

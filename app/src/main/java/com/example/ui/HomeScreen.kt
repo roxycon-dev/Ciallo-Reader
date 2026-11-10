@@ -866,33 +866,13 @@ fun HomeScreen(
                             onFavoriteClick = { item -> dismissSearchKeyboard(); onOpenFavorite(item) },
                             modifier = Modifier.weight(1f)
                         ) {
-                        val shelfToolsScroll = rememberScrollState()
-                        com.example.ui.adaptive.AdaptiveWorkspace(
-                            modifier = Modifier.fillMaxSize(),
-                            splitAt = 728.dp,
-                            sidebarWidth = 224.dp,
-                            controls = { split ->
-                                if (split) Column(
-                                    Modifier.fillMaxWidth().verticalScroll(shelfToolsScroll)
-                                        .padding(start = 16.dp, top = 12.dp, bottom = LocalAppBottomInset.current),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    WenkuSectionHeader("00", "READING SPACE", "阅读空间")
-                                    GlassCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp)) {
-                                        TodayReadTimeText(todayReadSecondsFlow)
-                                        Text("连续阅读 ${streakDays} 天", style = MaterialTheme.typography.labelMedium)
-                                    }
-                                    WenkuTextButton("导入书籍", { onImportClick(com.example.data.DEFAULT_CATEGORY) },
-                                        Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.FolderOpen)
-                                    WenkuTextButton("在线书库", onNavigateToShelf, Modifier.fillMaxWidth(),
-                                        wenkuSymbol = WenkuSymbol.Search)
-                                    WenkuTextButton("阅读统计", onNavigateToStats, Modifier.fillMaxWidth(),
-                                        wenkuSymbol = WenkuSymbol.Waveform)
-                                }
-                            },
-                        ) { split ->
+                        Box(Modifier.fillMaxSize()) {
                         BoxWithConstraints(Modifier.fillMaxSize()) {
                         val shelfWidth = maxWidth
+                        // 书架/收藏统一限宽 1280dp 并居中（两侧留白按实宽算），
+                        // 窄屏仍是 16dp 边距；只改视口内边距，不动网格坐标与拖拽命中。
+                        val shelfSidePadding =
+                            ((shelfWidth - 1280.dp) / 2f).coerceAtLeast(0.dp) + 16.dp
                         Column(Modifier.fillMaxSize()) {
                         Spacer(modifier = Modifier.height(12.dp))
 
@@ -992,7 +972,7 @@ fun HomeScreen(
                                 // 而卡片会复用槽位，坐标回调可能整帧不触发。
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(horizontal = 16.dp)
+                                    .padding(horizontal = shelfSidePadding)
                                     .onGloballyPositioned { booksGridRoot = it.positionInRoot() },
                                 verticalArrangement = Arrangement.spacedBy(20.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -1926,8 +1906,7 @@ fun HomeScreen(
                                     // 4. BOTTOM INFO CARD: READING STATISTICS PREVIEW
                                     // A2：原 24.dp 完全不足以躲开悬浮 Tab 栏 + 系统导航栏，
                                     // 改用全 App 统一的下发值
-                                    if (split) Spacer(Modifier.height(LocalAppBottomInset.current))
-                                    else Column(modifier = Modifier.padding(bottom = LocalAppBottomInset.current)) {
+                                    Column(modifier = Modifier.padding(bottom = LocalAppBottomInset.current)) {
                                         Text(
                                             text = "阅读统计",
                                             fontSize = 20.sp,

@@ -27,10 +27,16 @@ import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.BuildConfig
+import com.example.data.AppUpdateAutoCheck
 import com.example.data.AppUpdateInstaller
 import com.example.data.AppUpdateManager
+import com.example.data.AppUpdateSource
 import com.example.data.AppUpdateStage
 import com.example.data.AppUpdateState
+import com.example.data.PreferencesManager
+import com.example.data.mirrorDownloadUrl
+import com.example.data.officialDownloadUrl
 import com.example.ui.components.AppToast
 import com.example.ui.components.LocalOverlayClose
 import com.example.ui.wenku.WenkuIconButton
@@ -39,6 +45,7 @@ import com.example.ui.wenku.WenkuSymbol
 import com.example.ui.wenku.WenkuTextButton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -49,6 +56,7 @@ internal fun AppUpdateDialogHost() {
     val context = LocalContext.current
     val manager = remember(context.applicationContext) { AppUpdateManager.get(context) }
     val platform = remember(context) { AppUpdateInstaller(context) }
+    val prefs = remember(context.applicationContext) { PreferencesManager(context.applicationContext) }
     val state by manager.state.collectAsStateWithLifecycle()
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -98,6 +106,23 @@ internal fun AppUpdateDialogHost() {
             install()
         }
     }
+    // Kazumi-like startup check: only after onboarding, only while foreground,
+    // once per process. The manager refuses to replace an active download/install.
+    LaunchedEffect(lifecycle) {
+        if (lifecycle != Lifecycle.State.RESUMED) return@LaunchedEffect
+        var waited = 0L
+        while (!prefs.hasSeenOnboarding && waited < 10 * 60_000L) {
+            delay(1_000)
+            waited += 1_000
+        }
+        if (prefs.hasSeenOnboarding) {
+            delay(8_000)
+            manager.awaitInitialization()
+            AppUpdateAutoCheck.maybeCheckOnStartup(
+                context.applicationContext, manager, BuildConfig.VERSION_NAME,
+            )
+        }
+    }
     val openBrowser: (String) -> Unit = { url ->
         runCatching { browser.openUri(url) }.onFailure {
             AppToast.makeText(context, "无法打开浏览器，可先导出安装包后用文件管理器安装", Toast.LENGTH_LONG).show()
@@ -107,7 +132,7 @@ internal fun AppUpdateDialogHost() {
         state = state,
         exporting = exporting,
         onDismiss = manager::hide,
-        onDownload = manager::startDownload,
+        onDownload = { manager.startDownload(AppUpdateSource.GITHUB) },
         onCancel = manager::cancelDownload,
         onInstall = install,
         onPermission = {
@@ -116,8 +141,12 @@ internal fun AppUpdateDialogHost() {
             }
         },
         onExport = { state.release?.apk?.let { export.launch(it.name) } },
-        onBrowser = { state.release?.let { openBrowser(it.apk?.url ?: it.releaseUrl) } },
+        onBrowser = { state.release?.let { release ->
+            // Browser downloads always target the official same-repository asset.
+            openBrowser(release.apk?.let { officialDownloadUrl(release.tag, it) } ?: release.releaseUrl)
+        } },
         onReleasePage = { state.release?.let { openBrowser(it.releaseUrl) } },
+        onDownloadMirror = { manager.startDownload(AppUpdateSource.MIRROR) },
     )
 }
 
@@ -133,8 +162,12 @@ internal fun AppUpdateDialog(
     onExport: () -> Unit,
     onBrowser: () -> Unit,
     onReleasePage: () -> Unit,
+    onDownloadMirror: () -> Unit = {},
 ) {
     val release = state.release ?: return
+    // The mirror is offered only when the official release published a SHA-256
+    // for the same-repository asset URL.
+    val mirrorUrl = release.apk?.let { mirrorDownloadUrl(release.tag, it) }
     WenkuSheetDialog(onDismissRequest = onDismiss) {
         val close = LocalOverlayClose.current
         val title = when (state.stage) {
@@ -171,10 +204,24 @@ internal fun AppUpdateDialog(
                         LinearProgressIndicator(Modifier.fillMaxWidth().testTag("update_progress"))
                         Text(if (state.stage == AppUpdateStage.VERIFYING) "校验完整性、版本和签名…" else "已下载 ${updateBytes(state.downloaded)}")
                     }
-                    Text("可收起窗口继续使用。下载完成后，在前台自动打开安装页面。", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        if (state.source == AppUpdateSource.MIRROR)
+                            "正在通过 gh-proxy.com 镜像下载官方安装包；完成后仍校验大小、SHA-256、版本与签名。"
+                        else "可收起窗口继续使用。下载完成后，在前台自动打开安装页面。",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 } else {
                     release.apk?.size?.let { Text("安装包 ${updateBytes(it)}", style = MaterialTheme.typography.bodySmall) }
                     state.message?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    if (release.apk != null) {
+                        if (mirrorUrl == null) {
+                            Text("官方发布未提供可验证的 SHA-256，HTTPS 镜像下载已禁用。请使用 GitHub 下载。",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        } else {
+                            Text("镜像仅加速官方安装包（gh-proxy.com），不提供版本信息；版本、大小、SHA-256、包名与签名仍以 GitHub 官方为准。",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                     if (state.stage == AppUpdateStage.AVAILABLE || state.stage == AppUpdateStage.FAILED) {
                         Text(release.notes.ifBlank { "更新说明可在 GitHub 发布页查看。" }, style = MaterialTheme.typography.bodyMedium)
                     }
@@ -196,11 +243,19 @@ internal fun AppUpdateDialog(
                 AppUpdateStage.READY, AppUpdateStage.INSTALLING ->
                     WenkuTextButton("安装", onInstall, full, selected = true, enabled = !exporting, wenkuSymbol = WenkuSymbol.Upload)
                 AppUpdateStage.AVAILABLE, AppUpdateStage.FAILED -> if (release.apk != null) {
-                    WenkuTextButton(
-                        if (state.stage == AppUpdateStage.FAILED) "重新下载" else "下载并安装",
-                        onDownload, full, selected = true,
-                        wenkuSymbol = if (state.stage == AppUpdateStage.FAILED) WenkuSymbol.Refresh else WenkuSymbol.Download,
-                    )
+                    Column(full, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        WenkuTextButton(
+                            if (state.stage == AppUpdateStage.FAILED) "重新下载（GitHub）" else "GitHub 下载并安装",
+                            onDownload, full, selected = true,
+                            wenkuSymbol = if (state.stage == AppUpdateStage.FAILED) WenkuSymbol.Refresh else WenkuSymbol.Download,
+                        )
+                        WenkuTextButton(
+                            "HTTPS 镜像下载（gh-proxy.com）",
+                            onDownloadMirror, full,
+                            enabled = mirrorUrl != null && !exporting,
+                            wenkuSymbol = WenkuSymbol.Globe,
+                        )
+                    }
                 } else {
                     WenkuTextButton("打开发布页", onReleasePage, full, selected = true, wenkuSymbol = WenkuSymbol.External)
                 }

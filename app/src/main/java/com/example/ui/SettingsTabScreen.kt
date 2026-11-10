@@ -325,90 +325,92 @@ fun SettingsTabScreen(
                 }
 
                 item(key = "discover_settings") {
-                    SettingsSectionHeader("书库与发现")
-                    SettingsNavigationCard(
-                        title = "发现设置",
-                        symbol = WenkuSymbol.Discover,
-                        subtitle = "浏览布局、推荐偏好与屏蔽管理",
-                        onClick = { showDiscoverSettings = true }
-                    )
+                    SettingsSection("书库与发现") {
+                        SettingsNavigationCard(
+                            title = "发现设置",
+                            symbol = WenkuSymbol.Discover,
+                            subtitle = "浏览布局、推荐偏好与屏蔽管理",
+                            onClick = { showDiscoverSettings = true }
+                        )
+                    }
                 }
 
                 // Section 1: Splash Poster
                 item(key = "settings-开屏海报设置") {
-                    SettingsSectionHeader("开屏海报设置")
-GlassCard(
-                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("自定义开屏海报", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                }
-
-                                Row {
-                                    if (!splashPosterUri.isNullOrEmpty()) {
-                                        PullOutTextButton(
-                                            onClick = {
-                                                splashPosterUri = null
-                                                prefs.customSplashPosterUri = null
-                                                AppToast.makeText(context, "已还原默认海报", Toast.LENGTH_SHORT).show()
-                                            },
-                                            modifier = Modifier.padding(end = 4.dp)
-                                        ) {
-                                            Text("清除")
-                                        }
-                                    }
-                                    AppActionButton(
-                                        text = "选择相册图片",
-                                        onClick = { posterLauncher.launch("image/*") },
-                                        variant = AppButtonVariant.Primary,
-                                        buttonSize = AppButtonSize.Small
-                                    )
-                                }
-                            }
-
-                            if (!splashPosterUri.isNullOrEmpty()) {
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(130.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                                    contentAlignment = Alignment.Center
+                    SettingsSection("开屏海报设置") {
+                        GlassCard(
+                            modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    AsyncImage(
-                                        model = splashPosterUri,
-                                        contentDescription = "海报预览",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("自定义开屏海报", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                    }
+
+                                    Row {
+                                        if (!splashPosterUri.isNullOrEmpty()) {
+                                            PullOutTextButton(
+                                                onClick = {
+                                                    splashPosterUri = null
+                                                    prefs.customSplashPosterUri = null
+                                                    AppToast.makeText(context, "已还原默认海报", Toast.LENGTH_SHORT).show()
+                                                },
+                                                modifier = Modifier.padding(end = 4.dp)
+                                            ) {
+                                                Text("清除")
+                                            }
+                                        }
+                                        AppActionButton(
+                                            text = "选择相册图片",
+                                            onClick = { posterLauncher.launch("image/*") },
+                                            variant = AppButtonVariant.Primary,
+                                            buttonSize = AppButtonSize.Small
+                                        )
+                                    }
+                                }
+
+                                if (!splashPosterUri.isNullOrEmpty()) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(130.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        AsyncImage(
+                                            model = splashPosterUri,
+                                            contentDescription = "海报预览",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("纯净模式", fontWeight = FontWeight.SemiBold)
+                                    AppSwitch(
+                                        checked = splashPureMode,
+                                        onCheckedChange = {
+                                            splashPureMode = it
+                                            prefs.splashPureMode = it
+                                        }
                                     )
                                 }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("纯净模式", fontWeight = FontWeight.SemiBold)
-                                AppSwitch(
-                                    checked = splashPureMode,
-                                    onCheckedChange = {
-                                        splashPureMode = it
-                                        prefs.splashPureMode = it
-                                    }
-                                )
                             }
                         }
                     }
@@ -416,135 +418,136 @@ GlassCard(
 
                 // Section: 软件背景
                 item(key = "settings-软件背景设置", span = { GridItemSpan(maxLineSpan) }) {
-                    SettingsSectionHeader("软件背景设置")
-GlassCard(
-                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("软件背景", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                            Spacer(modifier = Modifier.height(10.dp))
-                            SegmentedPillSelector(
-                                options = listOf(0 to "默认", 1 to "自定义"),
-                                selected = appBgMode,
-                                onSelect = { mode ->
-                                    appBgMode = mode
-                                    prefs.appBackgroundMode = mode
-                                    AppBackgroundController.update(
-                                        mode,
-                                        if (mode == 1) appBgUri else null,
-                                        if (mode == 1) appBgDim else 0
-                                    )
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                    SettingsSection("软件背景设置") {
+                        GlassCard(
+                            modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text("软件背景", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Spacer(modifier = Modifier.height(10.dp))
+                                SegmentedPillSelector(
+                                    options = listOf(0 to "默认", 1 to "自定义"),
+                                    selected = appBgMode,
+                                    onSelect = { mode ->
+                                        appBgMode = mode
+                                        prefs.appBackgroundMode = mode
+                                        AppBackgroundController.update(
+                                            mode,
+                                            if (mode == 1) appBgUri else null,
+                                            if (mode == 1) appBgDim else 0
+                                        )
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
 
-                            if (appBgMode == 1) {
-                                Spacer(modifier = Modifier.height(12.dp))
-                                if (!appBgUri.isNullOrEmpty()) {
-                                    // 预览模拟卡：文字颜色实时按卡片底色取对比色
-                                    val previewCardColor = Color.White.copy(alpha = 0.92f)
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(160.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                                    ) {
-                                        // 实时预览：背景图 + 遮罩 + 模拟内容卡片，直观感受可读性
-                                        AsyncImage(
-                                            model = appBgUri,
-                                            contentDescription = "背景预览",
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
+                                if (appBgMode == 1) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    if (!appBgUri.isNullOrEmpty()) {
+                                        // 预览模拟卡：文字颜色实时按卡片底色取对比色
+                                        val previewCardColor = Color.White.copy(alpha = 0.92f)
                                         Box(
                                             modifier = Modifier
-                                                .fillMaxSize()
-                                                .background(Color.Black.copy(alpha = appBgDim / 100f))
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.Center)
                                                 .fillMaxWidth()
-                                                .padding(20.dp)
+                                                .height(160.dp)
                                                 .clip(RoundedCornerShape(12.dp))
-                                                .background(previewCardColor)
-                                                .padding(12.dp)
+                                                .background(MaterialTheme.colorScheme.surfaceVariant),
                                         ) {
-                                            Column {
-                                                Text(
-                                                    "预览",
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 13.sp,
-                                                    color = previewCardColor.onColor()
-                                                )
-                                                Text(
-                                                    "背景遮罩 ${appBgDim}%",
-                                                    fontSize = 11.sp,
-                                                    color = previewCardColor.onColor().copy(alpha = 0.65f)
-                                                )
+                                            // 实时预览：背景图 + 遮罩 + 模拟内容卡片，直观感受可读性
+                                            AsyncImage(
+                                                model = appBgUri,
+                                                contentDescription = "背景预览",
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(Color.Black.copy(alpha = appBgDim / 100f))
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.Center)
+                                                    .fillMaxWidth()
+                                                    .padding(20.dp)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(previewCardColor)
+                                                    .padding(12.dp)
+                                            ) {
+                                                Column {
+                                                    Text(
+                                                        "预览",
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 13.sp,
+                                                        color = previewCardColor.onColor()
+                                                    )
+                                                    Text(
+                                                        "背景遮罩 ${appBgDim}%",
+                                                        fontSize = 11.sp,
+                                                        color = previewCardColor.onColor().copy(alpha = 0.65f)
+                                                    )
+                                                }
                                             }
                                         }
-                                    }
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text("背景遮罩强度", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                        Spacer(modifier = Modifier.weight(1f))
-                                        Text("$appBgDim%", fontSize = 12.sp, color = MintPrimary, fontWeight = FontWeight.Bold)
-                                    }
-                                    // 原版 FluidSlider（基线样式零改动）；纵向让位由滑条内部方向仲裁承担
-                                    Box(modifier = Modifier.fillMaxWidth()) {
-                                    FluidSlider(
-                                        position = appBgDim / 50f,
-                                        onPositionChange = {
-                                            appBgDim = (it * 50).toInt().coerceIn(0, 50)
-                                            prefs.appBackgroundDim = appBgDim
-                                            if (appBgMode == 1 && !appBgUri.isNullOrEmpty()) {
-                                                AppBackgroundController.update(1, appBgUri, appBgDim)
-                                            }
-                                        },
-                                        barHeightDp = 32,
-                                        bubbleText = "$appBgDim%",
-                                        startText = "0%",
-                                        // C4：原先左端 "0"、右端 "50"、气泡 "$appBgDim%"，
-                                        // 单位与量纲混用；统一成 0%~50%
-                                        endText = "50%",
-                                        colorBar = MintPrimary,
-                                        colorBubble = Color.White,
-                                        colorBubbleText = MintPrimary,
-                                        colorBarText = glassTitleColor()
-                                    )
-                                    }
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                }
-                                Row(modifier = Modifier.fillMaxWidth()) {
-                                    AppActionButton(
-                                        text = if (appBgUri.isNullOrEmpty()) "选择背景图片" else "更换图片",
-                                        onClick = { bgLauncher.launch("image/*") },
-                                        variant = AppButtonVariant.Primary,
-                                        buttonSize = AppButtonSize.Small,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    if (!appBgUri.isNullOrEmpty()) {
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                        AppActionButton(
-                                            text = "恢复默认",
-                                            onClick = {
-                                                appBgUri = null
-                                                prefs.customAppBackgroundUri = null
-                                                prefs.appBackgroundMode = 0
-                                                appBgMode = 0
-                                                AppBackgroundController.update(0, null, appBgDim)
-                                                AppToast.makeText(context, "已恢复默认背景", Toast.LENGTH_SHORT).show()
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("背景遮罩强度", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                            Spacer(modifier = Modifier.weight(1f))
+                                            Text("$appBgDim%", fontSize = 12.sp, color = MintPrimary, fontWeight = FontWeight.Bold)
+                                        }
+                                        // 原版 FluidSlider（基线样式零改动）；纵向让位由滑条内部方向仲裁承担
+                                        Box(modifier = Modifier.fillMaxWidth()) {
+                                        FluidSlider(
+                                            position = appBgDim / 50f,
+                                            onPositionChange = {
+                                                appBgDim = (it * 50).toInt().coerceIn(0, 50)
+                                                prefs.appBackgroundDim = appBgDim
+                                                if (appBgMode == 1 && !appBgUri.isNullOrEmpty()) {
+                                                    AppBackgroundController.update(1, appBgUri, appBgDim)
+                                                }
                                             },
-                                            variant = AppButtonVariant.Secondary,
+                                            barHeightDp = 32,
+                                            bubbleText = "$appBgDim%",
+                                            startText = "0%",
+                                            // C4：原先左端 "0"、右端 "50"、气泡 "$appBgDim%"，
+                                            // 单位与量纲混用；统一成 0%~50%
+                                            endText = "50%",
+                                            colorBar = MintPrimary,
+                                            colorBubble = Color.White,
+                                            colorBubbleText = MintPrimary,
+                                            colorBarText = glassTitleColor()
+                                        )
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                    }
+                                    Row(modifier = Modifier.fillMaxWidth()) {
+                                        AppActionButton(
+                                            text = if (appBgUri.isNullOrEmpty()) "选择背景图片" else "更换图片",
+                                            onClick = { bgLauncher.launch("image/*") },
+                                            variant = AppButtonVariant.Primary,
                                             buttonSize = AppButtonSize.Small,
                                             modifier = Modifier.weight(1f)
                                         )
+                                        if (!appBgUri.isNullOrEmpty()) {
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            AppActionButton(
+                                                text = "恢复默认",
+                                                onClick = {
+                                                    appBgUri = null
+                                                    prefs.customAppBackgroundUri = null
+                                                    prefs.appBackgroundMode = 0
+                                                    appBgMode = 0
+                                                    AppBackgroundController.update(0, null, appBgDim)
+                                                    AppToast.makeText(context, "已恢复默认背景", Toast.LENGTH_SHORT).show()
+                                                },
+                                                variant = AppButtonVariant.Secondary,
+                                                buttonSize = AppButtonSize.Small,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -554,66 +557,68 @@ GlassCard(
 
                 // Section 2: Orientation Lock
                 item(key = "settings-屏幕方向") {
-                    SettingsSectionHeader("屏幕方向")
-GlassCard(
-                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Filled.ScreenRotation, contentDescription = null, tint = MintPrimary)
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text("方向锁定", fontWeight = FontWeight.SemiBold)
+                    SettingsSection("屏幕方向") {
+                        GlassCard(
+                            modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Filled.ScreenRotation, contentDescription = null, tint = MintPrimary)
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text("方向锁定", fontWeight = FontWeight.SemiBold)
+                                    }
                                 }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                SegmentedPillSelector(
+                                    options = listOf(0 to "跟随系统", 1 to "锁定竖屏", 2 to "锁定横屏"),
+                                    selected = orientationLockVal,
+                                    onSelect = onOrientationLockChange
+                                )
                             }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            SegmentedPillSelector(
-                                options = listOf(0 to "跟随系统", 1 to "锁定竖屏", 2 to "锁定横屏"),
-                                selected = orientationLockVal,
-                                onSelect = onOrientationLockChange
-                            )
                         }
                     }
                 }
 
                 // Section 2.5: 画面与性能（渲染画质四档）
                 item(key = "settings-画面与性能", span = { GridItemSpan(maxLineSpan) }) {
-                    SettingsSectionHeader("画面与性能")
-GlassCard(
-                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = MintPrimary)
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text("渲染画质", fontWeight = FontWeight.SemiBold)
-                                    Text("极致在实时玻璃上增加边缘折射", style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    SettingsSection("画面与性能") {
+                        GlassCard(
+                            modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = MintPrimary)
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text("渲染画质", fontWeight = FontWeight.SemiBold)
+                                        Text("极致在实时玻璃上增加边缘折射", style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
                                 }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                SegmentedPillSelector(
+                                    options = listOf(
+                                        -1 to "极简",
+                                        0 to "流畅",
+                                        1 to "均衡",
+                                        2 to "高",
+                                        3 to "极致"
+                                    ),
+                                    selected = renderQualityVal.coerceIn(-1, 3),
+                                    onSelect = onRenderQualityChange
+                                )
                             }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            SegmentedPillSelector(
-                                options = listOf(
-                                    -1 to "极简",
-                                    0 to "流畅",
-                                    1 to "均衡",
-                                    2 to "高",
-                                    3 to "极致"
-                                ),
-                                selected = renderQualityVal.coerceIn(-1, 3),
-                                onSelect = onRenderQualityChange
-                            )
                         }
                     }
                 }
@@ -653,26 +658,27 @@ GlassCard(
 
                 // Section 3: Page Turn Effect
                 item(key = "settings-翻页效果") {
-                    SettingsSectionHeader("翻页效果")
-GlassCard(
-                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                    SettingsSection("翻页效果") {
+                        GlassCard(
+                            modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
+                            shape = RoundedCornerShape(16.dp)
                         ) {
-                            PageTurnType.entries.forEach { turnType ->
-                                PageTurnSelectorRow(
-                                    title = turnType.title,
-                                    description = "",
-                                    type = turnType,
-                                    selected = pageTurnMode == turnType.id,
-                                    onClick = {
-                                        pageTurnMode = turnType.id
-                                        prefs.pageTurnMode = turnType.id
-                                    }
-                                )
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                PageTurnType.entries.forEach { turnType ->
+                                    PageTurnSelectorRow(
+                                        title = turnType.title,
+                                        description = "",
+                                        type = turnType,
+                                        selected = pageTurnMode == turnType.id,
+                                        onClick = {
+                                            pageTurnMode = turnType.id
+                                            prefs.pageTurnMode = turnType.id
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -691,167 +697,168 @@ GlassCard(
 
                 // Section 5: Health & Eye Protection
                 item(key = "settings-护眼与提醒", span = { GridItemSpan(maxLineSpan) }) {
-                    SettingsSectionHeader("护眼与提醒")
-GlassCard(
-                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Filled.Timer, contentDescription = null, tint = MintPrimary)
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text("定时休息", fontWeight = FontWeight.SemiBold)
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            SegmentedPillSelector(
-                                options = listOf(0 to "关", 15 to "15分", 30 to "30分", 45 to "45分", 60 to "60分"),
-                                selected = if (restReminderMinutes in listOf(0, 15, 30, 45, 60)) restReminderMinutes else -1,
-                                onSelect = {
-                                    restReminderMinutes = it
-                                    prefs.restReminderMinutes = it
-                                }
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = if (restReminderMinutes in listOf(0, 15, 30, 45, 60)) {
-                                        "自定义提醒时间"
-                                    } else {
-                                        "当前自定义：$restReminderMinutes 分钟"
-                                    },
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                AppActionButton(
-                                    text = "自定义",
-                                    onClick = { showCustomMinutes = true },
-                                    variant = AppButtonVariant.Secondary,
-                                    buttonSize = AppButtonSize.Small
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Filled.Nightlight, contentDescription = null, tint = MintPrimary)
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text("夜间模式", fontWeight = FontWeight.SemiBold)
-                                }
-                                AppSwitch(
-                                    checked = autoNightMode,
-                                    onCheckedChange = {
-                                        autoNightMode = it
-                                        onAutoNightModeChange(it)
-                                    }
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Filled.RemoveRedEye, contentDescription = null, tint = MintPrimary)
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text("护眼滤镜", fontWeight = FontWeight.SemiBold)
-                                }
-                                AppSwitch(
-                                    checked = blueLightFilter,
-                                    onCheckedChange = {
-                                        blueLightFilter = it
-                                        onBlueLightFilterChange(it)
-                                    }
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // 在线漫画预加载策略：开启后移动网络不提前下载后面的页（省流量）
-                            var preloadWifiOnly by remember { mutableStateOf(prefs.preloadWifiOnly) }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    modifier = Modifier.weight(1f),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(Icons.Filled.Wifi, contentDescription = null, tint = MintPrimary)
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text("仅 Wi-Fi 预加载漫画", fontWeight = FontWeight.SemiBold)
-                                    }
-                                }
-                                AppSwitch(
-                                    checked = preloadWifiOnly,
-                                    onCheckedChange = {
-                                        preloadWifiOnly = it
-                                        prefs.preloadWifiOnly = it
-                                    }
-                                )
-                            }
-
-                            if (blueLightFilter) {
-                                Spacer(modifier = Modifier.height(10.dp))
-                                // 静止态也可读：当前强度常驻显示（与遮罩强度行同款式）
+                    SettingsSection("护眼与提醒") {
+                        GlassCard(
+                            modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Filled.Timer, contentDescription = null, tint = MintPrimary)
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text("定时休息", fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                SegmentedPillSelector(
+                                    options = listOf(0 to "关", 15 to "15分", 30 to "30分", 45 to "45分", 60 to "60分"),
+                                    selected = if (restReminderMinutes in listOf(0, 15, 30, 45, 60)) restReminderMinutes else -1,
+                                    onSelect = {
+                                        restReminderMinutes = it
+                                        prefs.restReminderMinutes = it
+                                    }
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("当前强度", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                     Text(
-                                        "${(blueLightAlpha * 100).toInt()}%",
-                                        fontSize = 12.sp,
-                                        color = MintPrimary,
-                                        fontWeight = FontWeight.Bold
+                                        text = if (restReminderMinutes in listOf(0, 15, 30, 45, 60)) {
+                                            "自定义提醒时间"
+                                        } else {
+                                            "当前自定义：$restReminderMinutes 分钟"
+                                        },
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    AppActionButton(
+                                        text = "自定义",
+                                        onClick = { showCustomMinutes = true },
+                                        variant = AppButtonVariant.Secondary,
+                                        buttonSize = AppButtonSize.Small
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Box(modifier = Modifier.fillMaxWidth()) {
-                                FluidSlider(
-                                    position = blueLightAlpha,
-                                    onPositionChange = {
-                                        blueLightAlpha = it
-                                        onBlueLightAlphaChange(it)
-                                    },
-                                    bubbleText = "${(blueLightAlpha * 100).toInt()}%",
-                                    startText = "0",
-                                    endText = "100",
-                                    colorBar = MintPrimary,
-                                    colorBubble = Color.White,
-                                    colorBubbleText = MintPrimary,
-                                    colorBarText = glassTitleColor(),
-                                    barHeightDp = 28
-                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Filled.Nightlight, contentDescription = null, tint = MintPrimary)
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text("夜间模式", fontWeight = FontWeight.SemiBold)
+                                    }
+                                    AppSwitch(
+                                        checked = autoNightMode,
+                                        onCheckedChange = {
+                                            autoNightMode = it
+                                            onAutoNightModeChange(it)
+                                        }
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Filled.RemoveRedEye, contentDescription = null, tint = MintPrimary)
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text("护眼滤镜", fontWeight = FontWeight.SemiBold)
+                                    }
+                                    AppSwitch(
+                                        checked = blueLightFilter,
+                                        onCheckedChange = {
+                                            blueLightFilter = it
+                                            onBlueLightFilterChange(it)
+                                        }
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // 在线漫画预加载策略：开启后移动网络不提前下载后面的页（省流量）
+                                var preloadWifiOnly by remember { mutableStateOf(prefs.preloadWifiOnly) }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        modifier = Modifier.weight(1f),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Filled.Wifi, contentDescription = null, tint = MintPrimary)
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column {
+                                            Text("仅 Wi-Fi 预加载漫画", fontWeight = FontWeight.SemiBold)
+                                        }
+                                    }
+                                    AppSwitch(
+                                        checked = preloadWifiOnly,
+                                        onCheckedChange = {
+                                            preloadWifiOnly = it
+                                            prefs.preloadWifiOnly = it
+                                        }
+                                    )
+                                }
+
+                                if (blueLightFilter) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    // 静止态也可读：当前强度常驻显示（与遮罩强度行同款式）
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("当前强度", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(
+                                            "${(blueLightAlpha * 100).toInt()}%",
+                                            fontSize = 12.sp,
+                                            color = MintPrimary,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Box(modifier = Modifier.fillMaxWidth()) {
+                                    FluidSlider(
+                                        position = blueLightAlpha,
+                                        onPositionChange = {
+                                            blueLightAlpha = it
+                                            onBlueLightAlphaChange(it)
+                                        },
+                                        bubbleText = "${(blueLightAlpha * 100).toInt()}%",
+                                        startText = "0",
+                                        endText = "100",
+                                        colorBar = MintPrimary,
+                                        colorBubble = Color.White,
+                                        colorBubbleText = MintPrimary,
+                                        colorBarText = glassTitleColor(),
+                                        barHeightDp = 28
+                                    )
+                                    }
                                 }
                             }
                         }
@@ -860,65 +867,66 @@ GlassCard(
 
                 // Section 5.5: 隐私与安全（第七轮第 6.4 条）
                 item(key = "settings-隐私与安全", span = { GridItemSpan(maxLineSpan) }) {
-                    SettingsSectionHeader("隐私与安全")
-GlassCard(
-                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                    SettingsSection("隐私与安全") {
+                        GlassCard(
+                            modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f),
+                            shape = RoundedCornerShape(16.dp)
                         ) {
-                            Icon(
-                                Icons.Filled.Shield,
-                                contentDescription = null,
-                                tint = MintPrimary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text("隐私模式", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                                Text(
-                                    if (privacyModeEnabled) "已开启 · 分类密码保护与无痕阅读"
-                                    else "设置 6 位密码，为分类加锁",
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Filled.Shield,
+                                    contentDescription = null,
+                                    tint = MintPrimary,
+                                    modifier = Modifier.size(24.dp)
                                 )
-                            }
-                            // 第十一轮第 4 条：隐私模式开启/关闭的行内过渡动画——
-                            // 尾部控件（开关 ↔ "管理"入口）与副标题随状态淡入淡出切换，不再硬跳变
-                            AnimatedContent(
-                                targetState = privacyModeEnabled,
-                                transitionSpec = {
-                                    (fadeIn(tween(220)) + scaleIn(initialScale = 0.96f, animationSpec = tween(220)))
-                                        .togetherWith(fadeOut(tween(160)))
-                                },
-                                label = "privacyRowSwitch"
-                            ) { enabled ->
-                                if (!enabled) {
-                                // 首次开启：先走 6 位密码设置流程（输入 + 二次确认）
-                                com.example.ui.components.AppSwitch(
-                                    // 2026-09-21 修复：原为硬编码 false（点了开关不动、只弹窗，
-                                    // 用户以为没点上）。改为反映点击意图，取消时再回弹。
-                                    checked = privacySwitchPending,
-                                    onCheckedChange = { wantOn ->
-                                        if (wantOn) {
-                                            privacySwitchPending = true
-                                            showPinSetup = true
-                                        } else {
-                                            privacySwitchPending = false
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text("隐私模式", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                                    Text(
+                                        if (privacyModeEnabled) "已开启 · 分类密码保护与无痕阅读"
+                                        else "设置 6 位密码，为分类加锁",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                // 第十一轮第 4 条：隐私模式开启/关闭的行内过渡动画——
+                                // 尾部控件（开关 ↔ "管理"入口）与副标题随状态淡入淡出切换，不再硬跳变
+                                AnimatedContent(
+                                    targetState = privacyModeEnabled,
+                                    transitionSpec = {
+                                        (fadeIn(tween(220)) + scaleIn(initialScale = 0.96f, animationSpec = tween(220)))
+                                            .togetherWith(fadeOut(tween(160)))
+                                    },
+                                    label = "privacyRowSwitch"
+                                ) { enabled ->
+                                    if (!enabled) {
+                                    // 首次开启：先走 6 位密码设置流程（输入 + 二次确认）
+                                    com.example.ui.components.AppSwitch(
+                                        // 2026-09-21 修复：原为硬编码 false（点了开关不动、只弹窗，
+                                        // 用户以为没点上）。改为反映点击意图，取消时再回弹。
+                                        checked = privacySwitchPending,
+                                        onCheckedChange = { wantOn ->
+                                            if (wantOn) {
+                                                privacySwitchPending = true
+                                                showPinSetup = true
+                                            } else {
+                                                privacySwitchPending = false
+                                            }
                                         }
-                                    }
-                                )
-                            } else {
-                                // 已开启：验证密码后进入隐私管理悬浮窗口
-                                WenkuTextButton(
-                                    "管理",
-                                    onClick = { showManageVerify = true },
-                                    compact = true,
-                                    wenkuSymbol = WenkuSymbol.Shield,
-                                )
-                            }
+                                    )
+                                } else {
+                                    // 已开启：验证密码后进入隐私管理悬浮窗口
+                                    WenkuTextButton(
+                                        "管理",
+                                        onClick = { showManageVerify = true },
+                                        compact = true,
+                                        wenkuSymbol = WenkuSymbol.Shield,
+                                    )
+                                }
+                                }
                             }
                         }
                     }
@@ -926,111 +934,115 @@ GlassCard(
 
                 // Section 6: Cache Management
                 item(key = "settings-存储管理") {
-                    SettingsSectionHeader("存储管理")
-onOpenCacheManager?.let { open ->
-                        SettingsNavigationCard(
-                            title = "缓存管理",
-                            subtitle = "查看存储占用与离线文件",
-                            symbol = WenkuSymbol.Folder,
-                            onClick = open
-                        )
+                    SettingsSection("存储管理") {
+                        onOpenCacheManager?.let { open ->
+                            SettingsNavigationCard(
+                                title = "缓存管理",
+                                subtitle = "查看存储占用与离线文件",
+                                symbol = WenkuSymbol.Folder,
+                                onClick = open
+                            )
+                        }
                     }
                 }
 
                 item(key="user_backup") {
-                    SettingsSectionHeader("数据管理")
-                    SettingsNavigationCard(
-                        "设备互传与备份", WenkuSymbol.Sync,
-                        modifier = Modifier.testTag("device_transfer_entry"),
-                        onClick = { com.example.transfer.TransferManager.get(context).show() }
-                    )
+                    SettingsSection("数据管理") {
+                        SettingsNavigationCard(
+                            "设备互传与备份", WenkuSymbol.Sync,
+                            modifier = Modifier.testTag("device_transfer_entry"),
+                            onClick = { com.example.transfer.TransferManager.get(context).show() }
+                        )
+                    }
                 }
 
                 // Section 7: Library Help & Manual
                 item(key = "settings-帮助手册") {
-                    SettingsSectionHeader("帮助手册")
-SettingsNavigationCard(
-                        "书库使用手册", WenkuSymbol.Help,
-                        modifier = Modifier.testTag("library_help_entry_card"),
-                        onClick = { showHelpBottomSheet = true }
-                    )
+                    SettingsSection("帮助手册") {
+                        SettingsNavigationCard(
+                            "书库使用手册", WenkuSymbol.Help,
+                            modifier = Modifier.testTag("library_help_entry_card"),
+                            onClick = { showHelpBottomSheet = true }
+                        )
+                    }
                 }
 
                 // Section 8: About
                 item(key = "settings-关于", span = { GridItemSpan(maxLineSpan) }) {
-                    SettingsSectionHeader("关于")
-GlassCard(
-                        modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f).testTag("software-info"),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            horizontalAlignment = Alignment.Start
+                    SettingsSection("关于") {
+                        GlassCard(
+                            modifier = Modifier.fillMaxWidth().wenkuTabTitle(2, strength = .55f).testTag("software-info"),
+                            shape = RoundedCornerShape(16.dp)
                         ) {
-                            val versionName = remember {
-                                try {
-                                    context.packageManager.getPackageInfo(context.packageName, 0)?.versionName ?: BuildConfig.VERSION_NAME
-                                } catch (_: Exception) { BuildConfig.VERSION_NAME }
-                            }
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Filled.AutoStories, null, tint = MintPrimary, modifier = Modifier.size(24.dp))
-                                Spacer(Modifier.width(12.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text("Ciallo Reader", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                                    Text("版本 $versionName", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                horizontalAlignment = Alignment.Start
+                            ) {
+                                val versionName = remember {
+                                    try {
+                                        context.packageManager.getPackageInfo(context.packageName, 0)?.versionName ?: BuildConfig.VERSION_NAME
+                                    } catch (_: Exception) { BuildConfig.VERSION_NAME }
                                 }
-                                Spacer(Modifier.width(8.dp))
-                            WenkuTextButton(
-                                text = if (updateChecking) "检查中…" else "检查更新",
-                                enabled = !updateChecking,
-                                compact = true,
-                                wenkuSymbol = WenkuSymbol.Refresh,
-                                onClick = {
-                                    updateChecking = true
-                                    updateMessage = null
-                                    scope.launch {
-                                        try {
-                                            val result = updateChecker.check(versionName)
-                                            updateMessage = result.message
-                                            result.release?.let { appUpdate.offer(it) }
-                                        } finally { updateChecking = false }
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Filled.AutoStories, null, tint = MintPrimary, modifier = Modifier.size(24.dp))
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text("Ciallo Reader", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                                        Text("版本 $versionName", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
-                                }
-                            )
-                            }
-                            updateMessage?.let { message ->
-                                Spacer(Modifier.height(10.dp))
-                                Text(message, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            val updateUriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-                            if (updateMessage != null && appUpdateState.release == null && !updateMessage!!.contains("最新版本")) {
-                                WenkuTextButton("GitHub 发布页", onClick = {
-                                    runCatching { updateUriHandler.openUri(com.example.data.UPDATE_REPOSITORY + "/releases/latest") }.onFailure {
-                                        AppToast.makeText(context, "无法打开发布页，请检查浏览器。", Toast.LENGTH_SHORT).show()
-                                    }
-                                }, compact = true, wenkuSymbol = WenkuSymbol.External)
-                            }
-                            if (appUpdateState.release != null) {
+                                    Spacer(Modifier.width(8.dp))
                                 WenkuTextButton(
-                                    if (appUpdateState.transferring) "查看下载进度" else if (appUpdateState.hasPackage) "继续安装更新" else "查看更新",
-                                    onClick = appUpdate::show,
+                                    text = if (updateChecking) "检查中…" else "检查更新",
+                                    enabled = !updateChecking,
                                     compact = true,
-                                    wenkuSymbol = if (appUpdateState.hasPackage) WenkuSymbol.Upload else WenkuSymbol.Download,
+                                    wenkuSymbol = WenkuSymbol.Refresh,
+                                    onClick = {
+                                        updateChecking = true
+                                        updateMessage = null
+                                        scope.launch {
+                                            try {
+                                                val result = updateChecker.check(versionName)
+                                                updateMessage = result.message
+                                                result.release?.let { appUpdate.offer(it) }
+                                            } finally { updateChecking = false }
+                                        }
+                                    }
                                 )
-                            }
-                            Spacer(Modifier.height(12.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                            Spacer(Modifier.height(12.dp))
-                            com.example.ui.components.StartupDiagnosticsExportButton(Modifier.fillMaxWidth())
-                            Spacer(Modifier.height(12.dp))
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                WenkuTextButton("更新目录", onClick = { showReleaseHistory = true },
-                                    modifier = Modifier.weight(1f), compact = true, wenkuSymbol = WenkuSymbol.Document)
-                                val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-                                WenkuTextButton("GitHub", onClick = {
-                                    runCatching { uriHandler.openUri(com.example.data.UPDATE_REPOSITORY) }
-                                        .onFailure { AppToast.makeText(context, "无法打开 GitHub", Toast.LENGTH_SHORT).show() }
-                                }, modifier = Modifier.weight(1f), compact = true, wenkuSymbol = WenkuSymbol.External)
+                                }
+                                updateMessage?.let { message ->
+                                    Spacer(Modifier.height(10.dp))
+                                    Text(message, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                val updateUriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                                if (updateMessage != null && appUpdateState.release == null && !updateMessage!!.contains("最新版本")) {
+                                    WenkuTextButton("GitHub 发布页", onClick = {
+                                        runCatching { updateUriHandler.openUri(com.example.data.UPDATE_REPOSITORY + "/releases/latest") }.onFailure {
+                                            AppToast.makeText(context, "无法打开发布页，请检查浏览器。", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }, compact = true, wenkuSymbol = WenkuSymbol.External)
+                                }
+                                if (appUpdateState.release != null) {
+                                    WenkuTextButton(
+                                        if (appUpdateState.transferring) "查看下载进度" else if (appUpdateState.hasPackage) "继续安装更新" else "查看更新",
+                                        onClick = appUpdate::show,
+                                        compact = true,
+                                        wenkuSymbol = if (appUpdateState.hasPackage) WenkuSymbol.Upload else WenkuSymbol.Download,
+                                    )
+                                }
+                                Spacer(Modifier.height(12.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                Spacer(Modifier.height(12.dp))
+                                com.example.ui.components.StartupDiagnosticsExportButton(Modifier.fillMaxWidth())
+                                Spacer(Modifier.height(12.dp))
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    WenkuTextButton("更新目录", onClick = { showReleaseHistory = true },
+                                        modifier = Modifier.weight(1f), compact = true, wenkuSymbol = WenkuSymbol.Document)
+                                    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                                    WenkuTextButton("GitHub", onClick = {
+                                        runCatching { uriHandler.openUri(com.example.data.UPDATE_REPOSITORY) }
+                                            .onFailure { AppToast.makeText(context, "无法打开 GitHub", Toast.LENGTH_SHORT).show() }
+                                    }, modifier = Modifier.weight(1f), compact = true, wenkuSymbol = WenkuSymbol.External)
+                                }
                             }
                         }
                     }
@@ -1191,6 +1203,14 @@ private fun SettingsNavigationCard(
             }
             WenkuIcon(WenkuSymbol.Forward, size = 18.dp, tint = colors.onSurfaceVariant.copy(alpha = .6f), entrance = false)
         }
+    }
+}
+
+@Composable
+private fun SettingsSection(title: String, content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SettingsSectionHeader(title)
+        content()
     }
 }
 

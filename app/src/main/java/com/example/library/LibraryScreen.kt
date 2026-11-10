@@ -584,7 +584,7 @@ fun LibraryScreen(
                     )
                 }
         ) {
-            Column(modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 1040.dp).fillMaxSize()) {
+            Column(modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 1200.dp).fillMaxSize()) {
     // 滚动渐进折叠头部（书库强化版）：fraction 连续驱动副标题淡出→标题缩小→整卡高度归零，
     // 完全收起后零垂直占用；回顶或搜索失焦后按同一路径平滑恢复。
     // 折叠补间与「读取滚动状态」都下沉到 LibraryCollapsingHeader 内部，
@@ -613,6 +613,10 @@ fun LibraryScreen(
             
             val toolsScroll = rememberScrollState()
             com.example.ui.adaptive.AdaptiveWorkspace(
+                // 内容实宽 >=960dp 才出侧栏，且侧栏 300dp，保证结果区 >=600dp。
+                splitAt = 960.dp,
+                sidebarWidth = 300.dp,
+                landscapeOnly = true,
                 modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.imeAnimationTarget),
                 controls = { split ->
                     Column(
@@ -754,16 +758,18 @@ fun LibraryScreen(
                     }
                     Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                     LazyVerticalStaggeredGrid(
-                        columns = if (split) StaggeredGridCells.Adaptive(156.dp) else StaggeredGridCells.Fixed(
-                            // 多设备一致：手机2列 / 中屏3列 / 宽屏4列，避免平板上两列被拉伸过宽。
-                            // 改用全 App 统一断点体系 AdaptiveSpec（此前此处自行判断 screenWidthDp，
-                            // 与 AdaptiveSpec.rememberWindowWidthClass 的 600/840 断点重复定义）。
-                            when (com.example.ui.adaptive.rememberWindowWidthClass()) {
-                                com.example.ui.adaptive.WindowWidthClass.EXPANDED -> 4
-                                com.example.ui.adaptive.WindowWidthClass.MEDIUM -> 3
-                                else -> 2
-                            }
-                        ),
+                        // 列数按结果区实宽（Adaptive）算，不再只看整屏断点：
+                        // 840dp 横屏减去导航栏/侧栏后 Fixed 列会把封面撑到失控。
+                        columns = when {
+                            split -> StaggeredGridCells.Adaptive(156.dp)
+                            com.example.ui.adaptive.rememberWindowWidthClass() ==
+                                com.example.ui.adaptive.WindowWidthClass.EXPANDED ->
+                                StaggeredGridCells.Adaptive(150.dp)
+                            com.example.ui.adaptive.rememberWindowWidthClass() ==
+                                com.example.ui.adaptive.WindowWidthClass.MEDIUM ->
+                                StaggeredGridCells.Fixed(3)
+                            else -> StaggeredGridCells.Fixed(2)
+                        },
                         state = staggeredGridState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(

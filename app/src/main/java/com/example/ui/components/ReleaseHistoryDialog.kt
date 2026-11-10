@@ -27,6 +27,7 @@ import com.example.ui.wenku.WenkuTextButton
 
 internal data class ReleaseSummary(val version: String, val date: String, val summary: String)
 internal val releaseHistory = listOf(
+    ReleaseSummary("1.6.1", "11-10", "平板排版 · 旋转重排 · 启动检查更新 · 镜像下载"),
     ReleaseSummary("1.6.0", "11-10", "Wenku8 UI · 平板布局 · 漫画预加载数量 · Roxy 动画"),
     ReleaseSummary("1.5.16", "11-07", "EPUB 连续插图修复 · 保留插图原始尺寸"),
     ReleaseSummary("1.5.15", "11-06", "Alice's Library · 自动备份"),

@@ -24,86 +24,109 @@ import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.coroutineContext
 
+private val GITHUB_DOWNLOAD_HOSTS =
+    setOf("github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com")
+
 internal class AppUpdateDownload(
     private val context: Context,
     private val client: OkHttpClient = SharedHttpTransport.builder()
         .connectTimeout(12, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS)
         .callTimeout(10, TimeUnit.MINUTES).followRedirects(false).followSslRedirects(false).build(),
 ) {
-    suspend fun download(asset: UpdateApkAsset, tag: String, destination: File, onProgress: (Long, Long?) -> Unit) =
-        withContext(Dispatchers.IO) {
-            require(officialUpdateAsset(tag, asset.name, asset.url)) { "安装包地址不属于此版本的官方发布" }
-            require(asset.size == null || asset.size in 1..MAX_UPDATE_BYTES) { "安装包大小异常" }
-            val proxy = SystemProxyResolver.resolve(context.applicationContext)
-            val transport = client.newBuilder().followRedirects(false).followSslRedirects(false)
-                .apply { if (proxy != null) proxy(proxy) }.build()
-            var next = asset.url.toHttpUrl()
-            var finished = false
-            try {
-                for (redirect in 0..5) {
-                    ensureActive()
-                    val call = transport.newCall(Request.Builder().url(next)
-                        .header("User-Agent", "Ciallo-Reader/${BuildConfig.VERSION_NAME}")
-                        .header("Accept", "application/octet-stream").header("Accept-Encoding", "identity").build())
-                    // Keep cancellation attached until the entire body is copied, not just until
-                    // headers arrive. Cancelling closes a stalled socket immediately.
-                    val moved = coroutineScope {
-                        val cancellation = launch(start = CoroutineStart.UNDISPATCHED) {
-                            try { awaitCancellation() } finally { call.cancel() }
-                        }
-                        try {
-                            call.executeCancellable().use { response ->
-                                if (response.code in setOf(301, 302, 303, 307, 308)) {
-                                    next = response.header("Location")?.let(next::resolve)
-                                        ?: error("下载跳转缺少地址")
-                                    require(next.scheme == "https" && next.port == 443 &&
-                                        next.host in setOf("github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com") &&
-                                        next.username.isEmpty() && next.password.isEmpty()) { "下载跳转不是 GitHub 官方安全地址" }
-                                    true
-                                } else {
-                                    check(response.code == 200) { "安装包下载失败（HTTP ${response.code}），可重试或使用浏览器下载" }
-                                    val body = response.body ?: error("安装包下载为空")
-                                    val length = body.contentLength().takeIf { it >= 0 }
-                                    require(length == null || length in 1..MAX_UPDATE_BYTES) { "安装包大小异常" }
-                                    if (asset.size != null && length != null) require(asset.size == length) { "安装包大小与发布信息不符" }
-                                    val total = asset.size ?: length
-                                    var received = 0L
-                                    var lastProgress = 0L
-                                    onProgress(0, total)
-                                    FileOutputStream(destination).use { output ->
-                                        body.byteStream().use { input ->
-                                            val buffer = ByteArray(64 * 1024)
-                                            while (true) {
-                                                coroutineContext.ensureActive()
-                                                val read = input.read(buffer)
-                                                if (read < 0) break
-                                                received += read
-                                                require(received <= MAX_UPDATE_BYTES && (total == null || received <= total)) { "安装包大小异常" }
-                                                output.write(buffer, 0, read)
-                                                val now = System.nanoTime()
-                                                if (now - lastProgress >= 100_000_000) {
-                                                    onProgress(received, total)
-                                                    lastProgress = now
-                                                }
+    /**
+     * [source] only changes the transport URL. Version identity, size and SHA-256
+     * always come from the official GitHub release; the mirror is never consulted
+     * for metadata, and no credentials are ever attached to either host.
+     */
+    suspend fun download(
+        asset: UpdateApkAsset,
+        tag: String,
+        destination: File,
+        source: AppUpdateSource = AppUpdateSource.GITHUB,
+        onProgress: (Long, Long?) -> Unit,
+    ) = withContext(Dispatchers.IO) {
+        val mirror = source == AppUpdateSource.MIRROR
+        require(officialUpdateAsset(tag, asset.name, asset.url)) { "安装包地址不属于此版本的官方发布" }
+        val downloadUrl = if (mirror) {
+            requireNotNull(mirrorDownloadUrl(tag, asset)) { "镜像下载需要官方 SHA-256" }
+        } else asset.url
+        require(asset.size == null || asset.size in 1..MAX_UPDATE_BYTES) { "安装包大小异常" }
+        val proxy = SystemProxyResolver.resolve(context.applicationContext)
+        val transport = client.newBuilder().followRedirects(false).followSslRedirects(false)
+            .apply { if (proxy != null) proxy(proxy) }.build()
+        val allowedHosts = if (mirror) GITHUB_DOWNLOAD_HOSTS + UPDATE_MIRROR_HOST else GITHUB_DOWNLOAD_HOSTS
+        var next = downloadUrl.toHttpUrl()
+        require(next.scheme == "https" && next.port == 443 && next.host in allowedHosts &&
+            next.username.isEmpty() && next.password.isEmpty()) { "安装包地址不是受信任的安全地址" }
+        var finished = false
+        try {
+            for (redirect in 0..5) {
+                ensureActive()
+                val call = transport.newCall(Request.Builder().url(next)
+                    .header("User-Agent", "Ciallo-Reader/${BuildConfig.VERSION_NAME}")
+                    .header("Accept", "application/octet-stream").header("Accept-Encoding", "identity").build())
+                // Keep cancellation attached until the entire body is copied, not just until
+                // headers arrive. Cancelling closes a stalled socket immediately.
+                val moved = coroutineScope {
+                    val cancellation = launch(start = CoroutineStart.UNDISPATCHED) {
+                        try { awaitCancellation() } finally { call.cancel() }
+                    }
+                    try {
+                        call.executeCancellable().use { response ->
+                            if (response.code in setOf(301, 302, 303, 307, 308)) {
+                                next = response.header("Location")?.let(next::resolve)
+                                    ?: error("下载跳转缺少地址")
+                                require(next.scheme == "https" && next.port == 443 &&
+                                    next.host in allowedHosts &&
+                                    next.username.isEmpty() && next.password.isEmpty()) {
+                                    if (mirror) "下载跳转不是 GitHub 或镜像的安全地址"
+                                    else "下载跳转不是 GitHub 官方安全地址"
+                                }
+                                true
+                            } else {
+                                check(response.code == 200) { "安装包下载失败（HTTP ${response.code}），可重试或使用浏览器下载" }
+                                val body = response.body ?: error("安装包下载为空")
+                                val length = body.contentLength().takeIf { it >= 0 }
+                                require(length == null || length in 1..MAX_UPDATE_BYTES) { "安装包大小异常" }
+                                if (asset.size != null && length != null) require(asset.size == length) { "安装包大小与发布信息不符" }
+                                val total = asset.size ?: length
+                                var received = 0L
+                                var lastProgress = 0L
+                                onProgress(0, total)
+                                FileOutputStream(destination).use { output ->
+                                    body.byteStream().use { input ->
+                                        val buffer = ByteArray(64 * 1024)
+                                        while (true) {
+                                            coroutineContext.ensureActive()
+                                            val read = input.read(buffer)
+                                            if (read < 0) break
+                                            received += read
+                                            require(received <= MAX_UPDATE_BYTES && (total == null || received <= total)) { "安装包大小异常" }
+                                            output.write(buffer, 0, read)
+                                            val now = System.nanoTime()
+                                            if (now - lastProgress >= 100_000_000) {
+                                                onProgress(received, total)
+                                                lastProgress = now
                                             }
                                         }
-                                        output.fd.sync()
                                     }
-                                    check(received > 0 && (total == null || received == total)) { "安装包下载不完整，请重试" }
-                                    coroutineContext.ensureActive()
-                                    onProgress(received, total ?: received)
-                                    false
+                                    output.fd.sync()
                                 }
+                                check(received > 0 && (total == null || received == total)) { "安装包下载不完整，请重试" }
+                                coroutineContext.ensureActive()
+                                onProgress(received, total ?: received)
+                                false
                             }
-                        } finally { cancellation.cancel() }
-                    }
-                    if (!moved) { finished = true; break }
+                        }
+                    } finally { cancellation.cancel() }
                 }
-                check(finished) { "下载跳转次数过多，请使用浏览器下载" }
-            } finally {
-                if (!finished) destination.delete()
+                if (!moved) { finished = true; break }
             }
+            check(finished) { "下载跳转次数过多，请使用浏览器下载" }
+        } finally {
+            if (!finished) destination.delete()
         }
+    }
 }
 
 internal fun updateFileSha256(file: File): String {

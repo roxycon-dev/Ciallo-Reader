@@ -11,7 +11,7 @@ Read local ebooks, novels, and comics in one Android app.
 
 [🌐 Product site](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ Download the latest APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.6.0 release notes](docs/release-1.6.0-2026-11-10.md) ·
+[1.6.1 release notes](docs/release-1.6.1-2026-11-10.md) ·
 [See screenshots](#screenshots) ·
 [Features](#features) ·
 [Report an issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -24,6 +24,8 @@ Read local ebooks, novels, and comics in one Android app.
 </div>
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
+
+**1.6.1 / 260 · Tablet layout and update checks.** Tablet settings keep each title with its content, Library and Discover arrange results to the available width, and the bookshelf drops duplicate reading space. Rotation, split-screen, and window size changes trigger a fresh layout. Update checks run silently at startup and on demand from Settings; downloads use the official GitHub release or an explicitly chosen HTTPS mirror, still verify the official signature, and offer the mirror only when the official SHA-256 is published. See the [UI guide](docs/UI_MOTION_INTERACTION_GUIDE.md) and [release notes](docs/release-1.6.1-2026-11-10.md).
 
 **1.6.0 / 259 · UI redesign and tablet support.** The bookshelf, library, Discover, statistics, settings, and readers share a redesigned layout, glass panels, and coordinated page, text, and icon motion. The bookshelf keeps its 3D view and Ciallo themes. [Issue #7](https://github.com/roxycon-dev/Ciallo-Reader/issues/7) brings adaptive tablet layouts across the app, including a navigation rail, split browsing and detail panes, and an automatic or custom 0–12 image preload setting under Manga Reader → Settings → Image. [Release notes](docs/release-1.6.0-2026-11-10.md).
 
@@ -180,8 +182,8 @@ Version 1.3.8 adds Discover and restores Aiman and MYCOMIC reading. Its APK reta
 ## Install
 
 - **Android:** 7.0 (API 24) or newer.
-- **Architecture:** Current release APKs target arm64-v8a, supported by most Android phones and tablets. The release APK does not include an x86_64 emulator build.
-- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest).
+- **Architecture:** Current release 1.6.1 (version code 260) targets arm64-v8a, supported by most Android phones and tablets. The release APK does not include an x86_64 emulator build.
+- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) and verify `SHA256SUMS.txt` from the same release.
 - Open the downloaded APK and follow Android's prompt to allow installation from that source.
 
 ## Get started
@@ -219,6 +221,7 @@ cd Ciallo-Reader
 On Windows, use gradlew.bat :app:assembleDebug. For bugs and feature requests, open a [GitHub Issue](https://github.com/roxycon-dev/Ciallo-Reader/issues) with the app version, device model, and reproduction steps.
 
 - [Changelog](CHANGELOG.md)
+- [UI motion and interaction guide (Chinese)](docs/UI_MOTION_INTERACTION_GUIDE.md)
 - [v1.3.6 release notes and verification](docs/release-1.3.6-2026-10-12.md)
 - [Third-party component and model licenses](docs/vendor-licenses/README.md)
 

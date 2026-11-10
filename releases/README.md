@@ -1,5 +1,9 @@
 # releases
 
+**1.6.1 / 260** · [GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.6.1) · [下载 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.6.1/Ciallo-Reader-v1.6.1.apk) · [更新说明](../docs/release-1.6.1-2026-11-10.md) · SHA-256 见 Release 附件 `SHA256SUMS-v1.6.1.txt`（构建后生成）。
+
+平板设置按组排版，书库与发现按可用宽度组织结果，书架移除重复阅读空间；加强旋转与窗口重排。更新检测支持启动静默检查、设置手动检查及显式选择的 HTTPS 镜像，镜像需官方 SHA-256，安装包沿用官方签名校验。
+
 **1.6.0 / 259** · [GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.6.0) · [下载 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.6.0/Ciallo-Reader-v1.6.0.apk) · [更新说明](../docs/release-1.6.0-2026-11-10.md) · [SHA-256](SHA256SUMS-v1.6.0.txt)。UI 与交互重构、全应用宽屏导航与分栏布局、漫画图片预加载数量自定义。
 
 **1.5.14 / 256**：[GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.5.14) · [更新说明](../docs/release-1.5.14-2026-11-05.md)。下载入口状态纠正、数量徽标完整显示；统一高频状态图标、加载和按压反馈。
