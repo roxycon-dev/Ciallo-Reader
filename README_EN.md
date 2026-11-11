@@ -203,6 +203,38 @@ On Windows, use gradlew.bat :app:assembleDebug. For bugs and feature requests, o
 - [v1.3.6 release notes and verification](docs/release-1.3.6-2026-10-12.md)
 - [Third-party component and model licenses](docs/vendor-licenses/README.md)
 
+## Contributors and thanks
+
+Thanks to [mikufoxxx and the Wenku8 Flutter contributors](https://github.com/mikufoxxx/Wenku8_Flutter) for sharing their UI, interaction design, and motion work. Their editorial layouts, glass overlays, and coordinated transitions guided this redesign. 
+
+Many changes in this project come from issues: bug reports, new sources, and reports about layout or compatibility problems. Below are the people who filed them, with their issue numbers.
+
+<table>
+  <tr>
+    <td align="center" width="112">
+      <a href="https://github.com/mahaix"><img src="https://github.com/mahaix.png" width="64" height="64" alt="mahaix avatar" /><br /><sub><b>mahaix</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/1">#1</a></sub>
+    </td>
+    <td align="center" width="112">
+      <a href="https://github.com/metahuman1016"><img src="https://github.com/metahuman1016.png" width="64" height="64" alt="metahuman1016 avatar" /><br /><sub><b>metahuman1016</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/2">#2</a></sub>
+    </td>
+    <td align="center" width="112">
+      <a href="https://github.com/Wyingzik"><img src="https://github.com/Wyingzik.png" width="64" height="64" alt="Wyingzik avatar" /><br /><sub><b>Wyingzik</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/3">#3</a></sub>
+    </td>
+    <td align="center" width="112">
+      <a href="https://github.com/Lancher2048"><img src="https://github.com/Lancher2048.png" width="64" height="64" alt="Lancher2048 avatar" /><br /><sub><b>Lancher2048</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/4">#4</a></sub>
+    </td>
+    <td align="center" width="112">
+      <a href="https://github.com/Yang-p-c"><img src="https://github.com/Yang-p-c.png" width="64" height="64" alt="Yang-p-c avatar" /><br /><sub><b>Yang-p-c</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/5">#5</a></sub>
+    </td>
+    <td align="center" width="112">
+      <a href="https://github.com/jesonab"><img src="https://github.com/jesonab.png" width="64" height="64" alt="jesonab avatar" /><br /><sub><b>jesonab</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/6">#6</a></sub>
+    </td>
+    <td align="center" width="112">
+      <a href="https://github.com/qianyunli114514"><img src="https://github.com/qianyunli114514.png" width="64" height="64" alt="qianyunli114514 avatar" /><br /><sub><b>qianyunli114514</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/7">#7</a></sub>
+    </td>
+  </tr>
+</table>
+
 ## Content sources and license
 
 Ciallo Reader is a reading and library-management app. Online sources and translation services are provided by third parties; their content, availability, and terms are controlled by those providers. Please follow local laws, source-site rules, and copyright requirements.
