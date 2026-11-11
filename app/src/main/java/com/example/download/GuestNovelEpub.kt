@@ -1,5 +1,7 @@
 package com.example.download
 
+import com.example.i18n.tr
+
 import android.graphics.BitmapFactory
 import com.example.data.readImportBytes
 import com.example.source.SourceResult
@@ -31,11 +33,11 @@ internal object GuestNovelEpub {
 
     suspend fun write(source: PublicNovelSource, downloadUrl: String, target: File, progress: suspend (Int, Int) -> Unit) {
         val url = downloadUrl.toHttpUrl()
-        require(url.fragment == "ciallo-public-epub-v1") { "小说下载标识无效" }
+        require(url.fragment == "ciallo-public-epub-v1") { tr("小说下载标识无效") }
         val id = source.bookId(url)
         val book = value(source.getDetail(id))
         val toc = value(source.getChapters(id))
-        require(toc.isNotEmpty()) { "源站目录为空" }
+        require(toc.isNotEmpty()) { tr("源站目录为空") }
         val checkpoint = GuestNovelCheckpoint(target, source.id, downloadUrl, toc)
         val restored = checkpoint.completedChapters.coerceAtMost(toc.size)
         progress(restored, toc.size)
@@ -64,7 +66,7 @@ internal object GuestNovelEpub {
                             val asset = assets[part.url] ?: run {
                                 val image = checkpoint.image(part.url) ?: run {
                                     val imageUrl = part.url.toHttpUrl()
-                                    require(imageUrl.username.isEmpty() && imageUrl.password.isEmpty()) { "插图地址异常" }
+                                    require(imageUrl.username.isEmpty() && imageUrl.password.isEmpty()) { tr("插图地址异常") }
                                     val req = Request.Builder().url(imageUrl).header("Referer", chapter.id)
                                         .header("User-Agent", "Mozilla/5.0").build()
                                     source.http.newCall(req).executeCancellable().use { response ->
@@ -72,7 +74,7 @@ internal object GuestNovelEpub {
                                         val bytes = response.body?.byteStream()?.use { it.readImportBytes(16 * 1024 * 1024) } ?: error("插图为空")
                                         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                                         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
-                                        require(options.outWidth > 0 && options.outHeight > 0) { "插图损坏，未生成缺图电子书" }
+                                        require(options.outWidth > 0 && options.outHeight > 0) { tr("插图损坏，未生成缺图电子书") }
                                         val mime = options.outMimeType ?: error("插图格式无法识别")
                                         val extension = when (mime) { "image/jpeg" -> "jpg"; "image/png" -> "png"; "image/gif" -> "gif"; "image/webp" -> "webp"; else -> error("插图格式不受支持") }
                                         GuestNovelCheckpoint.Image(bytes, mime, extension).also { checkpoint.saveImage(part.url, it) }
@@ -97,7 +99,7 @@ internal object GuestNovelEpub {
                     if (cached == null) delay(200)
                 }
                 val latest = value(source.getChapters(id))
-                require(toc.map { it.id to it.title } == latest.map { it.id to it.title }) { "下载期间源站目录变化，请重试；未导入旧目录的残缺书籍" }
+                require(toc.map { it.id to it.title } == latest.map { it.id to it.title }) { tr("下载期间源站目录变化，请重试；未导入旧目录的残缺书籍") }
                 val nav = toc.mapIndexed { i, c -> "<li><a href=\"chapter$i.xhtml\">${xml(c.title)}</a></li>" }.joinToString("")
                 text("OEBPS/nav.xhtml", """<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>目录</title></head><body><nav epub:type="toc"><ol>$nav</ol></nav></body></html>""")
                 val manifest = toc.indices.joinToString("") { "<item id=\"c$it\" href=\"chapter$it.xhtml\" media-type=\"application/xhtml+xml\"/>" } +

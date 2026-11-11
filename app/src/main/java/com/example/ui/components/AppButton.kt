@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -174,7 +176,7 @@ fun AppActionButton(
                 }
                 Spacer(Modifier.width(6.dp))
             }
-            Text(if (loading) "处理中…" else text, color = ink.copy(alpha = if (enabled) 1f else .4f), fontSize = buttonSize.fontSize)
+            Text(if (loading) tr("处理中…") else text, color = ink.copy(alpha = if (enabled) 1f else .4f), fontSize = buttonSize.fontSize)
         }
         return
     }

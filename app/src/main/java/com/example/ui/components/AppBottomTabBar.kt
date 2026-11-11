@@ -8,8 +8,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -21,8 +19,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -367,45 +363,6 @@ fun AppBottomTabBar(
                             ink = selectedColor,
                             onClick = { onTabSelected(index) }
                         )
-                    }
-                }
-            }
-        }
-    }
-}
-
-internal val AppRailWidth = 96.dp
-
-/** Wide windows use the same animated tab glyphs and actions as the compact dock. */
-@Composable
-internal fun AppNavigationRail(
-    items: List<AppTabItem>,
-    selectedIndex: Int,
-    onTabSelected: (Int) -> Unit,
-) {
-    val colors = wenkuColors()
-    val reduce = rememberWenkuAccessibility().reduceMotion
-    val position = animateDpAsState(
-        targetValue = 56.dp * selectedIndex,
-        animationSpec = if (reduce) tween(0) else WenkuMotion.spring(),
-        label = "railSelection",
-    )
-    com.example.ui.wenku.WenkuGlassSurface(
-        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-            .width(AppRailWidth - 20.dp).testTag("app_tab_rail"),
-        shape = RoundedCornerShape(28.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(6.dp),
-    ) {
-        Box(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-            Box(
-                Modifier.fillMaxWidth().offset { androidx.compose.ui.unit.IntOffset(0, position.value.roundToPx()) }
-                    .height(56.dp).clip(RoundedCornerShape(20.dp))
-                    .background(colors.ink.copy(alpha = .09f)),
-            )
-            Column(Modifier.fillMaxWidth()) {
-                items.forEachIndexed { index, item ->
-                    DockTab(item, index == selectedIndex, labelFraction = 1f, ink = colors.ink) {
-                        onTabSelected(index)
                     }
                 }
             }

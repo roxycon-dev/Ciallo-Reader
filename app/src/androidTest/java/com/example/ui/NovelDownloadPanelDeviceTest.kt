@@ -2,6 +2,7 @@ package com.example.ui
 
 import android.graphics.Bitmap
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -42,7 +43,7 @@ class NovelDownloadPanelDeviceTest {
             NovelDownloadPanel(tasks, emptyMap(), tasks.associate { it.id to DownloadState.Success(it.filePath) }, {}, {}, {}, {}, {})
         } }
         compose.onNodeWithText("下载任务").assertIsDisplayed()
-        compose.onAllNodesWithText("已完成")[0].assertIsDisplayed()
+        compose.onAllNodesWithText("已完成 · 已存入书架")[0].assertIsDisplayed()
         val image = compose.onRoot().captureToImage().asAndroidBitmap()
         File(compose.activity.filesDir, "zlibrary-actual-downloads.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
@@ -55,14 +56,29 @@ class NovelDownloadPanelDeviceTest {
                 DownloadStatus.DOWNLOADING, 2 * 1024 * 1024, 5 * 1024 * 1024, "/downloads/sample.epub"),
             DownloadTaskEntity(failedId, "zlibrary", "失败任务演示", "测试样例", null, "https://example.com/file2", "epub",
                 DownloadStatus.FAILED, filePath = "/downloads/sample2.epub"))
+        val activeState = DownloadState.Downloading(2 * 1024 * 1024, 5 * 1024 * 1024, .4f)
+        val state = mutableStateOf<DownloadState>(activeState)
+        var paused: String? = null
+        var resumed: String? = null
         compose.setContent { MaterialTheme {
-            NovelDownloadPanel(tasks, emptyMap(), mapOf(activeId to DownloadState.Downloading(2 * 1024 * 1024, 5 * 1024 * 1024, .4f),
-                failedId to DownloadState.Error("节点暂时不可用，可重新获取链接并重试")), {}, {}, {}, {}, {})
+            NovelDownloadPanel(
+                tasks, emptyMap(), mapOf(activeId to state.value,
+                    failedId to DownloadState.Error("节点暂时不可用，可重新获取链接并重试")),
+                onPause = { paused = it; state.value = DownloadState.Paused(activeState.downloadedBytes, activeState.totalBytes) },
+                onResume = { resumed = it; state.value = activeState },
+                onCancel = {}, onRetry = {}, onDismiss = {},
+            )
         } }
         compose.onNodeWithText("下载中 · 40%").assertIsDisplayed()
         compose.onNodeWithText("2.0 MB / 5.0 MB").assertIsDisplayed()
         compose.onNodeWithContentDescription("重新获取并重试").assertIsDisplayed()
         val image = compose.onRoot().captureToImage().asAndroidBitmap()
         File(compose.activity.filesDir, "zlibrary-download-panel.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        compose.onNodeWithContentDescription("暂停").performClick()
+        compose.onNodeWithText("已暂停").assertIsDisplayed()
+        compose.onNodeWithContentDescription("继续").performClick()
+        compose.onNodeWithText("下载中 · 40%").assertIsDisplayed()
+        org.junit.Assert.assertEquals(activeId, paused)
+        org.junit.Assert.assertEquals(activeId, resumed)
     }
 }

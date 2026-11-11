@@ -1,5 +1,7 @@
 package com.example.god
 
+import com.example.i18n.tr
+
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutIconButton
 import android.graphics.Bitmap
@@ -142,7 +144,7 @@ fun GodCoverCropScreen(
         if (source == null || display == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    if (source == null) "封面加载失败，请返回重试" else "正在准备图片…",
+                    if (source == null) tr("封面加载失败，请返回重试") else tr("正在准备图片…"),
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 14.sp,
                 )
@@ -209,7 +211,7 @@ fun GodCoverCropScreen(
         ) {
             PullOutIconButton(
                 icon = Icons.Filled.Close,
-                contentDescription = "取消",
+                contentDescription = tr("取消"),
                 onClick = onCancel,
                 tint = Color.White
             )
@@ -222,7 +224,7 @@ fun GodCoverCropScreen(
             )
             PullOutIconButton(
                 icon = Icons.Filled.Refresh,
-                contentDescription = "旋转 90°",
+                contentDescription = tr("旋转 90°"),
                 tint = Color.White,
                 onClick = {
                     rotation = (rotation + 90f) % 360f
@@ -246,7 +248,7 @@ fun GodCoverCropScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PullOutTextButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
-                Text("取消", color = Color.White.copy(alpha = 0.75f))
+                Text(tr("取消"), color = Color.White.copy(alpha = 0.75f))
             }
             PullOutTextButton(
                 onClick = {
@@ -290,7 +292,7 @@ fun GodCoverCropScreen(
                 },
                 modifier = Modifier.weight(1f),
             ) {
-                Text("完成", color = Color(0xFFF5B942), fontWeight = FontWeight.Bold)
+                Text(tr("完成"), color = Color(0xFFF5B942), fontWeight = FontWeight.Bold)
             }
         }
     }

@@ -1,5 +1,7 @@
 package com.example.source.js
 
+import com.example.i18n.tr
+
 import com.example.source.ComicInfo
 import com.example.source.SearchBook
 import org.json.JSONArray
@@ -40,7 +42,7 @@ internal object JsComicMetadata {
             values(data.opt("otherNames")) + category("别名", "別名", "其他名称", "alternative", "alternate titles")).distinct()
         val status = values(data.opt("status")).firstOrNull()
             ?: category("状态", "狀態", "status").firstOrNull()
-            ?: (data.opt("isCompleted") as? Boolean)?.let { if (it) "已完结" else "连载中" }
+            ?: (data.opt("isCompleted") as? Boolean)?.let { if (it) tr("已完结") else tr("连载中") }
         return SearchBook(
             id = bookId,
             sourceId = sourceId,

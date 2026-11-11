@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.i18n.tr
+
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
@@ -14,8 +16,6 @@ import java.util.zip.GZIPInputStream
  * OkHttp 不再透明解压，图片字节实际是 gzip 流，解码前必须先解压。
  */
 object ImageBytes {
-
-    internal fun isIqtaoImageHost(host: String): Boolean = host=="webimg.iqtao.cn" || host=="f2.kkmh.com"
 
     private val normalizationLock=Any()
     private val expandedLimit: Long get() = minOf(32L*1024*1024,Runtime.getRuntime().maxMemory()/12)
@@ -35,7 +35,7 @@ object ImageBytes {
                     while (true) {
                         val read = input.read(buffer)
                         if (read < 0) break
-                        require(output.size().toLong() + read <= expandedLimit) { "图片解压体积过大" }
+                        require(output.size().toLong() + read <= expandedLimit) { tr("图片解压体积过大") }
                         output.write(buffer, 0, read)
                     }
                     output.toByteArray()
@@ -47,26 +47,19 @@ object ImageBytes {
     }
 
     /** 图片字节统一归一化：gzip 解压 + AVIF 转 PNG（BitmapFactory 在部分设备不支持 AVIF）。 */
-    fun normalizeImage(bytes: ByteArray, contentEncoding: String? = null, sourceUrl: String? = null): ByteArray = synchronized(normalizationLock) {
-        require(bytes.size<=32L*1024*1024) { "图片文件过大" }
+    fun normalizeImage(bytes: ByteArray, contentEncoding: String? = null): ByteArray = synchronized(normalizationLock) {
+        require(bytes.size<=32L*1024*1024) { tr("图片文件过大") }
         var result = if (contentEncoding?.contains("br", ignoreCase = true) == true) {
             brotliDecompress(bytes) ?: bytes
         } else {
             gunzipIfNeeded(bytes)
-        }
-        // Public reader's byte envelope (XOR_KEY=0xAB, SHIFT_VALUE=47).
-        // Scope it to the reader image origins and verify the decoded image signature.
-        val host=sourceUrl?.let { runCatching { java.net.URI(it).host }.getOrNull() }
-        if(host != null && isIqtaoImageHost(host) && MhttuImageDecryptor.imageExtension(result)==null) {
-            val decoded=ByteArray(result.size) { index -> (((result[index].toInt() and 255)-47) and 255 xor 171).toByte() }
-            if(MhttuImageDecryptor.imageExtension(decoded)!=null && decodeOk(decoded)) result=decoded
         }
         if (isAvif(result)) {
             result = try {
                 if (Build.VERSION.SDK_INT >= 28) {
                     val source = android.graphics.ImageDecoder.createSource(ByteBuffer.wrap(result))
                     val bmp = android.graphics.ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-                        require(info.size.width.toLong()*info.size.height <= minOf(32L*1024*1024,Runtime.getRuntime().maxMemory()/8)/4) { "AVIF 图片过大" }
+                        require(info.size.width.toLong()*info.size.height <= minOf(32L*1024*1024,Runtime.getRuntime().maxMemory()/8)/4) { tr("AVIF 图片过大") }
                         decoder.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
                     }
                     try {
@@ -95,7 +88,7 @@ object ImageBytes {
                         while (true) {
                             val read = input.read(buffer)
                             if (read < 0) break
-                            require(output.size().toLong() + read <= expandedLimit) { "图片解压体积过大" }
+                            require(output.size().toLong() + read <= expandedLimit) { tr("图片解压体积过大") }
                         output.write(buffer, 0, read)
                         }
                         output.toByteArray()

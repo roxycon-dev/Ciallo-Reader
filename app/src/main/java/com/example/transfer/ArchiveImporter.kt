@@ -1,5 +1,7 @@
 package com.example.transfer
 
+import com.example.i18n.tr
+
 import android.content.Context
 import androidx.room.withTransaction
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -14,7 +16,7 @@ import java.io.File
 
 internal object ArchiveImporter {
     suspend fun import(context: Context, archive: File, mode: ImportMode, progress: (TransferProgress) -> Unit): ImportResult {
-        progress(TransferProgress(TransferPhase.VERIFYING,message="检查数据完整性"))
+        progress(TransferProgress(TransferPhase.VERIFYING,message=tr("检查数据完整性")))
         val extracted=PortableArchive.extract(context,archive)
         val stage=extracted.directory; val preview=extracted.preview
         val db=AppDatabase.getDatabase(context); val sql=db.openHelper.writableDatabase
@@ -22,9 +24,9 @@ internal object ArchiveImporter {
         var chapterIndex:IncomingChapterIndex?=null
         try {
             if(mode==ImportMode.MERGE && ArchiveRows.all(sql,"transfer_receipts","packageId=?",arrayOf(preview.packageId)).isNotEmpty())
-                return ImportResult(0,0,preview.counts.values.sum(),listOf("这份数据已导入，无需重复接收"))
-            require(!preview.containsProtected || PrivacyManager(context).isEnabled()) { "请先在接收设备设置隐私 PIN，再导入受保护内容" }
-            require(context.filesDir.usableSpace > preview.expandedBytes.coerceAtMost(64L*1024*1024)+16L*1024*1024) { "空间不足以创建恢复快照" }
+                return ImportResult(0,0,preview.counts.values.sum(),listOf(com.example.i18n.tr("这份数据已导入，无需重复接收")))
+            require(!preview.containsProtected || PrivacyManager(context).isEnabled()) { tr("请先在接收设备设置隐私 PIN，再导入受保护内容") }
+            require(context.filesDir.usableSpace > preview.expandedBytes.coerceAtMost(64L*1024*1024)+16L*1024*1024) { tr("空间不足以创建恢复快照") }
             val rows=File(stage,"database.rows"); val files=File(stage,"files").absolutePath
             val incomingIndex=IncomingChapterIndex(stage,rows,context);chapterIndex=incomingIndex
             val bookIds=linkedMapOf<Int,Int>(); val chapterIds=linkedMapOf<Int,Int>(); val bookIdentities=hashMapOf<Int,String>()
@@ -109,7 +111,7 @@ internal object ArchiveImporter {
                                         localBodies.getOrPut(localId){bodyFingerprint.local(sql,localId,local.getString("contentType"))}==incomingBody
                                 } else null
                                 if(old==null && envelope.optBoolean("parentOnly")) {
-                                    warnings.add("《${row.getString("title")}》未在本机找到，相关标注和记录已跳过；选择书籍类别可完整传送")
+                                    warnings.add(com.example.i18n.archiveMissingBook(row.getString("title")))
                                     skipped++;return@forEach
                                 }
                                 if(old!=null) {
@@ -219,5 +221,5 @@ internal object ArchiveImporter {
             File(stage,"database.rows").delete(); File(stage,"settings.json").delete(); File(stage,"manifest.json").delete()
         } }
     }
-    private fun tableLabel(table: String)=when(table) { "books","chapters" -> "书籍"; "reading_sessions","reading_records" -> "阅读记录"; "favorites" -> "收藏"; else -> "用户数据" }
+    private fun tableLabel(table: String)=when(table) { "books","chapters" -> tr("书籍"); "reading_sessions","reading_records" -> tr("阅读记录"); "favorites" -> tr("收藏"); else -> tr("用户数据") }
 }

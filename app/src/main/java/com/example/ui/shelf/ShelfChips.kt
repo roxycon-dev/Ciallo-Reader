@@ -1,5 +1,7 @@
 package com.example.ui.shelf
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -145,7 +147,7 @@ fun CategoryPill(
             .semantics(mergeDescendants = true) {
                 role = Role.Tab
                 this.selected = selected
-                contentDescription = if (selected) "分类 $name，已选中" else "分类 $name"
+                contentDescription = if (selected) com.example.i18n.categorySelected(name) else com.example.i18n.categoryName(name)
                 semanticClick {
                     if (hapticEnabled) haptics.perform(HapticKind.SELECTION)
                     onClick()
@@ -168,7 +170,7 @@ fun CategoryPill(
             Spacer(modifier = Modifier.width(5.dp))
             Icon(
                 Icons.Filled.Lock,
-                contentDescription = "已加密",
+                contentDescription = tr("已加密"),
                 tint = contentColor.copy(alpha = if (selected) 0.9f else 0.45f),
                 modifier = Modifier.size(12.dp),
             )

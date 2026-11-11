@@ -1,5 +1,7 @@
 package com.example.transfer
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
@@ -57,7 +59,7 @@ internal object PortableArchive {
         "comic_progress" to TransferCategory.HISTORY, "comic_chapter_read" to TransferCategory.HISTORY)
 
     suspend fun export(context: Context, target: File, selection: ExportSelection, progress: (TransferProgress) -> Unit): File = withContext(Dispatchers.IO) {
-        require(selection.categories.isNotEmpty()) { "请至少选择一类数据" }
+        require(selection.categories.isNotEmpty()) { tr("请至少选择一类数据") }
         val db = AppDatabase.getDatabase(context); val sql = db.openHelper.writableDatabase
         val stage = File(context.cacheDir, "portable_${UUID.randomUUID()}").apply { mkdirs() }
         val warnings = mutableListOf<String>(); val resources = linkedMapOf<String, File>()
@@ -96,7 +98,7 @@ internal object PortableArchive {
             val relative = if(canonical.startsWith("$root${File.separator}")) file.canonicalFile.relativeTo(context.filesDir.canonicalFile).invariantSeparatorsPath
                 else "external/${sha256(canonical.toByteArray())}/${file.name}"
             if(file.isDirectory) file.walkTopDown().filter { it.isFile && !it.name.endsWith(".part") && !it.name.endsWith(".tmp") }.forEach {
-                require(it.canonicalPath.startsWith("$canonical${File.separator}")) { "资源路径越界" }
+                require(it.canonicalPath.startsWith("$canonical${File.separator}")) { tr("资源路径越界") }
                 resources["files/$relative/${it.relativeTo(file).invariantSeparatorsPath}"] = it
             } else resources["files/$relative"] = file
             return (if(path.startsWith("file://")) "file://" else "") + "@FILES@/$relative"
@@ -113,7 +115,7 @@ internal object PortableArchive {
             return row
         }
         try {
-            progress(TransferProgress(TransferPhase.PREPARING, message = "整理所选数据"))
+            progress(TransferProgress(TransferPhase.PREPARING, message = tr("整理所选数据")))
             val fingerprints = selectedBooks.associate { book -> book.getInt("id") to
                 (ArchiveRows.all(sql,"transfer_identities","localKey=?",arrayOf("books:${book.getInt("id")}")).firstOrNull()?.optString("stableId")
                     ?: bookFingerprint(context, sql, book)) }
@@ -170,7 +172,7 @@ internal object PortableArchive {
             for((name,file) in entries) {
                 currentCoroutineContext().ensureActive()
                 require(file.length() <= 512L*1024*1024) { "单个资源超过 512MiB：${file.name}" }
-                expanded += file.length(); require(expanded <= MAX_ARCHIVE_BYTES && entries.size < 50000) { "所选数据超过 4GiB 或文件过多" }
+                expanded += file.length(); require(expanded <= MAX_ARCHIVE_BYTES && entries.size < 50000) { tr("所选数据超过 4GiB 或文件过多") }
                 manifestEntries.put(JSONObject().put("path", name).put("size", file.length()).put("sha256", fileHash(file)))
             }
             val manifest = JSONObject().put("format","ciallo-transfer").put("version",2).put("schema",13)
@@ -178,7 +180,7 @@ internal object PortableArchive {
                 .put("categories",JSONArray(selection.categories.map { it.name })).put("counts",JSONObject(counts))
                 .put("expandedBytes",expanded).put("entries",manifestEntries).put("warnings",JSONArray(warnings.distinct()))
                 .put("containsProtected",containsProtected).put("protectedFavorites", containsProtectedFavorites)
-            require(manifest.toString().toByteArray().size <= 8*1024*1024) { "清单过大" }
+            require(manifest.toString().toByteArray().size <= 8*1024*1024) { tr("清单过大") }
             target.parentFile?.mkdirs()
             val temporary = File(target.parentFile,"${target.name}.tmp")
             try { ZipOutputStream(temporary.outputStream().buffered()).use { zip ->
@@ -187,7 +189,7 @@ internal object PortableArchive {
                 for((name,file) in entries) { zip.putNextEntry(ZipEntry(name)); file.inputStream().use { input ->
                     val buffer = ByteArray(64*1024)
                     while(true) { currentCoroutineContext().ensureActive(); val n=input.read(buffer); if(n<0) break
-                        zip.write(buffer,0,n); done+=n; progress(TransferProgress(TransferPhase.PREPARING,done,expanded,message="打包所选内容")) }
+                        zip.write(buffer,0,n); done+=n; progress(TransferProgress(TransferPhase.PREPARING,done,expanded,message=tr("打包所选内容"))) }
                 }; zip.closeEntry() }
             }; check(temporary.renameTo(target)) { "数据包保存失败" } } finally { temporary.delete() }
             target
@@ -237,22 +239,22 @@ internal object PortableArchive {
         extract(context,archive).let { try { it.preview } finally { it.directory.deleteRecursively() } }
     }
     internal suspend fun extract(context: Context, archive: File): Extracted {
-        require(archive.isFile && archive.length() in 1..MAX_ARCHIVE_BYTES) { "文件为空或超过容量限制" }
+        require(archive.isFile && archive.length() in 1..MAX_ARCHIVE_BYTES) { tr("文件为空或超过容量限制") }
         val stage=File(context.filesDir,"received_${UUID.randomUUID()}").apply { mkdirs() }
         try {
             val seen=hashSetOf<String>(); val budget=ArchiveBudget(512L*1024*1024,MAX_ARCHIVE_BYTES,50000)
             ZipInputStream(archive.inputStream().buffered()).use { zip -> while(true) {
                 currentCoroutineContext().ensureActive(); val entry=zip.nextEntry ?: break
-                require(entry.name.length <= 1024 && seen.add(entry.name) && seen.size <= 50000) { "压缩包包含重复或过多条目" }
-                require(entry.name in setOf("manifest.json","database.rows","settings.json") || entry.name.startsWith("files/")) { "不是 Ciallo 数据包" }
+                require(entry.name.length <= 1024 && seen.add(entry.name) && seen.size <= 50000) { tr("压缩包包含重复或过多条目") }
+                require(entry.name in setOf("manifest.json","database.rows","settings.json") || entry.name.startsWith("files/")) { tr("不是 Ciallo 数据包") }
                 val file=ArchiveBudget.destination(stage,entry.name)
                 if(!entry.isDirectory) {
                     file.parentFile?.mkdirs()
-                    require(stage.usableSpace > 8L*1024*1024) { "存储空间不足" }
+                    require(stage.usableSpace > 8L*1024*1024) { tr("存储空间不足") }
                     file.outputStream().use { budget.copyEntry(zip,it) }
                 }; zip.closeEntry()
             } }
-            val settingsFile=File(stage,"settings.json"); require(settingsFile.isFile && settingsFile.length()<=8*1024*1024) { "设置文件缺失或过大" }
+            val settingsFile=File(stage,"settings.json"); require(settingsFile.isFile && settingsFile.length()<=8*1024*1024) { tr("设置文件缺失或过大") }
             val rows=File(stage,"database.rows"); require(rows.isFile)
             val manifestFile=File(stage,"manifest.json")
             val manifest=if(manifestFile.isFile) { require(manifestFile.length()<=8*1024*1024); JSONObject(manifestFile.readText()) } else null
@@ -262,8 +264,8 @@ internal object PortableArchive {
             }) else rawSettings
             var expanded=0L
             if(manifest!=null) {
-                require(manifest.getString("format")=="ciallo-transfer" && manifest.getInt("version")==2 && manifest.getInt("schema")==13) { "不支持的数据版本，请升级应用" }
-                require(manifest.getString("packageId").matches(Regex("[a-f0-9-]{36}"))) { "数据包标识错误" }
+                require(manifest.getString("format")=="ciallo-transfer" && manifest.getInt("version")==2 && manifest.getInt("schema")==13) { tr("不支持的数据版本，请升级应用") }
+                require(manifest.getString("packageId").matches(Regex("[a-f0-9-]{36}"))) { tr("数据包标识错误") }
                 val listed=hashSetOf<String>(); val entries=manifest.getJSONArray("entries")
                 for(i in 0 until entries.length()) {
                     currentCoroutineContext().ensureActive(); val entry=entries.getJSONObject(i); val name=entry.getString("path")
@@ -272,7 +274,7 @@ internal object PortableArchive {
                     require(file.isFile && file.length()==entry.getLong("size") && fileHash(file)==entry.getString("sha256")) { "数据包校验失败：$name" }
                     expanded+=file.length()
                 }
-                require(listed==seen-setOf("manifest.json") && expanded==manifest.getLong("expandedBytes")) { "数据包清单不完整" }
+                require(listed==seen-setOf("manifest.json") && expanded==manifest.getLong("expandedBytes")) { tr("数据包清单不完整") }
             } else expanded=stage.walkTopDown().filter { it.isFile }.sumOf { it.length() }
             PortableSettings.validate(settings)
             val sql=AppDatabase.getDatabase(context).openHelper.writableDatabase
@@ -284,30 +286,30 @@ internal object PortableArchive {
             var protected=(manifest?.optBoolean("containsProtected") ?: false) || protectedFavorites
             ArchiveRows.forEach(rows) { table,row,_ ->
                 val schema=schemas.getValue(table)
-                require(row.keys().asSequence().toSet()==schema.keys) { "数据字段与当前版本不兼容" }
+                require(row.keys().asSequence().toSet()==schema.keys) { tr("数据字段与当前版本不兼容") }
                 schema.forEach { (key,type) -> val value=row.get(key)
-                    require(value!=JSONObject.NULL || !type.second) { "必填数据为空" }
+                    require(value!=JSONObject.NULL || !type.second) { tr("必填数据为空") }
                     require(value==JSONObject.NULL || when(type.first) { "TEXT" -> value is String; "INTEGER" -> value is Int || value is Long; "REAL" -> value is Number && value.toDouble().isFinite(); else -> false })
                     if(value is String && "@FILES@" in value) {
                         // Literal portable paths are checked again after relocation.
-                        require(!value.contains("@FILES@/../") && !value.contains("@FILES@\\..\\")) { "资源路径越界" }
+                        require(!value.contains("@FILES@/../") && !value.contains("@FILES@\\..\\")) { tr("资源路径越界") }
                         if(key in setOf("filePath","coverUri","localThumbPath","coverPath")) {
                             val relative=value.removePrefix("file://").removePrefix("@FILES@/")
                             ArchiveBudget.destination(File(stage,"files"),relative)
                         }
                     }
                 }
-                if(table=="books") require(bookIds.add(row.getInt("id"))) { "重复书籍标识" }
+                if(table=="books") require(bookIds.add(row.getInt("id"))) { tr("重复书籍标识") }
                 if(table in setOf("chapters","bookmarks","highlights") || table in setOf("reading_records","reading_sessions") && !row.isNull("bookId")) references.add(row.getInt("bookId"))
-                if(table in setOf("reading_records","reading_sessions")) require(row.getLong("durationSeconds") in 0..172800) { "阅读时长超出合理范围" }
+                if(table in setOf("reading_records","reading_sessions")) require(row.getLong("durationSeconds") in 0..172800) { tr("阅读时长超出合理范围") }
                 if(table=="reading_sessions")require(row.getLong("endTimeMs")>=row.getLong("startTimeMs") && row.getInt("startHour") in 0..23)
                 if(table=="chapters") require(row.getString("content").length<=256000)
                 if(table=="categories" && row.getInt("isProtected")!=0) protected=true
                 counts[table]=(counts[table]?:0)+1
             }
-            require(references.all { it in bookIds }) { "数据包含缺失的关联书籍" }
+            require(references.all { it in bookIds }) { tr("数据包含缺失的关联书籍") }
             val categories=manifest?.getJSONArray("categories")?.let { a -> (0 until a.length()).map { TransferCategory.valueOf(a.getString(it)) }.toSet() } ?: TransferCategory.entries.toSet()
-            if(manifest!=null) require(counts==manifest.getJSONObject("counts").let { obj -> obj.keys().asSequence().associateWith { obj.getInt(it) } }) { "数据数量与清单不符" }
+            if(manifest!=null) require(counts==manifest.getJSONObject("counts").let { obj -> obj.keys().asSequence().associateWith { obj.getInt(it) } }) { tr("数据数量与清单不符") }
             val warnings=manifest?.optJSONArray("warnings")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: listOf("旧版 ZIP：缺少完整性清单，将按兼容方式导入")
             return Extracted(stage,ArchivePreview(manifest?.getString("packageId") ?: fileHash(archive),if(manifest==null)1 else 2,counts,expanded,categories,warnings,protected,protectedFavorites),settings)
         } catch(e: Exception) { stage.deleteRecursively(); throw e }

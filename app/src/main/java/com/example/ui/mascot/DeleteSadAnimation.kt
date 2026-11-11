@@ -1,5 +1,7 @@
 package com.example.ui.mascot
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -131,7 +133,7 @@ fun DeleteSadAnimation(onComplete: () -> Unit) {
             Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = "🌧️ 成功移出书架",
+                text = tr("🌧️ 成功移出书架"),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFFFF6B81),
@@ -141,7 +143,7 @@ fun DeleteSadAnimation(onComplete: () -> Unit) {
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "别难过，随时可以在新分类重新找到它~",
+                text = tr("别难过，随时可以在新分类重新找到它~"),
                 fontSize = 12.sp,
                 color = Color.White.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center

@@ -1,13 +1,23 @@
 package com.example.ui.comic
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.unit.dp
 import com.example.ui.components.LocalRenderQuality
 import com.example.ui.components.RenderQuality
 import com.example.ui.feedback.LocalReduceMotion
 import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.wenku.WenkuReaderChromeLayer
+import com.example.ui.wenku.WenkuReaderChromePart
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,4 +73,38 @@ class ComicChromePerformanceTest {
 
     @Test fun minimalTabletKeepsContinuousProgressInsideChrome() = checkProgress(RenderQuality.MINIMAL)
     @Test fun highQualityTabletKeepsContinuousProgressInsideChrome() = checkProgress(RenderQuality.HIGH)
+
+    @Test fun staggeredCapsulesPlaceInOrderWithoutMeasuringAgain() {
+        val phase = mutableFloatStateOf(0f)
+        var measurements = 0
+        compose.setContent {
+            Column {
+                WenkuReaderChromeLayer(phase, visible = true, part = WenkuReaderChromePart.Progress) {
+                    Box(Modifier.size(120.dp, 44.dp).layout { measurable, constraints ->
+                        measurements++
+                        val child = measurable.measure(constraints)
+                        layout(child.width, child.height) { child.place(0, 0) }
+                    }) { Text("Progress") }
+                }
+                WenkuReaderChromeLayer(phase, visible = true, part = WenkuReaderChromePart.Dock) {
+                    Box(Modifier.size(120.dp, 44.dp)) { Text("Dock") }
+                }
+            }
+        }
+        compose.onNodeWithText("Progress").assertDoesNotExist()
+        compose.onNodeWithText("Dock").assertDoesNotExist()
+        val hiddenMeasurements = compose.runOnIdle { measurements }
+        assertTrue(hiddenMeasurements > 0)
+        compose.runOnIdle { phase.floatValue = .05f }
+        compose.onNodeWithText("Dock").assertExists()
+        compose.onNodeWithText("Progress").assertDoesNotExist()
+        compose.runOnIdle { phase.floatValue = .55f }
+        compose.onNodeWithText("Progress").assertExists()
+        compose.runOnIdle { phase.floatValue = .05f }
+        compose.onNodeWithText("Dock").assertExists()
+        compose.onNodeWithText("Progress").assertDoesNotExist()
+        compose.runOnIdle { phase.floatValue = 0f }
+        compose.onNodeWithText("Dock").assertDoesNotExist()
+        assertEquals(hiddenMeasurements, compose.runOnIdle { measurements })
+    }
 }

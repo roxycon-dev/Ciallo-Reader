@@ -242,9 +242,7 @@ fun CollapsingTabScreenHeader(
                     .heightIn(min = 48.dp * (1f - compact)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (leading != null) {
-                    Row(Modifier.wenkuTabTitle(0, strength = .55f), verticalAlignment = Alignment.CenterVertically, content = leading)
-                }
+                leading?.invoke(this)
                 if (titleVisible) Column(Modifier.weight(1f).graphicsLayer { alpha = titleOpacity() }.then(if (onTitleClick != null) Modifier.pullOutClickable(onClick = onTitleClick) else Modifier)) {
                     Text(
                         text = title,
@@ -271,13 +269,9 @@ fun CollapsingTabScreenHeader(
                         )
                     }
                 }
-                if (trailing != null) {
-                    Row(Modifier.wenkuTabTitle(0, strength = .55f), verticalAlignment = Alignment.CenterVertically, content = trailing)
-                }
+                trailing?.invoke(this)
             }
-            if (overlay != null) {
-                Box(Modifier.matchParentSize().wenkuTabTitle(0, strength = .55f)) { overlay(compact) }
-            }
+            overlay?.invoke(this, compact)
         }
     }
 }

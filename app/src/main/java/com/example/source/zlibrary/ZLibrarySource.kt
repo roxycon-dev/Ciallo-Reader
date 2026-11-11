@@ -1,5 +1,7 @@
 package com.example.source.zlibrary
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.util.Log
 import com.example.source.*
@@ -102,7 +104,7 @@ class ZLibrarySource(
             }
 
             if (credential.username.isBlank() || credential.password.isBlank()) {
-                return SourceResult.Error(SourceException.ParseError("请输入用户名和密码，或提供有效的 Cookie"))
+                return SourceResult.Error(SourceException.ParseError(tr("请输入用户名和密码，或提供有效的 Cookie")))
             }
 
             // 候选节点：健康检查通过的域优先（2026-09-04 修复"逐域盲提交"——
@@ -208,7 +210,7 @@ class ZLibrarySource(
                 }
             }
             SourceResult.Error(SourceException.NetworkError(lastError ?: if (reachedLogin)
-                "登录失败，请检查账号密码或 Cookie" else "当前网络无法连接可登录的 Z-Library 节点，已尝试备用入口"))
+                "登录失败，请检查账号密码或 Cookie" else tr("当前网络无法连接可登录的 Z-Library 节点，已尝试备用入口")))
         } catch (e: Exception) {
             currentCoroutineContext().ensureActive()
             SourceResult.Error(SourceException.NetworkError("登录过程异常: ${e.message}"))
@@ -225,9 +227,9 @@ class ZLibrarySource(
             is SourceException -> e
             is java.net.SocketTimeoutException, is java.net.UnknownHostException, is java.io.IOException -> {
                 if (e.message?.contains("Cloudflare") == true || e.message?.contains("403") == true || e.message?.contains("503") == true) {
-                    SourceException.NetworkError("该书源需要浏览器验证，请稍后重试")
+                    SourceException.NetworkError(tr("该书源需要浏览器验证，请稍后重试"))
                 } else {
-                    SourceException.NetworkError("Z-Library 当前节点不可用，正在寻找可用入口")
+                    SourceException.NetworkError(tr("Z-Library 当前节点不可用，正在寻找可用入口"))
                 }
             }
             else -> SourceException.NetworkError("网络连接失败，请检查网络: ${e.message}")
@@ -264,7 +266,7 @@ class ZLibrarySource(
                 // 官网明确声明搜索故障时，eapi 搜索大概率同样故障，直接给出明确错误
                 ZLibraryNetworkLogger.logParserResult("FAILED", 0, "Z-Library search service unavailable")
                 return SourceResult.Error(
-                    SourceException.NetworkError("Z-Library 搜索服务暂时不可用（官网故障），请稍后重试")
+                    SourceException.NetworkError(tr("Z-Library 搜索服务暂时不可用（官网故障），请稍后重试"))
                 )
             }
 
@@ -290,7 +292,7 @@ class ZLibrarySource(
                 if (retryRedirected) {
                     retryResponse.close()
                     return SourceResult.Error(
-                        SourceException.NetworkError("搜索被重定向（节点为入口跳转域，非真实镜像），请更换节点后重试")
+                        SourceException.NetworkError(tr("搜索被重定向（节点为入口跳转域，非真实镜像），请更换节点后重试"))
                     )
                 }
                 response = retryResponse
@@ -359,7 +361,7 @@ class ZLibrarySource(
                         rememberSearch(retryBooks, retryResponse.request.url.host)
                     } else {
                         SourceResult.Error(
-                            SourceException.NetworkError("搜索结果与关键词无关（节点返回了无关推荐），请更换节点后重试")
+                            SourceException.NetworkError(tr("搜索结果与关键词无关（节点返回了无关推荐），请更换节点后重试"))
                         )
                     }
                 }
@@ -393,7 +395,7 @@ class ZLibrarySource(
                 }
                 if (webBooks.stillChallenged) {
                     ZLibraryNetworkLogger.logParserResult("FAILED", 0, "captcha challenge")
-                    return SourceResult.Error(SourceException.NetworkError("需要浏览器验证，暂时无法自动搜索"))
+                    return SourceResult.Error(SourceException.NetworkError(tr("需要浏览器验证，暂时无法自动搜索")))
                 }
                 ZLibraryNetworkLogger.logParserResult("EMPTY", 0, "no results anywhere")
                 return SourceResult.Success(emptyList())
@@ -549,7 +551,7 @@ class ZLibrarySource(
     private suspend fun downloadWithFailover(bookId: String, format: String?, failedDomains: Set<String>): SourceResult<DownloadInfo> {
         if (!isLoggedIn()) return SourceResult.Error(SourceException.LoginRequired)
         val excluded = failedDomains.toMutableSet()
-        var last: SourceResult<DownloadInfo> = SourceResult.Error(SourceException.NetworkError("没有可用的下载节点"))
+        var last: SourceResult<DownloadInfo> = SourceResult.Error(SourceException.NetworkError(tr("没有可用的下载节点")))
         repeat(3) {
             currentCoroutineContext().ensureActive()
             val origin = bookOrigins[bookId]
@@ -562,7 +564,7 @@ class ZLibrarySource(
                 val refreshed = refreshBookOnMirror(known, domain, format)
                 if (refreshed == null) {
                     excluded += domain
-                    last = SourceResult.Error(SourceException.ParseError("备用节点未找到唯一匹配的书籍版本，请稍后重试"))
+                    last = SourceResult.Error(SourceException.ParseError(tr("备用节点未找到唯一匹配的书籍版本，请稍后重试")))
                     return@repeat
                 }
                 downloadBooks[bookId] = refreshed
@@ -692,7 +694,7 @@ class ZLibrarySource(
             val finalUrl = eapiLink?.url?.takeIf { it.isNotBlank() } ?: dlUrl
             if (finalUrl.isNullOrBlank()) {
                 return SourceResult.Error(
-                    SourceException.ParseError("未获取到下载链接，请稍后重试或切换节点")
+                    SourceException.ParseError(tr("未获取到下载链接，请稍后重试或切换节点"))
                 )
             }
             SourceResult.Success(

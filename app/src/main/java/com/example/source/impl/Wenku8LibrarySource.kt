@@ -1,5 +1,7 @@
 package com.example.source.impl
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.os.SystemClock
 import android.util.LruCache
@@ -40,7 +42,7 @@ class Wenku8LibrarySource(
     private val mutex = Mutex()
 
     private fun bookUrl(bookId: String): HttpUrl {
-        require(bookId.matches(Regex("[1-9][0-9]{0,8}"))) { "无效的文库书籍标识" }
+        require(bookId.matches(Regex("[1-9][0-9]{0,8}"))) { tr("无效的文库书籍标识") }
         return baseUrl.newBuilder().addPathSegments("api/books").addPathSegment(bookId).build()
     }
     private suspend fun json(url: HttpUrl): JSONObject {
@@ -55,17 +57,17 @@ class Wenku8LibrarySource(
         val bookId = data.optLong("id").toString()
         bookUrl(bookId)
         val title = (data.opt("title") as? String).orEmpty()
-        require(title.isNotBlank()) { "文库书名为空" }
+        require(title.isNotBlank()) { tr("文库书名为空") }
         val volumes = data.optInt("volumeCount")
         val updated = (data.opt("updatedAt") as? String).orEmpty()
         val intro = (data.opt("synopsis") as? String).orEmpty()
         return SearchBook(bookId, id, title, (data.opt("author") as? String).orEmpty(),
             cover = (data.opt("coverUrl") as? String)?.takeIf(String::isNotBlank)?.let { baseUrl.resolve(it)?.toString() },
             format = "epub", language = "中文", size = data.optLong("epubBytes").takeIf { it > 0 },
-            description = "中文轻小说文库版 EPUB，含插图，下载入书架后阅读。译本信息以书内注明为准。\n" +
+            description = tr("中文轻小说文库版 EPUB，含插图，下载入书架后阅读。译本信息以书内注明为准。\n") +
                 "文库收录 $volumes 卷 · 更新 $updated；可能晚于原版发行。\n\n" + org.jsoup.Jsoup.parse(intro).text(),
             novelInfo = NovelInfo(synopsis = org.jsoup.Jsoup.parse(intro).text(),
-                status = when (data.optString("status")) { "completed" -> "已完结"; "ongoing" -> "连载中"; else -> null },
+                status = when (data.optString("status")) { "completed" -> tr("已完结"); "ongoing" -> tr("连载中"); else -> null },
                 updatedAt = updated.takeIf(String::isNotBlank), volumeCount = volumes.takeIf { it > 0 },
                 chapterCount = data.optInt("chapterCount").takeIf { it > 0 },
                 wordCount = data.optLong("wordCount").takeIf { it > 0 }?.let { "%,d 字".format(it) },
@@ -81,14 +83,14 @@ class Wenku8LibrarySource(
         try { SourceResult.Success(action()) }
         catch (e: CancellationException) { throw e }
         catch (e: SourceException) { SourceResult.Error(e) }
-        catch (e: java.io.IOException) { SourceResult.Error(SourceException.NetworkError("中文文库连接失败，请稍后重试", e)) }
+        catch (e: java.io.IOException) { SourceResult.Error(SourceException.NetworkError(tr("中文文库连接失败，请稍后重试"), e)) }
         catch (e: Exception) { SourceResult.Error(SourceException.ParseError(e.message ?: "中文文库数据格式异常")) }
     }
     override suspend fun search(keyword: String) = result {
         if (keyword.isBlank()) return@result emptyList<SearchBook>()
         val url = baseUrl.newBuilder().addPathSegments("api/books").addQueryParameter("q", keyword.trim())
             .addQueryParameter("page", "1").addQueryParameter("limit", "24").build()
-        val items = json(url).optJSONArray("items") ?: throw SourceException.ParseError("未返回文库书籍列表")
+        val items = json(url).optJSONArray("items") ?: throw SourceException.ParseError(tr("未返回文库书籍列表"))
         (0 until items.length()).mapNotNull { i -> items.optJSONObject(i)?.let { data ->
             book(data).also { cache.put(it.id, Cached(SystemClock.elapsedRealtime(), data)) }
         } }.distinctBy { it.id }

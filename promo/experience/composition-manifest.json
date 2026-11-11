@@ -1,0 +1,35 @@
+[
+  {
+    "file": "composed-picker.webp",
+    "source": "11_glass_ui.mp4",
+    "second": 2,
+    "crop_ltrb": [
+      0,
+      1250,
+      1224,
+      2260
+    ]
+  },
+  {
+    "file": "composed-chapters.webp",
+    "source": "03_detail_download.mp4",
+    "second": 12.2,
+    "crop_ltrb": [
+      0,
+      1475,
+      1224,
+      2500
+    ]
+  },
+  {
+    "file": "composed-downloading.webp",
+    "source": "03_detail_download.mp4",
+    "second": 14.4,
+    "crop_ltrb": [
+      48,
+      2230,
+      1180,
+      2482
+    ]
+  }
+]

@@ -1,5 +1,7 @@
 package com.example.download
 
+import com.example.i18n.tr
+
 import com.example.data.ArchiveBudget
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -32,13 +34,13 @@ internal object NovelTextArchive {
             val sections = ArrayList<Section>()
             ZipFile(file).use { zip ->
                 val entries = zip.entries().asSequence().take(9).toList()
-                require(entries.size <= 8) { "小说压缩包条目异常" }
+                require(entries.size <= 8) { tr("小说压缩包条目异常") }
                 entries.forEach { ArchiveBudget.destination(parent.canonicalFile, it.name) }
                 val books = entries.filterNot { it.isDirectory }
-                require(books.size == 1 && books.single().name.endsWith(".txt", true)) { "本源的压缩包未包含唯一的 TXT 小说" }
+                require(books.size == 1 && books.single().name.endsWith(".txt", true)) { tr("本源的压缩包未包含唯一的 TXT 小说") }
                 val entry = books.single()
-                require(entry.size in 1..MAX_BYTES) { "小说文本体积超出限制" }
-                require(parent.usableSpace >= entry.size * 4 + 16L * 1024 * 1024) { "存储空间不足，请清理后重试" }
+                require(entry.size in 1..MAX_BYTES) { tr("小说文本体积超出限制") }
+                require(parent.usableSpace >= entry.size * 4 + 16L * 1024 * 1024) { tr("存储空间不足，请清理后重试") }
                 val sample = zip.getInputStream(entry).use { input ->
                     val bytes = ByteArray(64 * 1024)
                     val size = input.read(bytes)
@@ -71,7 +73,7 @@ internal object NovelTextArchive {
                         currentCoroutineContext().ensureActive()
                         val count = input.read(buffer)
                         if (count < 0) break
-                        require(offset + count <= MAX_BYTES) { "小说解压体积超出限制" }
+                        require(offset + count <= MAX_BYTES) { tr("小说解压体积超出限制") }
                         output.write(buffer, 0, count); crc.update(buffer, 0, count)
                         for (i in 0 until count) {
                             offset++
@@ -81,7 +83,7 @@ internal object NovelTextArchive {
                     }
                     if (lineSize > 0 || tooLong) finishLine()
                 } }
-                require(offset == entry.size && crc.value == entry.crc) { "小说压缩包不完整，请重新下载" }
+                require(offset == entry.size && crc.value == entry.crc) { tr("小说压缩包不完整，请重新下载") }
             }
             // Some site packages put the last two numbered chapters in reverse order.
             // Sort complete byte ranges only; preface, body bytes and non-numbered notes are preserved.
@@ -95,7 +97,7 @@ internal object NovelTextArchive {
                         while (remaining > 0) {
                             currentCoroutineContext().ensureActive()
                             val count = input.read(buffer, 0, minOf(remaining, buffer.size.toLong()).toInt())
-                            require(count > 0) { "小说内容截断" }
+                            require(count > 0) { tr("小说内容截断") }
                             output.write(buffer, 0, count); remaining -= count
                         }
                     }
@@ -112,7 +114,7 @@ internal object NovelTextArchive {
                         }
                     }
                 } }
-                require(ordered.length() == raw.length() + separators) { "小说章节整理失败" }
+                require(ordered.length() == raw.length() + separators) { tr("小说章节整理失败") }
             }
             val text = if (ordered.exists()) ordered else raw
             val decoder = charset.newDecoder().onMalformedInput(CodingErrorAction.REPORT)

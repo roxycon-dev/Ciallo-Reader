@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import com.example.i18n.tr
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -156,7 +158,7 @@ fun AppToastSnackbar(
             if (onDismissClick != null) {
                 PullOutIconButton(
                     icon = Icons.Filled.Close,
-                    contentDescription = "关闭",
+                    contentDescription = tr("关闭"),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     glyphSize = 16.dp,
                     onClick = onDismissClick, modifier = Modifier.size(28.dp)

@@ -1,5 +1,7 @@
 package com.example.source.js
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -26,6 +28,8 @@ import org.chromium.net.UrlResponseInfo
 import java.net.URL
 import java.nio.charset.Charset
 import java.security.MessageDigest
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -37,6 +41,8 @@ import javax.crypto.Cipher
 import javax.crypto.Mac
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
+import javax.net.ssl.SSLContext
+import javax.net.ssl.X509TrustManager
 import kotlin.random.Random
 import org.json.JSONObject
 import org.json.JSONArray
@@ -48,15 +54,14 @@ import org.json.JSONArray
 class JsMessageHandler(
     private val context: Context,
     private val sourceKey: String,
-    // Read old source settings without allowing them to disable peer authentication.
-    @Suppress("UNUSED_PARAMETER") insecureTls: Boolean = false
+    private val insecureTls: Boolean = false
 ) {
     private val dataPrefs = context.getSharedPreferences("js_source_data", Context.MODE_PRIVATE)
     val htmlStore = JsHtmlStore()
 
     @Volatile internal var requestJob: kotlinx.coroutines.Job? = null
     private val settingDefaults = HashMap<String, String>()
-    private val client = buildClient()
+    private val client = buildClient(insecureTls)
     private val publicDirectRoutes = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     /** 命中 JS 源代理路由的 URL 改走 OkHttp（代理在 client 的 ProxySelector 里；Cronet 不支持显式代理）。 */
@@ -68,13 +73,13 @@ class JsMessageHandler(
     private val imageBudget: Long get() = minOf(64L * 1024 * 1024, Runtime.getRuntime().maxMemory() / 6)
     private fun checkImageAllocation(width: Int, height: Int) = synchronized(images) {
         val pixels=width.toLong()*height
-        require(pixels<=imageBudget/4) { "脚本图片尺寸过大" }
+        require(pixels<=imageBudget/4) { tr("脚本图片尺寸过大") }
         val requested=pixels*4
         require(width>0 && height>0 && requested<=imageBudget &&
             images.values.distinct().sumOf { it.allocationByteCount.toLong() }+requested<=imageBudget) { "脚本图像内存预算不足" }
     }
     private fun putImage(bmp: Bitmap): Int = synchronized(images) {
-        require(images.size<48) { "脚本创建的图片过多" }
+        require(images.size<48) { tr("脚本创建的图片过多") }
         val key=imageKeyGen.incrementAndGet()
         images[key]=bmp
         key
@@ -215,7 +220,12 @@ class JsMessageHandler(
 
     fun isLoggedIn(): Boolean = dataPrefs.getBoolean("logged_$sourceKey", false)
 
-    private fun buildClient(): OkHttpClient {
+    private fun buildClient(insecure: Boolean): OkHttpClient {
+        val trustAll = arrayOf<X509TrustManager>(object : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+        })
         val builder = com.example.source.SharedHttpTransport.builder()
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
@@ -240,11 +250,18 @@ class JsMessageHandler(
             }
         builder.addNetworkInterceptor { chain ->
             val request = chain.request()
-            requireSecureCredentials(request.url.toString(), request.headers.names())
+            if (insecure && request.headers.names().any { it.equals("Cookie", true) || it.equals("Authorization", true) })
+                throw java.io.IOException(tr("不安全 TLS 书源不能发送登录凭据，请启用证书验证"))
             chain.proceed(request)
         }
-        if (sourceKey == "aimanhua") {
+        if (sourceKey == "aimanhua" && !insecure) {
             context.assets.open("certificates/isrg-root-x2.pem").use { AimanhuaTls.configure(builder, it) }
+        }
+        if (insecure) {
+            val sslContext = SSLContext.getInstance("TLS")
+            sslContext.init(null, trustAll, SecureRandom())
+            builder.sslSocketFactory(sslContext.socketFactory, trustAll[0])
+            builder.hostnameVerifier { _, _ -> true }
         }
         return builder.build()
     }
@@ -384,7 +401,7 @@ class JsMessageHandler(
         val httpMethod = (msg["http_method"] as? String ?: "GET").uppercase()
         val bytes = msg["bytes"] == true
         return try {
-            if (MyComicBrowserReader.accepts(sourceKey, httpMethod, url, bytes)) {
+            if (!insecureTls && MyComicBrowserReader.accepts(sourceKey, httpMethod, url, bytes)) {
                 val userAgent = context.getSharedPreferences("js_source_website_verification", Context.MODE_PRIVATE)
                     .getString("mycomic_user_agent", null)
                     ?: android.webkit.WebSettings.getDefaultUserAgent(context)
@@ -412,15 +429,14 @@ class JsMessageHandler(
             }
             // 合并脚本显式 Cookie 与本地 CookieJar：之前直接覆盖会把脚本里
             // 的 cookie（如 ehentai 的 nw=1）丢掉，导致站点响应异常/挂起。
-            requireSecureCredentials(url, effectiveHeaders.keys)
             val scriptCookie = sourceHeaders?.entries
                 ?.firstOrNull { it.key.toString().equals("Cookie", ignoreCase = true) }
                 ?.value?.toString()?.trim()
             val jarCookie = getCookiesFor(url).trim()
-            val mergedCookie = JsCookieJar.mergeHeaders(scriptCookie, jarCookie)
-            effectiveHeaders.keys.filter { it.equals("Cookie", true) }.forEach { effectiveHeaders.remove(it) }
+            val mergedCookie = listOfNotNull(scriptCookie, jarCookie)
+                .filter { it.isNotBlank() }
+                .joinToString("; ")
             if (mergedCookie.isNotBlank()) effectiveHeaders["Cookie"] = mergedCookie
-            requireSecureCredentials(url, effectiveHeaders.keys)
 
             val declaredContentType = effectiveHeaders.entries
                 .firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }
@@ -447,12 +463,12 @@ class JsMessageHandler(
 
             val publicReadBatch = sourceKey == "ikmmh" && httpMethod == "POST" &&
                 url.toHttpUrl().encodedPath == "/api/comic/read/pics"
-            if (httpMethod == "GET" && sourceKey in setOf("pufei", "bilimanga", "ikmmh", "wnacg", "nineteen", "aimanhua") || publicReadBatch) {
+            if ((httpMethod == "GET" && sourceKey in setOf("pufei", "bilimanga", "ikmmh") || publicReadBatch) && !insecureTls) {
                 return handleComicRead(url, effectiveHeaders, bytes, httpMethod, body)
             }
 
             val proxied = useProxyRoute(url)
-            if (!proxied && !AimanhuaTls.route(sourceKey, url) && !(sourceKey == "jm" && httpMethod == "GET")) {
+            if (!insecureTls && !proxied && !AimanhuaTls.route(sourceKey, url) && !(sourceKey == "jm" && httpMethod == "GET")) {
                 // 走 Cronet（Chromium 网络栈）：浏览器级 TLS 指纹，绕过按 Java 客户端封禁的站点
                 var res = cronetRequest(httpMethod, url, effectiveHeaders, bodyBytes,
                     timeoutMs = if (sourceKey == "jm") 10_000 else if (httpMethod == "GET" && !bytes) 20_000 else 60_000)
@@ -576,28 +592,19 @@ class JsMessageHandler(
         // endpoints can work directly while the configured proxy closes TLS.
         // Retry the same HTTPS endpoint, keeping certificate checks and cancellation.
         val host = url.toHttpUrl().host
-        // These public sources work directly while some system proxy routes
-        // return empty HTML or truncate the response. Consume the direct reply
-        // completely before falling back to the configured proxy/Chromium.
-        val scopedDirectFirst = sourceKey in setOf("wnacg", "nineteen", "aimanhua", "bilimanga")
         val publicMirror = sourceKey == "pufei" && host in setOf("www.guoman.net", "m.guoman.net") ||
             sourceKey == "ikmmh" && host == "ymcdnyfqdapp.ikmmh.com"
         val directMirrorRetry = httpFirst && publicMirror
         val preferDirect = publicMirror && (publicDirectRoutes[host] ?: 0L) > android.os.SystemClock.elapsedRealtime()
         // Bili's search ticket redemption deliberately returns an empty 200 response.
         val allowEmpty = sourceKey == "bilimanga" && url.toHttpUrl().queryParameter("search_guard") == "redeem"
-        // Leave time for the alternate 19 Manga origin within aggregate search's 60 s budget.
-        val routeTimeoutSeconds = if (sourceKey == "nineteen") 8L else 18L
         var requestUrl = url
         var lastError = "源站连接失败"
-        var verificationRequired = false
         val requestHeaders = LinkedHashMap(headers)
-        for (attempt in 0..(if (scopedDirectFirst) 2 else 1)) {
+        for (attempt in 0..1) {
             requestJob?.ensureActive()
-            val directMirror = if (scopedDirectFirst) attempt == 0
-                else if (preferDirect) attempt == 0 else attempt == 1 && directMirrorRetry
-            val http = if (scopedDirectFirst) attempt < 2
-                else directMirror || if (preferDirect) true else if (attempt == 0) httpFirst else !httpFirst
+            val directMirror = if (preferDirect) attempt == 0 else attempt == 1 && directMirrorRetry
+            val http = directMirror || if (preferDirect) true else if (attempt == 0) httpFirst else !httpFirst
             if (attempt != 0) {
                 requestHeaders["Cache-Control"] = "no-cache"
                 requestHeaders["Pragma"] = "no-cache"
@@ -613,12 +620,9 @@ class JsMessageHandler(
             }
             val response = try {
                 if (http) {
-                    val boundedClient = client.newBuilder().connectTimeout(minOf(8L, routeTimeoutSeconds), TimeUnit.SECONDS)
-                        .readTimeout(minOf(12L, routeTimeoutSeconds), TimeUnit.SECONDS).callTimeout(routeTimeoutSeconds, TimeUnit.SECONDS)
-                        .apply {
-                            if (directMirror) proxy(java.net.Proxy.NO_PROXY)
-                            if (scopedDirectFirst) protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
-                        }.build()
+                    val boundedClient = client.newBuilder().connectTimeout(8, TimeUnit.SECONDS)
+                        .readTimeout(12, TimeUnit.SECONDS).callTimeout(18, TimeUnit.SECONDS)
+                        .apply { if (directMirror) proxy(java.net.Proxy.NO_PROXY) }.build()
                     boundedClient.newCall(Request.Builder().url(requestUrl).method(method, body).apply {
                         requestHeaders.forEach { (key, value) -> header(key, value) }
                     }.build()).executeWithCancellation(requestJob).use { result ->
@@ -631,14 +635,13 @@ class JsMessageHandler(
                     }
                 } else {
                     val payload = body?.let { requestBody -> okio.Buffer().also { requestBody.writeTo(it) }.readByteArray() }
-                    val timeoutMs = minOf(15_000L, routeTimeoutSeconds * 1000)
-                    var result = cronetRequest(method, requestUrl, requestHeaders, payload, timeoutMs = timeoutMs)
+                    var result = cronetRequest(method, requestUrl, requestHeaders, payload, timeoutMs = 15_000)
                     if (result.error == null && CfWebViewSolver.isChallengeResponse(result.status, result.headers)) {
                         val solved = CfWebViewSolver.solveAndSync(context, requestUrl,
                             requestHeaders.entries.firstOrNull { it.key.equals("User-Agent", true) }?.value.orEmpty(), requestHeaders)
                         if (solved) {
                             getCookiesFor(requestUrl).takeIf(String::isNotBlank)?.let { requestHeaders["Cookie"] = it }
-                            result = cronetRequest(method, requestUrl, requestHeaders, payload, timeoutMs = timeoutMs)
+                            result = cronetRequest(method, requestUrl, requestHeaders, payload, timeoutMs = 15_000)
                         }
                     }
                     result
@@ -653,11 +656,10 @@ class JsMessageHandler(
             val retryable = response.error != null || empty || pageProblem != null || response.status == 403 ||
                 response.status == 429 || response.status >= 500
             if (retryable) {
-                if (sourceKey == "bilimanga" && response.status == 403) verificationRequired = true
                 if (directMirror) publicDirectRoutes.remove(host)
                 lastError = when {
                     pageProblem != null -> pageProblem
-                    empty -> "源站返回空响应，重新连接后仍未收到页面"
+                    empty -> tr("源站返回空响应，重新连接后仍未收到页面")
                     response.error != null -> "网络连接失败：${response.error}"
                     else -> "源站返回 HTTP ${response.status}"
                 }
@@ -679,8 +681,6 @@ class JsMessageHandler(
                     if (bytes) Base64.encodeToString(body, Base64.NO_WRAP) else decodeComicText(body, response.headers)).toString()
         }
         JsSourceProxy.forgetRoute(url)
-        if (verificationRequired) return JSONObject().put("status", 403).put("url", url)
-            .put("headers", JSONObject()).put("body", "").toString()
         return JSONObject().put("error", "$lastError，请重试").toString()
     }
 
@@ -696,13 +696,6 @@ class JsMessageHandler(
         val finalUrl: String? = null
     )
 
-    private fun requireSecureCredentials(url: String, headerNames: Iterable<String>) {
-        if (!url.toHttpUrl().isHttps && headerNames.any {
-                it.equals("Cookie", true) || it.equals("Authorization", true) || it.equals("Proxy-Authorization", true)
-            })
-            throw java.io.IOException("非 HTTPS 书源不能发送登录凭据")
-    }
-
     private fun cronetRequest(
         method: String,
         url: String,
@@ -711,7 +704,6 @@ class JsMessageHandler(
         job: kotlinx.coroutines.Job? = requestJob,
         timeoutMs: Long = 60_000
     ): CronetResult {
-        requireSecureCredentials(url, headers.keys)
         val latch = CountDownLatch(1)
         val statusRef = AtomicReference(-1)
         val headersRef = AtomicReference<Map<String, String>>(emptyMap())
@@ -726,7 +718,6 @@ class JsMessageHandler(
                 newLocationUrl: String?
             ) {
                 try {
-                    requireSecureCredentials(newLocationUrl ?: throw java.io.IOException("跳转缺少地址"), headers.keys)
                     request?.followRedirect()
                 } catch (t: Throwable) {
                     Log.e("CronetCB", "onRedirectReceived", t)
@@ -767,7 +758,7 @@ class JsMessageHandler(
                         val bytes = ByteArray(buffer.position())
                         buffer.rewind()
                         buffer.get(bytes)
-                        require(bodyOut.size().toLong()+bytes.size<=16L*1024*1024) { "JS 网络响应超过 16MiB" }
+                        require(bodyOut.size().toLong()+bytes.size<=16L*1024*1024) { tr("JS 网络响应超过 16MiB") }
                         bodyOut.write(bytes)
                     }
                     request?.read(java.nio.ByteBuffer.allocateDirect(64 * 1024))

@@ -1,5 +1,7 @@
 package com.example.ui.help
 
+import com.example.i18n.tr
+
 import com.example.ui.components.PullOutVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
@@ -28,6 +30,10 @@ fun FaqExpandableItem(
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val rotationState by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        label = "arrow_rotation"
+    )
 
     Card(
         modifier = modifier
@@ -59,11 +65,11 @@ fun FaqExpandableItem(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
                 )
-                com.example.ui.components.AnimatedChevron(
-                    expanded = expanded,
-                    contentDescription = if (expanded) "收起" else "展开",
+                Icon(
+                    imageVector = Icons.Default.ExpandMore,
+                    contentDescription = if (expanded) tr("收起") else tr("展开"),
                     tint = MintPrimary,
-                    modifier = Modifier
+                    modifier = Modifier.rotate(rotationState)
                 )
             }
             PullOutVisibility(

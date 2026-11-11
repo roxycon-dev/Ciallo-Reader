@@ -5,6 +5,8 @@
 
 package com.example.ui
 
+import com.example.i18n.tr
+
 import com.example.ui.components.pullOutClickable
 import com.example.ui.components.PullOutVisibility
 import android.os.StatFs
@@ -30,10 +32,8 @@ import androidx.compose.foundation.clickable
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -89,14 +89,20 @@ private val COVER_DIRS = listOf("comic_covers", "epub_covers", "fb2_covers", "mo
  */
 private data class StorageRow(
     val key: String,
-    val name: String,
-    val desc: String,
+    private val rawName: String,
+    private val rawDesc: String,
     val size: Long,
     val zone: Int,
     val deletable: Boolean,
-    val confirmTip: String? = null,
+    private val rawConfirmTip: String? = null,
     val countLabel: String? = null
-)
+) {
+    // 展示文案在读取时翻译：构造这些行的地方保持中文原文当 key，
+    // 换语言时已经建好的对象也会跟着变（不需要重建整张表）。
+    val name: String get() = com.example.i18n.tr(rawName)
+    val desc: String get() = com.example.i18n.tr(rawDesc)
+    val confirmTip: String? get() = rawConfirmTip?.let { com.example.i18n.tr(it) }
+}
 
 /**
  * 缓存管理页面：让用户看清应用存储占用，并能放心清理不紧要的文件。
@@ -262,9 +268,9 @@ fun CacheManagementScreen(
                 }
                 // B1：清理成功不再只弹 Toast，改为播放「打勾 + 释放量」动画
                 val msg = when {
-                    freed < 0 -> "检测到下载正在进行，已取消删除"
+                    freed < 0 -> tr("检测到下载正在进行，已取消删除")
                     freed > 0 -> { successFreed = freed; "" }
-                    else -> "没有可释放的内容"
+                    else -> tr("没有可释放的内容")
                 }
                 if (msg.isNotEmpty()) AppToast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                 scanTrigger++
@@ -291,7 +297,7 @@ fun CacheManagementScreen(
                 val msg = if (freed > 0) {
                     successFreed = freed
                     ""
-                } else "没有可释放的内容"
+                } else tr("没有可释放的内容")
                 if (msg.isNotEmpty()) AppToast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                 scanTrigger++
             } finally {
@@ -402,7 +408,7 @@ fun CacheManagementScreen(
                 }.getOrDefault(0)
                 if (trCacheSize > 0) {
                     rows += StorageRow("manga_tr_cache", "漫画译文缓存", "已翻译页面；清理后需要重新翻译", trCacheSize, 1, true,
-                        "清理后再次阅读这些页面需要重新翻译。", if (trCacheCount > 0) "共 $trCacheCount 页" else null)
+                        "清理后再次阅读这些页面需要重新翻译。", if (trCacheCount > 0) com.example.i18n.pagesTotal(trCacheCount) else null)
                 }
                 if (mangaJaNaiSize > 0) {
                     rows += StorageRow("mangajanai_models", "MangaJaNai 模型", "按需下载", mangaJaNaiSize, 1, true,
@@ -415,7 +421,7 @@ fun CacheManagementScreen(
 
                 rows += StorageRow("downloads", "离线书籍", "下载的书籍原文件，属于你的离线内容", downloadsSize, 1, true,
                     "书架记录仍保留，但删除原文件后无法重新解析；若书源失效，也无法重新下载。$activeDownloadTip",
-                    if (bookCount > 0) "共 $bookCount 个文件" else null)
+                    if (bookCount > 0) com.example.i18n.filesTotal(bookCount) else null)
                 rows += StorageRow("imports", "导入的原文件", "本地书籍源文件", importsSize, 1, true,
                     "删除后可能无法重新解析或恢复书内图片；书架记录仍会保留。")
                 rows += StorageRow("comics", "离线漫画", "已下载的漫画页面与封面，属于你的离线内容", comicsSize, 1, true,
@@ -470,16 +476,13 @@ fun CacheManagementScreen(
     }
 
     GlassManagementPage("缓存管理", "ARCHIVE / LOCAL STORAGE", onBack) { insets ->
-        BoxWithConstraints(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
-            val columns = if (maxWidth >= 840.dp && androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.3f) 2 else 1
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(columns),
-                modifier = Modifier.widthIn(max = if (columns == 2) 1120.dp else AdaptiveSpec.pageContentMaxWidth).fillMaxSize(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+        Box(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
+            LazyColumn(
+                modifier = Modifier.widthIn(max = AdaptiveSpec.pageContentMaxWidth).fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 contentPadding = PaddingValues(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 24.dp)
             ) {
-                item(key = "overview", span = { GridItemSpan(maxLineSpan) }) {
+                item(key = "overview") {
                     GlassCard(Modifier.fillMaxWidth().wenkuPagePart(1)) {
                         Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             // 骨架 → 内容交接（loading_handoff.dart）：内容从顶部擦除揭示，
@@ -497,7 +500,7 @@ fun CacheManagementScreen(
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
-                                Text(if (systemMeasured) "应用总占用 · 系统统计" else "已扫描占用 · 含安装包",
+                                Text(if (systemMeasured) tr("应用总占用 · 系统统计") else tr("已扫描占用 · 含安装包"),
                                     fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                                 // 占比条：缓存 / 用户数据 / 书籍数据与设置（+ 其他杂项，让总数与分段自洽）
@@ -545,7 +548,7 @@ fun CacheManagementScreen(
                                         )
                                         Spacer(Modifier.width(6.dp))
                                         Text(
-                                            "设备剩余 ${formatSize(freeBytes)} / 共 ${formatSize(deviceTotalBytes)}",
+                                            com.example.i18n.remainingOfTotal(formatSize(freeBytes), formatSize(deviceTotalBytes)),
                                             fontSize = 12.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -557,12 +560,12 @@ fun CacheManagementScreen(
                     }
                 }
 
-                item(key = "clear_all", span = { GridItemSpan(maxLineSpan) }) {
+                item(key = "clear_all") {
                     Column(Modifier.fillMaxWidth().wenkuPagePart(2)) {
                         val clearLabel = when {
-                            isClearing -> "正在清理…"
+                            isClearing -> tr("正在清理…")
                             cacheTotal > 0 -> "清理可再生缓存 · 约 ${formatSize(cacheTotal)}"
-                            else -> "清理可再生缓存"
+                            else -> tr("清理可再生缓存")
                         }
                         WenkuTextButton(
                             clearLabel,
@@ -581,14 +584,14 @@ fun CacheManagementScreen(
                 }
 
                 // 三个分区：可再生缓存 → 按需管理与离线内容 → 核心数据；空区整段隐藏
-                val zoneMeta = listOf(0 to "可清理缓存", 1 to "离线内容与个人文件", 2 to "应用与设置")
+                val zoneMeta = listOf(0 to tr("可清理缓存"), 1 to tr("离线内容与个人文件"), 2 to tr("应用与设置"))
                 var revealIndex = 3
                 zoneMeta.forEach { (zone, title) ->
                     val zoneRows = storageRows.filter { it.zone == zone && it.size > 0 }
                     if (zoneRows.isNotEmpty()) {
                         val headerIndex = revealIndex
                         revealIndex += 1 + zoneRows.size
-                        item(key = "zone_header_$zone", span = { GridItemSpan(maxLineSpan) }) {
+                        item(key = "zone_header_$zone") {
                             Text(title, modifier = Modifier.padding(top = 2.dp).wenkuPagePart(headerIndex), fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                         }
@@ -662,7 +665,7 @@ fun CacheManagementScreen(
                 enabled = deleteEnabled, modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.error, wenkuSymbol = WenkuSymbol.Delete,
             )
-            WenkuTextButton("取消", onClick = paperDismiss {},
+            WenkuTextButton(tr("取消"), onClick = paperDismiss {},
                 modifier = Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Close)
         }
     }
@@ -800,7 +803,7 @@ private fun CleanSuccessBadge(freedText: String) {
                 AnimatedCheckMark()
             }
             Spacer(Modifier.height(12.dp))
-            Text("清理完成", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(tr("清理完成"), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
                 "已释放 $freedText",

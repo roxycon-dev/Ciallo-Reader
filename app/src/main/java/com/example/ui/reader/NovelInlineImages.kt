@@ -1,5 +1,7 @@
 package com.example.ui.reader
 
+import com.example.i18n.tr
+
 import com.example.ui.components.pullOutClickable
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
@@ -281,13 +283,11 @@ object NovelInlineImages {
      * 把含 [IMG:...] 占位符的正文切成 文本/图片 块序列，块 raw 顺序拼接 == 输入。
      * 相邻 token 自然形成相邻图片块（每图独立占位，天然断行不叠绘）。
      * maxHeightPx 传页高（翻页）或 Float.MAX_VALUE（滚动长图）。
-     * densityScale 传屏幕密度：小图按原图（CSS px）尺寸显示，不再被拉满整栏。
      */
     fun splitIntoBlocks(
         text: String,
         contentWidthPx: Float,
-        maxHeightPx: Float,
-        densityScale: Float = 1f
+        maxHeightPx: Float
     ): List<InlineBlock> {
         if (!hasImages(text)) return listOf(InlineBlock.Text(text))
         val blocks = mutableListOf<InlineBlock>()
@@ -298,7 +298,7 @@ object NovelInlineImages {
             }
             val w = m.groupValues[2].toIntOrNull()?.coerceAtLeast(1) ?: 1
             val h = m.groupValues[3].toIntOrNull()?.coerceAtLeast(1) ?: 1
-            val (dw, dh) = displaySize(w, h, contentWidthPx, maxHeightPx, densityScale)
+            val (dw, dh) = displaySize(w, h, contentWidthPx, maxHeightPx)
             blocks.add(InlineBlock.Image(m.groupValues[1], m.value, dw, dh))
             cursor = m.range.last + 1
         }
@@ -306,27 +306,10 @@ object NovelInlineImages {
         return blocks
     }
 
-    /**
-     * 显示尺寸（px）。
-     *
-     * - 大图：按内容宽等比缩放，超高再按页高收敛（原行为）；
-     * - 小图：**不得超过原图尺寸**（原图像素 × 屏幕密度，即 HTML `<img>` 的固有 CSS 尺寸）。
-     *   EPUB 里的分隔符 / 装饰小图（如 20×20 的 note.png）以前会被拉成整栏宽，看起来像"被放大"。
-     *
-     * 分页测量（ReaderPagination）与实际渲染必须传同一个 densityScale，否则测出的页高与画出来的不一致。
-     */
-    fun displaySize(
-        w: Int,
-        h: Int,
-        contentWidthPx: Float,
-        maxHeightPx: Float,
-        densityScale: Float = 1f
-    ): Pair<Float, Float> {
+    fun displaySize(w: Int, h: Int, contentWidthPx: Float, maxHeightPx: Float): Pair<Float, Float> {
         val iw = w.coerceAtLeast(1)
         val ih = h.coerceAtLeast(1)
-        // 原图的固有尺寸（CSS px → 设备 px）；上限保证小图不被放大。
-        val naturalWidthPx = iw * densityScale.coerceIn(0.5f, 4f)
-        var dw = contentWidthPx.coerceAtMost(naturalWidthPx).coerceAtLeast(1f)
+        var dw = contentWidthPx
         var dh = dw * ih / iw
         // 竖版长图等比缩小，保证一页放得下
         if (dh > maxHeightPx) {
@@ -343,11 +326,7 @@ object NovelInlineImages {
 @Composable
 fun NovelInlineImage(path: String, onTap: () -> Unit, enabled: Boolean = true) {
     var decodeDone by remember(path) { mutableStateOf(false) }
-    // 位图属于 path：换图（翻页时同一个组合槽位换 bind 新的 path）必须重建状态，
-    // 否则会把上一张的位图留在屏幕上（极简渲染质量下的"连续插画全是第一张"）。
-    val bitmap by com.example.ui.components.rememberKeyedAsyncState<android.graphics.Bitmap?>(
-        initialValue = NovelInlineImages.NovelImageCache.get(path), path
-    ) {
+    val bitmap by com.example.ui.components.rememberAsyncState<android.graphics.Bitmap?>(initialValue = NovelInlineImages.NovelImageCache.get(path), path) {
         if (value == null) {
             value = withContext(Dispatchers.IO) {
                 runCatching {
@@ -374,12 +353,12 @@ fun NovelInlineImage(path: String, onTap: () -> Unit, enabled: Boolean = true) {
         if (bmp != null) {
             Image(
                 bitmap = bmp.asImageBitmap(),
-                contentDescription = "插图",
+                contentDescription = tr("插图"),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
             )
         } else if (decodeDone) {
-            Text("图片读取失败", color = Color.Gray)
+            Text(tr("图片读取失败"), color = Color.Gray)
         }
     }
 }
@@ -440,9 +419,7 @@ fun buildAnnotatedWithImages(
             val w = m.groupValues[2].toIntOrNull()?.coerceAtLeast(1) ?: 1
             val h = m.groupValues[3].toIntOrNull()?.coerceAtLeast(1) ?: 1
             val key = "novel_img_$idx"
-            val (dw, dh) = NovelInlineImages.displaySize(
-                w, h, contentWidthPx, maxHeightPx, density.density
-            )
+            val (dw, dh) = NovelInlineImages.displaySize(w, h, contentWidthPx, maxHeightPx)
             contents[key] = InlineTextContent(
                 Placeholder(
                     width = (dw * spPerPx).sp,

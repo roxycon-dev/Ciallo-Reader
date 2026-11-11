@@ -1,5 +1,7 @@
 package com.example.mangatranslate
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -665,10 +667,10 @@ class MangaPageTranslator(
         withContext(Dispatchers.IO) {
             if (ocr.isEmpty()) return@withContext PageTranslation(bitmap.width, bitmap.height, emptyList())
             if (engine != "ai") {
-                onStage("在线翻译对白…")
+                onStage(tr("在线翻译对白…"))
                 return@withContext PageTranslation(bitmap.width, bitmap.height, translateRegionsOnline(ocr))
             }
-            onStage("大模型翻译对白…")
+            onStage(tr("大模型翻译对白…"))
             val llmOut: Map<Int, String>? = llmTranslator.translateBuckets(ocr)
             val fallback = if (llmOut == null) llmTranslator.lastFailure ?: TranslationFailure.Empty else null
             val translated: List<TranslatedRegion> = if (llmOut != null) {
@@ -678,7 +680,7 @@ class MangaPageTranslator(
                 }
             } else {
                 if (fallback?.retryable != true) throw fallback!!.exception()
-                onStage("大模型暂不可用 · 正在用免 Key 机翻…")
+                onStage(tr("大模型暂不可用 · 正在用免 Key 机翻…"))
                 translateRegionsOnline(ocr)
             }
             PageTranslation(bitmap.width, bitmap.height, translated, fallback)
@@ -812,7 +814,7 @@ class TranslationCoordinator(
             val t0 = android.os.SystemClock.elapsedRealtime()
             try {
                 busyKeys.update { it + cacheKey }
-                progress.update { it + (cacheKey to "等待识别…") }
+                progress.update { it + (cacheKey to tr("等待识别…")) }
                 if (!TranslationPrivacy.allowed(appContext)) throw TranslationFailure.Privacy.exception()
                 val base = loadBase() ?: throw TranslationFailure.Ocr.exception()
                 if (bakedKeys.contains(cacheKey)) return@launch
@@ -821,7 +823,7 @@ class TranslationCoordinator(
                 val t1 = android.os.SystemClock.elapsedRealtime()
                 val cached = TranslationCache.read(appContext, engineKey, base.width, base.height)
                 val translation = cached ?: translateMutex.withLock {
-                    progress.update { it + (cacheKey to "识别漫画文字…") }
+                    progress.update { it + (cacheKey to tr("识别漫画文字…")) }
                     val cachedAgain = TranslationCache.read(appContext, engineKey, base.width, base.height)
                     if (cachedAgain != null) cachedAgain else {
                         // Recognition is independent of translation service and persists after a network failure.
@@ -845,7 +847,7 @@ class TranslationCoordinator(
                     android.util.Log.w("MTPerf", "page=${cacheKey.take(40)} engine=$selectedEngine NO-USABLE-TEXT total=${t2 - t0}ms regions=${translation.regions.size}")
                     return@launch
                 }
-                progress.update { it + (cacheKey to "排版译文…") }
+                progress.update { it + (cacheKey to tr("排版译文…")) }
                 val baked = BubblePipeline.bake(
                     base,
                     translation.regions.map { r ->
@@ -857,7 +859,7 @@ class TranslationCoordinator(
                 kotlinx.coroutines.currentCoroutineContext().ensureActive()
                 if (translation.regions.any { it.translated.isBlank() }) {
                     failedKeys.update { it + cacheKey }
-                    failures.update { it + (cacheKey to TranslationFailure("partial", "部分对白未获得译文", true)) }
+                    failures.update { it + (cacheKey to TranslationFailure("partial", com.example.i18n.tr("部分对白未获得译文"), true)) }
                 }
                 translation.fallbackReason?.let { reason -> notices.update { it + (cacheKey to "已用免 Key 机翻 · ${reason.description}") } }
                 publishBaked(baked)

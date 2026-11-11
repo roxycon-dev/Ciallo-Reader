@@ -1,5 +1,7 @@
 package com.example.transfer
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.data.BackupArchive
@@ -65,9 +67,9 @@ internal object PortableSettings {
     }
     fun validate(value: JSONObject) {
         value.optJSONObject(stores[0])?.let { settings -> settings.keys().forEach { key ->
-            require(BackupArchive.safeSetting(key) && BackupArchive.settingType(key) != null && key != "favorites_protected") { "包含不可迁移设置" }
+            require(BackupArchive.safeSetting(key) && BackupArchive.settingType(key) != null && key != "favorites_protected") { tr("包含不可迁移设置") }
             val item = settings.getJSONObject(key)
-            require(item.getString("type") == BackupArchive.settingType(key)) { "设置类型不符" }
+            require(item.getString("type") == BackupArchive.settingType(key)) { tr("设置类型不符") }
             if (item.getString("type") == "float") require(item.getDouble("value").isFinite() && kotlin.math.abs(item.getDouble("value")) <= 10000)
             when(key) {
                 "font_size" -> require(item.getDouble("value") in 8.0..80.0)
@@ -86,7 +88,7 @@ internal object PortableSettings {
         } }
         value.optJSONObject("sources")?.let { sources -> sources.keys().forEach { id ->
             require(id.length in 1..512 && sources.getJSONObject(id).toString().length <= 2 * 1024 * 1024)
-            require(!sensitive.containsMatchIn(sources.getJSONObject(id).toString())) { "书源含认证字段" }
+            require(!sensitive.containsMatchIn(sources.getJSONObject(id).toString())) { tr("书源含认证字段") }
         } }
         value.optJSONObject("god")?.let { it.getString("ranking_style"); it.getBoolean("last_page_hint"); it.getBoolean("gyro_parallax") }
         value.optJSONArray("scripts")?.let(com.example.source.js.JsSourceRepo::validatePortable)

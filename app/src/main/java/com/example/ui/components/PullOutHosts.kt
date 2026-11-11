@@ -196,12 +196,11 @@ internal fun PullOutPageContent(onDismiss: () -> Unit, content: @Composable (clo
     DisablePlatformWindowMotion(fullPage = true, lightSystemBars = MaterialTheme.colorScheme.background.luminance() > .5f); WindowPaperFinalizer(state)
     BackHandler { close {} }
     CompositionLocalProvider(LocalOverlayClose provides close, LocalPaperHandoff provides forward,
-        LocalPaperOrigin provides origin, LocalPaperOwner provides null, LocalPaperFullSurface provides true,
-        LocalPaperBackdropOwner provides rememberPaperLifecycle(state)) {
+        LocalPaperOrigin provides origin, LocalPaperOwner provides null, LocalPaperFullSurface provides true) {
         DialogLiquidGlass {
             val life = rememberPaperLifecycle(state)
             Box(Modifier.fillMaxSize()) {
-                Box(Modifier.fillMaxSize().graphicsLayer { alpha = paperBackdropProgress(life.progress) }
+                Box(Modifier.fillMaxSize().graphicsLayer { alpha = life.progress.coerceIn(0f, 1f) }
                     .background(Color.Black.copy(alpha = PullOutConfig.SCRIM)).clickable { /* modal boundary */ })
                 PullOutVisibility(state, Modifier.fillMaxSize()) {
                     PaperPageBackground { content { close {} } }
@@ -265,7 +264,7 @@ fun PullOutDialog(
 @Composable
 private fun DisablePlatformWindowMotion(fullPage: Boolean = false, lightSystemBars: Boolean = false, fillWindow: Boolean = true) {
     val view = LocalView.current
-    DisposableEffect(view, fullPage, lightSystemBars, fillWindow) {
+    SideEffect {
         (view.parent as? DialogWindowProvider)?.window?.let { window ->
             window.setWindowAnimations(0)
             window.setDimAmount(0f)
@@ -291,7 +290,6 @@ private fun DisablePlatformWindowMotion(fullPage: Boolean = false, lightSystemBa
                 }
             }
         }
-        onDispose { }
     }
 }
 
@@ -306,7 +304,6 @@ fun PullOutBottomSheet(
     tonalElevation: Dp = DesignTokens.Zero,
     scrimColor: Color = Color.Black.copy(alpha = PullOutConfig.SCRIM),
     dragHandle: (@Composable () -> Unit)? = { BottomSheetDefaults.DragHandle() },
-    wideMaxWidth: Dp = 560.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     // R15：统一到 Wenku 玻璃 sheet（与发现页「书源加载详情」同一套宿主）。
@@ -314,8 +311,7 @@ fun PullOutBottomSheet(
     // contentColor / tonalElevation / scrimColor 不再参与绘制，外观由 WenkuTokens 决定。
     com.example.ui.wenku.WenkuSheetDialog(
         onDismissRequest = onDismissRequest,
-        grabber = dragHandle != null,
-        wideMaxWidth = wideMaxWidth,
+        grabber = dragHandle != null
     ) {
         Column(modifier.fillMaxWidth()) { content() }
     }
@@ -348,7 +344,6 @@ fun PullOutDropdownMenu(
     offset: DpOffset = DpOffset.Zero,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
     anchorInWindow: androidx.compose.ui.geometry.Rect? = null,
-    borderless: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     var retained by remember { mutableStateOf(expanded) }
@@ -371,15 +366,13 @@ fun PullOutDropdownMenu(
             sourceRadius = DesignTokens.SpaceXxl,
             onDismiss = onDismissRequest,
             dismissRequested = dismissRequested,
-            onHidden = { retained = false },
-            borderlessSurface = containerColor.takeIf { borderless },
+            onHidden = { retained = false }
         ) {
             Column(
                 modifier = Modifier
                     .widthIn(min = 180.dp, max = 360.dp)
-                    .then(if (borderless) Modifier else Modifier
-                        .clip(RoundedCornerShape(DesignTokens.SpaceXl))
-                        .background(containerColor))
+                    .clip(RoundedCornerShape(DesignTokens.SpaceXl))
+                    .background(containerColor)
                     .padding(vertical = DesignTokens.SpaceSm)
             ) {
                 content()

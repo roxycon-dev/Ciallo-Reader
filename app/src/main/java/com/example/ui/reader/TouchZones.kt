@@ -6,11 +6,19 @@ import org.json.JSONObject
 import java.util.UUID
 import kotlin.math.abs
 
-enum class TouchAction(val label: String) {
+/** 展示文案在读取时翻译（枚举在类加载期初始化，构造期翻译会把语言冻住）。 */
+enum class TouchAction(private val raw: String) {
     NONE("不执行操作"), PREVIOUS("上一页"), NEXT("下一页"), CONTROLS("呼出 / 收起状态栏"),
-    SETTINGS("打开设置"), CONTENTS("打开目录"), LISTEN("听书"), EXIT("退出阅读"),
+    SETTINGS("打开设置"), CONTENTS("打开目录"), LISTEN("听书"), EXIT("退出阅读");
+
+    val label: String get() = com.example.i18n.tr(raw)
 }
-enum class SwipeAction(val label: String) { NONE("不执行操作"), PAGE("滑动翻页"), CONTROLS("呼出状态栏"), SETTINGS("打开设置") }
+
+enum class SwipeAction(private val raw: String) {
+    NONE("不执行操作"), PAGE("滑动翻页"), CONTROLS("呼出状态栏"), SETTINGS("打开设置");
+
+    val label: String get() = com.example.i18n.tr(raw)
+}
 
 /** Rectangles use viewport fractions; thresholds use dp, independent of editor scale or display density. */
 data class TouchZone(

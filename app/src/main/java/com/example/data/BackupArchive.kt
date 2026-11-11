@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.database.Cursor
 import androidx.room.withTransaction
@@ -24,6 +26,8 @@ internal object BackupArchive {
     private fun owned(name: String) = name in ownedNames || name.startsWith("comics_") || name.startsWith("restored_") || name.startsWith("custom_poster_") || name.startsWith("custom_background_") || name.startsWith("custom_app_bg_") || name.startsWith("custom_font_")
     internal fun safeSetting(key: String): Boolean = !Regex("(?i)(cookie|token|password|credential|secret|api.?key|pin_|salt|auth)").containsMatchIn(key)
     private val settingTypes = buildMap<String, String> {
+        put(PreferencesManager.SHELF_USES_3D_VIEW, "boolean")
+        put(PreferencesManager.FAVORITES_USE_3D_VIEW, "boolean")
         listOf("reading_totals_reconciled_v1","first_line_indent","splash_pure_mode","auto_night_mode","blue_light_filter","preload_wifi_only","keep_screen_on","haptics_enabled","incognito_browsing_enabled","favorites_protected","multi_language_search","multi_language_online_lookup","show_overlay_header_footer","card_tweaks_migrated_v2","has_seen_onboarding","has_seen_welcome","has_configured_source","has_imported_local_book","has_imported_community_comics_v1","show_adult_sources","js_source_health_checked_v3").forEach { put(it,"boolean") }
         listOf("font_size","line_height","blue_light_alpha","tts_speed","tts_pitch","reader_brightness","card_blur_dp","card_corner_dp","card_tilt_deg","card_cam_mult","card_ripple_a","card_tint_mix","card_press_s","card_press_r","card_alpha").forEach { put(it,"float") }
         listOf("margin_horizontal","reader_theme","custom_bg_color","custom_text_color","font_family_index","page_turn_mode","app_background_mode","app_background_dim","screen_orientation_lock","rest_reminder_minutes","shelf_drag_hint_shown","click_zone_left_action","click_zone_center_action","click_zone_right_action","color_primary_index","color_secondary_index","render_quality","daily_goal_minutes").forEach { put(it,"int") }
@@ -66,7 +70,7 @@ internal object BackupArchive {
             ZipOutputStream(temp.outputStream().buffered()).use { zip ->
                 var expanded = 0L
                 suspend fun entry(name: String, file: File) {
-                    require(file.length() <= 512L*1024*1024 && expanded + file.length() <= 4L*1024*1024*1024) { "备份内容超过容量限制" }
+                    require(file.length() <= 512L*1024*1024 && expanded + file.length() <= 4L*1024*1024*1024) { tr("备份内容超过容量限制") }
                     expanded += file.length()
                     zip.putNextEntry(ZipEntry(name)); file.inputStream().use { input ->
                         val buffer = ByteArray(64 * 1024)
@@ -101,7 +105,7 @@ internal object BackupArchive {
                     currentCoroutineContext().ensureActive()
                     val entry = zip.nextEntry ?: break
                     require(entry.name.length<=1024 && seen.size<50_000)
-                    require(seen.add(entry.name)) { "备份包含重复条目" }
+                    require(seen.add(entry.name)) { tr("备份包含重复条目") }
                     require(entry.name == "database.rows" || entry.name == "settings.json" || entry.name.startsWith("files/"))
                     val destination = ArchiveBudget.destination(stage, entry.name)
                     if (!entry.isDirectory) {
@@ -150,7 +154,7 @@ internal object BackupArchive {
                 tables.asReversed().forEach { db.openHelper.writableDatabase.execSQL("DELETE FROM `$it`") }
                 rows.bufferedReader().use { reader ->
                     val header = JSONObject(readBoundedLine(reader) ?: error("缺少备份元数据"))
-                    require(header.getInt("version") == 1 && header.getInt("schema") == 12) { "不支持的备份版本" }
+                    require(header.getInt("version") == 1 && header.getInt("schema") == 12) { tr("不支持的备份版本") }
                     var rowCount = 0
                     while (true) {
                         currentCoroutineContext().ensureActive()
@@ -160,16 +164,16 @@ internal object BackupArchive {
                         val table = item.getString("table")
                         require(table in tables)
                         val row = item.getJSONObject("row")
-                        if(table=="chapters") require(row.getString("content").length<=256_000) { "备份章节超过存储安全限制" }
+                        if(table=="chapters") require(row.getString("content").length<=256_000) { tr("备份章节超过存储安全限制") }
                         if(table in setOf("reading_records","reading_sessions")) require(row.getLong("durationSeconds")>=0)
                         val columns = columnCache.getValue(table)
                         val names = row.keys().asSequence().toList()
-                        require(names.toSet() == columns.keys) { "备份列与数据库不一致" }
+                        require(names.toSet() == columns.keys) { tr("备份列与数据库不一致") }
                         val values = names.map { name ->
                             val value=row.get(name)
                             val (type,required)=columns.getValue(name)
-                            require(value!=JSONObject.NULL || !required) { "备份必填字段为空" }
-                            require(value==JSONObject.NULL || when(type) { "TEXT" -> value is String; "INTEGER" -> value is Int || value is Long; "REAL" -> value is Number && value.toDouble().isFinite(); else -> false }) { "备份数据库字段类型错误" }
+                            require(value!=JSONObject.NULL || !required) { tr("备份必填字段为空") }
+                            require(value==JSONObject.NULL || when(type) { "TEXT" -> value is String; "INTEGER" -> value is Int || value is Long; "REAL" -> value is Number && value.toDouble().isFinite(); else -> false }) { tr("备份数据库字段类型错误") }
                             when (value) {
                                 JSONObject.NULL -> null
                                 is String -> value.replace("@FILES@", root)
@@ -182,7 +186,7 @@ internal object BackupArchive {
                 }
                 for(table in listOf("chapters","bookmarks","highlights")) {
                     val orphan=db.openHelper.writableDatabase.query("SELECT COUNT(*) FROM `$table` x LEFT JOIN books b ON x.bookId=b.id WHERE b.id IS NULL").use { it.moveToFirst(); it.getLong(0) }
-                    require(orphan==0L) { "备份包含孤立的书籍关联" }
+                    require(orphan==0L) { tr("备份包含孤立的书籍关联") }
                 }
             }
             committed = true
@@ -197,7 +201,7 @@ internal object BackupArchive {
             val ch = reader.read()
             if (ch < 0) return line.toString().takeIf { it.isNotEmpty() }
             if (ch == 10) return line.toString()
-            require(line.length < 512 * 1024) { "备份行过大" }
+            require(line.length < 512 * 1024) { tr("备份行过大") }
             line.append(ch.toChar())
         }
     }

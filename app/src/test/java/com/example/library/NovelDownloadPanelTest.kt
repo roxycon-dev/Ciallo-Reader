@@ -20,8 +20,8 @@ class NovelDownloadPanelTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun unknownLengthDoesNotClaimZeroPercent() {
-        assertEquals("下载中", downloadStatusLabel(DownloadState.Downloading(1024, -1, 0f)))
-        assertEquals("校验入库…", downloadStatusLabel(DownloadState.Downloading(1024, 1024, 1f)))
+        assertEquals("下载中 · 总大小未知", downloadStatusLabel(DownloadState.Downloading(1024, -1, 0f)))
+        assertEquals("校验文件并存入书架…", downloadStatusLabel(DownloadState.Downloading(1024, 1024, 1f)))
     }
 
     @Test fun restoredTasksAndPreTransferFailureRemainVisibleAndRetryable() {
@@ -48,17 +48,18 @@ class NovelDownloadPanelTest {
         compose.setContent { MaterialTheme {
             NovelDownloadPanel(listOf(task),emptyMap(),emptyMap(),{},{},{deleted++},{},{})
         } }
-        compose.onNodeWithText("已完成").assertIsDisplayed()
+        compose.onNodeWithText("已完成 · 已存入书架").assertIsDisplayed()
         compose.onNodeWithContentDescription("删除记录").performClick()
         assertEquals(0,deleted)
-        compose.onNodeWithText("取消").performClick()
+        compose.onNodeWithText("保留").performClick()
         assertEquals(0,deleted)
         compose.onNodeWithContentDescription("删除记录").performClick()
-        compose.onNodeWithText("删除记录？").assertIsDisplayed()
+        compose.onNodeWithText("删除下载记录？").assertIsDisplayed()
         compose.onNodeWithText("删除",useUnmergedTree=true).performClick()
+        compose.waitUntil { deleted == 1 }
         assertEquals(1,deleted)
         compose.onNodeWithContentDescription("删除记录").performClick()
-        compose.onNodeWithText("删除记录？").assertIsDisplayed()
+        compose.onNodeWithText("删除下载记录？").assertIsDisplayed()
         assertEquals(1,deleted)
     }
 

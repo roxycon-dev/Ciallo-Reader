@@ -1,5 +1,7 @@
 package com.example.discover
 
+import com.example.i18n.tr
+
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutIconButton
 import com.example.ui.components.pullOutClickable
@@ -32,17 +34,17 @@ internal fun DiscoverSourceStatusSheet(visible: Boolean, sources: List<BookSourc
     ) {
         Column(Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
             Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("书源加载详情", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                PullOutIconButton(icon = Icons.Outlined.Close, contentDescription = "关闭来源详情", onClick = com.example.ui.components.paperDismiss {})
+                Text(tr("书源加载详情"), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                PullOutIconButton(icon = Icons.Outlined.Close, contentDescription = tr("关闭来源详情"), onClick = com.example.ui.components.paperDismiss {})
             }
             LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("discover_source_status_list"), contentPadding = PaddingValues(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(sources, key = { it.id }) { source ->
                     val count = rows.count { work -> work.variants.any { it.book.sourceId == source.id } }
-                    val message = state.errors[source.id] ?: if (count > 0) "当前筛选 $count 本"
-                        else state.notices[source.id] ?: if (state.loading) "加载中"
+                    val message = state.errors[source.id] ?: if (count > 0) com.example.i18n.filterCount(count)
+                        else state.notices[source.id] ?: if (state.loading) tr("加载中")
                         else if (status != "全部" && state.entries.any { it.book.sourceId == source.id && serialLabel(it.book.comicInfo?.status) == "状态未知" })
-                            "作品状态尚未提供或待补全" else "当前筛选无结果"
+                            com.example.i18n.tr("作品状态尚未提供或待补全") else tr("当前筛选无结果")
                     Column {
                         Text(source.name, style = MaterialTheme.typography.titleSmall)
                         Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -50,7 +52,7 @@ internal fun DiscoverSourceStatusSheet(visible: Boolean, sources: List<BookSourc
                 }
             }
             if (state.errors.isNotEmpty()) PullOutTextButton(onClick = onRetry,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) { Text("重试失败书源") }
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) { Text(tr("重试失败书源")) }
         }
     }
 }
@@ -62,14 +64,14 @@ internal fun DiscoverSourcePicker(sources: List<BookSource>, enabled: Map<String
         val close = LocalOverlayClose.current
         val closeThenSelect: (String) -> Unit = { id -> close { onSelect(id) } }
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 12.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("选择书源", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-            PullOutIconButton(icon = Icons.Outlined.Close, contentDescription = "关闭书源窗口", onClick = com.example.ui.components.paperDismiss(onDismiss))
+            Text(tr("选择书源"), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+            PullOutIconButton(icon = Icons.Outlined.Close, contentDescription = tr("关闭书源窗口"), onClick = com.example.ui.components.paperDismiss(onDismiss))
         }
         LazyColumn(Modifier.heightIn(max = (LocalConfiguration.current.screenHeightDp * .6f).dp), contentPadding = PaddingValues(12.dp)) {
-            item { SourceOption("aggregate", "聚合 · 全部已启用书源", true, selected, closeThenSelect) }
+            item { SourceOption("aggregate", tr("聚合 · 全部已启用书源"), true, selected, closeThenSelect) }
             items(sources, key = { it.id }) { s -> SourceOption(s.id, s.name, enabled[s.id] != false, selected, closeThenSelect) }
         }
-        PullOutTextButton(onClick = paperOpen(onManage), modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) { Text("管理书源") }
+        PullOutTextButton(onClick = paperOpen(onManage), modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) { Text(tr("管理书源")) }
     }
 }
 
@@ -79,8 +81,8 @@ private fun SourceOption(id: String, title: String, enabled: Boolean, selected: 
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Icon(if (id == "aggregate") Icons.Outlined.Hub else Icons.Outlined.MenuBook, null,
             tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(if (enabled) title else "$title · 已停用", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        if (id == selected) Icon(Icons.Outlined.Check, "当前书源", tint = MaterialTheme.colorScheme.primary)
+        Text(if (enabled) title else com.example.i18n.titleDisabled(title), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        if (id == selected) Icon(Icons.Outlined.Check, tr("当前书源"), tint = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -110,7 +112,7 @@ internal fun DiscoverCategorySheet(entries: List<DiscoverEntry>, selected: Set<S
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("找你想看的${partition.label}", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                PullOutIconButton(icon = Icons.Outlined.Close, contentDescription = "关闭分类窗口", onClick = com.example.ui.components.paperDismiss(onDismiss))
+                PullOutIconButton(icon = Icons.Outlined.Close, contentDescription = tr("关闭分类窗口"), onClick = com.example.ui.components.paperDismiss(onDismiss))
             }
             if (facet == "native") {
                 val catalog = catalogs.firstOrNull { it.first.id == nativeSource }?.second
@@ -124,14 +126,14 @@ internal fun DiscoverCategorySheet(entries: List<DiscoverEntry>, selected: Set<S
                             onClick = { nativeSource = source.id; nativeGroup = "" }) }
                     } }
                     if (groups.size > 1) item { LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item { DiscoverChip("全部", nativeGroup.isBlank(), solid = false, onClick = { nativeGroup = "" }) }
+                        item { DiscoverChip(tr("全部"), nativeGroup.isBlank(), solid = false, onClick = { nativeGroup = "" }) }
                         items(groups) { g -> DiscoverChip(g, nativeGroup == g, solid = false, onClick = { nativeGroup = g }) }
                     } }
                     items(categories.chunked(3)) { row -> FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         row.forEach { c -> DiscoverChip(c.label, false, solid = false, outlined = true, onClick = { val source = nativeSource; close { onNative(source, c.id) } }) }
                     } }
-                    if (categories.isEmpty()) item { Text("这个书源暂未提供独立分类，可使用上方标准分类。", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(16.dp)) }
-                    if (catalog?.dynamicCategories == true) item { PullOutTextButton(onClick = { onLoadCategories(nativeSource) }) { Text("加载全部分类") } }
+                    if (categories.isEmpty()) item { Text(tr("这个书源暂未提供独立分类，可使用上方标准分类。"), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(16.dp)) }
+                    if (catalog?.dynamicCategories == true) item { PullOutTextButton(onClick = { onLoadCategories(nativeSource) }) { Text(tr("加载全部分类")) } }
                 }
             } else {
                 val root = DiscoverTaxonomy.roots.first { it.id == facet }
@@ -147,7 +149,7 @@ internal fun DiscoverCategorySheet(entries: List<DiscoverEntry>, selected: Set<S
                             branch.children.filter { c -> (openTaxonomy || c.id in supportedIds || c.id in draft || c.id in setOf("native_other", "year", "franchise")) &&
                                 (search.isBlank() || branch.label.contains(search, true) || c.label.contains(search, true) || c.aliases.any { it.contains(search, true) }) }.forEach { c ->
                                 val count = counts[c.id]?.let { " · ${it}本" }.orEmpty()
-                                DiscoverChip(c.label + count + if (c.id in updated) " · 今" else "", c.id in draft,
+                                DiscoverChip(c.label + count + if (c.id in updated) tr(" · 今") else "", c.id in draft,
                                     solid = false, outlined = true, onClick = {
                                         if (c.id in setOf("native_other", "year", "franchise")) { facet = "native"; search = "" }
                                         else toggle(c.id)
@@ -158,7 +160,7 @@ internal fun DiscoverCategorySheet(entries: List<DiscoverEntry>, selected: Set<S
                 }
             }
             Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                PullOutTextButton(onClick = { draft = emptySet() }) { Text("清除") }
+                PullOutTextButton(onClick = { draft = emptySet() }) { Text(tr("清除")) }
                 AppActionButton(if (draft.isEmpty()) "查看全部" else "应用 ${draft.size} 项", { val selectedDraft = draft; close { onApply(selectedDraft) } },
                     modifier = Modifier.weight(1f), fullWidth = true)
             }
@@ -171,12 +173,12 @@ internal fun DiscoverCategorySheet(entries: List<DiscoverEntry>, selected: Set<S
 private fun CategorySearchHeader(search: String, facet: String, onSearch: (String) -> Unit, onFacet: (String) -> Unit) {
     Column {
         OutlinedTextField(search, onSearch, Modifier.fillMaxWidth(), singleLine = true,
-            placeholder = { Text("搜索分类") }, leadingIcon = { Icon(Icons.Outlined.Search, null) })
+            placeholder = { Text(tr("搜索分类")) }, leadingIcon = { Icon(Icons.Outlined.Search, null) })
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(DiscoverTaxonomy.roots) { root -> DiscoverChip(root.label, facet == root.id, solid = false, onClick = { onFacet(root.id) }) }
-            item { DiscoverChip("书源分类", facet == "native", solid = false, onClick = { onFacet("native") }) }
+            item { DiscoverChip(tr("书源分类"), facet == "native", solid = false, onClick = { onFacet("native") }) }
         }
-        Text("组内多选，跨组组合 · 本数仅统计已加载作品", style = MaterialTheme.typography.labelSmall,
+        Text(tr("组内多选，跨组组合 · 本数仅统计已加载作品"), style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 4.dp))
     }
 }

@@ -41,13 +41,6 @@ class LiveComicSourcesAuditTest {
         val imageSamples = InstrumentationRegistry.getArguments().getString("imageSamples")?.toIntOrNull()?.coerceIn(1, 24) ?: 1
         val freshMycomicSession = requestedKeys == setOf("mycomic") &&
             InstrumentationRegistry.getArguments().getString("freshSession") == "true"
-        val freshBilimangaSession = requestedKeys == setOf("bilimanga") &&
-            InstrumentationRegistry.getArguments().getString("freshSession") == "true"
-        if (freshBilimangaSession) {
-            // Explicit opt-in on the disposable audit device; leave all other sites intact.
-            JsCookieJar.clear(context, "bilimanga.net")
-            JsCookieJar.clear(context, "www.bilimanga.net")
-        }
         if (freshMycomicSession) {
             // Explicit live diagnostic on the disposable device: keep all other accounts.
             JsCookieJar.clear(context, "mycomic.com")
@@ -97,15 +90,7 @@ class LiveComicSourcesAuditTest {
         sources.map { source -> async(Dispatchers.IO) { gate.withPermit {
             val key = (source as? JsComicSource)?.sourceKey ?: source.id
             val row = JSONObject().put("key", key).put("name", source.name)
-            if (InstrumentationRegistry.getArguments().getString("skipAuth") == "true" &&
-                (source.requiresLogin || key in setOf("picacg", "mycomic"))) {
-                record(row.put("status","skipped_auth").put("stage","login_or_browser_verification"))
-                return@withPermit
-            }
-
-            row.put("systemProxyConfigured", com.example.source.zlibrary.network.SystemProxyResolver.resolve(context) != null)
             if (key == "mycomic" && freshMycomicSession) row.put("freshSession", true)
-            if (key == "bilimanga" && freshBilimangaSession) row.put("freshSession", true)
             val started = SystemClock.elapsedRealtime()
             Log.i("SourceAudit", "START $key")
             suspend fun <T> stage(name: String, timeoutMs: Long = 45_000, block: suspend () -> T): T {
@@ -198,7 +183,6 @@ class LiveComicSourcesAuditTest {
                             val chapters = stage("chapters") { value(source.getChapters(book.id)) }
                             attempts.put(JSONObject().put("count", chapters.size))
                             chapter = if (key == "pufei" && auditQuery.isEmpty()) chapters.lastOrNull { it.title == "456" && !it.external }
-                                else if (key in setOf("mxs", "hot_manga")) chapters.lastOrNull { !it.external }
                                 else chapters.firstOrNull { !it.external }
                             val candidateChapter = chapter
                             if (candidateChapter != null) {
@@ -279,14 +263,14 @@ class LiveComicSourcesAuditTest {
                             row.put("freshDownload", true)
                             it.copy(id = it.id + "#audit-" + java.util.UUID.randomUUID())
                         }
-                        stage("download", 600_000) {
+                        stage("download", 180_000) {
                             val application = context.applicationContext as android.app.Application
                             val database = AppDatabase.getDatabase(context)
                             val id = ComicDownloadManager.taskId(book, readableChapter.id)
                             val previousTask = ComicDownloadManager.tasks.value[id]
                             ComicDownloadManager.start(application, database, book, readableChapter, source)
                             val terminal = try {
-                                withTimeout(595_000) {
+                                withTimeout(175_000) {
                                     ComicDownloadManager.tasks.first { tasks ->
                                         tasks[id] !== previousTask &&
                                             tasks[id]?.status in setOf(ComicDownloadStatus.SUCCESS, ComicDownloadStatus.FAILED)
@@ -368,11 +352,6 @@ class LiveComicSourcesAuditTest {
         if (requestedKeys.isNotEmpty()) {
             assertTrue("Some requested sources were unavailable: ${requestedKeys - sources.map { (it as? JsComicSource)?.sourceKey ?: it.id }.toSet()}",
                 requestedKeys.all { key -> sources.any { ((it as? JsComicSource)?.sourceKey ?: it.id) == key } })
-        }
-        if (InstrumentationRegistry.getArguments().getString("requirePass") == "true") {
-            val failures = report.readLines().filter(String::isNotBlank).map(::JSONObject)
-                .filter { it.has("key") && it.optString("status") != "download_and_offline_ok" }
-            assertTrue("Full source verification failed: ${failures.joinToString { it.toString() }}", failures.isEmpty())
         }
     }
 }

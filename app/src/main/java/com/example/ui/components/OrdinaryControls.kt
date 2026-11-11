@@ -69,7 +69,7 @@ internal fun OrdinarySegmentedSelector(options: List<LiquidSegmentOption>, selec
             SegmentedButton(selected = selected == option.id, onClick = { if (selected != option.id) onSelect(option.id) },
                 shape = SegmentedButtonDefaults.itemShape(index, options.size), icon = {}) {
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(option.label, fontSize = fontSp.sp, maxLines = 1)
+                    Text(com.example.i18n.tr(option.label), fontSize = fontSp.sp, maxLines = 1)
                     if (option.favorite) Text("♥", fontSize = fontSp.sp)
                     if (option.badge > 0) Text(option.badge.toString(), fontSize = fontSp.sp)
                 }

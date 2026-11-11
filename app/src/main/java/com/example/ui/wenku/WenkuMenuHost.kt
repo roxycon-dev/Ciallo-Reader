@@ -238,7 +238,6 @@ fun WenkuMenuHost(
     modifier: Modifier = Modifier,
     dismissRequested: Boolean = false,
     onHidden: () -> Unit = {},
-    borderlessSurface: Color? = null,
     content: @Composable () -> Unit
 ) {
     val a11y = rememberWenkuAccessibility()
@@ -306,7 +305,6 @@ fun WenkuMenuHost(
                     anchor = { anchorBounds ?: geometry.target },
                     target = { geometry.target },
                     sourceRadiusPx = sourceRadiusPx,
-                    borderlessSurface = borderlessSurface,
                     modifier = Modifier.fillMaxWidth()
                         .then(if (open) Modifier else Modifier.clearAndSetSemantics { }.wenkuBlockPointer())
                 ) {
@@ -386,7 +384,6 @@ fun WenkuSheetHost(
     viewportContent: Boolean = false,
     dismissGesturesEnabled: Boolean = true,
     additionalBottomInsetPx: Int = 0,
-    wideMaxWidth: Dp = 560.dp,
     content: @Composable () -> Unit
 ) {
     val a11y = rememberWenkuAccessibility()
@@ -545,11 +542,7 @@ fun WenkuSheetHost(
         ) { measurables, constraints ->
             // app_ui.dart:2465-2494：宽度 min(440, safe.width - 24)，下沿贴锚点底边。
             val safe = wenkuSafeRect(constraints, insets, this, layoutDirection)
-            val cap = when {
-                safe.width >= 840.dp.toPx() -> wideMaxWidth
-                safe.width >= 600.dp.toPx() -> 560.dp
-                else -> 440.dp
-            }
+            val cap = if (safe.width >= 600.dp.toPx()) 560.dp else 440.dp
             val widthPx = min(cap.toPx(), max(0f, safe.width - 24.dp.toPx()))
             val bottomEdge = if (anchorBounds != null) min(anchorBounds.bottom, safe.bottom) else safe.bottom - 8.dp.toPx()
             val maxHeightPx = max(0f, bottomEdge - safe.top - 22.dp.toPx())
@@ -666,7 +659,6 @@ private fun WenkuMenuStretchCore(
     target: () -> Rect,
     sourceRadiusPx: Float,
     modifier: Modifier = Modifier,
-    borderlessSurface: Color? = null,
     content: @Composable () -> Unit
 ) {
     val a11y = rememberWenkuAccessibility()
@@ -726,18 +718,16 @@ private fun WenkuMenuStretchCore(
                     translate(0f, (viewportHeight - size.height) / 2f)
                 }) {
                     clipPath(path) {
-                        drawRect(borderlessSurface ?: colors.panel, topLeft = Offset.Zero, size = Size(viewportWidth, viewportHeight))
+                        drawRect(colors.panel, topLeft = Offset.Zero, size = Size(viewportWidth, viewportHeight))
                         // 嵌套在 DrawScope(lambda) 里必须显式取回 ContentDrawScope 接收者。
                         this@drawWithContent.drawContent()
                     }
                     // 材质描边（LiquidGlass hairline；不使用 blur/backdrop）。
-                    if (borderlessSurface == null) {
-                        drawPath(
-                            path,
-                            colors.outline.copy(alpha = if (colors.isDark) 0.55f else 0.42f),
-                            style = Stroke(hairlinePx)
-                        )
-                    }
+                    drawPath(
+                        path,
+                        colors.outline.copy(alpha = if (colors.isDark) 0.55f else 0.42f),
+                        style = Stroke(hairlinePx)
+                    )
                 }
             }
             // GlassMenuStretchRender.hitTest：progress < .15 时不参与命中（motion_ui.dart:860）。
@@ -1038,7 +1028,6 @@ fun WenkuSheetDialog(
     dismissGesturesEnabled: Boolean = true,
     fitKeyboard: Boolean = false,
     requestDismiss: Boolean = false,
-    wideMaxWidth: Dp = 560.dp,
     content: @Composable () -> Unit
 ) {
     var dismissRequested by remember { mutableStateOf(false) }
@@ -1083,7 +1072,6 @@ fun WenkuSheetDialog(
             dismissRequested = dismissRequested || requestDismiss,
             dismissGesturesEnabled = dismissGesturesEnabled,
             additionalBottomInsetPx = bottomInset,
-            wideMaxWidth = wideMaxWidth,
             modifier = Modifier.fillMaxSize()
         ) {
             content()

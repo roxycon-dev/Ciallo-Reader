@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.i18n.tr
+
 import android.app.Application
 import android.content.Context
 import androidx.work.*
@@ -42,7 +44,6 @@ object ComicDownloadManager {
         return File(context.filesDir, "comics_$hash")
     }
     fun initialize(context: Context) { scope.launch { load(context.applicationContext) } }
-    internal suspend fun awaitInitialized(context: Context) = withContext(Dispatchers.IO) { load(context.applicationContext) }
     private fun load(context: Context) = synchronized(stateLock) {
         if (app != null) return@synchronized
         val f = android.util.AtomicFile(File(context.filesDir, "comic_download_tasks.json"))
@@ -65,7 +66,7 @@ object ComicDownloadManager {
                         ComicDownloadStatus.valueOf(o.getString("status")),o.optDouble("progress",0.0).toFloat().takeIf { it.isFinite() }?.coerceIn(0f,1f) ?: 0f,o.optString("error").takeIf { it.isNotBlank() })
                 }
             }
-        }.getOrElse { _message.value = "下载任务记录读取失败，原记录已保留"; throw it }
+        }.getOrElse { _message.value = com.example.i18n.tr("下载任务记录读取失败，原记录已保留"); throw it }
         app = context
         _tasks.value = restored
         persist()
@@ -78,7 +79,7 @@ object ComicDownloadManager {
                     if (work.getWorkInfosForUniqueWork(workName(id)).get().none { !it.state.isFinished }) enqueue(work, id)
                 } catch (e: Exception) {
                     currentCoroutineContext().ensureActive()
-                    update(id) { it.copy(status = ComicDownloadStatus.PAUSED, error = "后台任务恢复失败，请手动继续") }
+                    update(id) { it.copy(status = ComicDownloadStatus.PAUSED, error = com.example.i18n.tr("后台任务恢复失败，请手动继续")) }
                 }
             }
         } }
@@ -98,8 +99,7 @@ object ComicDownloadManager {
             db.withTransaction {
                 val dao = db.downloadTaskDao()
                 val ids = _tasks.value.keys
-                val saved=dao.getAllTasksSync().filter { it.format == "comic" }.associateBy { it.id }
-                saved.values.filter { it.id !in ids }.forEach { dao.deleteTaskById(it.id) }
+                dao.getAllTasksSync().filter { it.format == "comic" && it.id !in ids }.forEach { dao.deleteTaskById(it.id) }
                 _tasks.value.forEach { (id, t) ->
                     val status = when (t.status) {
                         ComicDownloadStatus.DOWNLOADING -> DownloadStatus.DOWNLOADING
@@ -108,10 +108,9 @@ object ComicDownloadManager {
                         ComicDownloadStatus.SUCCESS -> DownloadStatus.COMPLETED
                     }
                     val descriptor = a.getJSONObject(_tasks.value.keys.indexOf(id)).toString()
-                    val row=DownloadTaskEntity(id, t.book.sourceId, t.book.title, t.book.author,
+                    dao.insertOrUpdate(DownloadTaskEntity(id, t.book.sourceId, t.book.title, t.book.author,
                         t.book.cover, descriptor, "comic", status, 0, 0,
-                        directory(context,id).absolutePath, t.error, progress=t.progress)
-                    if(saved[id]?.copy(updatedAt=row.updatedAt) != row) dao.insertOrUpdate(row)
+                        directory(context,id).absolutePath, t.error, progress=t.progress))
                 }
             }
         }

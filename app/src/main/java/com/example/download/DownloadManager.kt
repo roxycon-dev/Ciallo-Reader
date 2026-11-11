@@ -1,5 +1,7 @@
 package com.example.download
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.util.Log
 import androidx.work.*
@@ -154,7 +156,7 @@ class DownloadManager(private val context: Context) {
 
             val downloadsDir = File(context.filesDir, "downloads")
             val finalFormat = request.format.trim().lowercase()
-            require(finalFormat.matches(Regex("[a-z0-9]{1,10}"))) { "下载格式无效" }
+            require(finalFormat.matches(Regex("[a-z0-9]{1,10}"))) { tr("下载格式无效") }
             val finalFilePath = if (replaceNovel) File(downloadsDir, "${sanitizeFileName(id)}_${System.nanoTime()}.$finalFormat").absolutePath
                 else existing?.filePath ?: File(downloadsDir, "${sanitizeFileName(id)}.$finalFormat").absolutePath
 
@@ -284,7 +286,7 @@ class DownloadManager(private val context: Context) {
             val values=org.json.JSONObject(headers)
             if(!referer.isNullOrBlank()) values.put("Referer",referer)
             val raw=values.toString()
-            require(raw.length<=32*1024) { "下载请求头过大" }
+            require(raw.length<=32*1024) { tr("下载请求头过大") }
             if(values.length()>0) secrets.write("download:$bookId",raw) else secrets.remove("download:$bookId")
         }
         val constraints = Constraints.Builder()

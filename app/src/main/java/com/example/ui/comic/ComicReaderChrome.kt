@@ -1,8 +1,6 @@
 package com.example.ui.comic
 
-import androidx.compose.ui.composed
-
-import androidx.compose.ui.graphics.graphicsLayer
+import com.example.i18n.tr
 
 import com.example.ui.components.PullOutIconButton
 import com.example.ui.components.AppIconButton
@@ -43,7 +41,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -422,7 +419,7 @@ private fun ComicTopBar(
                         .size(44.dp)
                         .onGloballyPositioned { settingsCoordinates = it }
                         .clip(CircleShape)
-                        .semantics { contentDescription = "阅读设置" }
+                        .semantics { contentDescription = com.example.i18n.AppLocale.t("阅读设置") }
                         .pullOutCombinedClickable(
                             interactionSource = settingsInteraction,
                             role = androidx.compose.ui.semantics.Role.Button,
@@ -481,21 +478,20 @@ private fun ComicTopBar(
                     onDismissRequest = { menuOpen = false },
                     containerColor = ReadingPalette.DialogSurface,
                     anchorInWindow = menuAnchor,
-                    borderless = true,
                 ) {
                     PullOutDropdownMenuItem(
-                        text = { Text("临时合页 / 取消", color = TextPrimary) },
+                        text = { Text(tr("临时合页 / 取消"), color = TextPrimary) },
                         leadingIcon = { Icon(Icons.Filled.AutoStories, null, tint = TextSecondary) },
                         enabled = canToggleMerge,
                         onClick = com.example.ui.components.paperDismiss(onToggleMerge)
                     )
                     PullOutDropdownMenuItem(
-                        text = { Text("手动裁边", color = TextPrimary) },
+                        text = { Text(tr("手动裁边"), color = TextPrimary) },
                         leadingIcon = { Icon(Icons.Filled.Settings, null, tint = TextSecondary) },
                         onClick = com.example.ui.components.paperOpen { menuOpen = false; onOpenPanel(ComicPanel.CROP) },
                     )
                     PullOutDropdownMenuItem(
-                        text = { Text("阅读预设", color = TextPrimary) },
+                        text = { Text(tr("阅读预设"), color = TextPrimary) },
                         leadingIcon = { Icon(Icons.Filled.ChevronLeft, null, tint = TextSecondary) },
                         onClick = com.example.ui.components.paperOpen { menuOpen = false; onOpenPanel(ComicPanel.PRESET) },
                     )
@@ -559,7 +555,7 @@ private fun ComicBottomBar(
                 Text("$currentPage / $totalPages", color = TextPrimary, fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Bold)
                 WenkuReaderProgressSlider(
                     value = if (dragging) dragTarget else sliderValue,
-                    label = "阅读进度",
+                    label = com.example.i18n.AppLocale.t("阅读进度"),
                     tint = MintPrimary,
                     onValueChange = {
                         dragging = true
@@ -594,7 +590,7 @@ private fun ComicBottomBar(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        if (autoRead) "自动阅读中" else config.mode.label,
+                        if (autoRead) tr("自动阅读中") else config.mode.label,
                         color = if (autoRead) MintPrimary else TextSecondary,
                         fontSize = DesignTokens.TypeCaptionSmall,
                         modifier = Modifier.weight(1f)
@@ -602,7 +598,7 @@ private fun ComicBottomBar(
                     ChromeIconButton(if (reverse) Icons.Filled.ChevronRight else Icons.Filled.ChevronLeft, "上一页") { onGoPrev() }
                     ChromeIconButton(
                         if (autoRead) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        if (autoRead) "暂停自动阅读" else "开始自动阅读"
+                        if (autoRead) tr("暂停自动阅读") else tr("开始自动阅读")
                     ) { onAutoReadToggle() }
                     ChromeIconButton(if (reverse) Icons.Filled.ChevronLeft else Icons.Filled.ChevronRight, "下一页") { onGoNext() }
                 }
@@ -697,10 +693,7 @@ internal fun ChromeIconButton(
 }
 
 internal fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier =
-    this.composed {
-        val interaction = androidx.compose.runtime.remember { MutableInteractionSource() }
-        this.pullOutClickable(interactionSource = interaction, indication = null, onClick = onClick)
-    }
+    this.pullOutClickable(interactionSource = MutableInteractionSource(), indication = null, onClick = onClick)
 
 /** 分段选择器（id 由调用方定义）。
  *  FlowRow 流式布局：每项按文字实际宽度占位，一行放不下自动换行——
@@ -846,7 +839,7 @@ internal fun ComicSheetContainer(
             Text(title, color = TextPrimary, fontSize = DesignTokens.TypeSectionLineHeight, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             PullOutIconButton(
                 icon = androidx.compose.material.icons.Icons.Filled.Close,
-                contentDescription = "关闭$title",
+                contentDescription = com.example.i18n.closeNamed(title),
                 tint = TextSecondary,
                 onClick = com.example.ui.components.paperDismiss(onDismiss)
             )

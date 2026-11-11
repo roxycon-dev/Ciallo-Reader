@@ -241,6 +241,15 @@ class DiscoverUiTest {
         compose.onNodeWithText("分享").assertIsDisplayed()
         capture("discover-large-menu.png")
     }
+    @Test fun longPressActionDismissesTheMenuAndAllowsReopeningAnotherCard() {
+        mount(DiscoverLayout.LARGE)
+        compose.onNodeWithText("星海冒险 1").performTouchInput { longClick() }
+        compose.onNodeWithText("不感兴趣").performClick()
+        compose.onNodeWithText("不感兴趣").assertDoesNotExist()
+        compose.onNodeWithText("星海冒险 1").assertDoesNotExist()
+        compose.onNodeWithText("星海冒险 2").performTouchInput { longClick() }
+        compose.onNodeWithText("分享").assertIsDisplayed()
+    }
     @Test fun settingsUseOwnWindowAndExcludeRemovedOptions() {
         mount(DiscoverLayout.GRID)
         compose.onNodeWithContentDescription("发现设置").performClick()

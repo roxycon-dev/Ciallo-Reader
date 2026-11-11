@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.i18n.tr
+
 import androidx.compose.material.icons.filled.AddCircleOutline
 import androidx.compose.material.icons.filled.RemoveCircleOutline
 import com.example.ui.wenku.WenkuTextButton
@@ -16,10 +18,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,7 +33,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -143,7 +142,7 @@ fun StatisticsScreen(
             )
     ) {
         // 滚动联动折叠头部：此前 LazyColumn 无 state 可挂，先补 state（代理B方案挂点）
-        val statisticsListState = rememberLazyGridState()
+        val statisticsListState = rememberLazyListState()
         val statsHeaderCollapsedSource = rememberHeaderCollapsedSource(statisticsListState)
         Scaffold(
             containerColor = Color.Transparent,
@@ -151,7 +150,7 @@ fun StatisticsScreen(
                 TabScreenHeader(
                     collapsedSource = statsHeaderCollapsedSource,
                     modifier = Modifier.statusBarsPadding(),
-                    title = "阅读统计",
+                    title = com.example.i18n.AppLocale.t("阅读统计"),
                     subtitle = "STATISTICS & INSIGHTS",
                     titleColor = glassTitleColor()
                 )
@@ -160,37 +159,34 @@ fun StatisticsScreen(
             // 性能优化（视觉零变化）：原为普通 Column+verticalScroll，
             // 5 张玻璃卡 + 3 个图表在滚动时全部参与绘制命令录制（低端机卡顿主因）。
             // 改 LazyColumn 后屏幕外的卡片/图表不再组合与绘制，布局顺序间距完全一致。
-            BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            val columns = if (maxWidth >= 720.dp && LocalDensity.current.fontScale < 1.3f) 2 else 1
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(columns),
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+LazyColumn(
                 state = statisticsListState,
                 modifier = Modifier
-                .widthIn(max = if (columns == 2) 1120.dp else AdaptiveSpec.pageContentMaxWidth)
+                .widthIn(max = AdaptiveSpec.pageContentMaxWidth)
                     .fillMaxSize()
                     .padding(padding)
                     .padding(horizontal = DesignTokens.SpacePage),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
                 // 底部避让放进 contentPadding：contentPadding 区不做裁剪，
                 // 卡片滚动到 tab 栏背后时玻璃背景/内容照常渲染（与其他页一致）。
                 // A2：原 120.dp magic number → 统一避让值
                 contentPadding = PaddingValues(top = 12.dp, bottom = LocalAppBottomInset.current)
             ) {
                 if (totalReadTimeSeconds == 0L) {
-                    item(key = "stats_empty", span = { GridItemSpan(maxLineSpan) }) {
+                    item(key = "stats_empty") {
                         com.example.ui.components.MascotEmptyState(
                             mascotResId = com.example.ui.mascot.MascotSpriteSheet.sadDrawable,
-                            title = "「暂无阅读统计记录」",
-                            description = "您最近还没有在本软件中阅读过小说哦。Roxy 已经乖乖为您备好了专属书签，快去读一章，开启您的阅读旅程并点亮统计图表吧！",
-                            actionLabel = "立即前往书架阅读",
+                            title = com.example.i18n.AppLocale.t("「暂无阅读统计记录」"),
+                            description = tr("您最近还没有在本软件中阅读过小说哦。Roxy 已经乖乖为您备好了专属书签，快去读一章，开启您的阅读旅程并点亮统计图表吧！"),
+                            actionLabel = com.example.i18n.AppLocale.t("立即前往书架阅读"),
                             onActionClick = onGoToShelf,
                             testTagPrefix = "stats_empty_state"
                         )
                     }
                 } else {
                     // ---------- 周期总览 ----------
-                    item(key = "stats_period", span = { GridItemSpan(maxLineSpan) }) {
+                    item(key = "stats_period") {
                         Box(Modifier.fillMaxWidth().wenkuPagePart(1)) {
                             PeriodOverviewCard(
                                 dailyTotals = dailyTotals,
@@ -223,7 +219,7 @@ fun StatisticsScreen(
                     }
 
                     // ---------- 神回排行榜（核心数据卡片之后） ----------
-                    item(key = "stats_god_ranking", span = { GridItemSpan(maxLineSpan) }) {
+                    item(key = "stats_god_ranking") {
                         Box(Modifier.fillMaxWidth().wenkuPagePart(4)) {
                             com.example.god.GodRankingCard(
                                 moments = godMoments,
@@ -239,11 +235,11 @@ fun StatisticsScreen(
                     }
 
                     // ---------- 本周明细（保留原周视图 + 封面轮播/删除） ----------
-                    item(key = "stats_weekly_header", span = { GridItemSpan(maxLineSpan) }) {
-                        WenkuSectionHeader("03", "READING LOG", "本周阅读明细")
+                    item(key = "stats_weekly_header") {
+                        WenkuSectionHeader("03", "READING LOG", com.example.i18n.AppLocale.t("本周阅读明细"))
                     }
 
-                    item(key = "stats_weekly", span = { GridItemSpan(maxLineSpan) }) {
+                    item(key = "stats_weekly") {
                         // 2026-09-21 修复：原来两处都是无 key 的 remember，只在首次组合算一次 ——
                         // 跨过午夜/跨周后不刷新，“这周过了不重置”。改用跨天自动更新的今天。
                         val todayCal = rememberTodayCalendar()
@@ -398,17 +394,17 @@ private fun PeriodOverviewCard(
         animationSpec = com.example.ui.feedback.AppMotion.settle(),
         label = "periodTotal"
     )
-    val periodName = listOf("本周", "本月", "今年")[period]
-    val prevName = listOf("上周", "上月", "去年")[period]
+    val periodName = listOf(com.example.i18n.AppLocale.t("本周"), com.example.i18n.AppLocale.t("本月"), com.example.i18n.AppLocale.t("今年"))[period]
+    val prevName = listOf(com.example.i18n.AppLocale.t("上周"), com.example.i18n.AppLocale.t("上月"), com.example.i18n.AppLocale.t("去年"))[period]
 
     val shareCtx = androidx.compose.ui.platform.LocalContext.current
-    val shareLabel = when (period) { 0 -> "周"; 1 -> "月"; else -> "年" }
+    val shareLabel = when (period) { 0 -> com.example.i18n.AppLocale.t("周"); 1 -> com.example.i18n.AppLocale.t("月"); else -> com.example.i18n.AppLocale.t("年") }
     val shareReport: () -> Unit = {
         val shareText = buildString {
             appendLine("📚 我的阅读${shareLabel}报 · Ciallo Reader")
             appendLine("────────────────────")
             if (periodTotal > 0) {
-                appendLine("⏱ ${periodName}阅读 ${formatReadDuration(periodTotal)}（日均 ${if (avgDaily in 1..59) "不足1分钟" else formatShortDuration(avgDaily)}）")
+                appendLine("⏱ ${periodName}阅读 ${formatReadDuration(periodTotal)}（日均 ${if (avgDaily in 1..59) com.example.i18n.AppLocale.t("不足1分钟") else formatShortDuration(avgDaily)}）")
             } else {
                 appendLine("⏱ ${periodName}暂无阅读记录，从一页开始 ✨")
             }
@@ -422,7 +418,7 @@ private fun PeriodOverviewCard(
             type = "text/plain"
             putExtra(android.content.Intent.EXTRA_TEXT, shareText)
         }
-        shareCtx.startActivity(android.content.Intent.createChooser(intent, "分享阅读报告"))
+        shareCtx.startActivity(android.content.Intent.createChooser(intent, com.example.i18n.AppLocale.t("分享阅读报告")))
     }
 
     GlassCard(
@@ -430,7 +426,7 @@ private fun PeriodOverviewCard(
         shape = RoundedCornerShape(20.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            WenkuSectionHeader("01", "READING OVERVIEW", "阅读总览", trailing = {
+            WenkuSectionHeader("01", "READING OVERVIEW", com.example.i18n.AppLocale.t("阅读总览"), trailing = {
                 WenkuIconButton(
                     Icons.Filled.Share, "分享${periodName}阅读报告", shareReport,
                     wenkuSymbol = WenkuSymbol.Share,
@@ -438,7 +434,7 @@ private fun PeriodOverviewCard(
             })
             Spacer(Modifier.height(6.dp))
             SegmentedPillSelector(
-                options = listOf(0 to "周", 1 to "月", 2 to "年"),
+                options = listOf(0 to com.example.i18n.AppLocale.t("周"), 1 to com.example.i18n.AppLocale.t("月"), 2 to com.example.i18n.AppLocale.t("年")),
                 selected = period,
                 onSelect = { period = it },
                 modifier = Modifier.fillMaxWidth()
@@ -456,8 +452,8 @@ private fun PeriodOverviewCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    val avgDailyText = if (avgDaily in 1..59) "不足1分钟" else formatShortDuration(avgDaily)
-                    val prevText = if (prevTotal <= 0 && periodTotal > 0) "首次记录" else "$deltaPct%"
+                    val avgDailyText = if (avgDaily in 1..59) com.example.i18n.AppLocale.t("不足1分钟") else formatShortDuration(avgDaily)
+                    val prevText = if (prevTotal <= 0 && periodTotal > 0) com.example.i18n.AppLocale.t("首次记录") else "$deltaPct%"
                     val prevColor = when {
                         prevTotal <= 0 && periodTotal > 0 -> MintGold
                         deltaPct > 0 -> MintPrimary
@@ -465,7 +461,7 @@ private fun PeriodOverviewCard(
                         else -> MintGold
                     }
                     Text(
-                        text = "日均 $avgDailyText · 较$prevName $prevText",
+                        text = com.example.i18n.dailyAverage(avgDailyText, prevName, prevText),
                         fontSize = 11.sp,
                         color = prevColor,
                         fontWeight = FontWeight.SemiBold
@@ -518,16 +514,16 @@ private fun PeriodOverviewCard(
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("每日目标", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(com.example.i18n.AppLocale.t("每日目标"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${dailyGoalMinutes} 分钟", style = MaterialTheme.typography.titleSmall, color = MintPrimary)
                     }
                     WenkuIconButton(
-                        Icons.Filled.RemoveCircleOutline, "减少目标15分钟",
+                        Icons.Filled.RemoveCircleOutline, com.example.i18n.AppLocale.t("减少目标15分钟"),
                         { onGoalChange(dailyGoalMinutes - 15) },
                         enabled = dailyGoalMinutes > 15, wenkuSymbol = WenkuSymbol.RemoveCircle,
                     )
                     WenkuIconButton(
-                        Icons.Filled.AddCircleOutline, "增加目标15分钟",
+                        Icons.Filled.AddCircleOutline, com.example.i18n.AppLocale.t("增加目标15分钟"),
                         { onGoalChange(dailyGoalMinutes + 15) },
                         enabled = dailyGoalMinutes < 480, wenkuSymbol = WenkuSymbol.AddCircle,
                     )
@@ -541,13 +537,13 @@ private fun PeriodOverviewCard(
             ) {
                 MiniStatCard(
                     icon = { Icon(Icons.Filled.Book, contentDescription = null, tint = MintSecondary) },
-                    label = if (period == 0) "本周阅读天数" else "周期阅读天数",
+                    label = if (period == 0) com.example.i18n.AppLocale.t("本周阅读天数") else com.example.i18n.AppLocale.t("周期阅读天数"),
                     value = "$daysRead 天",
                     modifier = Modifier.weight(1f)
                 )
                 MiniStatCard(
                     icon = { Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = MintGold) },
-                    label = "当前连续",
+                    label = com.example.i18n.AppLocale.t("当前连续"),
                     value = "$streak 天",
                     modifier = Modifier.weight(1f)
                 )
@@ -556,7 +552,7 @@ private fun PeriodOverviewCard(
             if (period == 0) {
                 Spacer(modifier = Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("本周点亮", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(com.example.i18n.AppLocale.t("本周点亮"), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.width(6.dp))
                     val weekDates = remember { weekDatesOf(todayCalendar()).map { dateStrOf(it) } }
                     weekDates.forEach { date ->
@@ -693,7 +689,7 @@ private fun DayDetailSheet(
             Text("$date 阅读明细", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "共 ${formatReadDuration(totalSeconds)}",
+                text = com.example.i18n.totalOf(formatReadDuration(totalSeconds)),
                 fontSize = 13.sp,
                 color = MintPrimary,
                 fontWeight = FontWeight.Bold
@@ -702,7 +698,7 @@ private fun DayDetailSheet(
             Spacer(modifier = Modifier.height(14.dp))
 
             if (records.isEmpty() && sessions.isEmpty()) {
-                Text("这一天没有阅读记录", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(com.example.i18n.AppLocale.t("这一天没有阅读记录"), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             records.forEach { record ->
@@ -756,14 +752,14 @@ private fun DayDetailSheet(
                         )
                     }
                     PullOutTextButton(onClick = { onDeleteRecord(record) }) {
-                        Text("删除", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                        Text(com.example.i18n.AppLocale.t("删除"), fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
 
             if (sessions.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("阅读时段", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(com.example.i18n.AppLocale.t("阅读时段"), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(6.dp))
                 sessions.forEach { session ->
                     Row(

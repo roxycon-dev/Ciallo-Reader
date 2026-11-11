@@ -1,0 +1,498 @@
+{
+  "duration": 41.35,
+  "original": true,
+  "visual_cues": [
+    {
+      "second": 1.055,
+      "frame_30fps": 32,
+      "picture": "开页运动速度峰值"
+    },
+    {
+      "second": 3.1,
+      "frame_30fps": 93,
+      "picture": "发现段切点"
+    },
+    {
+      "second": 6.4,
+      "frame_30fps": 192,
+      "picture": "发现段切点"
+    },
+    {
+      "second": 7.9,
+      "frame_30fps": 237,
+      "picture": "发现段切点"
+    },
+    {
+      "second": 10.4,
+      "frame_30fps": 312,
+      "picture": "发现段切点"
+    },
+    {
+      "second": 12.15,
+      "frame_30fps": 364,
+      "picture": "走进去字卡：短重音"
+    },
+    {
+      "second": 15.4,
+      "frame_30fps": 462,
+      "picture": "阅读设置第1屏落定"
+    },
+    {
+      "second": 16.2,
+      "frame_30fps": 486,
+      "picture": "阅读设置第2屏落定"
+    },
+    {
+      "second": 17.0,
+      "frame_30fps": 510,
+      "picture": "阅读设置第3屏落定"
+    },
+    {
+      "second": 17.8,
+      "frame_30fps": 534,
+      "picture": "阅读设置第4屏落定"
+    },
+    {
+      "second": 18.6,
+      "frame_30fps": 558,
+      "picture": "阅读设置第5屏落定"
+    },
+    {
+      "second": 19.4,
+      "frame_30fps": 582,
+      "picture": "阅读设置第6屏落定"
+    },
+    {
+      "second": 20.2,
+      "frame_30fps": 606,
+      "picture": "静下来：撤掉鼓点与混响尾巴"
+    },
+    {
+      "second": 23.95,
+      "frame_30fps": 718,
+      "picture": "书签保存"
+    },
+    {
+      "second": 24.95,
+      "frame_30fps": 748,
+      "picture": "下载开始"
+    },
+    {
+      "second": 25.9,
+      "frame_30fps": 777,
+      "picture": "已暂停：短暂收声"
+    },
+    {
+      "second": 26.5,
+      "frame_30fps": 795,
+      "picture": "已完成：和声解决"
+    },
+    {
+      "second": 30.4,
+      "frame_30fps": 912,
+      "picture": "主题颜色交替中点"
+    },
+    {
+      "second": 32.35,
+      "frame_30fps": 970,
+      "picture": "玻璃掠光中点"
+    },
+    {
+      "second": 36.7,
+      "frame_30fps": 1101,
+      "picture": "故事还在：从暗场中显现，主题返回"
+    },
+    {
+      "second": 39.1,
+      "frame_30fps": 1173,
+      "picture": "片尾品牌从暗场落定：最后和弦"
+    }
+  ],
+  "notes": [
+    {
+      "second": 0.22,
+      "midi": 66,
+      "velocity": 0.13
+    },
+    {
+      "second": 1.055,
+      "midi": 73,
+      "velocity": 0.13
+    },
+    {
+      "second": 1.93,
+      "midi": 69,
+      "velocity": 0.105
+    },
+    {
+      "second": 3.1,
+      "midi": 43,
+      "velocity": 0.065
+    },
+    {
+      "second": 3.114,
+      "midi": 57,
+      "velocity": 0.065
+    },
+    {
+      "second": 3.128,
+      "midi": 62,
+      "velocity": 0.065
+    },
+    {
+      "second": 3.142,
+      "midi": 66,
+      "velocity": 0.065
+    },
+    {
+      "second": 6.4,
+      "midi": 45,
+      "velocity": 0.065
+    },
+    {
+      "second": 6.414,
+      "midi": 59,
+      "velocity": 0.065
+    },
+    {
+      "second": 6.428,
+      "midi": 64,
+      "velocity": 0.065
+    },
+    {
+      "second": 7.9,
+      "midi": 47,
+      "velocity": 0.065
+    },
+    {
+      "second": 7.914,
+      "midi": 61,
+      "velocity": 0.065
+    },
+    {
+      "second": 7.928,
+      "midi": 66,
+      "velocity": 0.065
+    },
+    {
+      "second": 10.4,
+      "midi": 50,
+      "velocity": 0.065
+    },
+    {
+      "second": 10.414,
+      "midi": 61,
+      "velocity": 0.065
+    },
+    {
+      "second": 10.428,
+      "midi": 69,
+      "velocity": 0.065
+    },
+    {
+      "second": 4.45,
+      "midi": 73,
+      "velocity": 0.074
+    },
+    {
+      "second": 5.2,
+      "midi": 69,
+      "velocity": 0.074
+    },
+    {
+      "second": 7.1,
+      "midi": 71,
+      "velocity": 0.074
+    },
+    {
+      "second": 8.65,
+      "midi": 73,
+      "velocity": 0.074
+    },
+    {
+      "second": 9.35,
+      "midi": 78,
+      "velocity": 0.074
+    },
+    {
+      "second": 11.1,
+      "midi": 76,
+      "velocity": 0.074
+    },
+    {
+      "second": 12.15,
+      "midi": 43,
+      "velocity": 0.1
+    },
+    {
+      "second": 12.164,
+      "midi": 50,
+      "velocity": 0.1
+    },
+    {
+      "second": 12.178,
+      "midi": 62,
+      "velocity": 0.1
+    },
+    {
+      "second": 12.7,
+      "midi": 55,
+      "velocity": 0.085
+    },
+    {
+      "second": 12.714,
+      "midi": 62,
+      "velocity": 0.085
+    },
+    {
+      "second": 12.728,
+      "midi": 66,
+      "velocity": 0.085
+    },
+    {
+      "second": 12.742,
+      "midi": 69,
+      "velocity": 0.085
+    },
+    {
+      "second": 13.25,
+      "midi": 78,
+      "velocity": 0.077
+    },
+    {
+      "second": 13.8,
+      "midi": 74,
+      "velocity": 0.077
+    },
+    {
+      "second": 14.6,
+      "midi": 73,
+      "velocity": 0.077
+    },
+    {
+      "second": 15.4,
+      "midi": 64,
+      "velocity": 0.105
+    },
+    {
+      "second": 15.8,
+      "midi": 57,
+      "velocity": 0.047
+    },
+    {
+      "second": 16.2,
+      "midi": 66,
+      "velocity": 0.105
+    },
+    {
+      "second": 16.6,
+      "midi": 59,
+      "velocity": 0.047
+    },
+    {
+      "second": 17.0,
+      "midi": 69,
+      "velocity": 0.105
+    },
+    {
+      "second": 17.4,
+      "midi": 61,
+      "velocity": 0.047
+    },
+    {
+      "second": 17.8,
+      "midi": 71,
+      "velocity": 0.105
+    },
+    {
+      "second": 18.2,
+      "midi": 57,
+      "velocity": 0.047
+    },
+    {
+      "second": 18.6,
+      "midi": 73,
+      "velocity": 0.105
+    },
+    {
+      "second": 19.0,
+      "midi": 59,
+      "velocity": 0.047
+    },
+    {
+      "second": 19.4,
+      "midi": 76,
+      "velocity": 0.105
+    },
+    {
+      "second": 19.8,
+      "midi": 61,
+      "velocity": 0.047
+    },
+    {
+      "second": 21.18,
+      "midi": 66,
+      "velocity": 0.085
+    },
+    {
+      "second": 22.45,
+      "midi": 73,
+      "velocity": 0.065
+    },
+    {
+      "second": 23.95,
+      "midi": 69,
+      "velocity": 0.07
+    },
+    {
+      "second": 24.95,
+      "midi": 43,
+      "velocity": 0.07
+    },
+    {
+      "second": 24.964,
+      "midi": 57,
+      "velocity": 0.07
+    },
+    {
+      "second": 24.978,
+      "midi": 62,
+      "velocity": 0.07
+    },
+    {
+      "second": 25.45,
+      "midi": 69,
+      "velocity": 0.06
+    },
+    {
+      "second": 26.5,
+      "midi": 50,
+      "velocity": 0.08
+    },
+    {
+      "second": 26.514,
+      "midi": 57,
+      "velocity": 0.08
+    },
+    {
+      "second": 26.528,
+      "midi": 61,
+      "velocity": 0.08
+    },
+    {
+      "second": 26.542,
+      "midi": 66,
+      "velocity": 0.08
+    },
+    {
+      "second": 27.35,
+      "midi": 47,
+      "velocity": 0.067
+    },
+    {
+      "second": 27.364,
+      "midi": 59,
+      "velocity": 0.067
+    },
+    {
+      "second": 27.378,
+      "midi": 66,
+      "velocity": 0.067
+    },
+    {
+      "second": 28.95,
+      "midi": 55,
+      "velocity": 0.068
+    },
+    {
+      "second": 28.964,
+      "midi": 62,
+      "velocity": 0.068
+    },
+    {
+      "second": 28.978,
+      "midi": 66,
+      "velocity": 0.068
+    },
+    {
+      "second": 30.4,
+      "midi": 78,
+      "velocity": 0.09
+    },
+    {
+      "second": 32.35,
+      "midi": 76,
+      "velocity": 0.074
+    },
+    {
+      "second": 33.45,
+      "midi": 47,
+      "velocity": 0.075
+    },
+    {
+      "second": 33.464,
+      "midi": 59,
+      "velocity": 0.075
+    },
+    {
+      "second": 33.478,
+      "midi": 66,
+      "velocity": 0.075
+    },
+    {
+      "second": 34.15,
+      "midi": 73,
+      "velocity": 0.085
+    },
+    {
+      "second": 35.2,
+      "midi": 69,
+      "velocity": 0.062
+    },
+    {
+      "second": 36.7,
+      "midi": 66,
+      "velocity": 0.1
+    },
+    {
+      "second": 37.35,
+      "midi": 73,
+      "velocity": 0.095
+    },
+    {
+      "second": 38.0,
+      "midi": 69,
+      "velocity": 0.075
+    },
+    {
+      "second": 39.1,
+      "midi": 38,
+      "velocity": 0.069
+    },
+    {
+      "second": 39.114,
+      "midi": 50,
+      "velocity": 0.069
+    },
+    {
+      "second": 39.128,
+      "midi": 57,
+      "velocity": 0.069
+    },
+    {
+      "second": 39.142,
+      "midi": 61,
+      "velocity": 0.069
+    },
+    {
+      "second": 39.156,
+      "midi": 66,
+      "velocity": 0.069
+    },
+    {
+      "second": 39.66,
+      "midi": 73,
+      "velocity": 0.055
+    }
+  ]
+}

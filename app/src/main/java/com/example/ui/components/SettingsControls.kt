@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -211,7 +213,7 @@ fun CustomMinutesDialog(
 
     AcrylicDialog(
         onDismissRequest = onDismiss,
-        title = { Text("自定义休息时间", fontWeight = FontWeight.Bold) },
+        title = { Text(tr("自定义休息时间"), fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -226,7 +228,7 @@ fun CustomMinutesDialog(
                             if (it in 1..180) value = it
                         }
                     },
-                    label = { Text("输入分钟数") },
+                    label = { Text(tr("输入分钟数")) },
                     singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
@@ -259,7 +261,7 @@ fun CustomMinutesDialog(
                         label = "minutesValue"
                     ) { v ->
                         Text(
-                            text = "$v 分钟",
+                            text = com.example.i18n.minutesValue("$v"),
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
                             color = primary,
@@ -282,7 +284,7 @@ fun CustomMinutesDialog(
         confirmButton = {
             val closeOverlay = com.example.ui.components.LocalOverlayClose.current
             AppActionButton(
-                text = "确定",
+                text = tr("确定"),
                 onClick = { closeOverlay {
                     val finalValue = text.toIntOrNull()?.coerceIn(1, 180) ?: value.coerceIn(1, 180)
                     onConfirm(finalValue)
@@ -294,7 +296,7 @@ fun CustomMinutesDialog(
         dismissButton = {
             val closeOverlay = com.example.ui.components.LocalOverlayClose.current
             PullOutTextButton(onClick = { closeOverlay {  } }) {
-                Text("取消")
+                Text(tr("取消"))
             }
         }
     )

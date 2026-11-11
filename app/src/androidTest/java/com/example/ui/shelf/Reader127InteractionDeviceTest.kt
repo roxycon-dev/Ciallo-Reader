@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -118,6 +119,34 @@ class Reader127InteractionDeviceTest {
     @Test fun favoritesBarActionDoesNotToggleTheFavoriteBehindIt() = bar("fav::source::42")
     @Test fun disabledBarActionDoesNotLeakThrough() = bar("1", enabled = false)
     @Test fun barOuterPaddingDoesNotLeakThrough() = bar("1", padding = true)
+
+    @Test fun categoryPickerKeepsTheMovePendingUntilItsExit() {
+        val open = mutableStateOf(true)
+        val events = mutableListOf<String>()
+        compose.setContent {
+            MaterialTheme {
+                if (open.value) {
+                    CategoryPickerSheet(
+                        listOf("默认", "目标分类"), "移动到分类",
+                        onPick = { events.add("pick:$it") },
+                        onDismiss = { events.add("dismiss"); open.value = false },
+                        onCreate = { events.add("create:$it") },
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("新建分类").performClick()
+        compose.onNodeWithText("创建并放入").assertIsNotEnabled()
+        compose.onNode(hasSetTextAction()).performTextInput("NewTestCategory")
+        compose.onNodeWithText("创建并放入").performClick()
+        compose.waitUntil(5000) { events.size == 2 }
+        assertEquals(listOf("dismiss", "create:NewTestCategory"), events)
+
+        compose.runOnIdle { events.clear(); open.value = true }
+        compose.onNodeWithText("目标分类").performClick()
+        compose.waitUntil(5000) { events.size == 2 }
+        assertEquals(listOf("dismiss", "pick:目标分类"), events)
+    }
 
     @Test fun uncoveredBooksStillRespondToLongPressAndSelectionTap() {
         val state = ShelfSelectionState().apply { aliveKeys = setOf("1"); fallbackHit = { "1" } }

@@ -2,6 +2,11 @@ package com.example.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Text
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.ui.wenku.WenkuPlaneTabSwitcher
+import com.example.ui.wenku.wenkuPlaneLayer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.runtime.*
@@ -32,7 +37,67 @@ import java.io.File
 @OptIn(com.github.takahirom.roborazzi.ExperimentalRoborazziApi::class)
 class TabBarMotionTest {
     @get:Rule val compose = createComposeRule()
-    private fun indicatorCenter(): Float {
+
+    @Test fun aTransparentIncomingPaneRevealsWallpaperInsteadOfTheOldPage() {
+        compose.setContent {
+            MyApplicationTheme {
+                Box(Modifier.fillMaxSize().background(Color.White)) {
+                    Box(Modifier.fillMaxSize()
+                        .wenkuPlaneLayer({ .27f }, incoming = false, occludeOutgoing = true)
+                        .background(Color.Red))
+                    Box(Modifier.fillMaxSize()
+                        .wenkuPlaneLayer({ .27f }, incoming = true)
+                        .background(Color.Blue.copy(alpha = .5f)))
+                }
+            }
+        }
+        val capture = File.createTempFile("wenku-tab-plane", ".png")
+        val pixels = try {
+            compose.onRoot().captureRoboImage(capture.absolutePath,
+                roborazziOptions = RoborazziOptions(taskType = RoborazziTaskType.Record))
+            requireNotNull(android.graphics.BitmapFactory.decodeFile(capture.absolutePath))
+        } finally {
+            capture.delete()
+        }
+        val revealed = Color(pixels.getPixel(pixels.width / 8, pixels.height * 2 / 3))
+        val leaving = Color(pixels.getPixel(pixels.width * 9 / 10, pixels.height * 2 / 3))
+        assertTrue("The incoming plane should blend with white wallpaper, found $revealed", revealed.green > .35f && revealed.blue > .9f)
+        assertTrue("The outgoing plane remains on the other side of the cut, found $leaving", leaving.red > .9f && leaving.blue < .15f)
+    }
+
+    @Test fun visitedPaneKeepsItsCompositionAndPausesWhileOffstage() {
+        val selected = mutableIntStateOf(0)
+        val mounts = mutableListOf<Int>()
+        val paneLifecycles = mutableMapOf<Int, Lifecycle>()
+        compose.setContent {
+            MyApplicationTheme {
+                WenkuPlaneTabSwitcher(selected.intValue, Modifier.fillMaxSize(), { from, to -> to - from }) { tab ->
+                    val lifecycle = LocalLifecycleOwner.current.lifecycle
+                    DisposableEffect(tab, lifecycle) {
+                        mounts += tab
+                        paneLifecycles[tab] = lifecycle
+                        onDispose { }
+                    }
+                    Text("Pane " + tab)
+                }
+            }
+        }
+        compose.onNodeWithText("Pane 0").assertIsDisplayed()
+        compose.runOnIdle { selected.intValue = 1 }
+        compose.onNodeWithText("Pane 1").assertIsDisplayed()
+        compose.onNodeWithText("Pane 0").assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(Lifecycle.State.CREATED, paneLifecycles.getValue(0).currentState)
+            selected.intValue = 0
+        }
+        compose.onNodeWithText("Pane 0").assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(listOf(0, 1), mounts)
+            assertTrue(paneLifecycles.getValue(0).currentState.isAtLeast(Lifecycle.State.STARTED))
+        }
+    }
+
+    private fun lineCenter(): Float {
         val root = generateSequence(File(requireNotNull(System.getProperty("user.dir")))) { it.parentFile }
             .first { File(it, "gradlew.bat").exists() }
         val file = File(root, "artifacts/multilingual-search-v5/tab-probe.png")
@@ -40,14 +105,8 @@ class TabBarMotionTest {
         compose.onNodeWithTag("app_tab_bar_surface").captureRoboImage(file.absolutePath,
             roborazziOptions = RoborazziOptions(taskType = RoborazziTaskType.Record))
         val pixels = requireNotNull(android.graphics.BitmapFactory.decodeFile(file.absolutePath))
-        // Sample inside the rounded indicator but above the tab glyphs.
-        val y = pixels.height / 8
-        val edge = pixels.width / 20
-        val luminance = (edge until pixels.width - edge).associateWith { x ->
-            Color(pixels.getPixel(x, y)).luminance()
-        }
-        val panel = luminance.values.max()
-        val xs = luminance.filterValues { it < panel - 0.045f }.keys
+        val y = 9.coerceAtMost(pixels.height - 1)
+        val xs = (0 until pixels.width).filter { x -> Color(pixels.getPixel(x,y)).luminance() < 0.12f }
         assertTrue("The indicator must be visible", xs.isNotEmpty())
         return xs.average().toFloat()
     }
@@ -69,7 +128,7 @@ class TabBarMotionTest {
                 }
             }
         } }
-        val before = indicatorCenter()
+        val before = lineCenter()
         val width = compose.onNodeWithTag("app_tab_bar_surface").fetchSemanticsNode().boundsInRoot.width
         screenshot("tab-before.png")
         compose.mainClock.autoAdvance = false
@@ -78,19 +137,19 @@ class TabBarMotionTest {
         compose.waitForIdle()
         compose.mainClock.advanceTimeBy(64)
         compose.waitForIdle()
-        val moving = indicatorCenter()
-        assertTrue("The indicator must travel between slots: before=$before, moving=$moving, width=$width", moving > before + 1 && moving < width * 0.875f - 1)
+        val moving = lineCenter()
+        assertTrue("The line must travel rather than jump: before=$before, moving=$moving, width=$width", moving > before + 1 && moving < width * 0.875f - 1)
         screenshot("tab-moving.png")
         compose.mainClock.advanceTimeBy(2000)
         compose.waitForIdle()
-        val settled = indicatorCenter()
+        val settled = lineCenter()
         assertEquals(width * 0.875f, settled, 2f)
         compose.runOnIdle { collapse.connection().onPreScroll(Offset(0f,-12f), NestedScrollSource.UserInput) }
         compose.mainClock.advanceTimeBy(2000)
         compose.waitForIdle()
         val collapsedWidth = compose.onNodeWithTag("app_tab_bar_surface").fetchSemanticsNode().boundsInRoot.width
         assertEquals(width, collapsedWidth, 0.5f)
-        assertEquals(settled, indicatorCenter(), 2f)
+        assertEquals(settled, lineCenter(), 2f)
         screenshot("tab-collapsed.png")
         compose.mainClock.autoAdvance = true
     }

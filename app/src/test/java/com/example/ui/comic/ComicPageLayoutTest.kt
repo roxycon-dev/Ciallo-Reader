@@ -18,17 +18,6 @@ class ComicPageLayoutTest {
         (0 until n).associate { i -> "p$i" to SizeI((aspect(i) * 1000).toInt(), 1000) }
 
     @Test
-    fun customPreloadCountsImagesInsteadOfSpreadsAndKeepsVisiblePages() {
-        val layout = ComicPageLayout.build(pages(8), emptyMap(), ComicReaderConfig(mode = ComicMode.DOUBLE))
-        val manual = layout.preloadSlots(current = 1, configuredImages = 1, automaticSpreads = 2)
-        assertEquals(listOf(2, 3, 4, 0, 1), manual.map { it.second.rawIndex })
-        val disabled = layout.preloadSlots(current = 1, configuredImages = 0, automaticSpreads = 2)
-        assertEquals(listOf(2, 3), disabled.map { it.second.rawIndex })
-        val automatic = layout.preloadSlots(current = 1, configuredImages = -1, automaticSpreads = 2)
-        assertEquals(listOf(2, 3, 4, 5, 6, 7, 0, 1), automatic.map { it.second.rawIndex })
-    }
-
-    @Test
     fun `single mode - every page is its own spread`() {
         val layout = ComicPageLayout.build(pages(7), emptyMap(), ComicReaderConfig(mode = ComicMode.SINGLE))
         assertEquals(7, layout.spreadCount)

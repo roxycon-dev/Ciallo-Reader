@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.i18n.tr
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
@@ -36,13 +38,21 @@ import com.example.ui.wenku.rememberWenkuAccessibility
 import com.example.ui.wenku.wenkuColors
 import com.example.ui.wenku.wenkuPagePart
 
+/**
+ * 引导页数据。展示文案在**读取时**翻译：这个 list 是顶层 `val`，类加载期就构造好了，
+ * 在构造参数里调 `tr()` 会把语言永久冻住。
+ */
 private data class OnboardingPage(
-    val title: String,
-    val description: String,
+    private val rawTitle: String,
+    private val rawDescription: String,
     val imageRes: Int,
-    val label: String,
+    private val rawLabel: String,
     val code: String,
-)
+) {
+    val title: String get() = com.example.i18n.tr(rawTitle)
+    val description: String get() = com.example.i18n.tr(rawDescription)
+    val label: String get() = com.example.i18n.tr(rawLabel)
+}
 
 private val onboardingPages = listOf(
     OnboardingPage(
@@ -79,14 +89,12 @@ private val onboardingPages = listOf(
 fun OnboardingScreen(onFinished: () -> Unit) {
     var page by rememberSaveable { mutableIntStateOf(0) }
     var finishing by remember { mutableStateOf(false) }
-    val context = androidx.compose.ui.platform.LocalContext.current
     val colors = wenkuColors()
     val reduceMotion = rememberWenkuAccessibility().reduceMotion
 
     fun finish() {
         if (finishing) return
         finishing = true
-        com.example.data.StartupDiagnostics.breadcrumb(context, "onboarding:finish")
         onFinished()
     }
 
@@ -99,7 +107,7 @@ fun OnboardingScreen(onFinished: () -> Unit) {
         contentAlignment = Alignment.TopCenter,
     ) {
         Column(
-            Modifier.widthIn(max = 1060.dp).fillMaxSize().padding(horizontal = 22.dp),
+            Modifier.widthIn(max = 680.dp).fillMaxSize().padding(horizontal = 22.dp),
         ) {
             Box(Modifier.fillMaxWidth().heightIn(min = 54.dp)) {
                 if (page > 0) {
@@ -137,7 +145,7 @@ fun OnboardingScreen(onFinished: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Row(
-                    modifier = Modifier.semantics { contentDescription = "第 ${page + 1} 步，共 ${onboardingPages.size} 步" },
+                    modifier = Modifier.semantics { contentDescription = com.example.i18n.stepCounter(page + 1, onboardingPages.size) },
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
                     onboardingPages.indices.forEach { index ->
@@ -154,7 +162,7 @@ fun OnboardingScreen(onFinished: () -> Unit) {
                 }
                 val last = page == onboardingPages.lastIndex
                 WenkuTextButton(
-                    if (last) "立即开启阅读之旅" else "下一步",
+                    if (last) tr("立即开启阅读之旅") else tr("下一步"),
                     onClick = { if (!finishing) { if (last) finish() else page++ } },
                     modifier = Modifier.fillMaxWidth().testTag("onboarding_action_button"),
                     selected = true,
@@ -171,8 +179,16 @@ private fun OnboardingStory(page: OnboardingPage, index: Int) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val viewportHeight = maxHeight
         val imageSize = (viewportHeight * .40f).coerceIn(96.dp, 190.dp)
-        val wide = maxWidth >= 760.dp
-        val art: @Composable () -> Unit = {
+        Column(
+            Modifier.fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = viewportHeight)
+                .padding(horizontal = 2.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
+        ) {
+            WenkuSectionHeader(
+                "0${index + 1}", page.code, page.label,
+            )
             WenkuContentPanel(
                 Modifier.fillMaxWidth().wenkuPagePart(1).testTag("onboarding_illustration_card_$index"),
             ) {
@@ -182,51 +198,20 @@ private fun OnboardingStory(page: OnboardingPage, index: Int) {
                     modifier = Modifier.align(Alignment.CenterHorizontally).size(imageSize),
                 )
             }
-        }
-        val description: @Composable () -> Unit = {
             Text(
                 page.title,
                 modifier = Modifier.fillMaxWidth().wenkuPagePart(2),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.ExtraBold,
-                textAlign = if (wide) TextAlign.Start else TextAlign.Center,
+                textAlign = TextAlign.Center,
             )
             Text(
                 page.description,
                 modifier = Modifier.fillMaxWidth().wenkuPagePart(3),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = if (wide) TextAlign.Start else TextAlign.Center,
+                textAlign = TextAlign.Center,
             )
-        }
-        Column(
-            Modifier.fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .heightIn(min = viewportHeight)
-                .padding(horizontal = 2.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
-        ) {
-            if (wide) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(Modifier.weight(1f)) { art() }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            WenkuSectionHeader(
-                "0${index + 1}", page.code, page.label,
-            )
-                        description()
-                    }
-                }
-            } else {
-            WenkuSectionHeader(
-                "0${index + 1}", page.code, page.label,
-            )
-                art()
-                description()
-            }
         }
     }
 }

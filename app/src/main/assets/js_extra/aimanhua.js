@@ -6,7 +6,7 @@
 class AiManhua extends ComicSource {
     name = "爱漫画";
     key = "aimanhua";
-    version = "1.0.7";
+    version = "1.0.5";
     minAppVersion = "1.6.0";
     url = "https://www.alipaypay.com";
     baseUrl = "https://www.alipaypay.com";
@@ -32,7 +32,7 @@ class AiManhua extends ComicSource {
         return match[1];
     }
 
-    async page(url, validate) {
+    async page(url) {
         if (!url.startsWith(this.baseUrl + "/")) throw new Error("爱漫画请求地址无效");
         const path = url.substring(this.baseUrl.length);
         const allOrigins = [...new Set([this.readOrigin, "https://mh.iqtao.cn", this.baseUrl])];
@@ -49,7 +49,6 @@ class AiManhua extends ComicSource {
                 const body = String(r.body);
                 if (path.startsWith("/index.php/api/")) JSON.parse(body);
                 else if (!/\bMcpath\s*=/.test(body)) throw new Error("爱漫画返回了无效页面");
-                if (validate) validate(body);
                 this.readOrigin = origin;
                 delete this.failedOrigins[origin];
                 return body;
@@ -177,19 +176,9 @@ class AiManhua extends ComicSource {
     parseImages(html, expected) {
         const doc = new HtmlDocument(html);
         try {
-            const images = doc.querySelectorAll("#comicContain img").map(img => this.readerImageUrl(img.attributes["data-src"] || img.attributes.src));
+            const images = doc.querySelectorAll("#comicContain img[data-src]").map(img => this.readerImageUrl(img.attributes["data-src"]));
             if (!images.length) throw new Error("爱漫画未提供正文图片");
-            const modern = doc.querySelectorAll("#comicContain .comic-page");
-            const key = html.match(/const\s+XOR_KEY\s*=\s*(0x[0-9a-f]+|[0-9]+)/i);
-            const shift = html.match(/const\s+SHIFT_VALUE\s*=\s*([0-9]+)/);
-            if (modern.length && key && shift) {
-                if (Number(key[1]) !== 171 || Number(shift[1]) !== 47) throw new Error("图片编码已更新，请更新书源");
-                // Current browser pages exclude retired promotional images still counted
-                // by the catalogue's pnum. The complete rendered list is authoritative.
-                if (modern.length !== images.length || !html.includes("</ul>")) throw new Error("章节页面不完整");
-            } else if (!Number.isInteger(expected) || expected <= 0 || images.length !== expected) {
-                throw new Error("爱漫画章节图片不完整：" + images.length + "/" + expected);
-            }
+            if (!Number.isInteger(expected) || expected <= 0 || images.length !== expected) throw new Error("爱漫画章节图片不完整：" + images.length + "/" + expected);
             if (images.some(url => !/^https?:\/\//.test(url))) throw new Error("爱漫画图片地址无效");
             return {images};
         } finally { doc.dispose(); }
@@ -227,7 +216,7 @@ class AiManhua extends ComicSource {
             const row = (await this.catalog(match[1])).find(item => this.abs(item.path) === url);
             if (!row) throw new Error("该章节已不在源站目录中");
             if (row.locked) throw new Error("该章节需要源站授权");
-            return this.parseImages(await this.page(url, html => this.parseImages(html, row.pages)), row.pages);
+            return this.parseImages(await this.page(url), row.pages);
         },
         // Rewrite previously cached proxy URLs as well as newly parsed pages.
         onImageLoad: (url) => ({url: this.readerImageUrl(url), headers: {"User-Agent": this.headers["User-Agent"], "Accept": "image/jpeg"}}),

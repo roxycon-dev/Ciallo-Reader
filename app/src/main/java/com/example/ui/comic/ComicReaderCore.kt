@@ -1,5 +1,7 @@
 package com.example.ui.comic
 
+import com.example.i18n.tr
+
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.reader.TouchZone
 import com.example.ui.reader.TouchAction
@@ -28,7 +30,6 @@ import net.engawapg.lib.zoomable.toggleScale
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -777,8 +778,8 @@ fun ComicReaderCore(
         val modelStatus = when (val status = translationModelState) {
             com.example.mangatranslate.TranslateModelManager.DownloadState.Ready -> null
             is com.example.mangatranslate.TranslateModelManager.DownloadState.Downloading -> "准备 OCR 模型 · ${(status.progress * 100).toInt()}%"
-            is com.example.mangatranslate.TranslateModelManager.DownloadState.Failed -> "OCR 模型下载失败 · 点按检查翻译设置"
-            else -> "检查 OCR 模型…"
+            is com.example.mangatranslate.TranslateModelManager.DownloadState.Failed -> tr("OCR 模型下载失败 · 点按检查翻译设置")
+            else -> tr("检查 OCR 模型…")
         }
         if (config.translationEnabled && modelStatus != null && !panelShown) {
             Text(modelStatus, color = Color.White, fontSize = DesignTokens.TypeCaption,
@@ -805,7 +806,7 @@ fun ComicReaderCore(
         }
         val currentFailure = currentTranslationKeys.firstOrNull { it in translationFailures }?.let { translationFailureDetails[it] }
         if (config.translationEnabled && currentFailure != null && currentTranslationBusy == null && !panelShown) {
-            val action = if (currentFailure.retryable) "点按重试" else "点按检查设置"
+            val action = if (currentFailure.retryable) tr("点按重试") else tr("点按检查设置")
             Text("${currentFailure.description} · $action", color = Color.White, fontSize = DesignTokens.TypeCaption,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = translationStatusBottom, start = DesignTokens.SpaceXl, end = DesignTokens.SpaceXl)
                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(50)).background(PanelBg)
@@ -1719,8 +1720,6 @@ private fun ComicVerticalList(
             userScrollEnabled = config.touchZones == null,
             state = listState,
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .widthIn(max = 820.dp)
                 .fillMaxSize()
                 .onSizeChanged { onAreaSizeChanged(Size(it.width.toFloat(), it.height.toFloat())) }
                 .touchZoneGestures(config.touchZones, { comicTurnTravel(it, density.density) }, gestureCallbacks.onZoneAction,
@@ -1805,8 +1804,8 @@ private fun ComicVerticalItem(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text("图片加载失败", color = ReadingPalette.Error)
-                PullOutTextButton(onClick = { retry++ }) { Text("点击重试", color = Color.White.copy(alpha = 0.8f)) }
+                Text(tr("图片加载失败"), color = ReadingPalette.Error)
+                PullOutTextButton(onClick = { retry++ }) { Text(tr("点击重试"), color = Color.White.copy(alpha = 0.8f)) }
             }
             is PageBitmapState.Ready -> {
                 imageBitmap?.let {
@@ -2262,7 +2261,7 @@ internal fun DoubleSpreadContent(
                             .background(ReadingPalette.SubtleFill),
                         contentAlignment = Alignment.Center
                     ) {
-                        PullOutTextButton(onClick = { retry++ }) { Text("加载失败·重试", color = ReadingPalette.Error, fontSize = DesignTokens.TypeCaption) }
+                        PullOutTextButton(onClick = { retry++ }) { Text(tr("加载失败·重试"), color = ReadingPalette.Error, fontSize = DesignTokens.TypeCaption) }
                     }
                 } else {
                     Box(
@@ -2295,7 +2294,7 @@ internal fun ComicRefinementFeedback(refining: Boolean, error: Throwable?, modif
             val modelStatus = when (mode) { ComicEnhanceMode.MANGAJANAI -> MangaJaNai.status.collectAsStateWithLifecycle().value; ComicEnhanceMode.MANGAJANAI_FULL -> MangaJaNaiFull.status.collectAsStateWithLifecycle().value; else -> "" }
             Text(modelStatus.ifBlank { "高清图加载中…" }, color = Color.White, fontSize = DesignTokens.TypeCaption)
         }
-        else PullOutTextButton(onClick = onRetry) { Text("高清图加载失败 · 重试", color = Color.White) }
+        else PullOutTextButton(onClick = onRetry) { Text(tr("高清图加载失败 · 重试"), color = Color.White) }
     }
 }
 
@@ -2363,8 +2362,8 @@ private fun PagePlaceholder(state: PageBitmapState, onRetry: () -> Unit, enhance
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text("图片加载失败", color = ReadingPalette.Error)
-            PullOutTextButton(onClick = onRetry) { Text("点击重试", color = Color.White.copy(alpha = 0.8f)) }
+            Text(tr("图片加载失败"), color = ReadingPalette.Error)
+            PullOutTextButton(onClick = onRetry) { Text(tr("点击重试"), color = Color.White.copy(alpha = 0.8f)) }
         }
         is PageBitmapState.Ready -> Unit
     }
@@ -2385,15 +2384,15 @@ internal fun ComicLoadingFeedback(ref: ComicPageRef?, onRetry: (() -> Unit)? = n
         val fraction = transfer?.fraction
         if (fraction != null && fraction < 1f) LinearProgressIndicator(progress = { fraction }, modifier = Modifier.width(144.dp))
         val label = when {
-            fraction == 1f -> "正在展开页面…"
+            fraction == 1f -> tr("正在展开页面…")
             fraction != null -> "正在加载 · ${(fraction * 100).toInt()}%"
             (transfer?.bytes ?: 0) > 0 -> "已接收 ${transfer!!.bytes / 1024} KB"
-            elapsed >= 5 -> "连接较慢，正在加载…"
-            else -> "正在加载页面…"
+            elapsed >= 5 -> tr("连接较慢，正在加载…")
+            else -> tr("正在加载页面…")
         }
         Text(label, color = Color(0xBBFFFFFF), fontSize = DesignTokens.TypeCaption)
         if (elapsed >= 8 && onRetry != null) PullOutTextButton(onClick = onRetry) {
-            Text("重新加载", color = Color.White)
+            Text(tr("重新加载"), color = Color.White)
         }
     }
 }

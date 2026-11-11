@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.i18n.tr
+
 import com.example.ui.components.PullOutTextButton
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
@@ -31,10 +33,10 @@ internal fun ComicMetadataBlock(book: SearchBook, onSearch: (String) -> Unit = {
     val tags = info?.tags.orEmpty()
     val rows = buildList {
         info?.status?.let { raw -> add("状态" to when (raw.lowercase()) {
-            "ongoing" -> "连载中"
-            "completed", "finished" -> "已完结"
-            "hiatus" -> "休刊中"
-            "cancelled", "canceled" -> "已中止"
+            "ongoing" -> tr("连载中")
+            "completed", "finished" -> tr("已完结")
+            "hiatus" -> tr("休刊中")
+            "cancelled", "canceled" -> tr("已中止")
             else -> raw
         }) }
         book.language?.let { add("源站标注语言" to it) }
@@ -54,7 +56,7 @@ internal fun ComicMetadataBlock(book: SearchBook, onSearch: (String) -> Unit = {
                 if (aliases.isNotEmpty()) Text("别名：${(if (expanded) aliases else aliases.take(3)).joinToString(" / ")}",
                     style = MaterialTheme.typography.bodySmall)
                 if (tags.isNotEmpty()) {
-                    Text("标签", style = MaterialTheme.typography.bodySmall,
+                    Text(tr("标签"), style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -76,7 +78,7 @@ internal fun ComicMetadataBlock(book: SearchBook, onSearch: (String) -> Unit = {
                     }
                 }
                 if (aliases.size > 3 || tags.size > 6) PullOutTextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(0.dp)) {
-                    Text(if (expanded) "收起资料" else "展开全部资料")
+                    Text(if (expanded) tr("收起资料") else tr("展开全部资料"))
                 }
             }
         }

@@ -1,5 +1,7 @@
 package com.example.ui.favorite
 
+import com.example.i18n.tr
+
 import com.example.ui.components.pullOutCombinedClickable
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
@@ -26,7 +28,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -85,17 +86,11 @@ fun FavoriteHeartButton(
     var burstId by remember { mutableIntStateOf(0) }
     val burst = remember { Animatable(0f) }
 
-    var initialized by remember { mutableStateOf(false) }
     LaunchedEffect(favorite) {
-        if (!initialized) {
-            initialized = true
-            fill.snapTo(if (favorite) 1f else 0f)
-            return@LaunchedEffect
-        }
         if (favorite) {
             haptics.perform(HapticKind.LIGHT)
             fill.snapTo(0f)
-            fill.animateTo(1f, tween(if (reduceMotion) 0 else AppMotion.ICON_MS))
+            fill.animateTo(1f, tween(if (reduceMotion) 100 else 260))
             if (!reduceMotion) {
                 scale.snapTo(0.6f)
                 scale.animateTo(1.25f, AppMotion.springDefault)
@@ -104,7 +99,7 @@ fun FavoriteHeartButton(
             }
         } else {
             haptics.perform(HapticKind.SELECTION)
-            fill.animateTo(0f, tween(if (reduceMotion) 0 else AppMotion.ICON_MS))
+            fill.animateTo(0f, tween(if (reduceMotion) 100 else 180))
             if (!reduceMotion) {
                 scale.animateTo(0.86f, tween(110))
                 scale.animateTo(1f, AppMotion.springDefault)
@@ -127,7 +122,7 @@ fun FavoriteHeartButton(
         label = "fav_press",
     )
 
-    val tint = if (favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+    val tint = if (favorite) MintPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
     val containerAlpha = if (enabled) 1f else 0.4f
 
     Box(
@@ -156,8 +151,8 @@ fun FavoriteHeartButton(
             .semantics {
                 role = Role.Button
                 contentDescription = if (!enabled) disabledHint
-                else if (favorite) "已喜欢，点击取消喜欢"
-                else "喜欢，加入我喜欢的"
+                else if (favorite) tr("已喜欢，点击取消喜欢")
+                else tr("喜欢，加入我喜欢的")
             }
             .pullOutCombinedClickable(
                 interactionSource = interaction,
@@ -189,7 +184,7 @@ fun FavoriteHeartButton(
             if (showLabel) {
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = if (favorite) "已喜欢" else "喜欢",
+                    text = if (favorite) tr("已喜欢") else tr("喜欢"),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = tint,

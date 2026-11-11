@@ -11,7 +11,7 @@ Read local ebooks, novels, and comics in one Android app.
 
 [🌐 Product site](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ Download the latest APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.6.1 release notes](docs/release-1.6.1-2026-11-10.md) ·
+[1.6.2 release notes](docs/release-1.6.2-2026-11-12.md) ·
 [See screenshots](#screenshots) ·
 [Features](#features) ·
 [Report an issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -25,30 +25,9 @@ Read local ebooks, novels, and comics in one Android app.
 
 Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
 
-**1.6.1 / 260 · Tablet layout and update checks.** Tablet settings keep each title with its content, Library and Discover arrange results to the available width, and the bookshelf drops duplicate reading space. Rotation, split-screen, and window size changes trigger a fresh layout. Update checks run silently at startup and on demand from Settings; downloads use the official GitHub release or an explicitly chosen HTTPS mirror, still verify the official signature, and offer the mirror only when the official SHA-256 is published. See the [UI guide](docs/UI_MOTION_INTERACTION_GUIDE.md) and [release notes](docs/release-1.6.1-2026-11-10.md).
+**Algorithm and adaptation validation (unreleased):** Reduces repeated motion work and fixes long-chapter resize anchors, dropped boundary newlines, manga region resolution caching and resource teardown. Existing visuals and quality tiers remain. All 145 JVM checks and 19 Android emulator checks passed; reducing whole-app consumption to 10–20% has not been established. [Validation report](docs/performance-stability-2026-10-26.md).
 
-**1.6.0 / 259 · UI redesign and tablet support.** The bookshelf, library, Discover, statistics, settings, and readers share a redesigned layout, glass panels, and coordinated page, text, and icon motion. The bookshelf keeps its 3D view and Ciallo themes. [Issue #7](https://github.com/roxycon-dev/Ciallo-Reader/issues/7) brings adaptive tablet layouts across the app, including a navigation rail, split browsing and detail panes, and an automatic or custom 0–12 image preload setting under Manga Reader → Settings → Image. [Release notes](docs/release-1.6.0-2026-11-10.md).
-
-**1.5.16 / 258 · Consecutive EPUB illustrations fixed:** Under the minimal render quality every page after the first one kept drawing the previous illustration; images are now keyed by their path, so the inline image and the full-screen viewer always agree. Small EPUB art (dividers, ornaments) is no longer stretched to the full column width. Verified page by page in curl, cover, slide, fade and scroll page turns. [Release notes](docs/release-1.5.16-2026-11-07.md).
-
-**1.5.14 / 256 · Consistent state feedback:** The download entry keeps its navigation arrow, acknowledges fresh completion briefly and shows uncropped counts. Favorites, bookmarks, playback, disclosure, selection and loading share consistent transitions and theme colors. Glass and paper motion remain. [Release notes](docs/release-1.5.14-2026-11-05.md).
-
-**1.5.13 / 255 · Smoother paper transitions:** Preserve the existing deformation and spring tuning while fixing stretched timing after missed frames. Blur and dimming follow the same transition; nested windows keep independent backdrop ownership. [Release notes](docs/release-1.5.13-2026-11-05.md).
-
-**1.5.12 / 254 · Unified download center:** Library and Discover share one compact glass queue with a dimmed, blurred backdrop. The single toolbar entry shows task counts, live progress and task status. Progress and completed records persist; every record deletion requires confirmation and preserves imported books. EPUB import uses bounded batches and reports validation/import after transfer. [Release notes](docs/release-1.5.12-2026-11-05.md).
-
-**1.5.10 / 252 · Resumable novel downloads:** Public novel EPUB downloads, including Fanqie, now preserve completed chapters and illustrations across network changes and manual pauses. Temporary network failures retry with bounded backoff. Canceling removes checkpoints; changed catalogues and incomplete content still fail integrity checks. Keeps the signing certificate used since 1.5.6 for in-place upgrades from 1.5.6–1.5.9. All 21 related regression tests passed; physical-device network switching and source throughput have not been measured. [Release notes](docs/release-1.5.10-2026-10-29.md).
-
-**1.5.9 / 251 · Bili and 19 Manga connections and security hardening:** Deduplicates Bili cookies, renews expired search tickets and adds visible website verification. 19 Manga gains a same-site fallback host. Chapter downloads retry truncated response bodies. Shared image transport blocks credentials over plaintext HTTP, including redirects, while retaining the fixed release certificate. **System antivirus classification remains unconfirmed; no emulator or new antivirus test was run, as requested.** Host checks passed for 46 Bili pages and 27 19 Manga pages, including saved-file offline decoding. Previously verified sources are not repeated. [Release notes](docs/release-1.5.9-2026-10-28.md).
-
-**1.5.8 / 250 · Comic search and image recovery:** Repairs WNACG, 19 Manhua and AiManhua empty responses, corrupted images and download failures on some proxy routes. Public requests try a complete direct response before fallback; WNACG no longer waits for the publisher page when its configured origin is usable. The three sources passed real search, online reading, fresh chapter download and offline decoding for 22, 24 and 45 pages respectively. Uses the fixed release certificate and upgrades 1.5.6/1.5.7 in place. [Release notes](docs/release-1.5.8-2026-10-27.md) · [Verification](docs/comic-source-repair-2026-10-27.md).
-
-**1.5.7 / 249 · Startup compatibility and diagnostics:** Repairs legacy-system home rendering paths, avoids unused backdrop capture where realtime blur is unsupported, and adds recovery after early home rendering failures. Settings → About now has a visible diagnostic export button without the old small print. Reports include operation stages, exception chains, threads, device environment, crash history and available system exit information. **Existing permissions and transfer, background download and text-to-speech capabilities are retained.** Uses the same fixed signing certificate as 1.5.6 and upgrades that version in place; retired-signature releases still require backup and migration. HarmonyOS 3.0 physical-device verification and a new antivirus retest remain unavailable. [Release notes](docs/release-1.5.7-2026-10-26.md).
-
-**1.5.6 / 248 · Signing migration:** Includes today's motion and Z Fold fixes, source certificate verification, HTTP credential protection, and complete retirement of the exposed release key. The final APK was not listed as risk software in two paired Tencent Mobile Manager tests; the original 1.5.5 control was still flagged. HarmonyOS 3.0 physical-device validation remains unavailable. Android 7+, adult sources enabled by default, and system installation remain. **First export a backup, uninstall the old release, install this release, then import the backup. It cannot update the retired signature in place.** See the [release and migration steps](docs/release-1.5.6-2026-10-26.md), [security record](docs/security-remediation-2026-10-26.md), and [signing notes](docs/app-signing.md).
-
-**Algorithm and adaptation (included in 1.5.6):** Reduces repeated motion work and fixes long-chapter resize anchors, dropped boundary newlines, manga region resolution caching and resource teardown. Existing visuals and quality tiers remain. All 145 JVM checks and 19 Android emulator checks passed; reducing whole-app consumption to 10–20% has not been established. [Validation report](docs/performance-stability-2026-10-26.md).
-
+**1.6.2 / 250 · 3D shelf and bilingual UI**: Opening a book used to cross two renderers (the shelf canvas turning the book flat, then a cover overlay scaling a bitmap), which always left a velocity seam. The whole book is now drawn by one renderer (`ShelfVolumeArtist`) along one timeline (`ShelfOpenTimeline`): the first frame is pixel-identical to the resting shelf frame and the return trip is the same path reversed. Fixes the "one book turns into a black cover after leaving the reader" bug (the cover pre-raster window now follows the slots actually drawn, and fallback fills are paper-coloured). The spine no longer prints the title, only the number and cylindrical shading. English coverage completed: 1300+ `tr()` call sites, 2900+ entries, zero missing keys, plus a fix for work status collapsing to "unknown" in English mode. See [release notes](docs/release-1.6.2-2026-11-12.md).
 **1.5.4 / 246** reserves the existing paper deformation, liquid buttons, waterdrop selectors, liquid sliders and squishy switches for High/Max quality. Balanced/Low/Minimal use ordinary transitions and basic controls, preserving values and selected options when quality changes. Adult sources remain enabled by default, the existing update installation flow stays available, and startup exception handling includes local diagnostic export. [Release notes](docs/release-1.5.4-2026-10-26.md).
 
 **1.5.5 / 247 · In-place upgrade correction:** Restores the original release package `com.aistudio.novelreader.kxmpzq` and keeps the fixed signing certificate. Releases such as 1.5.2 with the same package and certificate can upgrade in place while retaining data. The motion quality tiers and startup fixes from 1.5.4 remain. Users of the 1.5.3 probe or 1.5.4 with package `com.roxycon.ciallo.reader.probe` must export a backup under Settings → Device transfer and backup, install this release, then import it; the packages do not share data automatically. [Release notes](docs/release-1.5.5-2026-10-26.md). No antivirus retest was performed for this release.
@@ -182,8 +161,8 @@ Version 1.3.8 adds Discover and restores Aiman and MYCOMIC reading. Its APK reta
 ## Install
 
 - **Android:** 7.0 (API 24) or newer.
-- **Architecture:** Current release 1.6.1 (version code 260) targets arm64-v8a, supported by most Android phones and tablets. The release APK does not include an x86_64 emulator build.
-- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) and verify `SHA256SUMS.txt` from the same release.
+- **Architecture:** Current release APKs target arm64-v8a, supported by most Android phones and tablets. The release APK does not include an x86_64 emulator build.
+- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest). You can also [download v1.4.12 directly](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.12/Ciallo-Reader-v1.4.12.apk).
 - Open the downloaded APK and follow Android's prompt to allow installation from that source.
 
 ## Get started
@@ -221,41 +200,8 @@ cd Ciallo-Reader
 On Windows, use gradlew.bat :app:assembleDebug. For bugs and feature requests, open a [GitHub Issue](https://github.com/roxycon-dev/Ciallo-Reader/issues) with the app version, device model, and reproduction steps.
 
 - [Changelog](CHANGELOG.md)
-- [UI motion and interaction guide (Chinese)](docs/UI_MOTION_INTERACTION_GUIDE.md)
 - [v1.3.6 release notes and verification](docs/release-1.3.6-2026-10-12.md)
 - [Third-party component and model licenses](docs/vendor-licenses/README.md)
-
-## Contributors and thanks
-
-Thanks to [mikufoxxx and the Wenku8 Flutter contributors](https://github.com/mikufoxxx/Wenku8_Flutter) for sharing their UI, interaction design, and motion work. Their editorial layouts, glass overlays, and coordinated transitions guided this redesign. Thanks to [qianyunli114514](https://github.com/qianyunli114514) for requesting tablet support and configurable manga image preloading in [Issue #7](https://github.com/roxycon-dev/Ciallo-Reader/issues/7).
-
-Many changes in this project come from issues: bug reports, new sources, and reports about layout or compatibility problems. Below are the people who filed them, with their issue numbers.
-
-<table>
-  <tr>
-    <td align="center" width="112">
-      <a href="https://github.com/mahaix"><img src="https://github.com/mahaix.png" width="64" height="64" alt="mahaix avatar" /><br /><sub><b>mahaix</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/1">#1</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/metahuman1016"><img src="https://github.com/metahuman1016.png" width="64" height="64" alt="metahuman1016 avatar" /><br /><sub><b>metahuman1016</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/2">#2</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/Wyingzik"><img src="https://github.com/Wyingzik.png" width="64" height="64" alt="Wyingzik avatar" /><br /><sub><b>Wyingzik</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/3">#3</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/Lancher2048"><img src="https://github.com/Lancher2048.png" width="64" height="64" alt="Lancher2048 avatar" /><br /><sub><b>Lancher2048</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/4">#4</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/Yang-p-c"><img src="https://github.com/Yang-p-c.png" width="64" height="64" alt="Yang-p-c avatar" /><br /><sub><b>Yang-p-c</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/5">#5</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/jesonab"><img src="https://github.com/jesonab.png" width="64" height="64" alt="jesonab avatar" /><br /><sub><b>jesonab</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/6">#6</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/qianyunli114514"><img src="https://github.com/qianyunli114514.png" width="64" height="64" alt="qianyunli114514 avatar" /><br /><sub><b>qianyunli114514</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/7">#7</a></sub>
-    </td>
-  </tr>
-</table>
 
 ## Content sources and license
 

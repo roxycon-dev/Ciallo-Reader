@@ -1,5 +1,7 @@
 package com.example.source.impl
 
+import com.example.i18n.tr
+
 import com.example.discover.*
 import com.example.source.*
 import kotlinx.coroutines.sync.Mutex
@@ -28,9 +30,9 @@ internal class FanqieDiscovery(
                 val request = Request.Builder().url(url).header("Accept", "application/json")
                     .header("Referer", home.toString()).header("User-Agent", "Mozilla/5.0").build()
                 http.newCall(request).executeCancellable().use { r ->
-                    require(r.isSuccessful && r.request.url.host == home.host && r.request.url.scheme == home.scheme) { "番茄发现接口暂时不可用" }
+                    require(r.isSuccessful && r.request.url.host == home.host && r.request.url.scheme == home.scheme) { tr("番茄发现接口暂时不可用") }
                     SourceResponse.jsonObject(r.readSourceText()).also { data ->
-                        require(data.optInt("code", 0) == 0) { "番茄未返回当前栏目" }
+                        require(data.optInt("code", 0) == 0) { tr("番茄未返回当前栏目") }
                         if (cache.size >= 12) cache.remove(cache.keys.first())
                         cache[url.toString()] = System.currentTimeMillis() to data
                     }
@@ -46,7 +48,7 @@ internal class FanqieDiscovery(
         val state = JSONTokener(script.substringAfter("window.__INITIAL_STATE__=")).nextValue() as JSONObject
         val types = state.getJSONObject("rank").getJSONObject("rankCategoryTypeList")
         val categories = listOf("male" to "1", "female" to "0").flatMap { (key, gender) ->
-            objects(types.optJSONArray(key)).map { o -> DiscoverNativeCategory("$gender:${o.getString("id")}", o.getString("name"), if (gender == "1") "男频" else "女频") }
+            objects(types.optJSONArray(key)).map { o -> DiscoverNativeCategory("$gender:${o.getString("id")}", o.getString("name"), if (gender == "1") tr("男频") else tr("女频")) }
         }
         return DiscoverCatalog(feeds = listOf(DiscoverFeed("native", "番茄推荐"), DiscoverFeed("updates", "最近更新", "updates"),
             DiscoverFeed("top", "番茄作品榜", "ranking")), categories = categories, declared = true, explicit = true,
@@ -58,7 +60,7 @@ internal class FanqieDiscovery(
         val kind = q.feedId ?: if (q.dimension == DiscoverDimension.UPDATES) "updates" else "top"
         if (q.feedId == null && !catalog.supports(q.dimension, q.range)) return DiscoverPage(supported = false, catalog = catalog)
         val selected = (listOfNotNull(q.categoryId) + q.categoryIds).distinct()
-        require(selected.all { id -> catalog.categories.any { it.id == id } }) { "番茄分类已变化，请重新选择" }
+        require(selected.all { id -> catalog.categories.any { it.id == id } }) { tr("番茄分类已变化，请重新选择") }
         val labels = catalog.categories.filter { it.id in selected }.map { it.label }.toSet()
         val arrays: List<Pair<List<JSONObject>, String>>
         var more = false
@@ -97,11 +99,11 @@ internal class FanqieDiscovery(
         val id = text("bookId", "book_id")
         val title = text("bookName", "book_name")
         if (!id.matches(Regex("[0-9]{18,20}")) || title.isBlank()) return null
-        require(title.none { it.code in 0xe000..0xf8ff }) { "番茄当前返回字形编码，未展示乱码作品" }
+        require(title.none { it.code in 0xe000..0xf8ff }) { tr("番茄当前返回字形编码，未展示乱码作品") }
         val updated = text("updateTime", "lastChapterUpdateTime").toLongOrNull()?.takeIf { it > 0 }?.times(1000)
         val latest = text("title", "lastChapterTitle").takeIf(String::isNotBlank)
         val info = NovelInfo(category = text("category").takeIf(String::isNotBlank), synopsis = text("abstract").takeIf(String::isNotBlank),
-            latestChapter = latest, status = when (text("creationStatus", "creation_status")) { "0" -> "已完结"; "1" -> "连载中"; else -> null })
+            latestChapter = latest, status = when (text("creationStatus", "creation_status")) { "0" -> tr("已完结"); "1" -> tr("连载中"); else -> null })
         val book = SearchBook(id, "fanqie", title, text("author"), cover = text("thumbUri", "thumb_url").takeIf(String::isNotBlank),
             format = "epub", language = "中文", description = info.synopsis, novelInfo = info)
         return DiscoverEntry(book, updatedAt = updated, latestChapter = latest, native = true, origin = origin,

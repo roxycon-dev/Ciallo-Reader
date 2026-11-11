@@ -1,5 +1,7 @@
 package com.example.transfer
 
+import com.example.i18n.tr
+
 import java.io.DataInputStream
 import java.io.DataOutputStream
 
@@ -15,16 +17,16 @@ internal object NearbyHandshake {
         out.writeBoolean(offer.sending);out.writeBoolean(offer.busy);out.flush()
     }
     fun read(input:DataInputStream):NearbyOffer {
-        require(input.readInt()==MAGIC && input.readUnsignedByte()==VERSION){"附近互传协议不兼容，请更新双方应用"}
+        require(input.readInt()==MAGIC && input.readUnsignedByte()==VERSION){tr("附近互传协议不兼容，请更新双方应用")}
         fun text():String {
             // Check the encoded size before allocating the UTF payload.
-            val length=input.readUnsignedShort();require(length<=256){"无效附近握手"}
+            val length=input.readUnsignedShort();require(length<=256){tr("无效附近握手")}
             val bytes=ByteArray(length+2);bytes[0]=(length shr 8).toByte();bytes[1]=length.toByte()
             input.readFully(bytes,2,length)
             return DataInputStream(bytes.inputStream()).readUTF()
         }
         val id=text();val name=text()
-        require(id.length in 1..64 && name.length<=64){"无效附近设备信息"}
+        require(id.length in 1..64 && name.length<=64){tr("无效附近设备信息")}
         return NearbyOffer(id,name,input.readBoolean(),input.readBoolean())
     }
     fun shouldStart(local:NearbyOffer,remote:NearbyOffer)=!local.busy && !remote.busy && local.sending!=remote.sending

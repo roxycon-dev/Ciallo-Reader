@@ -1,10 +1,14 @@
 package com.example.ui.wenku
 
+import android.graphics.Bitmap
+import android.graphics.BitmapShader
 import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
+import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.Typeface
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
@@ -35,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -64,6 +69,7 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -93,9 +99,12 @@ import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.ln
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sign
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
  * ArchiveFileCarousel 的 Compose 等价实现（重写版）。
@@ -169,7 +178,8 @@ fun ArchiveShelf(
     onBookClick: (Book) -> Unit,
     modifier: Modifier = Modifier,
     initialIndex: Int? = null,
-    showChrome: Boolean = true
+    showChrome: Boolean = true,
+    scopeKey: String = "shelf"
 ) {
     if (books.isEmpty()) return
     val shelfBooks = remember(books) { books.take(60) }
@@ -183,9 +193,18 @@ fun ArchiveShelf(
     val volumes = remember(shelfBooks) { shelfBooks.mapIndexed { index, book -> ShelfVolume.of(index, book) } }
     val covers = remember { ShelfCoverStore() }
     val scene = remember { ShelfScenePainter() }
+    // 封面贴图是画的时候才读的普通对象，画布不会自己去失效；
+    // 每光栅化一批就把它 +1，让绘制块重新跑一遍（否则新贴图要等到下次动效才显示）。
+    var coverGeneration by remember { mutableIntStateOf(0) }
+    // 连点保护：飞行期间不再拿起第二本。
+    var openingLocked by remember { mutableStateOf(false) }
 
     val starting = remember(shelfBooks, initialIndex) {
-        (initialIndex ?: shelfBooks.indexOf(shelfBooks.maxByOrNull { it.lastReadTime } ?: shelfBooks.first()))
+        // 打开一本书再返回时，必须回到刚才那本：先看调用方给的 index，
+        // 再看本作用域的内存（跨重组/跨返回都活着），最后才按最近阅读时间兜底。
+        (initialIndex
+            ?: ArchiveShelfMemory.indexFor(scopeKey, shelfBooks)
+            ?: shelfBooks.indexOf(shelfBooks.maxByOrNull { it.lastReadTime } ?: shelfBooks.first()))
             .coerceIn(0, shelfBooks.lastIndex)
     }
     val logicalFocus = remember { Animatable(starting.toFloat()) }
@@ -210,10 +229,17 @@ fun ArchiveShelf(
     // Only clamp when the collection shrinks; never reset the active book on a
     // background DB emission (the shelf must keep the user's swiped position).
     LaunchedEffect(shelfBooks.size) {
-        logicalFocus.snapTo(logicalFocus.value.coerceIn(0f, shelfBooks.lastIndex.toFloat()))
+        logicalFocus.snapTo(wrapFocus(logicalFocus.value, shelfBooks.size))
     }
+    // 无限轮播：logicalFocus 可以无限增大/减小（12 后面就是 1、2、3…），
+    // 书号一律对 count 取模；这里只把"当前是哪一本"折回 0..count-1。
     val activeIndex by remember(shelfBooks.size) {
-        derivedStateOf { logicalFocus.value.roundToInt().coerceIn(0, shelfBooks.lastIndex) }
+        derivedStateOf { floorMod(logicalFocus.value.roundToInt(), shelfBooks.size) }
+    }
+    // 记住停在哪一本（按作用域分开：书架 / 我喜欢的各记各的），
+    // 这样打开阅读器再返回、或切去别的 Tab 再回来，都停在刚才那本。
+    LaunchedEffect(scopeKey, activeIndex, shelfBooks.size) {
+        shelfBooks.getOrNull(activeIndex)?.let { ArchiveShelfMemory.remember(scopeKey, it.id) }
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
@@ -226,50 +252,123 @@ fun ArchiveShelf(
     val rowHeight = with(density) { (metrics.baseYPx + metrics.bodyPx + 12f * density.density).toDp() }
         val coverStates = painters.map { (it as? AsyncImagePainter)?.state }
         val coverReady = coverStates.map { it is AsyncImagePainter.State.Success }
-        val bitmapped = with(density) { (metrics.coverPx - 20f * density.density).roundToInt() }
-            .coerceIn(64, 256)
-        val bitmapHeight = (bitmapped * 166f / 118f).roundToInt()
-        val warm = remember(activeIndex, shelfBooks.size) { shelfWarmWindow(activeIndex, shelfBooks.size) }
+        // 封面贴图 = 封面面本身的比例（cover × body），满版裁切，不留纸边。
+        val bitmapWidth = metrics.coverPx.roundToInt().coerceIn(64, 288)
+        val bitmapHeight = (bitmapWidth * metrics.bodyPx / metrics.coverPx).roundToInt().coerceIn(64, 512)
+        val warm = remember(activeIndex, shelfBooks.size, metrics) { shelfWarmWindow(activeIndex, shelfBooks.size, metrics) }
         // 封面每本只光栅化一次（Painter -> ImageBitmap），draw 阶段只做矩阵贴图。
+        // 没有封面的书在这里生成一张印刷风封面（同一张图给 3D 书 + 飞行动画 + 阅读器落点），
+        // 之后再也不会出现"打开时变成纯黑一块"。
+        // 每帧最多补几本：一次性把 18 本都光栅化会在切书那一帧掉十几毫秒，
+        // 分批补完既不掉帧，也不会出现"某本书没有封面"的中间态（见 shelfWarmWindow）。
         SideEffect {
             val portrait = Density(density.density)
+            var budget = COVER_RASTER_BUDGET
+            var changed = false
             for (index in warm) {
-                if (!coverReady.getOrElse(index) { false }) continue
                 val book = shelfBooks[index]
-                if (covers.get(book.id) != null) continue
-                rasterizeShelfCover(painters.getOrNull(index), bitmapped, bitmapHeight, portrait)
-                    ?.let { covers.put(book.id, it) }
+                if (covers.get(book.id) != null && !covers.isPlaceholder(book.id)) continue
+                if (budget <= 0) break
+                val ready = coverReady.getOrElse(index) { false }
+                val raster = if (ready) {
+                    rasterizeShelfCover(painters.getOrNull(index), bitmapWidth, bitmapHeight, portrait)
+                } else null
+                if (raster != null) {
+                    covers.put(book.id, raster)
+                    changed = true
+                    budget--
+                } else if (covers.get(book.id) == null) {
+                    // 解码还没回来：先给一张生成封面顶上，真封面到达后由上面的分支替换。
+                    covers.put(
+                        book.id,
+                        generateShelfCover(
+                            title = book.title,
+                            author = book.author,
+                            tag = if (book.isComic) "COMIC" else "TXT",
+                            dark = colors.isDark,
+                            widthPx = bitmapWidth,
+                            heightPx = bitmapHeight,
+                            density = portrait
+                        ),
+                        placeholder = true
+                    )
+                    changed = true
+                    budget--
+                }
             }
+            // 补到东西就 +1：组合重跑一轮，接着补下一批（每轮最多 COVER_RASTER_BUDGET 本）。
+            if (changed) coverGeneration++
         }
 
         val center = metrics.startXPx + metrics.pullPx * METRICS_DEPTH_X
 
-        // 3D 书架的封面飞行入口：语义盒就是可见封面的矩形（shelfSemanticBox 的布局与
-        // ScenePainter 画封面面完全同源），登记成 root 坐标后点击时交给飞行桥。
-        // 普通 Map：onGloballyPositioned 在布局阶段写状态会触发「布局→重组→布局」死循环
-        // （R15 实测：切列表模式直接 ANR）。这里只给点击时查表用，不需要参与重组。
-        val bookBounds = remember { HashMap<Int, androidx.compose.ui.geometry.Rect>() }
+        // 画布在 root 里的位置：飞行落点必须用 root 坐标，不能拿行内坐标直接喂给覆盖层。
+        // 普通 FloatArray 而非 state：onGloballyPositioned 在布局阶段写 state 会触发
+        // 「布局→重组→布局」死循环（R15 实测：切列表模式直接 ANR），这里只在点击时读。
+        val sceneOrigin = remember { FloatArray(2) }
+
+        /**
+         * 把这本书整本交给根覆盖层：**同一个渲染器、同一条时间轴**，从书架上的斜书
+         * 一路画到铺满全屏。书架这边只要在起飞后不再画它，交接处就没有第二个渲染器可言。
+         */
+        fun launchVolume(book: Book, index: Int): Boolean {
+            if (book.isComic) return false
+            val art = scene.artAt(index) ?: return false
+            // 书架上的静止姿态（行内坐标）→ 换成 root 坐标，覆盖层拿到的第一帧和刚看到的一模一样。
+            val restOx = slotOriginX(metrics, logicalFocus.value, shelfBooks.size, index) + sceneOrigin[0]
+            val restOy = slotOriginY(metrics, logicalFocus.value, shelfBooks.size, index) + sceneOrigin[1]
+            return com.example.ui.wenku.WenkuVolumeFlightBridge.begin(
+                bookKey = book.id.toString(),
+                bookId = book.id,
+                art = art,
+                restOx = restOx,
+                restOy = restOy,
+                onArrive = { onBookClick(book) }
+            )
+        }
+
         fun openBook(book: Book) {
             val index = shelfBooks.indexOf(book)
-            val rect = bookBounds[index]
-            if (index >= 0 && rect != null && !book.isComic) {
-                com.example.ui.wenku.WenkuFlightBridge.begin(
-                    bookKey = book.id.toString(),
-                    bounds = rect,
-                    image = covers.get(book.id),
-                    radius = 3.dp
-                )
+            if (index < 0) {
+                onBookClick(book)
+                return
             }
-            onBookClick(book)
+            ArchiveShelfMemory.remember(scopeKey, book.id)
+            if (openingLocked) return
+            // 起飞失败（没有封面贴图 / 素材还没准备好 / 减少动效）：直接进阅读器，
+            // 不能出现"点了没反应"。
+            if (a11y.reduceMotion || !launchVolume(book, index)) {
+                onBookClick(book)
+                return
+            }
+            openingLocked = true
+            scope.launch {
+                // 解锁放在飞行结束之后：连点不会把两本书同时拿起来。
+                com.example.ui.wenku.WenkuVolumeFlightBridge.awaitIdle(book.id.toString())
+                openingLocked = false
+            }
         }
 
         fun centre(target: Int) {
-            if (shelfBooks.size < 2) return
-            val destination = target.coerceIn(0, shelfBooks.lastIndex)
+            val count = shelfBooks.size
+            if (count < 2) return
+            // 无限轮播：同一本书有无数个等价槽位，取离当前焦点最近的那个，
+            // 于是"下一本"从最后一本跨到第一本只需要动一格，而不是倒着扫回去。
+            val base = floorMod(target, count)
+            val k = ((logicalFocus.value - base) / count).roundToInt()
+            val destination = base + k * count
             if (abs(logicalFocus.value - destination) < .01f) return
             scope.launch {
-                if (a11y.reduceMotion) logicalFocus.snapTo(destination.toFloat())
-                else logicalFocus.animateTo(destination.toFloat(), tween(WenkuMotion.ENTER_MS, easing = SHELF_CENTRE_CURVE))
+                if (a11y.reduceMotion) {
+                    logicalFocus.snapTo(wrapFocus(destination.toFloat(), count))
+                } else {
+                    logicalFocus.animateTo(
+                        destination.toFloat(),
+                        tween(WenkuMotion.ENTER_MS, easing = SHELF_CENTRE_CURVE)
+                    )
+                    // 动画结束后折回 0 起步，避免焦点数值无限增长。
+                    logicalFocus.snapTo(wrapFocus(logicalFocus.value, count))
+                }
             }
         }
 
@@ -277,9 +376,8 @@ fun ArchiveShelf(
             val count = shelfBooks.size
             if (count <= 0) return null
             val focus = metrics.focusOf(logicalFocus.value, count)
-            val first = floor(focus - metrics.edgeSlots - 2f).toInt().coerceAtLeast(0)
+            val first = floor(focus - metrics.edgeSlots - 2f).toInt()
             val last = ceil(focus + metrics.edgeSlots + 2f).toInt()
-                .coerceAtMost(metrics.poolCountOf(count) - 1)
             var hit: Int? = null
             for (slot in first..last) {
                 val distance = slot - focus
@@ -297,14 +395,16 @@ fun ArchiveShelf(
             val focus = metrics.focusOf(logicalFocus.value, count)
             val slot = slotAt(point)
             if (slot == null) {
-                if (count <= 1 || abs(point.x - center) <= metrics.coverPx * .42f) {
+                val centerX = metrics.startXPx + metrics.pullPx * METRICS_DEPTH_X
+                if (count <= 1 || abs(point.x - centerX) <= metrics.coverPx * .42f) {
                     shelfBooks.getOrNull(activeIndex)?.let(::openBook)
                 }
                 return
             }
             // archive_wave.dart L161 _tap: 命中的就是中心书才打开，否则先滚到中心。
-            if (abs(slot - focus) < .30f) shelfBooks.getOrNull(metrics.bookIndexOf(slot, count))?.let(::openBook)
-            else centre(metrics.bookIndexOf(slot, count))
+            val bookIndex = metrics.bookIndexOf(slot, count)
+            if (abs(slot - focus) < .30f) shelfBooks.getOrNull(bookIndex)?.let(::openBook)
+            else centre(bookIndex)
         }
 
         Column(
@@ -321,15 +421,28 @@ fun ArchiveShelf(
                     Modifier
                         .fillMaxWidth()
                         .height(rowHeight)
+                        .onGloballyPositioned { coordinates ->
+                            val origin = coordinates.positionInRoot()
+                            sceneOrigin[0] = origin.x
+                            sceneOrigin[1] = origin.y
+                        }
                         .drawWithCache {
-                            scene.bind(metrics, volumes, covers, colors)
+                            // 读一次 coverGeneration：贴图补上后重新构建缓存块并重画，
+                            // 不然新光栅化的封面要等到下一次动效才出现。
+                            @Suppress("UNUSED_VARIABLE") val coversVersion = coverGeneration
+                            scene.bind(metrics, volumes, covers, colors, coverGeneration)
                             onDrawBehind {
+                                // 在**绘制阶段**读飞行状态：进度每帧都变，读在组合里会让整个
+                                // 书架每帧重组；读在这里只会让这一块画布重绘。
+                                val flight = com.example.ui.wenku.WenkuVolumeFlightBridge.request
                                 scene.draw(
                                     scope = this,
                                     logicalFocus = logicalFocus.value,
                                     entrance = reveal.value,
                                     frameNanos = frameNanos.value,
-                                    reduceMotion = a11y.reduceMotion
+                                    reduceMotion = a11y.reduceMotion,
+                                    flyingBookId = flight?.bookId,
+                                    flyingProgress = com.example.ui.wenku.WenkuVolumeFlightBridge.progress
                                 )
                             }
                         }
@@ -347,13 +460,12 @@ fun ArchiveShelf(
                     Box(
                         modifier = Modifier
                             .shelfSemanticBox(index, logicalFocus, metrics, shelfBooks.size)
-                            .onGloballyPositioned { bookBounds[index] = it.boundsInRoot() }
                             .semantics {
                                 role = Role.Button
                                 selected = selectedNow
                                 contentDescription =
-                                    "《${book.title}》，${book.author.ifBlank { "未知作者" }}${if (selectedNow) "，当前选中" else ""}"
-                                onClick(label = "打开") {
+                                    "《${book.title}》，${book.author.ifBlank { com.example.i18n.AppLocale.t("未知作者") }}${if (selectedNow) com.example.i18n.AppLocale.t("，当前选中") else ""}"
+                                onClick(label = com.example.i18n.AppLocale.t("打开")) {
                                     openBook(book)
                                     true
                                 }
@@ -408,15 +520,20 @@ fun ArchiveShelf(
                                         val amount = change.position.x - lastX
                                         lastX = change.position.x
                                         change.consume()
-                                        val next = (logicalFocus.value - amount / metrics.pitchPx)
-                                            .coerceIn(0f, shelfBooks.lastIndex.toFloat())
+                                        // 无限轮播：不夹在 0..last，划到最后一本继续划就是第 1 本。
+                                        val next = logicalFocus.value - amount / metrics.pitchPx
                                         scope.launch { logicalFocus.snapTo(next) }
                                     }
                                 }
                                 if (!moved && !cancelled) {
                                     tap(down.position)
                                 } else if (horizontal) {
-                                    val velocity = tracker.calculateVelocity().x
+                                    // ⚠️ 符号：拖拽里 `next = focus - amount/pitch`，即"手指往左
+                                    // （amount<0）→ 焦点往后翻"。惯性模拟的 position 用的就是
+                                    // focus*pitch，所以必须喂**取反后的**手指速度；直接喂
+                                    // tracker 的 x 速度会让松手瞬间往反方向甩，表现为
+                                    // "怎么划都到不了尽头 / 划一下又被拉回来"。
+                                    val velocity = -tracker.calculateVelocity().x
                                     val from = logicalFocus.value
                                     if (a11y.reduceMotion) {
                                         hapticsPerform(haptics)
@@ -428,13 +545,14 @@ fun ArchiveShelf(
                                             pitch = metrics.pitchPx,
                                             minVelocity = 50f * densityScale
                                         )
-                                        val target = (simulation.target / metrics.pitchPx)
-                                            .coerceIn(0f, shelfBooks.lastIndex.toFloat())
+                                        val target = simulation.target / metrics.pitchPx
                                         val fromPx = from * metrics.pitchPx
                                         val toPx = target * metrics.pitchPx
                                         hapticsPerform(haptics)
                                         if (abs(toPx - fromPx) < .01f) {
-                                            scope.launch { logicalFocus.snapTo(target) }
+                                            scope.launch {
+                                                logicalFocus.snapTo(wrapFocus(target, shelfBooks.size))
+                                            }
                                         } else {
                                             val span = toPx - fromPx
                                             val duration = simulation.durationSeconds()
@@ -449,6 +567,8 @@ fun ArchiveShelf(
                                                         }
                                                     )
                                                 )
+                                                // 落定后折回 0..count，渲染对 ±count 平移不变，看不出跳变。
+                                                logicalFocus.snapTo(wrapFocus(logicalFocus.value, shelfBooks.size))
                                             }
                                         }
                                     }
@@ -490,6 +610,7 @@ private fun ArchiveShelfCaption(
     onOpen: () -> Unit
 ) {
     val colors = wenkuColors()
+    val str = com.example.i18n.LocalStrings.current
     Column(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp)) {
         Row(
             modifier = Modifier
@@ -518,9 +639,9 @@ private fun ArchiveShelfCaption(
                 )
                 Text(
                     text = buildString {
-                        append(book.author.ifBlank { "未知作者" })
+                        append(book.author.ifBlank { str.t("未知作者") })
                         if (book.totalChapters > 0) {
-                            append(" · 第 ${(book.currentChapterIndex + 1).coerceAtMost(book.totalChapters)} / ${book.totalChapters} 章")
+                            append(" · " + str.chapters((book.currentChapterIndex + 1).coerceAtMost(book.totalChapters), book.totalChapters))
                         }
                     },
                     fontSize = 12.sp,
@@ -545,7 +666,7 @@ private fun ArchiveShelfCaption(
             ) {
                 ShelfStepButton(
                     icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                    label = "上一本",
+                    label = str.t("上一本"),
                     enabled = onPrevious != null,
                     onClick = { onPrevious?.invoke() },
                     wenkuSymbol = WenkuSymbol.ArrowLeft
@@ -559,7 +680,7 @@ private fun ArchiveShelfCaption(
                 )
                 ShelfStepButton(
                     icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    label = "下一本",
+                    label = str.t("下一本"),
                     enabled = onNext != null,
                     onClick = { onNext?.invoke() },
                     wenkuSymbol = WenkuSymbol.ArrowRight
@@ -602,11 +723,13 @@ private fun rememberShelfPainter(book: Book, context: android.content.Context): 
             // 「我喜欢的」是在线收藏，封面是远程 URL：ArchiveShelf 现在两个板块共用，
             // 这里必须认 http(s)，否则收藏 3D 书架全是空白书脊。
             uri.startsWith("http://") || uri.startsWith("https://") -> uri
-            book.isCoverValid -> {
+            // 收藏板块的本地缩略图是**裸路径**（`/data/data/…/thumb.jpg`），
+            // 而 Book.isCoverValid 只对数据库里的本地书有意义 —— 收藏是运行时拼出来的
+            // Book，这个字段天然是 false。过去这里直接判死，收藏 3D 书架就全变空白纸卡。
+            else -> {
                 val path = if (uri.startsWith("file://")) uri.substring(7) else uri
                 java.io.File(path)
             }
-            else -> null
         }
     }
     if (model == null) return null
@@ -626,11 +749,17 @@ private fun rememberShelfPainter(book: Book, context: android.content.Context): 
 // ---------------------------------------------------------------------------
 
 private const val METRICS_DEPTH_X = .66f
-private const val METRICS_DEPTH_Y = -.30f
+private const val METRICS_DEPTH_Y = -.16f
 private const val METRICS_ROW_STEP = 2.5f
 private const val METRICS_RADIUS = 1.48f
 private val METRICS_MAX_VIEWPORT = 520.dp
 private val SHELF_CENTRE_CURVE = CubicBezierEasing(.2f, 1.06f, .35f, 1f)
+
+/** 平滑起停（smoothstep）：0 处导数为 0，动画第一帧不会有速度跳变。 */
+private fun smoothStep(t: Float): Float {
+    val x = t.coerceIn(0f, 1f)
+    return x * x * (3f - 2f * x)
+}
 
 /** 全部字段 px（= Dart logical px × density），比例与常量完全一致。 */
 private class ShelfMetrics(
@@ -708,16 +837,28 @@ private class ShelfMetrics(
     fun focusOf(logicalFocus: Float, count: Int): Float =
         if (count < 2) 0f else edgeSlots + logicalFocus
 
-    fun poolCountOf(count: Int): Int = if (count < 2) 1 else count + edgeSlots * 2
-
+    /**
+     * 槽位 → 书号。**无限轮播**：取模回绕，12 的右边接回 1、2、3…
+     *
+     * 这样任何槽位都有书，滑到最后一本继续滑就是第 1 本 —— 和初版一致。
+     * 焦点书永远在中央，由 [focusOf] 保证。
+     */
     fun bookIndexOf(slot: Int, count: Int): Int =
         if (count < 2) 0 else floorMod(slot - edgeSlots, count)
 }
 
+/** 取模到 `0 until count`（负数也落到正区间）。 */
 private fun floorMod(value: Int, count: Int): Int {
     if (count <= 0) return 0
     val result = value % count
     return if (result < 0) result + count else result
+}
+
+/** 把无限增长的焦点折回 `0 until count`；小数部分保留，渲染对 ±count 平移不变。 */
+private fun wrapFocus(value: Float, count: Int): Float {
+    if (count <= 0) return 0f
+    val result = value % count
+    return if (result < 0f) result + count else result
 }
 
 /**
@@ -826,8 +967,6 @@ private class ShelfScrollSimulation(
 // volume data — archive_spine_title.dart / archive_design.dart
 // ---------------------------------------------------------------------------
 
-private class SpineRun(val text: String, val latin: Boolean)
-
 /** archive_spine_title.dart L5：拉丁连排、CJK 单字。 */
 private fun archiveSpineRuns(title: String): List<SpineRun> {
     val runs = ArrayList<SpineRun>(title.length.coerceAtMost(16))
@@ -854,7 +993,9 @@ private class ShelfVolume private constructor(
     val coverCode: String,
     val fileCode: String,
     val runs: List<SpineRun>,
-    val truncated: Boolean
+    val truncated: Boolean,
+    /** 全书章数：厚度映射的唯一真实来源（0 = 不知道，按 id 稳定兜底）。 */
+    val chapters: Int
 ) {
     companion object {
         fun of(index: Int, book: Book): ShelfVolume {
@@ -871,91 +1012,129 @@ private class ShelfVolume private constructor(
                 // 负 id = 「我喜欢的」映射条目（见 HomeScreen 的 favShelfBooks），书脊编号用 FAV-。
             fileCode = (if (book.id < 0) "FAV-" else "WK-") + kotlin.math.abs(book.id).toString().padStart(5, '0'),
                 runs = runs,
-                truncated = all.size > 7
+                truncated = all.size > 7,
+                chapters = book.totalChapters
             )
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// cover bitmaps — Painter 每本只取一次
+// cover bitmaps
 // ---------------------------------------------------------------------------
 
-private class ShelfCoverStore(private val capacity: Int = 32) {
+/**
+ * 每本书一张"封面面像素"：真实封面按封面比例中心裁切，或由 [generateShelfCover]
+ * 生成。3D 书、飞行贴图、阅读器落点共用同一张，颜色与纸质不会三处不一致。
+ */
+private class ShelfCoverStore(private val capacity: Int = 64) {
     private val entries = LinkedHashMap<Int, ImageBitmap>(16, .75f, true)
+    private val tints = HashMap<Int, Int>()
+    private val placeholders = HashSet<Int>()
 
     fun get(bookId: Int): ImageBitmap? = entries[bookId]
 
-    fun put(bookId: Int, image: ImageBitmap) {
+    /** true = 当前这张是生成的兜底封面，真封面解码完成后要顶掉它。 */
+    fun isPlaceholder(bookId: Int): Boolean = placeholders.contains(bookId)
+
+    /** 书脊包裹色：取封面左侧竖带的平均色；生成封面同样适用。 */
+    fun tintOf(bookId: Int): Int? = tints[bookId]
+
+    fun put(bookId: Int, image: ImageBitmap, placeholder: Boolean = false) {
         entries[bookId] = image
+        if (placeholder) placeholders.add(bookId) else placeholders.remove(bookId)
+        tints[bookId] = dominantEdgeColor(image)
         while (entries.size > capacity) {
             val iterator = entries.entries.iterator()
             if (!iterator.hasNext()) break
-            iterator.next()
+            val eldest = iterator.next()
+            placeholders.remove(eldest.key)
+            tints.remove(eldest.key)
             iterator.remove()
         }
     }
 }
 
-private fun shelfWarmWindow(active: Int, count: Int): List<Int> {
+/**
+ * **会被真正画到屏幕上的书号**，按"离焦点由近到远"排序，用于预光栅化封面。
+ *
+ * 之前这里是死板的 `active ± 5`：而一行里真正画出来的是 `focus ± (edgeSlots + 2)` 个槽位
+ * （411dp 屏上是 18 个槽位、屏幕上同时能看到 18 本），12 本书会**全部**出现在屏幕里。
+ * 于是落在 ±5 之外的那本永远拿不到封面贴图，`drawVolume` 只能填 `fallbackTint`，
+ * 其中 1/3 的 id 会拿到深蓝灰 —— 用户看到的就是"中间书右边某一本变成了黑封面"。
+ * 退出阅读器再回来时最明显：那时以刚读完的那本为中心，±5 的窗口刚好把某一本挤出去。
+ */
+private fun shelfWarmWindow(active: Int, count: Int, metrics: ShelfMetrics): List<Int> {
     if (count <= 0) return emptyList()
-    val low = (active - 5).coerceAtLeast(0)
-    val high = (active + 5).coerceAtMost(count - 1)
-    return (low..high).toList()
+    val result = LinkedHashSet<Int>(count.coerceAtMost(24))
+    val reach = metrics.edgeSlots + 2
+    val cull = metrics.coverPx * 1.8f
+    // 由近到远：0、+1、-1、+2、-2 …（近处的书先补，远处即使这一轮没补到也看不出）
+    for (step in 0..reach) {
+        for (d in if (step == 0) intArrayOf(0) else intArrayOf(step, -step)) {
+            val x = metrics.startXPx + d * metrics.pitchPx + metrics.originX(d.toFloat())
+            if (x > metrics.viewportPx + cull) continue
+            if (x + metrics.footprintPx < -cull) continue
+            result.add(floorMod(active + d, count))
+            if (result.size >= count) return result.toList()
+        }
+    }
+    return result.toList()
 }
 
-/** Painters 只在这里被光栅化一次；之后每帧都是 drawBitmap + 矩阵。 */
-private fun rasterizeShelfCover(
-    painter: Painter?,
-    widthPx: Int,
-    heightPx: Int,
-    density: Density
-): ImageBitmap? {
-    if (widthPx <= 0 || heightPx <= 0) return null
-    val success = (painter as? AsyncImagePainter)?.state as? AsyncImagePainter.State.Success ?: return null
-    val drawable = success.result.drawable ?: return null
-    return runCatching {
-        val bitmap = android.graphics.Bitmap.createBitmap(widthPx, heightPx, android.graphics.Bitmap.Config.ARGB_8888)
-        val canvas = android.graphics.Canvas(bitmap)
-        drawable.setBounds(0, 0, widthPx, heightPx)
-        drawable.draw(canvas)
-        bitmap.asImageBitmap()
-    }.getOrNull()
+/** 每轮组合最多光栅化几本封面：18 本一次画完会在切书那一帧掉十几毫秒。 */
+private const val COVER_RASTER_BUDGET = 6
+
+// ---------------------------------------------------------------------------
+// painting
+// ---------------------------------------------------------------------------
+
+/**
+ * 没有封面贴图时的兜底书脊/封面色。**必须是纸色系**：
+ * 以前这里会给 1/3 的书 `#3F4A56` 深蓝灰，只要那本书的贴图晚到一帧，
+ * 画出来就是一整块"黑封面"。宁可像一本空白纸书，也不要像一块黑砖。
+ */
+private fun fallbackTint(volume: ShelfVolume): Int = when (abs(volume.id) % 4) {
+    0 -> 0xFFEFE9DC.toInt()
+    1 -> 0xFFD9C9AE.toInt()
+    2 -> 0xFFC9C2B4.toInt()
+    else -> 0xFFDCD3C2.toInt()
 }
 
-private class ShelfPalette(colors: WenkuColors, density: Float) {
-    val coverFace: Int = (if (colors.isDark) colors.panel else colors.milk).toArgb()
-    val spineFace: Int = (if (colors.isDark) colors.raised else Color(0xFFF2F0E9)).toArgb()
-    val capTop: Int = (if (colors.isDark) colors.raisedHigh else Color(0xFFE3DFD3)).toArgb()
-    val capBottom: Int = (if (colors.isDark) colors.raised else colors.milk).toArgb()
-    val capStroke: Int = (if (colors.isDark) WenkuTokens.MilkDark else Color(0xFF9A927F)).toArgb()
-    val capStrokeAlpha: Float = .24f
-    val floorInk: Int = (if (colors.isDark) colors.milk else Color(0xFF8A806B)).toArgb()
-    val border: Int = colors.outline.toArgb()
-    val ink: Int = colors.ink.toArgb()
-    val secondary: Int = colors.inkSecondary.toArgb()
-    val paperHint: Int = (if (colors.isDark) colors.raisedHigh else Color(0xFFE9E4D6)).toArgb()
+/** 打开一本书之后，回到书架要停在它身上 —— 按作用域记住最后停下的那本。 */
+internal object ArchiveShelfMemory {
+    private val focus = HashMap<String, Int>()
 
-    val codeSize: Float = 9f * density
-    val codeLine: Float = 9f * 1.35f * density
-    val codeSpacing: Float = 1.05f / 9f
-    val titleSize: Float = 9f * density
-    val titleLine: Float = 9f * 1.08f * density
-    val coverPadH: Float = 10f * density
-    val coverPadV: Float = 9f * density
-    val coverPadBottom: Float = 8f * density
-    val gapCoverCode: Float = 7f * density
-    val gapFileCode: Float = 4f * density
-    val spinePadH: Float = 1f * density
-    val spinePadV: Float = 9f * density
-    val gapAfterNumber: Float = 10f * density
-    val gapBeforeDot: Float = 6f * density
-    val dotRadius: Float = 3f * density
-    val dotSize: Float = 6f * density
-    val faceRadius: Float = 3f * density
-    val hairline: Float = .7f * density
-    val capHairline: Float = .4f * density
-    val registration: Float = 7f * density
+    fun remember(scope: String, bookId: Int) {
+        focus[scope] = bookId
+    }
+
+    fun indexFor(scope: String, books: List<Book>): Int? {
+        val id = focus[scope] ?: return null
+        val index = books.indexOfFirst { it.id == id }
+        return if (index >= 0) index else null
+    }
+}
+
+/** 某一本书"离焦点最近的那个副本"的槽位号（无限轮播里同一本有多份）。 */
+private fun shelfSlotOf(metrics: ShelfMetrics, logicalFocus: Float, count: Int, index: Int): Float {
+    if (count <= 1) return 0f
+    val focus = metrics.focusOf(logicalFocus, count)
+    val base = metrics.edgeSlots + index
+    val k = ((focus - base) / count.toFloat()).roundToInt()
+    return (base + k * count).toFloat()
+}
+
+/** 那本书在画布里的左上角 x（行内坐标 = 与绘制用的一致）。 */
+private fun slotOriginX(metrics: ShelfMetrics, logicalFocus: Float, count: Int, index: Int): Float {
+    val distance = shelfSlotOf(metrics, logicalFocus, count, index) - metrics.focusOf(logicalFocus, count)
+    return metrics.startXPx + distance * metrics.pitchPx + metrics.originX(distance)
+}
+
+/** 那本书在画布里的左上角 y（不含入场时的浮动，静止态即最终值）。 */
+private fun slotOriginY(metrics: ShelfMetrics, logicalFocus: Float, count: Int, index: Int): Float {
+    val distance = shelfSlotOf(metrics, logicalFocus, count, index) - metrics.focusOf(logicalFocus, count)
+    return metrics.railY(distance) + metrics.originY(distance)
 }
 
 private class ShelfScenePainter {
@@ -964,58 +1143,74 @@ private class ShelfScenePainter {
     private var covers: ShelfCoverStore? = null
     private var palette: ShelfPalette? = null
     private var paletteDark: Boolean? = null
+    private var arts: List<ShelfVolumeArt> = emptyList()
+    private var artGeneration: Int = -1
 
-    private val capPath = Path()
+    private val artist = ShelfVolumeArtist()
     private val floorPath = Path()
-    private val registrationPath = Path()
-    private val matrix = Matrix()
-    private val values = FloatArray(9)
-    private val bounds = android.graphics.RectF()
-    private val fontMetrics = Paint.FontMetrics()
-    private val source = Rect()
-    private val destination = Rect()
-    private val widthCache = HashMap<String, Float>(32)
+    private val floorBounds = RectF()
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val hairline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeJoin = Paint.Join.ROUND
-    }
-    private val capFill = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val capStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val floorFill = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
-    private val codePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val placeholder = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val mono: Typeface = Typeface.create("monospace", Typeface.NORMAL)
 
     private var slotIndices = IntArray(192)
     private var slotX = FloatArray(192)
     private var slotY = FloatArray(192)
     private var slotInk = FloatArray(192)
 
-    fun bind(metrics: ShelfMetrics, volumes: List<ShelfVolume>, covers: ShelfCoverStore, colors: WenkuColors) {
+    fun bind(
+        metrics: ShelfMetrics,
+        volumes: List<ShelfVolume>,
+        covers: ShelfCoverStore,
+        colors: WenkuColors,
+        generation: Int
+    ) {
         val sameGeometry = this.metrics === metrics
         val sameInk = this.paletteDark == colors.isDark
-        if (sameGeometry && sameInk && this.volumes === volumes) {
-            this.covers = covers
-            return
-        }
+        this.covers = covers
+        if (sameGeometry && sameInk && this.volumes === volumes && this.artGeneration == generation) return
         this.metrics = metrics
         this.volumes = volumes
-        this.covers = covers
         this.paletteDark = colors.isDark
+        this.artGeneration = generation
         val palette = ShelfPalette(colors, metrics.density)
         this.palette = palette
-        buildPaths(metrics, palette)
-        buildShaders(metrics, palette)
-        widthCache.clear()
+        buildFloor(metrics, palette)
+        artist.clearCache()
+        // 每本书的绘制素材（封面贴图 / 主色 / 厚度 / 材质）在 bind 时定下来：
+        // 书架每帧只做矩阵变换，覆盖层拿到的是同一份 art 去画飞行中的那一本。
+        arts = volumes.map { volume -> artFor(volume, metrics, covers, palette) }
     }
 
-    /** Path.rewind() 复用：只在尺寸/配色变化时重建，draw 阶段零分配。 */
-    private fun buildPaths(metrics: ShelfMetrics, palette: ShelfPalette) {
+    /** 覆盖层起飞时用：把某一本的绘制素材交出去（和书架上画的那份是同一份数据）。 */
+    fun artAt(bookIndex: Int): ShelfVolumeArt? = arts.getOrNull(bookIndex)
+
+    private fun artFor(
+        volume: ShelfVolume,
+        metrics: ShelfMetrics,
+        covers: ShelfCoverStore,
+        palette: ShelfPalette
+    ): ShelfVolumeArt {
+        val heightScale = volumeHeightScale(volume.id)
+        return ShelfVolumeArt(
+            id = volume.id,
+            coverWidth = metrics.coverPx,
+            body = metrics.bodyPx * heightScale,
+            thickness = volumeThicknessPx(volume.chapters, volume.id, metrics.density),
+            topInset = metrics.bodyPx * (heightScale - 1f),
+            tint = covers.tintOf(volume.id) ?: fallbackTint(volume),
+            material = volumeMaterial(volume.id, volume.title.length),
+            cover = covers.get(volume.id),
+            number = volume.number,
+            fileCode = volume.fileCode,
+            runs = volume.runs,
+            truncated = volume.truncated,
+            palette = palette,
+            unit = metrics.density
+        )
+    }
+
+    private fun buildFloor(metrics: ShelfMetrics, palette: ShelfPalette) {
         val depth = Offset(metrics.coverPx * METRICS_DEPTH_X, metrics.coverPx * METRICS_DEPTH_Y)
         val front = Offset(metrics.spinePx, 1.4f * metrics.density)
         val tail = Offset(-10f * metrics.density, 10f * metrics.density)
@@ -1027,69 +1222,19 @@ private class ShelfScenePainter {
         floorPath.lineTo(depth.x + tail.x, depth.y + tail.y)
         floorPath.lineTo(tail.x, tail.y)
         floorPath.close()
-
-        val capFront = Offset(metrics.spinePx, metrics.spinePx * .10f)
-        capPath.rewind()
-        capPath.moveTo(0f, 0f)
-        capPath.lineTo(capFront.x, capFront.y)
-        capPath.lineTo(capFront.x + depth.x, capFront.y + depth.y)
-        capPath.lineTo(depth.x, depth.y)
-        capPath.close()
-
-        // ArchiveRegistration (archive_design.dart L283)：四角 L 形标记。
-        registrationPath.rewind()
-        val inset = .5f * metrics.density
-        val left = inset
-        val top = inset
-        val right = metrics.coverPx - inset
-        val bottom = metrics.bodyPx - inset
-        val length = minOf(palette.registration, minOf(right - left, bottom - top) / 3f)
-        if (length > 0f) {
-            registrationPath.moveTo(left + length, top)
-            registrationPath.lineTo(left, top)
-            registrationPath.lineTo(left, top + length)
-            registrationPath.moveTo(right - length, top)
-            registrationPath.lineTo(right, top)
-            registrationPath.lineTo(right, top + length)
-            registrationPath.moveTo(left + length, bottom)
-            registrationPath.lineTo(left, bottom)
-            registrationPath.lineTo(left, bottom - length)
-            registrationPath.moveTo(right - length, bottom)
-            registrationPath.lineTo(right, bottom)
-            registrationPath.lineTo(right, bottom - length)
-        }
-    }
-
-    private fun buildShaders(metrics: ShelfMetrics, palette: ShelfPalette) {
-        capPath.computeBounds(bounds, true)
-        capFill.shader = LinearGradient(
-            bounds.left,
-            bounds.top,
-            bounds.right,
-            bounds.bottom,
-            palette.capTop,
-            palette.capBottom,
-            android.graphics.Shader.TileMode.CLAMP
-        )
-        capStroke.color = palette.capStroke
-        capStroke.strokeWidth = palette.capHairline
-
-        floorPath.computeBounds(bounds, true)
+        // 地面墨影必须带渐变：右上方 10% 墨色 → 左下方全透明（archive_wave.dart L1492）。
+        // 少了这个 shader，floorFill 就是一块不透明纯黑多边形 —— 每本书脚下那几根
+        // "不明黑色线条"就是它。
+        floorPath.computeBounds(floorBounds, true)
         floorFill.shader = LinearGradient(
-            bounds.right,
-            bounds.top,
-            bounds.left,
-            bounds.bottom,
+            floorBounds.right,
+            floorBounds.top,
+            floorBounds.left,
+            floorBounds.bottom,
             withAlpha(palette.floorInk, .10f),
             withAlpha(palette.floorInk, 0f),
-            android.graphics.Shader.TileMode.CLAMP
+            Shader.TileMode.CLAMP
         )
-        hairline.strokeWidth = palette.hairline
-        hairline.color = palette.border
-        placeholder.color = palette.paperHint
-        codePaint.typeface = mono
-        codePaint.letterSpacing = palette.codeSpacing
-        titlePaint.isFakeBoldText = true
     }
 
     fun draw(
@@ -1097,7 +1242,10 @@ private class ShelfScenePainter {
         logicalFocus: Float,
         entrance: Float,
         frameNanos: Long,
-        reduceMotion: Boolean
+        reduceMotion: Boolean,
+        /** 正在被"拿起来"的那本：它的**最近副本**不在书架上画（覆盖层在同一个坐标上画它）。 */
+        flyingBookId: Int?,
+        flyingProgress: Float
     ) {
         val metrics = metrics ?: return
         val volumes = volumes ?: return
@@ -1106,9 +1254,8 @@ private class ShelfScenePainter {
         if (count <= 0) return
         val width = scope.size.width
         val focus = metrics.focusOf(logicalFocus, count)
-        val poolCount = metrics.poolCountOf(count)
-        val first = floor(focus - metrics.edgeSlots - 2f).toInt().coerceAtLeast(0)
-        val last = ceil(focus + metrics.edgeSlots + 2f).toInt().coerceAtMost(poolCount - 1)
+        val first = floor(focus - metrics.edgeSlots - 2f).toInt()
+        val last = ceil(focus + metrics.edgeSlots + 2f).toInt()
         if (last < first) return
         if (slotX.size < last - first + 1) slotX = FloatArray(last - first + 1).also {
             slotY = FloatArray(it.size)
@@ -1117,6 +1264,10 @@ private class ShelfScenePainter {
         }
         val cull = metrics.coverPx * 1.8f
         val entranceValue = if (reduceMotion) 1f else entrance
+        // 起飞前的一小段还留在书架上画（与覆盖层的参数逐位相同，两层重叠 = 一层），
+        // 之后交给覆盖层，书架这边只留另一侧的那份副本。
+        val hideFlying = flyingBookId != null && 
+            flyingProgress > com.example.ui.wenku.WenkuVolumeFlightBridge.HANDOFF_P
 
         scope.drawIntoCanvas { canvas ->
             val native = canvas.nativeCanvas
@@ -1148,273 +1299,44 @@ private class ShelfScenePainter {
                 native.drawPath(floorPath, floorFill)
                 native.restoreToCount(save)
             }
-            // ---- 实体：槽位升序 = 左在后、右在前（固定遮挡序）----
+            // ---- 实体：按槽位升序（左邻在后、右邻在前），这是静止时的遮挡关系 ----
+            // 被拿起来的那本由覆盖层画，并且画在所有书之上 —— 它已经被"拿出手"了。
+            var hiddenEntry = -1
+            if (hideFlying && flyingBookId != null) {
+                var bestDistance = Float.MAX_VALUE
+                for (index in 0 until n) {
+                    val bookIndex = metrics.bookIndexOf(slotIndices[index], count)
+                    if (volumes[bookIndex].id != flyingBookId) continue
+                    val slotDistance = abs(slotIndices[index] - focus)
+                    if (slotDistance < bestDistance) {
+                        bestDistance = slotDistance
+                        hiddenEntry = index
+                    }
+                }
+            }
             for (index in 0 until n) {
-                val volume = volumes[floorMod(slotIndices[index] - metrics.edgeSlots, count)]
-                drawVolume(native, volume, slotX[index], slotY[index], slotInk[index], metrics, palette)
+                if (index == hiddenEntry) continue
+                val bookIndex = metrics.bookIndexOf(slotIndices[index], count)
+                artist.draw(
+                    native,
+                    arts.getOrNull(bookIndex) ?: continue,
+                    ShelfVolumePose(
+                        ox = slotX[index],
+                        oy = slotY[index],
+                        depthX = METRICS_DEPTH_X,
+                        depthY = METRICS_DEPTH_Y,
+                        skew = .10f,
+                        thicknessScale = 1f,
+                        detail = 1f,
+                        alpha = slotInk[index],
+                        scale = 1f
+                    )
+                )
             }
         }
     }
 
-    private fun drawVolume(
-        native: android.graphics.Canvas,
-        volume: ShelfVolume,
-        ox: Float,
-        oy: Float,
-        ink: Float,
-        metrics: ShelfMetrics,
-        palette: ShelfPalette
-    ) {
-        val cover = metrics.coverPx
-        val body = metrics.bodyPx
-        val spine = metrics.spinePx
-        if (cover < 4f || body < 4f || spine < 2f) return
-        val alpha = (255f * ink).roundToInt().coerceIn(0, 255)
 
-        // ---- 1) 封面面：_coverTransform (archive_wave.dart L1689) ----
-        val sx = ox + spine
-        val sy = oy + spine * .10f
-        values[0] = METRICS_DEPTH_X; values[1] = 0f; values[2] = sx
-        values[3] = METRICS_DEPTH_Y; values[4] = 1f; values[5] = sy
-        values[6] = 0f; values[7] = 0f; values[8] = 1f
-        matrix.setValues(values)
-        val coverSave = native.save()
-        native.concat(matrix)
-        val imageLeft = palette.coverPadH
-        val imageTop = palette.coverPadV + palette.codeLine + palette.gapCoverCode
-        val imageWidth = (cover - palette.coverPadH * 2f).coerceAtLeast(1f)
-        val imageHeight = imageWidth * 166f / 118f
-
-        fill.color = palette.coverFace
-        fill.alpha = alpha
-        native.drawRoundRect(0f, 0f, cover, body, palette.faceRadius, palette.faceRadius, fill)
-
-        val bitmap = covers?.get(volume.id)
-        if (bitmap != null) {
-            source.set(0, 0, bitmap.width, bitmap.height)
-            destination.set(
-                imageLeft.roundToInt(),
-                imageTop.roundToInt(),
-                (imageLeft + imageWidth).roundToInt(),
-                (imageTop + imageHeight).roundToInt()
-            )
-            bitmapPaint.alpha = alpha
-            val imageSave = native.save()
-            native.clipRect(imageLeft, imageTop, imageLeft + imageWidth, imageTop + imageHeight)
-            native.drawBitmap(bitmap.asAndroidBitmap(), source, destination, bitmapPaint)
-            native.restoreToCount(imageSave)
-        } else {
-            // 没有封面图时保持"纸"的观感，绝不整面纯白。
-            val imageSave = native.save()
-            native.clipRect(imageLeft, imageTop, imageLeft + imageWidth, imageTop + imageHeight)
-            placeholder.alpha = alpha
-            native.drawRect(imageLeft, imageTop, imageLeft + imageWidth, imageTop + imageHeight, placeholder)
-            drawTitleFallback(native, volume, imageLeft, imageTop, imageWidth, imageHeight, palette, ink)
-            native.restoreToCount(imageSave)
-        }
-
-        // NO.xxx
-        codePaint.textSize = palette.codeSize
-        codePaint.color = palette.secondary
-        codePaint.alpha = alpha
-        native.drawText(
-            volume.coverCode,
-            imageLeft,
-            baseline(codePaint, palette.coverPadV, palette.codeLine),
-            codePaint
-        )
-        // WK-00000
-        native.drawText(
-            volume.fileCode,
-            imageLeft,
-            baseline(codePaint, body - palette.coverPadBottom - palette.codeLine, palette.codeLine),
-            codePaint
-        )
-        drawRegistration(native, cover, body, palette, ink)
-        hairline.color = palette.border
-        hairline.alpha = alpha
-        native.drawRoundRect(
-            palette.hairline * .5f,
-            palette.hairline * .5f,
-            cover - palette.hairline * .5f,
-            body - palette.hairline * .5f,
-            palette.faceRadius,
-            palette.faceRadius,
-            hairline
-        )
-        native.restoreToCount(coverSave)
-
-        // ---- 2) 顶面：只用平移（archive_wave.dart L1826）----
-        val capSave = native.save()
-        native.translate(ox, oy)
-        capFill.alpha = alpha
-        native.drawPath(capPath, capFill)
-        capStroke.alpha = (255f * palette.capStrokeAlpha * ink).roundToInt().coerceIn(0, 255)
-        native.drawPath(capPath, capStroke)
-        native.restoreToCount(capSave)
-
-        // ---- 3) 书脊面：_base (archive_wave.dart L1679) ----
-        values[0] = 1f; values[1] = 0f; values[2] = ox
-        values[3] = .10f; values[4] = 1f; values[5] = oy
-        values[6] = 0f; values[7] = 0f; values[8] = 1f
-        matrix.setValues(values)
-        val spineSave = native.save()
-        native.concat(matrix)
-        fill.color = palette.spineFace
-        fill.alpha = alpha
-        native.drawRect(0f, 0f, spine, body, fill)
-        val clip = native.save()
-        native.clipRect(0f, 0f, spine, body)
-        drawSpineNumber(native, volume, spine, palette, alpha)
-        drawSpineTitle(native, volume, spine, body, palette, ink, alpha)
-        dotPaint.color = palette.secondary
-        dotPaint.alpha = (255f * .9f * ink).roundToInt().coerceIn(0, 255)
-        native.drawCircle(
-            spine * .5f,
-            body - palette.spinePadV - palette.dotRadius,
-            palette.dotRadius,
-            dotPaint
-        )
-        native.restoreToCount(clip)
-        hairline.color = palette.border
-        hairline.alpha = alpha
-        native.drawRect(
-            palette.hairline * .5f,
-            palette.hairline * .5f,
-            spine - palette.hairline * .5f,
-            body - palette.hairline * .5f,
-            hairline
-        )
-        native.restoreToCount(spineSave)
-    }
-
-    /** archive_wave.dart L692：FittedBox(scaleDown) 的 01。 */
-    private fun drawSpineNumber(
-        native: android.graphics.Canvas,
-        volume: ShelfVolume,
-        spine: Float,
-        palette: ShelfPalette,
-        alpha: Int
-    ) {
-        codePaint.textSize = palette.codeSize
-        codePaint.letterSpacing = palette.codeSpacing
-        codePaint.color = palette.secondary
-        codePaint.alpha = alpha
-        val available = (spine - palette.spinePadH * 2f).coerceAtLeast(1f)
-        val width = codePaint.measureText(volume.number)
-        if (width > available && width > 0f) {
-            codePaint.textSize = palette.codeSize * (available / width)
-        }
-        val measured = codePaint.measureText(volume.number)
-        native.drawText(
-            volume.number,
-            spine * .5f - measured / 2f,
-            baseline(codePaint, palette.spinePadV, palette.codeLine),
-            codePaint
-        )
-    }
-
-    /**
-     * archive_spine_title.dart L25：竖排标题。列在书脊内居中，
-     * FittedBox(scaleDown) 只在放不下时缩小；拉丁段整体旋转 90°。
-     */
-    private fun drawSpineTitle(
-        native: android.graphics.Canvas,
-        volume: ShelfVolume,
-        spine: Float,
-        body: Float,
-        palette: ShelfPalette,
-        ink: Float,
-        alpha: Int
-    ) {
-        val items = volume.runs.size + if (volume.truncated) 1 else 0
-        if (items <= 0) return
-        val bandTop = palette.spinePadV + palette.codeLine + palette.gapAfterNumber
-        val bandBottom = body - palette.spinePadV - palette.dotSize - palette.gapBeforeDot
-        val band = bandBottom - bandTop
-        if (band <= palette.titleLine) return
-        val needed = palette.titleLine * items
-        val scale = if (needed > band) band / needed else 1f
-        if (scale <= .30f) return
-        val size = palette.titleSize * scale
-        val line = palette.titleLine * scale
-        titlePaint.textSize = size
-        titlePaint.color = palette.ink
-        titlePaint.alpha = alpha
-        titlePaint.isFakeBoldText = true
-        titlePaint.getFontMetrics(fontMetrics)
-        // 单行垂直居中：baseline = 中心 - (ascent + descent) / 2
-        val centerOffset = -(fontMetrics.ascent + fontMetrics.descent) / 2f
-        var top = bandTop + (band - line * items) / 2f
-        for (i in 0 until items) {
-            val centerY = top + line / 2f
-            val run = volume.runs.getOrNull(i)
-            val text = if (run == null) "…" else run.text
-            val latin = run?.latin == true
-            val width = measure(titlePaint, text, scale >= .999f)
-            val baselineY = centerY + centerOffset
-            if (latin) {
-                val save = native.save()
-                native.rotate(90f, spine * .5f, centerY)
-                native.drawText(text, spine * .5f - width / 2f, baselineY, titlePaint)
-                native.restoreToCount(save)
-            } else {
-                native.drawText(text, spine * .5f - width / 2f, baselineY, titlePaint)
-            }
-            top += line
-        }
-    }
-
-    private fun drawTitleFallback(
-        native: android.graphics.Canvas,
-        volume: ShelfVolume,
-        left: Float,
-        top: Float,
-        width: Float,
-        height: Float,
-        palette: ShelfPalette,
-        ink: Float
-    ) {
-        titlePaint.textSize = palette.titleSize * 1.35f
-        titlePaint.color = palette.ink
-        titlePaint.alpha = (255f * .48f * ink).roundToInt().coerceIn(0, 255)
-        titlePaint.isFakeBoldText = true
-        val text = volume.title.take(4)
-        val measured = titlePaint.measureText(text)
-        native.drawText(
-            text,
-            left + (width - measured) / 2f,
-            top + height / 2f + palette.titleSize * .5f,
-            titlePaint
-        )
-    }
-
-    private fun drawRegistration(
-        native: android.graphics.Canvas,
-        cover: Float,
-        body: Float,
-        palette: ShelfPalette,
-        ink: Float
-    ) {
-        if (registrationPath.isEmpty) return
-        hairline.color = palette.ink
-        hairline.alpha = (255f * .42f * ink).roundToInt().coerceIn(0, 255)
-        hairline.strokeWidth = palette.hairline * .8f
-        native.drawPath(registrationPath, hairline)
-        hairline.strokeWidth = palette.hairline
-        hairline.color = palette.border
-    }
-
-    private fun baseline(paint: Paint, top: Float, lineHeight: Float): Float {
-        paint.getFontMetrics(fontMetrics)
-        val textHeight = fontMetrics.descent - fontMetrics.ascent
-        return top + (lineHeight - textHeight) / 2f - fontMetrics.ascent
-    }
-
-    private fun measure(paint: Paint, text: String, cache: Boolean): Float {
-        if (!cache) return paint.measureText(text)
-        return widthCache.getOrPut(text) { paint.measureText(text) }
-    }
 }
 
 private fun withAlpha(color: Int, alpha: Float): Int {
@@ -1439,6 +1361,7 @@ private fun Modifier.shelfSemanticBox(
         )
     )
     val focus = metrics.focusOf(logicalFocus.value, count)
+    // 无限轮播：同号书在前后各有一份，取离焦点最近的那一份当语义盒。
     val base = metrics.edgeSlots + index
     val slot = if (count <= 1) 0 else {
         val k = ((focus - base) / count.toFloat()).roundToInt()

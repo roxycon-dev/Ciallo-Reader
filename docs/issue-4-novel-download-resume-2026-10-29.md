@@ -22,14 +22,11 @@
 
 执行：`:app:testDebugUnitTest`，按上述四个测试类筛选。
 
-本次正式发布基于 GitHub 最新版 1.5.9，版本递增至 **1.5.10 / 252**；包含 1.5.9 已发布的漫画连接与安全修复。
+`:app:assembleRelease` 构建成功，包含正式版 Lint 检查、R8 混淆与资源精简。首次构建进程在内存压力较高时被主动重启，后续复用已完成的编译结果完成构建。
 
-`:app:assembleRelease` 构建通过；21 项相关回归在最新版代码上复验通过。
-
-- APK：`Ciallo-Reader-v1.5.10.apk`，29,287,732 字节。
-- APK SHA-256：`e0fa1a554e7f720b8ac3acc623260a9fddf92f527bd6a87d7283984670efb188`。
-- 签名与固定证书一致，版本从 1.5.9 / 251 递增至 1.5.10 / 252；新旧 APK 包名、签名及版本递增的静态升级条件检查通过。
-- 16 KiB ZIP 对齐检查通过，权限集合与 1.5.9 一致；未进行真机覆盖安装。
-- 发布附件提供 SHA-256、混淆映射、公开证书及原始测试和构建记录。
+- APK：`app/build/outputs/apk/release/app-release.apk`，29,235,200 字节，沿用 1.5.5 / 247。
+- APK SHA-256：`8faddeb5b3d19fa26cbb05d4f3828f976f63333e38fc4d480034836c5845e17b`。
+- `apksigner verify` 通过，证书 SHA-256 与仓库固定的 `signing/release-cert.sha256` 一致。
+- 未推送代码、发布 GitHub Release 或关闭 issue。
 
 本次未进行真机 Wi-Fi / 移动网络切换验证，也未测量源站接口吞吐量。消除重复章节请求可减少中断后的额外耗时；首次下载仍受逐章接口响应及请求节流影响。

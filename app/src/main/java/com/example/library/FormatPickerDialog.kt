@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.i18n.tr
+
 import com.example.ui.components.PullOutIconButton
 import com.example.ui.components.PullOutDialog
 import com.example.ui.components.pullOutClickable
@@ -99,7 +101,7 @@ fun FormatPickerDialog(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "选择下载格式",
+                                text = tr("选择下载格式"),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 17.sp,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -116,7 +118,7 @@ fun FormatPickerDialog(
                         if (!loading) {
                             PullOutIconButton(
                                 icon = Icons.Default.Close,
-                                contentDescription = "关闭",
+                                contentDescription = tr("关闭"),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 onClick = com.example.ui.components.paperDismiss(onDismiss)
                             )
@@ -200,7 +202,7 @@ private fun FormatRow(format: BookFormat, onClick: () -> Unit) {
                 }
             }
             AppActionButton(
-                text = "下载",
+                text = tr("下载"),
                 onClick = onClick,
                 variant = AppButtonVariant.Secondary,
                 buttonSize = AppButtonSize.Small,

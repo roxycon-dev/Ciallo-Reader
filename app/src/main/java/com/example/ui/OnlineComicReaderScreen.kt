@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.i18n.tr
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -121,7 +123,7 @@ fun OnlineComicReaderScreen(
                             color = androidx.compose.material3.MaterialTheme.colorScheme.secondary,
                         )
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("正在加载图片…", color = Color.White, fontSize = 14.sp)
+                        Text(tr("正在加载图片…"), color = Color.White, fontSize = 14.sp)
                     }
                 }
             }
@@ -136,14 +138,14 @@ fun OnlineComicReaderScreen(
                             modifier = Modifier.padding(horizontal = 32.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
-                        AppLiquidButton(text = "重试", onClick = onRetry)
+                        AppLiquidButton(text = tr("重试"), onClick = onRetry)
                     }
                 }
             }
 
             imageUrls.isEmpty() -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("没有可显示的图片", color = Color.White)
+                    Text(tr("没有可显示的图片"), color = Color.White)
                 }
             }
 
@@ -325,7 +327,7 @@ internal fun buildComicImageLoader(context: android.content.Context): ImageLoade
             var lastError: Exception? = null
             for (attempt in 1..3) {
                 try {
-                    if (chain.call().isCanceled()) throw java.io.IOException("请求已取消")
+                    if (chain.call().isCanceled()) throw java.io.IOException(tr("请求已取消"))
                     response = chain.proceed(builder.build())
                     if (response!!.code !in listOf(408, 429, 500, 502, 503, 504) || attempt == 3) break
                     response!!.close()
@@ -337,12 +339,12 @@ internal fun buildComicImageLoader(context: android.content.Context): ImageLoade
                 if (attempt < 3) {
                     // Check cancellation during backoff; no sleep after the final failure.
                     repeat(attempt * 3) {
-                        if (chain.call().isCanceled()) throw java.io.IOException("请求已取消")
+                        if (chain.call().isCanceled()) throw java.io.IOException(tr("请求已取消"))
                         Thread.sleep(100)
                     }
                 }
             }
-            if (response == null) throw (lastError ?: Exception("图片请求失败"))
+            if (response == null) throw (lastError ?: Exception(tr("图片请求失败")))
             val finalResponse = response!!
             if (!finalResponse.isSuccessful) return@addInterceptor finalResponse
             val body = finalResponse.body ?: return@addInterceptor finalResponse
@@ -353,7 +355,6 @@ internal fun buildComicImageLoader(context: android.content.Context): ImageLoade
             val previewStarted = System.nanoTime()
             val streamPreview = chain.request().tag(ComicStreamPreview::class.java)?.takeIf {
                 !MhttuImageDecryptor.isEncryptedHost(finalResponse.request.url.host) &&
-                    !ImageBytes.isIqtaoImageHost(finalResponse.request.url.host) &&
                     !JsImageProcessor.hasTransform(progressUrl) &&
                     !JsImageProcessor.hasTransform(finalResponse.request.url.toString())
             }
@@ -361,8 +362,8 @@ internal fun buildComicImageLoader(context: android.content.Context): ImageLoade
                 val source = it.source()
                 var lastUpdate = 0L
                 while (source.read(buffer, 64L * 1024) != -1L) {
-                    if (buffer.size > 32L * 1024 * 1024) throw java.io.IOException("图片文件过大")
-                    if (chain.call().isCanceled()) throw java.io.IOException("请求已取消")
+                    if (buffer.size > 32L * 1024 * 1024) throw java.io.IOException(tr("图片文件过大"))
+                    if (chain.call().isCanceled()) throw java.io.IOException(tr("请求已取消"))
                     // Fast transfers go straight to the full decoder. Slow transfers can
                     // reveal completed progressive scans without waiting for the last byte.
                     if (System.nanoTime() - previewStarted >= 250_000_000L) streamPreview?.offer(buffer)
@@ -376,14 +377,14 @@ internal fun buildComicImageLoader(context: android.content.Context): ImageLoade
             ComicTransfers.update(progressUrl, buffer.size, total)
             val raw = buffer.readByteArray()
             val host = response.request.url.host
-            var processed = ImageBytes.normalizeImage(raw, finalResponse.header("Content-Encoding"), finalResponse.request.url.toString())
+            var processed = ImageBytes.normalizeImage(raw, finalResponse.header("Content-Encoding"))
             // 平台解不了 AVIF 时，自动尝试 hitomi 类 CDN 的 webp 变体
             if (ImageBytes.isAvif(processed) && !ImageBytes.decodeOk(processed)) {
                 for (candidate in ImageBytes.webpVariants(response.request.url.toString())) {
                     try {
                         val p2 = chain.proceed(response.request.newBuilder().url(candidate).build()).use { r2 ->
                             if (!r2.isSuccessful) null else r2.body?.bytes()?.let { b2 ->
-                                ImageBytes.normalizeImage(b2, r2.header("Content-Encoding"), r2.request.url.toString())
+                                ImageBytes.normalizeImage(b2, r2.header("Content-Encoding"))
                             }
                         } ?: continue
                         if (!ImageBytes.isAvif(p2) && ImageBytes.decodeOk(p2)) {

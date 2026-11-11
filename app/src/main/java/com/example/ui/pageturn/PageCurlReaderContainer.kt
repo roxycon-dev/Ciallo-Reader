@@ -2,6 +2,8 @@
 
 package com.example.ui.pageturn
 
+import com.example.i18n.tr
+
 import com.example.ui.reader.TouchZone
 import com.example.ui.reader.TouchAction
 import com.example.ui.reader.SwipeAction
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -371,13 +374,13 @@ fun PageCurlReaderContainer(
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                com.example.ui.components.AppProgressIndicator(
+                                CircularProgressIndicator(
                                     progress = { (pullValue / 80f).coerceIn(0f, 1f) },
                                     strokeWidth = 3.dp,
                                     color = if (charged) MintGold else MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(40.dp)
                                 )
-                                com.example.ui.components.AnimatedStateIcon(
+                                Icon(
                                     imageVector = if (isCurrentBookmarked) Icons.Filled.BookmarkBorder else Icons.Filled.Bookmark,
                                     contentDescription = null,
                                     tint = if (charged) MintGold else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -387,10 +390,10 @@ fun PageCurlReaderContainer(
                             Spacer(Modifier.height(6.dp))
                             Text(
                                 text = when {
-                                    charged && isCurrentBookmarked -> "松开即可取消书签"
-                                    charged -> "松开即可保存书签"
-                                    isCurrentBookmarked -> "下拉取消书签"
-                                    else -> "下拉添加书签"
+                                    charged && isCurrentBookmarked -> tr("松开即可取消书签")
+                                    charged -> tr("松开即可保存书签")
+                                    isCurrentBookmarked -> tr("下拉取消书签")
+                                    else -> tr("下拉添加书签")
                                 },
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,

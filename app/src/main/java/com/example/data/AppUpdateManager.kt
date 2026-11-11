@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import android.content.Context
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -18,8 +20,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.io.File
 
-internal enum class AppUpdateSource { GITHUB, MIRROR }
-
 internal enum class AppUpdateStage { AVAILABLE, DOWNLOADING, VERIFYING, READY, NEED_PERMISSION, INSTALLING, FAILED }
 
 internal data class AppUpdateState(
@@ -30,7 +30,6 @@ internal data class AppUpdateState(
     val total: Long? = null,
     val message: String? = null,
     val autoInstall: Boolean = false,
-    val source: AppUpdateSource = AppUpdateSource.GITHUB,
 ) {
     val transferring get() = stage == AppUpdateStage.DOWNLOADING || stage == AppUpdateStage.VERIFYING
     val hasPackage get() = stage in setOf(AppUpdateStage.READY, AppUpdateStage.NEED_PERMISSION, AppUpdateStage.INSTALLING)
@@ -62,13 +61,11 @@ internal class AppUpdateManager(
             catch (_: Exception) { store.clear(); null }
         }
         if (pending != null) mutableState.value = AppUpdateState(pending.release, AppUpdateStage.READY,
-            message = "安装包已下载，可继续安装")
+            message = tr("安装包已下载，可继续安装"))
     }
 
     fun offer(release: UpdateRelease) = scope.launch {
         initialized.await()
-        // Never cover the installer while it is in the foreground.
-        if (state.value.stage == AppUpdateStage.INSTALLING) return@launch
         val old = state.value
         if (old.transferring || old.hasPackage && old.release?.tag == release.tag) {
             mutableState.update { it.copy(visible = true) }
@@ -77,40 +74,27 @@ internal class AppUpdateManager(
         }
     }
 
-    /**
-     * Startup path: present only a newer release, and only when no dialog,
-     * transfer or verified package is already active. Errors never surface here.
-     */
-    fun offerAuto(release: UpdateRelease) = scope.launch {
-        initialized.await()
-        val old = state.value
-        if (old.visible || old.transferring || old.hasPackage || old.stage == AppUpdateStage.INSTALLING) return@launch
-        mutableState.value = AppUpdateState(release = release, visible = true)
-    }
-
     fun show() { mutableState.update { it.copy(visible = it.release != null) } }
     fun hide() { mutableState.update { it.copy(visible = false, autoInstall = false) } }
     fun cancelDownload() { transfer?.cancel() }
     fun consumeAutoInstall() { mutableState.update { it.copy(autoInstall = false) } }
     suspend fun awaitInitialization() { initialized.await() }
 
-    fun startDownload(source: AppUpdateSource = AppUpdateSource.GITHUB) {
+    fun startDownload() {
         if (transfer?.isActive == true) return
         val release = state.value.release ?: return
         val asset = release.apk ?: return
-        if (source == AppUpdateSource.MIRROR && mirrorDownloadUrl(release.tag, asset) == null) return
         mutableState.update { it.copy(stage = AppUpdateStage.DOWNLOADING, downloaded = 0, total = asset.size,
-            visible = true, message = null, autoInstall = false, source = source) }
+            visible = true, message = null, autoInstall = false) }
         transfer = scope.launch {
             var temporary: File? = null
             var committed = false
             try {
                 val file = withContext(Dispatchers.IO) { store.newTransferFile() }
                 temporary = file
-                downloader.download(asset, release.tag, file, source = source,
-                    onProgress = { received, total ->
-                        mutableState.update { it.copy(downloaded = received, total = total) }
-                    })
+                downloader.download(asset, release.tag, file) { received, total ->
+                    mutableState.update { it.copy(downloaded = received, total = total) }
+                }
                 mutableState.update { it.copy(stage = AppUpdateStage.VERIFYING) }
                 val pending = withContext(Dispatchers.IO) {
                     val code = verify(file, release)
@@ -121,12 +105,12 @@ internal class AppUpdateManager(
                 mutableState.update { it.copy(stage = AppUpdateStage.READY, autoInstall = true) }
             } catch (cancelled: CancellationException) {
                 mutableState.update { it.copy(stage = if (committed) AppUpdateStage.READY else AppUpdateStage.AVAILABLE,
-                    message = if (committed) "安装包已下载，可继续安装" else "下载已取消", autoInstall = false) }
+                    message = if (committed) tr("安装包已下载，可继续安装") else tr("下载已取消"), autoInstall = false) }
                 throw cancelled
             } catch (e: Exception) {
                 if (!currentCoroutineContext().isActive) {
                     mutableState.update { it.copy(stage = if (committed) AppUpdateStage.READY else AppUpdateStage.AVAILABLE,
-                        message = if (committed) "安装包已下载，可继续安装" else "下载已取消", autoInstall = false) }
+                        message = if (committed) tr("安装包已下载，可继续安装") else tr("下载已取消"), autoInstall = false) }
                     currentCoroutineContext().ensureActive()
                 } else mutableState.update { it.copy(stage = AppUpdateStage.FAILED,
                     message = e.message?.take(250) ?: "更新下载失败，请重试或使用浏览器下载", autoInstall = false) }
@@ -150,7 +134,7 @@ internal class AppUpdateManager(
         if (state.value.stage != AppUpdateStage.INSTALLING || state.value.release?.tag != original.release?.tag) return@launch
         if (installed) mutableState.value = AppUpdateState()
         else mutableState.update { it.copy(stage = AppUpdateStage.READY, visible = true,
-            message = "安装包已保留。如果尚未完成安装，可以重试或导出安装包", autoInstall = false) }
+            message = tr("安装包已保留。如果尚未完成安装，可以重试或导出安装包"), autoInstall = false) }
     }
 
     fun installationFailed(message: String) {

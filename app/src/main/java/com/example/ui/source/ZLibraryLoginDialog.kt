@@ -1,5 +1,7 @@
 package com.example.ui.source
 
+import com.example.i18n.tr
+
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -80,7 +82,7 @@ fun ZLibraryLoginDialog(
                     try {
                         when (val result = source.login(credential)) {
                             is SourceResult.Success -> {
-                                AppToast.makeText(context, if (siteVerification) "验证成功" else "登录成功", Toast.LENGTH_SHORT).show()
+                                AppToast.makeText(context, if (siteVerification) tr("验证成功") else tr("登录成功"), Toast.LENGTH_SHORT).show()
                                 closeAfterSuccess()
                             }
                             is SourceResult.Error -> {
@@ -100,7 +102,7 @@ fun ZLibraryLoginDialog(
 
         if (!isJsSource) {
             SegmentedPillSelector(
-                options = listOf(0 to "账号密码", 1 to "粘贴 Cookie"),
+                options = listOf(0 to tr("账号密码"), 1 to tr("粘贴 Cookie")),
                 selected = loginMode,
                 onSelect = { if (!loading) { loginMode = it; error = null } },
                 fontSp = 14f,
@@ -148,10 +150,10 @@ fun ZLibraryLoginDialog(
         }
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         val action = when {
-            siteVerification && loading -> "等待站点验证"
-            siteVerification -> "打开站点验证"
-            loading -> "登录中"
-            else -> "确认登录"
+            siteVerification && loading -> tr("等待站点验证")
+            siteVerification -> tr("打开站点验证")
+            loading -> tr("登录中")
+            else -> tr("确认登录")
         }
         WenkuTextButton(
             action, submit, Modifier.fillMaxWidth(),
@@ -168,7 +170,7 @@ fun ZLibraryLoginDialog(
                     scope.launch {
                         try {
                             onRegister()
-                            AppToast.makeText(context, "注册成功，已自动登录", Toast.LENGTH_SHORT).show()
+                            AppToast.makeText(context, tr("注册成功，已自动登录"), Toast.LENGTH_SHORT).show()
                             closeAfterSuccess()
                         } catch (e: CancellationException) {
                             throw e
@@ -187,7 +189,7 @@ fun ZLibraryLoginDialog(
                 "没有账号？去注册",
                 onClick = {
                     runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }.onFailure {
-                        AppToast.makeText(context, "无法打开注册页面", Toast.LENGTH_SHORT).show()
+                        AppToast.makeText(context, tr("无法打开注册页面"), Toast.LENGTH_SHORT).show()
                     }
                 },
                 modifier = Modifier.fillMaxWidth(), enabled = !loading,
@@ -211,7 +213,7 @@ internal fun SourceCredentialFields(
         OutlinedTextField(
             value = username,
             onValueChange = onUsernameChange,
-            label = { Text("邮箱 / 账号") },
+            label = { Text(tr("邮箱 / 账号")) },
             singleLine = true,
             enabled = enabled,
             modifier = Modifier.fillMaxWidth(),
@@ -221,7 +223,7 @@ internal fun SourceCredentialFields(
         OutlinedTextField(
             value = password,
             onValueChange = onPasswordChange,
-            label = { Text("密码") },
+            label = { Text(tr("密码")) },
             singleLine = true,
             enabled = enabled,
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -232,7 +234,7 @@ internal fun SourceCredentialFields(
             trailingIcon = {
                 AppIconButton(
                     if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                    if (passwordVisible) "隐藏密码" else "显示密码",
+                    if (passwordVisible) tr("隐藏密码") else tr("显示密码"),
                     onClick = { passwordVisible = !passwordVisible },
                     enabled = enabled,
                     wenkuSymbol = if (passwordVisible) WenkuSymbol.EyeOff else WenkuSymbol.Eye,

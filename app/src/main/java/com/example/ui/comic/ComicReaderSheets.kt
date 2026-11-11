@@ -2,6 +2,8 @@
 
 package com.example.ui.comic
 
+import com.example.i18n.tr
+
 import androidx.compose.material3.MaterialTheme
 
 import com.example.ui.components.paperSurface
@@ -183,13 +185,13 @@ private val AccentColor = ReadingPalette.WarmAccent
 // 第七轮第 3 条：Tab 增加简洁线性图标（书页/眼睛/图片/调色板/时钟/手掌），
 // 作为完整导航区域设计——图标+文字+统一高度+明确但克制的选中反馈。
 private val SettingsTabs = listOf(
-    PanelTabData("翻页", WenkuSymbol.Book),
-    PanelTabData("显示", WenkuSymbol.Eye),
-    PanelTabData("图像", WenkuSymbol.Image),
-    PanelTabData("翻译", WenkuSymbol.Language),
-    PanelTabData("主题", WenkuSymbol.Sliders),
-    PanelTabData("自动", WenkuSymbol.Timer),
-    PanelTabData("手势", WenkuSymbol.Touch),
+    PanelTabData(tr("翻页"), WenkuSymbol.Book),
+    PanelTabData(tr("显示"), WenkuSymbol.Eye),
+    PanelTabData(tr("图像"), WenkuSymbol.Image),
+    PanelTabData(tr("翻译"), WenkuSymbol.Language),
+    PanelTabData(tr("主题"), WenkuSymbol.Sliders),
+    PanelTabData(tr("自动"), WenkuSymbol.Timer),
+    PanelTabData(tr("手势"), WenkuSymbol.Touch),
 )
 
 @Composable
@@ -235,7 +237,7 @@ internal fun ComicSettingsSheet(
                 .comicPanelGlass(glassBackdrop, sheetShape)
                 .border(1.dp, StrokeColor, sheetShape)
                 .overlayTouchShield()
-                .semantics { paneTitle = "漫画阅读设置" }
+                .semantics { paneTitle = tr("漫画阅读设置") }
         ) {
             Row(Modifier.fillMaxWidth().padding(start = DesignTokens.SpaceXl, end = DesignTokens.SpaceSm, top = DesignTokens.SpaceTight, bottom = DesignTokens.SpaceCompact),
                 verticalAlignment = Alignment.CenterVertically) {
@@ -243,12 +245,12 @@ internal fun ComicSettingsSheet(
                     modifier = Modifier.readingGlass(CircleShape).padding(DesignTokens.SpaceTight).size(DesignTokens.SpaceXl))
                 Spacer(Modifier.width(DesignTokens.SpaceMd))
                 Column(Modifier.weight(1f)) {
-                    Text("阅读设置", color = TextPrimary, fontSize = DesignTokens.TypeTitle, fontWeight = FontWeight.SemiBold)
+                    Text(tr("阅读设置"), color = TextPrimary, fontSize = DesignTokens.TypeTitle, fontWeight = FontWeight.SemiBold)
                     Text("${config.mode.label} · ${config.direction.label}", color = TextSecondary, fontSize = DesignTokens.TypeCaption)
                 }
                 PullOutIconButton(
                     icon = Icons.Filled.Close,
-                    contentDescription = "关闭阅读设置",
+                    contentDescription = tr("关闭阅读设置"),
                     tint = TextSecondary,
                     onClick = com.example.ui.components.paperDismiss(onDismiss)
                 )
@@ -295,10 +297,10 @@ internal fun ComicSettingsSheet(
                     verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Tune, null, tint = MintPrimary, modifier = Modifier.size(DesignTokens.SpaceLoose))
                     Spacer(Modifier.width(DesignTokens.SpaceSm))
-                    Text("预设管理", color = TextPrimary, fontSize = DesignTokens.TypeLabel)
+                    Text(tr("预设管理"), color = TextPrimary, fontSize = DesignTokens.TypeLabel)
                 }
                 Box(Modifier.weight(1f)) {
-                    SwitchRow("独立设置", if (perBookConfig) "仅当前漫画生效" else "跟随全局设置",
+                    SwitchRow(tr("独立设置"), if (perBookConfig) tr("仅当前漫画生效") else tr("跟随全局设置"),
                         perBookConfig, onPerBookConfigChange)
                 }
             }
@@ -326,7 +328,7 @@ internal fun ComicSettingsSheet(
                     modifier = Modifier.size(DesignTokens.SpaceLg)
                 )
                 Spacer(Modifier.width(DesignTokens.SpaceSm))
-                Text("预设管理", color = TextPrimary, fontSize = DesignTokens.TypeLabel, modifier = Modifier.weight(1f))
+                Text(tr("预设管理"), color = TextPrimary, fontSize = DesignTokens.TypeLabel, modifier = Modifier.weight(1f))
                 PanelDecorativeIcon(
                     Icons.Filled.ChevronRight,
                     tint = TextSecondary,
@@ -335,8 +337,8 @@ internal fun ComicSettingsSheet(
             }
             Spacer(Modifier.height(DesignTokens.SpaceXs))
             SwitchRow(
-                title = "本漫画独立设置",
-                subtitle = if (perBookConfig) "仅当前漫画生效" else "跟随全局设置",
+                title = tr("本漫画独立设置"),
+                subtitle = if (perBookConfig) tr("仅当前漫画生效") else tr("跟随全局设置"),
                 checked = perBookConfig,
                 onChange = onPerBookConfigChange
             )
@@ -419,7 +421,7 @@ private fun TranslationTab(
                 onRefresh(false)
             } catch (e: Exception) {
                 kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                aiTestResult = "配置未保存：系统安全存储不可用，请重新打开应用后再试"
+                aiTestResult = tr("配置未保存：系统安全存储不可用，请重新打开应用后再试")
             }
         }
     }
@@ -435,28 +437,28 @@ private fun TranslationTab(
 
     if (engineSubPage == "ai") {
         /* ── 二级页：自定义 AI 配置 ── */
-        PanelSectionCard("自定义 AI 接口", Icons.Filled.Cloud) {
-            PanelRow("返回引擎列表", Icons.AutoMirrored.Filled.ArrowBack) { engineSubPage = null }
+        PanelSectionCard(tr("自定义 AI 接口"), Icons.Filled.Cloud) {
+            PanelRow(tr("返回引擎列表"), Icons.AutoMirrored.Filled.ArrowBack) { engineSubPage = null }
             Spacer(Modifier.height(DesignTokens.SpaceCompact))
-            PanelHint("仅发送识别文字；额度由服务商决定")
+            PanelHint(tr("仅发送识别文字；额度由服务商决定"))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceCompact)) {
-                PullOutTextButton(onClick = { useProvider("https://api.siliconflow.cn/v1", "Qwen/Qwen2.5-7B-Instruct") }) { Text("硅基流动", color = MintPrimary) }
+                PullOutTextButton(onClick = { useProvider("https://api.siliconflow.cn/v1", "Qwen/Qwen2.5-7B-Instruct") }) { Text(tr("硅基流动"), color = MintPrimary) }
                 PullOutTextButton(onClick = { useProvider("https://api.deepseek.com/v1", "deepseek-chat") }) { Text("DeepSeek", color = MintPrimary) }
-                PullOutTextButton(onClick = { useProvider("https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus") }) { Text("阿里百炼", color = MintPrimary) }
+                PullOutTextButton(onClick = { useProvider("https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus") }) { Text(tr("阿里百炼"), color = MintPrimary) }
             }
-            PanelTextField("API 地址（支持完整 chat/completions 地址）", llmUrl) {
+            PanelTextField(tr("API 地址（支持完整 chat/completions 地址）"), llmUrl) {
                 saveLlm(it, llmKey, llmModel, llmGemini)
             }
             PanelTextField("API Key", llmKey, obscured = !showKey) {
                 saveLlm(llmUrl, it, llmModel, llmGemini)
             }
-            PullOutTextButton(onClick = { showKey = !showKey }) { Text(if (showKey) "隐藏密钥" else "显示密钥", color = TextSecondary) }
-            PanelTextField("模型名（如 deepseek-chat）", llmModel) {
+            PullOutTextButton(onClick = { showKey = !showKey }) { Text(if (showKey) tr("隐藏密钥") else tr("显示密钥"), color = TextSecondary) }
+            PanelTextField(tr("模型名（如 deepseek-chat）"), llmModel) {
                 saveLlm(llmUrl, llmKey, it, llmGemini)
             }
             SwitchRow(
-                title = "Gemini 接口格式",
-                subtitle = if (llmGemini) "Gemini 接口" else "OpenAI 兼容接口",
+                title = tr("Gemini 接口格式"),
+                subtitle = if (llmGemini) tr("Gemini 接口") else tr("OpenAI 兼容接口"),
                 checked = llmGemini,
             ) { v -> saveLlm(llmUrl, llmKey, llmModel, v) }
             PullOutTextButton(enabled = !aiTesting && LlmBubbleTranslator.LlmConfig(llmUrl, llmKey, llmModel, llmGemini).isValid(), onClick = {
@@ -469,28 +471,28 @@ private fun TranslationTab(
                         onRefresh(false)
                     } catch (e: Exception) {
                         kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                        aiTestResult = "配置未保存：系统安全存储不可用，请重新打开应用后再试"
+                        aiTestResult = tr("配置未保存：系统安全存储不可用，请重新打开应用后再试")
                     } finally { aiTesting = false }
                 }
-            }) { Text(if (aiTesting) "正在检查…" else "测试 AI 翻译", color = MintPrimary) }
+            }) { Text(if (aiTesting) tr("正在检查…") else tr("测试 AI 翻译"), color = MintPrimary) }
             aiTestResult?.let { PanelHint(it) }
         }
     } else if (engineSubPage == "online") {
         /* ── 二级页：在线翻译设置 ── */
-        PanelSectionCard("免费免 Key 在线机翻", Icons.Filled.Public) {
-            PanelRow("返回引擎列表", Icons.AutoMirrored.Filled.ArrowBack) { engineSubPage = null }
+        PanelSectionCard(tr("免费免 Key 在线机翻"), Icons.Filled.Public) {
+            PanelRow(tr("返回引擎列表"), Icons.AutoMirrored.Filled.ArrowBack) { engineSubPage = null }
             Spacer(Modifier.height(DesignTokens.SpaceCompact))
             val langIdx = when (config.translationLang) { "ja" -> 1; "en" -> 2; "ko" -> 3; else -> 0 }
             SegmentRow(
                 "页面文字",
-                listOf(0 to "自动识别", 1 to "日文", 2 to "英文", 3 to "韩文"),
+                listOf(0 to tr("自动识别"), 1 to tr("日文"), 2 to tr("英文"), 3 to tr("韩文")),
                 langIdx,
             ) { i ->
                 val lang = when (i) { 1 -> "ja"; 2 -> "en"; 3 -> "ko"; else -> "auto" }
                 update { it.copy(translationLang = lang) }
             }
             Spacer(Modifier.height(DesignTokens.SpaceSm))
-            Text("手机 OCR · 腾讯机翻 · 免 Key", color = TextSecondary, fontSize = DesignTokens.TypeCaption, lineHeight = DesignTokens.TypeCaptionLineHeight)
+            Text(tr("手机 OCR · 腾讯机翻 · 免 Key"), color = TextSecondary, fontSize = DesignTokens.TypeCaption, lineHeight = DesignTokens.TypeCaptionLineHeight)
             PullOutTextButton(enabled = !onlineTesting, onClick = {
                 onlineTesting = true
                 onlineTestResult = null
@@ -503,20 +505,20 @@ private fun TranslationTab(
                             else "连接成功 · ${android.os.SystemClock.elapsedRealtime() - start} ms · $result"
                     } finally { onlineTesting = false }
                 }
-            }) { Text(if (onlineTesting) "正在检查…" else "测试在线翻译", color = MintPrimary) }
+            }) { Text(if (onlineTesting) tr("正在检查…") else tr("测试在线翻译"), color = MintPrimary) }
             onlineTestResult?.let { Text(it, color = TextSecondary, fontSize = DesignTokens.TypeCaption, lineHeight = DesignTokens.TypeCaptionLineHeight) }
         }
     } else {
         /* ── 一级页：引擎选择卡片 ── */
-        PanelSectionCard("翻译引擎（点击选择）", Icons.Filled.Bolt) {
+        PanelSectionCard(tr("翻译引擎（点击选择）"), Icons.Filled.Bolt) {
             val aiConfigured = llmUrl.isNotBlank() && llmModel.isNotBlank()
             EngineCard(
-                title = "自定义 AI 接口",
-                desc = "上下文翻译",
+                title = tr("自定义 AI 接口"),
+                desc = tr("上下文翻译"),
                 state = when {
-                    config.translationEngine == "ai" && aiConfigured -> "当前使用 · 已配置"
-                    aiConfigured -> "已配置 · 点击选用并配置"
-                    else -> "未配置 · 点击选用并配置"
+                    config.translationEngine == "ai" && aiConfigured -> tr("当前使用 · 已配置")
+                    aiConfigured -> tr("已配置 · 点击选用并配置")
+                    else -> tr("未配置 · 点击选用并配置")
                 },
                 selected = config.translationEngine == "ai",
             ) {
@@ -525,9 +527,9 @@ private fun TranslationTab(
             }
             Spacer(Modifier.height(DesignTokens.SpaceSm))
             EngineCard(
-                title = "免费免 Key 在线机翻",
-                desc = "免费免配置",
-                state = if (config.translationEngine == "online") "当前使用" else "点击选用",
+                title = tr("免费免 Key 在线机翻"),
+                desc = tr("免费免配置"),
+                state = if (config.translationEngine == "online") tr("当前使用") else tr("点击选用"),
                 selected = config.translationEngine == "online",
             ) {
                 update { it.copy(translationEngine = "online") }
@@ -535,15 +537,15 @@ private fun TranslationTab(
             }
         }
 
-        PanelSectionCard("功能", Icons.Filled.Translate) {
+        PanelSectionCard(tr("功能"), Icons.Filled.Translate) {
             SwitchRow(
-                title = "整页自动翻译",
+                title = tr("整页自动翻译"),
                 checked = config.translationEnabled,
             ) { v -> update { it.copy(translationEnabled = v) } }
             val langIdx = when (config.translationLang) { "ja" -> 1; "en" -> 2; "ko" -> 3; else -> 0 }
             SegmentRow(
                 "页面文字",
-                listOf(0 to "自动识别", 1 to "日文", 2 to "英文", 3 to "韩文"),
+                listOf(0 to tr("自动识别"), 1 to tr("日文"), 2 to tr("英文"), 3 to tr("韩文")),
                 langIdx,
             ) { i ->
                 val lang = when (i) { 1 -> "ja"; 2 -> "en"; 3 -> "ko"; else -> "auto" }
@@ -552,9 +554,9 @@ private fun TranslationTab(
         }
     }
 
-    PanelSectionCard("离线模型", Icons.Filled.CloudDownload) {
+    PanelSectionCard(tr("离线模型"), Icons.Filled.CloudDownload) {
         if (modelsReady) {
-            PanelHint("OCR 与气泡识别模型已就绪 · 约 34 MB")
+            PanelHint(tr("OCR 与气泡识别模型已就绪 · 约 34 MB"))
         } else if (downloading >= 0f) {
             Column(Modifier.fillMaxWidth().padding(vertical = DesignTokens.SpaceSm)) {
                 Text("正在下载模型 ${(downloading * 100).toInt()}%", color = TextPrimary, fontSize = DesignTokens.TypeLabel)
@@ -593,7 +595,7 @@ private fun TranslationTab(
                     PanelDecorativeIcon(Icons.Filled.Download, tint = MintPrimary, modifier = Modifier.size(DesignTokens.SpaceLg))
                     Spacer(Modifier.width(DesignTokens.SpaceSm))
                     Text(
-                        if (downloadError == null) "下载模型" else "重试下载",
+                        if (downloadError == null) tr("下载模型") else tr("重试下载"),
                         color = TextPrimary, fontSize = DesignTokens.TypeLabel, modifier = Modifier.weight(1f)
                     )
                 }
@@ -605,9 +607,9 @@ private fun TranslationTab(
         }
     }
 
-    PanelSectionCard("译文显示", Icons.Filled.FormatSize) {
+    PanelSectionCard(tr("译文显示"), Icons.Filled.FormatSize) {
         SliderRow(
-            title = "译文字号",
+            title = tr("译文字号"),
             value = config.translationTextScale * 100f,
             range = 80f..140f,
             format = { "${it.toInt()}%" },
@@ -615,8 +617,8 @@ private fun TranslationTab(
         )
     }
 
-    PanelSectionCard("译文缓存", Icons.Filled.CleaningServices) {
-        PanelHint("已缓存译文 %.1f MB / 64 MB".format(cacheBytes / (1024f * 1024f)))
+    PanelSectionCard(tr("译文缓存"), Icons.Filled.CleaningServices) {
+        PanelHint(tr("已缓存译文 %.1f MB / 64 MB").format(cacheBytes / (1024f * 1024f)))
         Row(
             Modifier
                 .fillMaxWidth()
@@ -632,7 +634,7 @@ private fun TranslationTab(
         ) {
             PanelDecorativeIcon(Icons.Filled.Delete, tint = ReadingPalette.ErrorMuted, modifier = Modifier.size(DesignTokens.SpaceLg))
             Spacer(Modifier.width(DesignTokens.SpaceSm))
-            Text("清空全部已翻译页面", color = TextPrimary, fontSize = DesignTokens.TypeLabel)
+            Text(tr("清空全部已翻译页面"), color = TextPrimary, fontSize = DesignTokens.TypeLabel)
         }
     }
 }
@@ -641,20 +643,20 @@ private fun TranslationTab(
 
 @Composable
 private fun ModeTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit) {
-    PanelSectionCard("阅读模式", Icons.Filled.AutoStories) {
+    PanelSectionCard(tr("阅读模式"), Icons.Filled.AutoStories) {
         ModeGrid(config.mode) { m -> update { c -> c.copy(mode = m) } }
         PanelHint(when (config.mode) {
-            ComicMode.SINGLE -> "每次显示一页；宽度适配可平移查看长页。"
-            ComicMode.DOUBLE -> "横向配对显示；跨页扫描图保持独占，封面可单独显示。"
-            ComicMode.WEBTOON -> "纵向阅读长图，可保留页间距并选择磁吸。"
-            ComicMode.CONTINUOUS -> "纵向无缝拼接，保持自由滚动。"
-            ComicMode.MAGNETIC -> "拖动跟手，松手按距离与速度吸附到相邻页。"
+            ComicMode.SINGLE -> tr("每次显示一页；宽度适配可平移查看长页。")
+            ComicMode.DOUBLE -> tr("横向配对显示；跨页扫描图保持独占，封面可单独显示。")
+            ComicMode.WEBTOON -> tr("纵向阅读长图，可保留页间距并选择磁吸。")
+            ComicMode.CONTINUOUS -> tr("纵向无缝拼接，保持自由滚动。")
+            ComicMode.MAGNETIC -> tr("拖动跟手，松手按距离与速度吸附到相邻页。")
         })
     }
-    PanelSectionCard("阅读方向", Icons.Filled.SwapHoriz) {
+    PanelSectionCard(tr("阅读方向"), Icons.Filled.SwapHoriz) {
         DirectionGrid(config.direction) { d -> update { c -> c.copy(direction = d) } }
     }
-    PanelSectionCard("翻页动画", Icons.Filled.Animation) {
+    PanelSectionCard(tr("翻页动画"), Icons.Filled.Animation) {
         SegmentRow(
             "动画",
             listOf(
@@ -666,19 +668,19 @@ private fun ModeTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> C
             config.pageAnim.ordinal
         ) { i -> update { it.copy(pageAnim = ComicPageAnim.entries[i]) } }
         if (!curlEngineActive(config.pageAnim, config.direction, config.mode) && config.pageAnim == ComicPageAnim.CURL)
-            PanelHint("仿真翻页需横向分页")
+            PanelHint(tr("仿真翻页需横向分页"))
         if (config.mode == ComicMode.WEBTOON || config.mode == ComicMode.CONTINUOUS)
-            PanelHint("翻页动画仅用于分页")
+            PanelHint(tr("翻页动画仅用于分页"))
     }
     // 第 6/7 条：条漫模式磁吸到页边界（可关闭）；无缝滚动恒无磁吸且强制 0 间距
     if (config.mode == ComicMode.WEBTOON || config.mode == ComicMode.CONTINUOUS) {
-        PanelSectionCard("垂直滚动", Icons.Filled.SwipeVertical) {
+        PanelSectionCard(tr("垂直滚动"), Icons.Filled.SwipeVertical) {
             if (config.mode == ComicMode.WEBTOON) {
-                SwitchRow("磁吸到页边界", null, config.webtoonSnap) { v ->
+                SwitchRow(tr("磁吸到页边界"), null, config.webtoonSnap) { v ->
                     update { it.copy(webtoonSnap = v) }
                 }
             } else {
-                PanelHint("无缝滚动 · 零间距")
+                PanelHint(tr("无缝滚动 · 零间距"))
             }
         }
     }
@@ -772,7 +774,7 @@ private val FitOptions = listOf(
 )
 
 private fun fitLabel(fit: ComicFit): String = FitOptions.firstOrNull { it.first == fit }?.second
-    ?: if (fit == ComicFit.FIT_WIDTH) "适应宽度" else fit.label
+    ?: if (fit == ComicFit.FIT_WIDTH) tr("适应宽度") else fit.label
 
 @Composable
 private fun PageTab(
@@ -780,27 +782,27 @@ private fun PageTab(
     update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit,
     store: ComicSettingsStore? = null,
 ) {
-    PanelSectionCard("缩放方式", Icons.Filled.AspectRatio) {
+    PanelSectionCard(tr("缩放方式"), Icons.Filled.AspectRatio) {
         SegmentRow(
             "适配",
             FitOptions.mapIndexed { i, (_, label) -> i to label },
             FitOptions.indexOfFirst { it.first == config.fit }.coerceAtLeast(0),
         ) { i -> update { it.copy(fit = FitOptions[i].first) } }
         PanelHint(when (config.fit) {
-            ComicFit.FIT_PAGE -> "完整显示页面，保留比例与留白。"
-            ComicFit.FIT_WIDTH -> "填满宽度，超出高度的内容可拖动查看。"
-            ComicFit.FIT_HEIGHT -> "填满高度，超出宽度的内容可左右拖动查看。"
-            ComicFit.ORIGINAL -> "按图像像素显示，大图可平移查看。"
-            ComicFit.FILL -> "保持比例铺满，多余部分居中裁切。"
-            ComicFit.STRETCH -> "铺满显示区域，图像比例会改变。"
-            ComicFit.CUSTOM -> "在基础适配上叠加缩放系数，可保存常用档位。"
+            ComicFit.FIT_PAGE -> tr("完整显示页面，保留比例与留白。")
+            ComicFit.FIT_WIDTH -> tr("填满宽度，超出高度的内容可拖动查看。")
+            ComicFit.FIT_HEIGHT -> tr("填满高度，超出宽度的内容可左右拖动查看。")
+            ComicFit.ORIGINAL -> tr("按图像像素显示，大图可平移查看。")
+            ComicFit.FILL -> tr("保持比例铺满，多余部分居中裁切。")
+            ComicFit.STRETCH -> tr("铺满显示区域，图像比例会改变。")
+            ComicFit.CUSTOM -> tr("在基础适配上叠加缩放系数，可保存常用档位。")
         })
         if (config.mode == ComicMode.WEBTOON || config.mode == ComicMode.CONTINUOUS)
-            PanelHint("滚动模式固定适应宽度")
+            PanelHint(tr("滚动模式固定适应宽度"))
     }
 
     if (config.fit == ComicFit.CUSTOM) {
-        PanelSectionCard("自定义缩放", Icons.Filled.Tune) {
+        PanelSectionCard(tr("自定义缩放"), Icons.Filled.Tune) {
             SegmentRow(
                 "基础适配",
                 FitOptions.filter { it.first != ComicFit.CUSTOM }.mapIndexed { i, (_, label) -> i to label },
@@ -820,7 +822,7 @@ private fun PageTab(
                     Modifier.fillMaxWidth().padding(vertical = DesignTokens.SpaceXs),
                     horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm),
                 ) {
-                    ActionChip("保存当前组合", Modifier.weight(1f)) { nameDialog = true }
+                    ActionChip(tr("保存当前组合"), Modifier.weight(1f)) { nameDialog = true }
                 }
                 presets.forEach { p ->
                     Row(
@@ -850,12 +852,12 @@ private fun PageTab(
                         PullOutTextButton(onClick = {
                             store.deleteCustomFitPreset(p.id)
                             presets = store.loadCustomFitPresets()
-                        }) { Text("删除", color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall) }
+                        }) { Text(tr("删除"), color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall) }
                     }
                 }
                 if (nameDialog) {
                     PresetNameDialog(
-                        title = "保存自定义缩放",
+                        title = tr("保存自定义缩放"),
                         initial = "",
                         onConfirm = { name ->
                             store.saveCustomFitPreset(name, config.customFitBase, (config.customFitScale * 100).toInt())
@@ -869,8 +871,8 @@ private fun PageTab(
         }
     }
 
-    PanelSectionCard("间距", Icons.Filled.Height) {
-        if (config.mode == ComicMode.CONTINUOUS) PanelHint("无缝模式无间距")
+    PanelSectionCard(tr("间距"), Icons.Filled.Height) {
+        if (config.mode == ComicMode.CONTINUOUS) PanelHint(tr("无缝模式无间距"))
         SliderRow(
             "页面间距", config.pageSpacingDp, 0f..40f,
             format = { "${it.toInt()} dp" },
@@ -883,9 +885,9 @@ private fun PageTab(
         )
     }
 
-    PanelSectionCard("双页排列", Icons.Filled.Bookmark) {
-        if (config.mode != ComicMode.DOUBLE) PanelHint("双页模式生效")
-        SwitchRow("首页单独显示", null, config.doubleFirstAlone) { v ->
+    PanelSectionCard(tr("双页排列"), Icons.Filled.Bookmark) {
+        if (config.mode != ComicMode.DOUBLE) PanelHint(tr("双页模式生效"))
+        SwitchRow(tr("首页单独显示"), null, config.doubleFirstAlone) { v ->
             update { it.copy(doubleFirstAlone = v) }
         }
         SegmentRow(
@@ -909,18 +911,18 @@ private fun PageTab(
         )
         PullOutTextButton(onClick = { update { it.copy(doubleGapDp = 8f, doubleAlign = ComicDoubleAlign.CENTER,
             doubleShiftXDp = 0f, doubleShiftYDp = 0f, doubleFirstAlone = false) } }) {
-            Text("恢复双页排版默认值", color = TextSecondary)
+            Text(tr("恢复双页排版默认值"), color = TextSecondary)
         }
     }
 
-    PanelSectionCard("缩放", Icons.Filled.ZoomIn) {
-        SwitchRow("双击放大", null, config.doubleTapZoom) { v ->
+    PanelSectionCard(tr("缩放"), Icons.Filled.ZoomIn) {
+        SwitchRow(tr("双击放大"), null, config.doubleTapZoom) { v ->
             update { it.copy(doubleTapZoom = v) }
         }
-        SwitchRow("长按放大", null, config.longPressZoom) { v ->
+        SwitchRow(tr("长按放大"), null, config.longPressZoom) { v ->
             update { it.copy(longPressZoom = v) }
         }
-        SwitchRow("放大状态翻页", null, config.zoomWhileTurn) { v ->
+        SwitchRow(tr("放大状态翻页"), null, config.zoomWhileTurn) { v ->
             update { it.copy(zoomWhileTurn = v) }
         }
     }
@@ -940,28 +942,19 @@ private fun ImageTab(
     bookState: ComicBookState,
     onBookStateChange: (ComicBookState) -> Unit,
 ) {
-    PanelSectionCard("图片预加载", Icons.Filled.Image) {
+    PanelSectionCard(tr("图片预加载"), Icons.Filled.Image) {
         SegmentRow(
-            "预加载模式",
-            listOf(0 to "自动", 1 to "自定义"),
-            if (config.imagePreloadCount < 0) 0 else 1,
-        ) { mode -> update { it.copy(imagePreloadCount = if (mode == 0) -1 else 4) } }
-        if (config.imagePreloadCount >= 0) {
-            SliderRow(
-                "提前加载图片数",
-                config.imagePreloadCount.toFloat(),
-                0f..12f,
-                steps = 11,
-                format = { if (it < .5f) "关闭" else "${kotlin.math.round(it).toInt()} 张" },
-            ) { count -> update { it.copy(imagePreloadCount = kotlin.math.round(count).toInt()) } }
-        }
+            "提前加载图片数",
+            listOf(-1 to tr("自动"), 0 to tr("关"), 2 to tr("2 张"), 4 to tr("4 张"), 8 to tr("8 张"), 12 to tr("12 张")),
+            config.imagePreloadCount,
+        ) { count -> update { it.copy(imagePreloadCount = count) } }
         Text(
             "翻页和滚动共用。关闭后只加载当前图片，预加载仍受设备内存限制。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    PanelSectionCard("裁边", Icons.Filled.Crop) {
+    PanelSectionCard(tr("裁边"), Icons.Filled.Crop) {
         SegmentRow(
             "自动裁边",
             listOf(
@@ -982,7 +975,7 @@ private fun ImageTab(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                if (config.manualCrop != null) "手动裁边 · 已设置" else "手动裁边",
+                if (config.manualCrop != null) tr("手动裁边 · 已设置") else tr("手动裁边"),
                 color = TextPrimary, fontSize = DesignTokens.TypeLabel,
                 modifier = Modifier.weight(1f)
             )
@@ -994,18 +987,18 @@ private fun ImageTab(
         }
         if (config.manualCrop != null) {
             PullOutTextButton(onClick = { update { it.copy(manualCrop = null) } }) {
-                Text("清除手动裁边", color = TextSecondary)
+                Text(tr("清除手动裁边"), color = TextSecondary)
             }
         }
     }
 
-    PanelSectionCard("大图拆分", Icons.Filled.VerticalSplit) {
-        PanelHint(if (config.splitWide) "自动识别跨页"
-            else "拆分后生效")
-        SwitchRow("宽页自动拆分", null, config.splitWide) { v ->
+    PanelSectionCard(tr("大图拆分"), Icons.Filled.VerticalSplit) {
+        PanelHint(if (config.splitWide) tr("自动识别跨页")
+            else tr("拆分后生效"))
+        SwitchRow(tr("宽页自动拆分"), null, config.splitWide) { v ->
             update { it.copy(splitWide = v) }
         }
-        SwitchRow("拆分左右反转", null, config.splitReverse) { v ->
+        SwitchRow(tr("拆分左右反转"), null, config.splitReverse) { v ->
             update { it.copy(splitReverse = v) }
         }
         SliderRow(
@@ -1014,11 +1007,11 @@ private fun ImageTab(
             onChange = { v -> update { it.copy(splitPosition = v) } }
         )
         PullOutTextButton(onClick = { update { it.copy(splitPosition = 0.5f, splitReverse = false) } }) {
-            Text("重置", color = TextSecondary)
+            Text(tr("重置"), color = TextSecondary)
         }
     }
 
-    PanelSectionCard("旋转", Icons.Filled.RotateRight) {
+    PanelSectionCard(tr("旋转"), Icons.Filled.RotateRight) {
         SegmentRow(
             "整本旋转",
             listOf(0 to "0°", 90 to "90°", 180 to "180°", 270 to "270°"),
@@ -1028,12 +1021,12 @@ private fun ImageTab(
         pageRef?.let { ref ->
             if ((bookState.pageRotations[ref.id] ?: 0) != 0) {
                 PullOutTextButton(onClick = { onBookStateChange(bookState.copy(pageRotations = bookState.pageRotations - ref.id)) }) {
-                    Text("还原本页旋转", color = TextSecondary)
+                    Text(tr("还原本页旋转"), color = TextSecondary)
                 }
             }
         }
         Row(Modifier.fillMaxWidth().padding(vertical = DesignTokens.SpaceXs), horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
-            ActionChip("旋转本页 +90°", Modifier.weight(1f)) {
+            ActionChip(tr("旋转本页 +90°"), Modifier.weight(1f)) {
                 if (pageRef != null) {
                     val cur = bookState.pageRotations[pageRef.id] ?: 0
                     onBookStateChange(
@@ -1042,7 +1035,7 @@ private fun ImageTab(
                 }
             }
             ActionChip(
-                if (currentRawPage in bookState.mergeAnchors) "取消临时合页" else "与下一页临时合页",
+                if (currentRawPage in bookState.mergeAnchors) tr("取消临时合页") else tr("与下一页临时合页"),
                 Modifier.weight(1f), enabled = currentRawPage in bookState.mergeAnchors || currentRawPage < pages.lastIndex
             ) {
                 onBookStateChange(bookState.toggleMerge(currentRawPage, pages.size))
@@ -1050,7 +1043,7 @@ private fun ImageTab(
         }
     }
 
-    PanelSectionCard("画质增强", Icons.Filled.AutoAwesome) {
+    PanelSectionCard(tr("画质增强"), Icons.Filled.AutoAwesome) {
         SegmentRow(
             "增强引擎",
             ComicEnhanceMode.visibleModes.map { it.ordinal to it.label },
@@ -1070,30 +1063,30 @@ private fun ImageTab(
         }
     }
 
-    PanelSectionCard("滤镜", Icons.Filled.Tune) {
+    PanelSectionCard(tr("滤镜"), Icons.Filled.Tune) {
         FilterPreview(pages.getOrNull(currentRawPage), loader, config, bookState.pageRotations[pages.getOrNull(currentRawPage)?.id] ?: 0)
-        SliderRow("亮度", config.filterBrightness.toFloat(), -100f..100f, format = { "${it.toInt()}" }) { v ->
+        SliderRow(tr("亮度"), config.filterBrightness.toFloat(), -100f..100f, format = { "${it.toInt()}" }) { v ->
             update { it.copy(filterBrightness = v.toInt()) }
         }
-        SliderRow("对比度", config.filterContrast.toFloat(), -100f..100f, format = { "${it.toInt()}" }) { v ->
+        SliderRow(tr("对比度"), config.filterContrast.toFloat(), -100f..100f, format = { "${it.toInt()}" }) { v ->
             update { it.copy(filterContrast = v.toInt()) }
         }
-        SliderRow("饱和度", config.filterSaturation.toFloat(), -100f..100f, format = { "${it.toInt()}" }) { v ->
+        SliderRow(tr("饱和度"), config.filterSaturation.toFloat(), -100f..100f, format = { "${it.toInt()}" }) { v ->
             update { it.copy(filterSaturation = v.toInt()) }
         }
-        SliderRow("色调", config.filterHue.toFloat(), -180f..180f, format = { "${it.toInt()}°" }) { v ->
+        SliderRow(tr("色调"), config.filterHue.toFloat(), -180f..180f, format = { "${it.toInt()}°" }) { v ->
             update { it.copy(filterHue = v.toInt()) }
         }
         SliderRow("Gamma", config.filterGamma, 0.5f..2.2f, format = { "%.2f".format(it) }) { v ->
             update { it.copy(filterGamma = v) }
         }
-        SliderRow("锐化", config.filterSharpen.toFloat(), 0f..100f, format = { "${it.toInt()}" }) { v ->
+        SliderRow(tr("锐化"), config.filterSharpen.toFloat(), 0f..100f, format = { "${it.toInt()}" }) { v ->
             update { it.copy(filterSharpen = v.toInt()) }
         }
-        SliderRow("阴影", config.filterShadow.toFloat(), -100f..100f, format = { "${it.toInt()}" }) { v ->
+        SliderRow(tr("阴影"), config.filterShadow.toFloat(), -100f..100f, format = { "${it.toInt()}" }) { v ->
             update { it.copy(filterShadow = v.toInt()) }
         }
-        SwitchRow("黑白模式", null, config.filterBW) { v -> update { it.copy(filterBW = v) } }
+        SwitchRow(tr("黑白模式"), null, config.filterBW) { v -> update { it.copy(filterBW = v) } }
         PullOutTextButton(onClick = {
             update {
                 it.copy(
@@ -1101,7 +1094,7 @@ private fun ImageTab(
                     filterHue = 0, filterGamma = 1.0f, filterSharpen = 0, filterShadow = 0, filterBW = false
                 )
             }
-        }) { Text("重置全部滤镜", color = TextSecondary) }
+        }) { Text(tr("重置全部滤镜"), color = TextSecondary) }
     }
 }
 
@@ -1128,12 +1121,12 @@ internal fun FilterPreview(page: ComicPageRef?, loader: ComicPageLoader, config:
     val geometry = ComicImagePipeline.Geometry(cropMode = config.cropMode, manualCrop = config.manualCrop,
         rotationDeg = config.bookRotation + pageRotation)
     val previewKey = "${page.id}|${config.imagePipelineFingerprint()}|$pageRotation|$detail|$retry"
-    SegmentRow("对比范围", listOf(0 to "整页", 1 to "原始细节"), if (detail) 1 else 0) { detail = it == 1 }
+    SegmentRow(tr("对比范围"), listOf(0 to tr("整页"), 1 to tr("原始细节")), if (detail) 1 else 0) { detail = it == 1 }
     val original by key(page.id, geometry, detail, retry) {
         com.example.ui.components.rememberAsyncState<PageBitmapState>(PageBitmapState.Loading) {
             try {
                 val bitmap = loader.loadPreview(page, geometry, ComicImagePipeline.Toning(), detail)
-                    ?: throw java.io.IOException("预览解码失败")
+                    ?: throw java.io.IOException(tr("预览解码失败"))
                 value = PageBitmapState.Ready(bitmap)
             } catch (error: Exception) {
                 if (error is kotlinx.coroutines.CancellationException) throw error
@@ -1154,7 +1147,7 @@ internal fun FilterPreview(page: ComicPageRef?, loader: ComicPageLoader, config:
                         shadow = config.filterShadow, bw = config.filterBW,
                         enhanceMode = config.enhanceMode, enhanceStrength = config.enhanceStrength,
                     ), detail,
-                ) ?: throw java.io.IOException("预览解码失败")
+                ) ?: throw java.io.IOException(tr("预览解码失败"))
                 value = PageBitmapState.Ready(result)
         } catch (error: Exception) {
             if (error is kotlinx.coroutines.CancellationException) throw error
@@ -1178,7 +1171,7 @@ internal fun FilterPreview(page: ComicPageRef?, loader: ComicPageLoader, config:
                 is PageBitmapState.Ready -> Image(preview.bitmap.asImageBitmap(), label,
                     Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                 is PageBitmapState.Failed -> PullOutTextButton(onClick = { retry++ }) {
-                    Text("预览失败 · 重试", color = TextSecondary)
+                    Text(tr("预览失败 · 重试"), color = TextSecondary)
                 }
                 PageBitmapState.Loading -> com.example.ui.components.ChasingDots(size = DesignTokens.SpaceLoose, color = MintPrimary)
             }
@@ -1409,7 +1402,7 @@ internal fun PanelTextField(
 
 @Composable
 private fun EffectTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit) {
-    PanelSectionCard("阅读背景", Icons.Filled.Palette) {
+    PanelSectionCard(tr("阅读背景"), Icons.Filled.Palette) {
         BgSwatchRow(config.bgType) { t -> update { it.copy(bgType = t) } }
         if (config.bgType == ComicBgType.PAPER) {
             Spacer(Modifier.height(DesignTokens.SpaceSm))
@@ -1420,26 +1413,26 @@ private fun EffectTab(config: ComicReaderConfig, update: ((ComicReaderConfig) ->
         }
     }
 
-    PanelSectionCard("场景", Icons.Filled.MusicNote) {
+    PanelSectionCard(tr("场景"), Icons.Filled.MusicNote) {
         SceneOptionFlow(config.scene) { s -> update { it.copy(scene = s) } }
         if (config.scene != ComicScene.NONE) {
             Spacer(Modifier.height(DesignTokens.SpaceCompact))
-            SwitchRow("环境声音", null, config.sceneSound) { v -> update { it.copy(sceneSound = v) } }
+            SwitchRow(tr("环境声音"), null, config.sceneSound) { v -> update { it.copy(sceneSound = v) } }
             if (config.sceneSound) {
                 SliderRow(
                     "音量", config.sceneVolume.toFloat(), 0f..100f,
                     format = { "${it.toInt()}" }
                 ) { v -> update { it.copy(sceneVolume = v.toInt()) } }
             }
-            SwitchRow("阅读特效", null, config.sceneEffect) { v -> update { it.copy(sceneEffect = v) } }
+            SwitchRow(tr("阅读特效"), null, config.sceneEffect) { v -> update { it.copy(sceneEffect = v) } }
         }
     }
 
-    PanelSectionCard("显示", Icons.Filled.Visibility) {
-        SwitchRow("进度缩略图", null, config.showThumbPreview) { v ->
+    PanelSectionCard(tr("显示"), Icons.Filled.Visibility) {
+        SwitchRow(tr("进度缩略图"), null, config.showThumbPreview) { v ->
             update { it.copy(showThumbPreview = v) }
         }
-        SwitchRow("沉浸式", null, config.hideSystemBars) { v ->
+        SwitchRow(tr("沉浸式"), null, config.hideSystemBars) { v ->
             update { it.copy(hideSystemBars = v) }
         }
     }
@@ -1449,15 +1442,15 @@ private fun EffectTab(config: ComicReaderConfig, update: ((ComicReaderConfig) ->
 
 @Composable
 private fun AutoTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit) {
-    PanelHint("底栏启停；后台自动暂停")
-    PanelSectionCard("自动翻页", Icons.Filled.Schedule) {
+    PanelHint(tr("底栏启停；后台自动暂停"))
+    PanelSectionCard(tr("自动翻页"), Icons.Filled.Schedule) {
         SliderRow(
             "翻页间隔", config.autoPageIntervalSec, 1f..120f, steps = 118,
             format = { "${it.toInt()} 秒" }
         ) { v -> update { it.copy(autoPageIntervalSec = v) } }
     }
 
-    PanelSectionCard("自动滚动", Icons.Filled.SwipeVertical) {
+    PanelSectionCard(tr("自动滚动"), Icons.Filled.SwipeVertical) {
         SliderRow(
             "滚动速度", config.autoScrollSpeedDp, 5f..400f, steps = 394,
             format = { "${it.toInt()} / 秒" }
@@ -1469,23 +1462,23 @@ private fun AutoTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> C
 
 @Composable
 private fun GestureTab(config: ComicReaderConfig, update: ((ComicReaderConfig) -> ComicReaderConfig) -> Unit, onEditTouchZones: () -> Unit) {
-    PanelSectionCard("触控功能分区", Icons.Filled.PanTool) {
-        PanelHint("在当前漫画上直接调整分区，画面保持原尺寸。点击与滑动独立配置，双指缩放与放大后拖图优先。")
-        PullOutFilledTonalButton(onClick = com.example.ui.components.paperDismiss(onEditTouchZones), modifier = Modifier.fillMaxWidth()) { Text("可视化编辑功能分区") }
+    PanelSectionCard(tr("触控功能分区"), Icons.Filled.PanTool) {
+        PanelHint(tr("在当前漫画上直接调整分区，画面保持原尺寸。点击与滑动独立配置，双指缩放与放大后拖图优先。"))
+        PullOutFilledTonalButton(onClick = com.example.ui.components.paperDismiss(onEditTouchZones), modifier = Modifier.fillMaxWidth()) { Text(tr("可视化编辑功能分区")) }
     }
-    PanelSectionCard("手势开关", Icons.Filled.TouchApp) {
-        SwitchRow("单指滑动翻页", null, config.gestureSwipe) { v -> update { it.copy(gestureSwipe = v) } }
-        SwitchRow("双指合拢退出", null, config.gesturePinchClose) { v ->
+    PanelSectionCard(tr("手势开关"), Icons.Filled.TouchApp) {
+        SwitchRow(tr("单指滑动翻页"), null, config.gestureSwipe) { v -> update { it.copy(gestureSwipe = v) } }
+        SwitchRow(tr("双指合拢退出"), null, config.gesturePinchClose) { v ->
             update { it.copy(gesturePinchClose = v) }
         }
-        SwitchRow("侧边滑动关闭", null, config.gestureEdgeSwipe) { v ->
+        SwitchRow(tr("侧边滑动关闭"), null, config.gestureEdgeSwipe) { v ->
             update { it.copy(gestureEdgeSwipe = v) }
         }
-        SwitchRow("长按呼出控制层", null, config.gestureLongPressPanel) { v ->
+        SwitchRow(tr("长按呼出控制层"), null, config.gestureLongPressPanel) { v ->
             update { it.copy(gestureLongPressPanel = v) }
         }
         // 第 28 条：音量键翻页（方向感知：RTL 下音量上=下一页），仅阅读页拦截
-        SwitchRow("音量键翻页", null, config.volumeKeyTurn) { v ->
+        SwitchRow(tr("音量键翻页"), null, config.volumeKeyTurn) { v ->
             update { it.copy(volumeKeyTurn = v) }
         }
     }
@@ -1506,7 +1499,7 @@ internal fun ComicTocSheet(
     glassBackdrop: Backdrop? = null,
 ) {
     ComicSheetContainer(
-        title = "目录", onDismiss = onDismiss, heightFraction = 0.7f, scrollable = false,
+        title = tr("目录"), onDismiss = onDismiss, heightFraction = 0.7f, scrollable = false,
         glassBackdrop = glassBackdrop,
     ) {
         if (toc.isNotEmpty()) {
@@ -1630,7 +1623,7 @@ internal fun ComicPresetSheet(
     }
 
     ComicSheetContainer(
-        title = "阅读预设", onDismiss = onDismiss, heightFraction = 0.62f, scrollable = false,
+        title = tr("阅读预设"), onDismiss = onDismiss, heightFraction = 0.62f, scrollable = false,
         glassBackdrop = glassBackdrop,
     ) {
         LazyColumn {
@@ -1664,7 +1657,7 @@ internal fun ComicPresetSheet(
                                 if (preset.favorite) {
                                     Spacer(Modifier.width(DesignTokens.SpaceCompact))
                                     // 收藏标记（区别于"默认预设"）：实心星 + 强调色
-                                    Icon(Icons.Filled.Star, "已收藏", tint = ReadingPalette.Favorite, modifier = Modifier.size(13.dp))
+                                    Icon(Icons.Filled.Star, tr("已收藏"), tint = ReadingPalette.Favorite, modifier = Modifier.size(13.dp))
                                 }
                                 if (preset.id == defaultId) {
                                     Spacer(Modifier.width(DesignTokens.SpaceCompact))
@@ -1700,7 +1693,7 @@ internal fun ComicPresetSheet(
                                 .heightIn(min = 48.dp)
                                 .padding(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceSm),
                             contentAlignment = Alignment.Center
-                        ) { Text("应用", color = Color(0xFF0E1512), fontSize = DesignTokens.TypeCaption, fontWeight = FontWeight.SemiBold) }
+                        ) { Text(tr("应用"), color = Color(0xFF0E1512), fontSize = DesignTokens.TypeCaption, fontWeight = FontWeight.SemiBold) }
                     }
                     // Keep actions on their own wrapping row so names retain their width
                     // on small screens and when the system font size is increased.
@@ -1718,7 +1711,7 @@ internal fun ComicPresetSheet(
                         ) {
                             Icon(
                                 if (preset.favorite) Icons.Filled.Star else Icons.Filled.StarBorder,
-                                if (preset.favorite) "取消收藏" else "收藏",
+                                if (preset.favorite) tr("取消收藏") else tr("收藏"),
                                 tint = if (preset.favorite) ReadingPalette.Favorite else TextSecondary,
                                 modifier = Modifier.size(DesignTokens.SpaceLg)
                             )
@@ -1751,12 +1744,12 @@ internal fun ComicPresetSheet(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Filled.ContentCopy, "复制", tint = TextSecondary, modifier = Modifier.size(15.dp))
+                            Icon(Icons.Filled.ContentCopy, tr("复制"), tint = TextSecondary, modifier = Modifier.size(15.dp))
                         }
                         if (!preset.builtIn) {
                             PullOutIconButton(
                                     icon = Icons.Filled.Save,
-                                    contentDescription = "用当前设置更新预设",
+                                    contentDescription = tr("用当前设置更新预设"),
                                     onClick = {
                                 store.updatePreset(preset.id, config = currentConfig)
                                 refresh()
@@ -1773,7 +1766,7 @@ internal fun ComicPresetSheet(
                                     .clickableNoRipple { renameTarget = preset },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Filled.DriveFileRenameOutline, "重命名", tint = TextSecondary, modifier = Modifier.size(15.dp))
+                                Icon(Icons.Filled.DriveFileRenameOutline, tr("重命名"), tint = TextSecondary, modifier = Modifier.size(15.dp))
                             }
                             Box(
                                 Modifier
@@ -1784,7 +1777,7 @@ internal fun ComicPresetSheet(
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Filled.Delete, "删除", tint = ReadingPalette.Error, modifier = Modifier.size(15.dp))
+                                Icon(Icons.Filled.Delete, tr("删除"), tint = ReadingPalette.Error, modifier = Modifier.size(15.dp))
                             }
                         }
                     }
@@ -1805,7 +1798,7 @@ internal fun ComicPresetSheet(
                 ) {
                     Icon(Icons.Filled.Add, null, tint = MintPrimary, modifier = Modifier.size(17.dp))
                     Spacer(Modifier.width(DesignTokens.SpaceCompact))
-                    Text("从当前设置新建预设", color = MintPrimary, fontSize = DesignTokens.TypeLabel)
+                    Text(tr("从当前设置新建预设"), color = MintPrimary, fontSize = DesignTokens.TypeLabel)
                 }
                 Spacer(Modifier.height(DesignTokens.SpaceMd))
             }
@@ -1814,7 +1807,7 @@ internal fun ComicPresetSheet(
 
     if (createDialog) {
         PresetNameDialog(
-            title = "新建预设",
+            title = tr("新建预设"),
             initial = "",
             onConfirm = { name ->
                 store.createPreset(name.ifBlank { "我的预设" }, name.take(2).ifBlank { "SC" }, currentConfig)
@@ -1826,7 +1819,7 @@ internal fun ComicPresetSheet(
     }
     renameTarget?.let { target ->
         PresetNameDialog(
-            title = "重命名预设",
+            title = tr("重命名预设"),
             initial = target.name,
             onConfirm = { name ->
                 store.updatePreset(target.id, name = name.ifBlank { target.name })
@@ -1838,12 +1831,12 @@ internal fun ComicPresetSheet(
     }
     deleteTarget?.let { target ->
         PullOutAlertDialog(onDismissRequest = { deleteTarget = null },
-            title = { Text("删除预设", color = TextPrimary) },
+            title = { Text(tr("删除预设"), color = TextPrimary) },
             text = { Text("删除「${target.name}」？当前阅读配置仍会保留。", color = TextSecondary) },
             confirmButton = { PullOutTextButton(onClick = { store.deletePreset(target.id); refresh(); deleteTarget = null }) {
-                Text("删除", color = TextPrimary)
+                Text(tr("删除"), color = TextPrimary)
             } },
-            dismissButton = { PullOutTextButton(onClick = { deleteTarget = null }) { Text("取消", color = TextSecondary) } },
+            dismissButton = { PullOutTextButton(onClick = { deleteTarget = null }) { Text(tr("取消"), color = TextSecondary) } },
             containerColor = PanelBg)
     }
 }
@@ -1865,7 +1858,7 @@ private fun PresetNameDialog(
                 value = name,
                 onValueChange = { name = it.take(12) },
                 singleLine = true,
-                placeholder = { Text("预设名称", color = TextSecondary) },
+                placeholder = { Text(tr("预设名称"), color = TextSecondary) },
                 colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary,
@@ -1875,8 +1868,8 @@ private fun PresetNameDialog(
                 )
             )
         },
-        confirmButton = { PullOutTextButton(onClick = { onConfirm(name) }) { Text("确定", color = MintPrimary) } },
-        dismissButton = { PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Text("取消", color = TextSecondary) } },
+        confirmButton = { PullOutTextButton(onClick = { onConfirm(name) }) { Text(tr("确定"), color = MintPrimary) } },
+        dismissButton = { PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Text(tr("取消"), color = TextSecondary) } },
         containerColor = ReadingPalette.DialogSurface
     )
 }
@@ -1938,18 +1931,18 @@ internal fun ComicCropSheet(
     ) {
         Column(Modifier.fillMaxSize().padding(DesignTokens.SpaceLg)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("手动裁边", color = TextPrimary, fontSize = DesignTokens.TypeBody, fontWeight = FontWeight.SemiBold)
+                Text(tr("手动裁边"), color = TextPrimary, fontSize = DesignTokens.TypeBody, fontWeight = FontWeight.SemiBold)
             }
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 PullOutTextButton(onClick = {
                     crop = floatArrayOf(0f, 0f, 1f, 1f)
-                }) { Text("重置", color = TextSecondary) }
-                PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Text("取消", color = TextSecondary) }
+                }) { Text(tr("重置"), color = TextSecondary) }
+                PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss)) { Text(tr("取消"), color = TextSecondary) }
                 PullOutTextButton(onClick = { onApply(crop[0], crop[1], crop[2], crop[3]) }) {
-                    Text("保存", color = MintPrimary, fontWeight = FontWeight.SemiBold)
+                    Text(tr("保存"), color = MintPrimary, fontWeight = FontWeight.SemiBold)
                 }
             }
-            Text("拖动角与边调整范围，拖动框内移动选区。", color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall)
+            Text(tr("拖动角与边调整范围，拖动框内移动选区。"), color = TextSecondary, fontSize = DesignTokens.TypeCaptionSmall)
 
             Spacer(Modifier.height(DesignTokens.SpaceMd))
             BoxWithImageLayout(
@@ -2029,7 +2022,7 @@ private fun CropCanvas(
     val currentOnChange by rememberUpdatedState(onCropChange)
     Box(
         canvasModifier
-            .semantics { contentDescription = "裁剪选区" }
+            .semantics { contentDescription = tr("裁剪选区") }
             .pointerInput(Unit) {
                 val hr = handleR.toPx()
                 awaitEachGesture {

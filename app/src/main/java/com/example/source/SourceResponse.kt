@@ -1,5 +1,7 @@
 package com.example.source
 
+import com.example.i18n.tr
+
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
@@ -54,7 +56,7 @@ internal object SourceResponse {
         if (Regex("<title[^>]*>\\s*(Just a moment|Attention Required|Access denied|Forbidden|Service Unavailable)", RegexOption.IGNORE_CASE).containsMatchIn(sample) ||
             sample.contains("/cdn-cgi/challenge-platform/", true))
             return "源站返回验证或拦截页面，请在书源管理完成站点验证或稍后重试"
-        return if (expectJson) "源站返回网页而非接口数据，请稍后重试或切换该源线路" else null
+        return if (expectJson) tr("源站返回网页而非接口数据，请稍后重试或切换该源线路") else null
     }
 
     fun jsonRoot(text: String): Any {
@@ -64,12 +66,12 @@ internal object SourceResponse {
             val tokener = JSONTokener(normalized)
             val root = tokener.nextValue()
             if ((root !is JSONObject && root !is JSONArray) || tokener.nextClean() != '\u0000')
-                throw SourceException.ParseError("接口数据结构异常，预期为 JSON 对象或数组")
+                throw SourceException.ParseError(tr("接口数据结构异常，预期为 JSON 对象或数组"))
             root
         } catch (e: SourceException) { throw e }
-        catch (_: Exception) { throw SourceException.ParseError("接口数据不完整或 JSON 格式异常，请稍后重试") }
+        catch (_: Exception) { throw SourceException.ParseError(tr("接口数据不完整或 JSON 格式异常，请稍后重试")) }
     }
 
     fun jsonObject(text: String): JSONObject = jsonRoot(text) as? JSONObject
-        ?: throw SourceException.ParseError("接口数据结构异常，预期为 JSON 对象")
+        ?: throw SourceException.ParseError(tr("接口数据结构异常，预期为 JSON 对象"))
 }

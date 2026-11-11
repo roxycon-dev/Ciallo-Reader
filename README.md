@@ -11,7 +11,7 @@
 
 [🌐 产品主页](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.6.1 更新说明](docs/release-1.6.1-2026-11-10.md) ·
+[1.6.2 更新说明](docs/release-1.6.2-2026-11-12.md) ·
 [查看截图](#界面预览) ·
 [全部功能](#功能亮点) ·
 [提交问题或建议](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -27,32 +27,9 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 
 **English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
 
-**1.6.1 / 260 · 平板排版与更新检测**：平板设置的标题与内容按组呈现，书库和发现按可用宽度组织结果，书架移除重复的阅读空间；旋转、分屏和窗口尺寸变化后重新布局。更新检测支持启动静默检查与设置手动检查；下载使用 GitHub 官方发布或显式选择的 HTTPS 镜像，继续校验官方签名，镜像仅在官方 SHA-256 可用时提供。设计约定见[界面动效与交互规范](docs/UI_MOTION_INTERACTION_GUIDE.md)，完整说明见[1.6.1 更新说明](docs/release-1.6.1-2026-11-10.md)。
+**算法与适配验证（待发布）**：继续减少动效重复计算，修复长章折叠重分页的换行丢失与暂时跳位、漫画区域清晰度缓存及资源释放。保留现有视觉与画质分档。145 项 JVM 对照与回归、19 项 Android 模拟器回归通过；整款软件降至原占用 10–20% 尚未证实。详见[本轮验证记录](docs/performance-stability-2026-10-26.md)。
 
-**1.6.0 / 259 · UI 重构与平板适配**。书架、书库、发现、统计、设置和阅读器采用统一的版式、玻璃面板与转场，文字和图标按层级浮现，保留 Ciallo 配色与 3D 书架。[Issue #7](https://github.com/roxycon-dev/Ciallo-Reader/issues/7) 带来全应用宽屏布局，包括侧边导航、独立搜索筛选区、分栏详情和设置面板，以及「漫画阅读器 → 设置 → 图像」中的自动预加载与自定义 0–12 张。详见[更新说明](docs/release-1.6.0-2026-11-10.md)。
-
-**1.5.16 / 258 · EPUB 连续插图修复**：修复极简渲染质量下连续几张插图全部显示第一张的问题，点开大图与正文显示终于一致；EPUB 里的小图（分隔符、装饰图）不再被拉满整栏宽度。仿真卷页、覆盖、平移、渐变、上下滚动五种翻页方式逐页核对通过，真机《无职转生 01》的 3 张彩页与 6 张连续黑白插图全部正确。详见[更新说明](docs/release-1.5.16-2026-11-07.md)。
-
-**1.5.15 / 257 · 爱丽丝书屋与自动备份**：新增内置书源「爱丽丝书屋」，多线路自动切选、搜索与整本 EPUB；发现页接入日／周／月／总榜单与分类目录。新增自动备份与空书架一键恢复，卸载重装不再丢书源和已下载的书。[更新说明](docs/release-1.5.15-2026-11-06.md)。
-
-**1.5.14 / 256 · 统一状态反馈**：下载入口恢复常态箭头，完成时短暂确认；修复数量徽标裁切。收藏、书签、播放/暂停、展开箭头、选择和加载指示共用更一致的动效与主题色，保留毛玻璃和抽纸主视觉。[更新说明](docs/release-1.5.14-2026-11-05.md)。
-
-**1.5.13 / 255 · 抽纸过渡优化**：保留原有形变和弹簧手感，修复掉帧时动画被拉长的问题；背景模糊与压暗随窗口同步淡入淡出，多层窗口分别保留效果。详见 [更新说明](docs/release-1.5.13-2026-11-05.md)。
-
-**1.5.12 / 254 · 统一下载中心**：书库与发现打开同一下载中心，小说与漫画采用紧凑毛玻璃列表，周围压暗并模糊。右侧单一下载图标显示任务数量与进度，暂停、失败和完成状态清晰可见。任务及进度持久保存，完成记录由用户确认后删除，删除记录保留已入书架的书籍。EPUB 分批入库，减少导入峰值内存，传输完成后明确显示校验与入库状态。详见 [更新说明](docs/release-1.5.12-2026-11-05.md)。
-
-**1.5.10 / 252 · 小说下载断点续传**：修复番茄等公开小说逐章下载在 Wi-Fi／移动网络切换后从头下载的问题。已完成章节与插图保存为可校验断点，网络恢复或手动继续时复用；暂停保留、取消清理。短暂网络故障有限重试，目录变化与残缺正文继续严格校验。沿用 1.5.6 起的固定签名，可覆盖升级 1.5.6–1.5.9。21 项相关回归通过；真机网络切换与源站速度未实测。详见 [1.5.10 更新说明](docs/release-1.5.10-2026-10-29.md)。
-
-**1.5.9 / 251 · 哔哩、19 漫画连接与安全加固**：修复哔哩 Cookie 重复、过期搜索凭证续取，并新增站点验证入口；19 漫画增加同站备用域名，下载重试覆盖响应体中途断开。图片、封面和下载统一禁止明文 HTTP 携带登录凭据，继续使用固定签名。**系统报毒尚未确认消除；按要求未运行模拟器或重新查杀。** 本轮仅对两个报告源做主机实网回归：哔哩 46 页、19 漫画 27 页共 73 页下载和离线解码通过；其他既有验证不重复。详见 [1.5.9 更新说明](docs/release-1.5.9-2026-10-28.md)。
-
-**1.5.8 / 250 · 漫画源搜索与读图修复**：修复紳士漫畫、19 漫画和爱漫画在部分代理线路下的空响应、图片损坏及下载失败。三个源的公开请求优先读取完整直连响应，再按需回退；紳士漫畫已有可用域名时不再等待发布页刷新。爱漫画《泛而不精的我被逐出了勇者队伍》45 页、19 漫画 24 页、紳士漫畫 22 页均完成搜索、在线读取、全新整章下载与离线解码。沿用当前固定签名，可覆盖 1.5.6、1.5.7。详见 [1.5.8 更新说明](docs/release-1.5.8-2026-10-27.md)与[验收记录](docs/comic-source-repair-2026-10-27.md)。
-
-**1.5.7 / 249 · 启动兼容与完整诊断**：修正旧系统进入主页时的渲染兼容路径，避免在不支持实时模糊的系统上开启无效采样，并增加主页渲染异常后的恢复机制。「设置 → 关于」的诊断导出改为明确按钮，移除下方小字；日志补全操作阶段、异常链、线程、设备环境、历史崩溃与系统退出线索。**保留现有权限及互传、后台下载、朗读等功能，不以删权限替代闪退修复。** 沿用 1.5.6 的新固定签名，可直接覆盖 1.5.6；旧签名版本仍须先备份再迁移。未在 HarmonyOS 3.0 原机验证，也未对本版进行新的查杀复测。详见 [1.5.7 更新说明](docs/release-1.5.7-2026-10-26.md)。
-
-**1.5.6 / 248 · 安全签名迁移**：合入今天的动效和 Z Fold 修复，补齐书源证书校验、HTTP 凭据保护，并完全退休暴露的旧发布密钥。最终 APK 在腾讯手机管家的两次对照复测中未再被列为风险软件，原始 1.5.5 对照仍复现风险；未在 HarmonyOS 3.0 真机验证。保留 Android 7+、成人源默认启用及系统安装功能。**首次迁移须先导出备份，再卸载旧版、安装新版并导入，无法直接覆盖旧签名。** 详见[更新与迁移步骤](docs/release-1.5.6-2026-10-26.md)、[安全验证记录](docs/security-remediation-2026-10-26.md)及[签名说明](docs/app-signing.md)。
-
-**算法与适配（已合入 1.5.6）**：继续减少动效重复计算，修复长章折叠重分页的换行丢失与暂时跳位、漫画区域清晰度缓存及资源释放。保留现有视觉与画质分档。145 项 JVM 对照与回归、19 项 Android 模拟器回归通过；整款软件降至原占用 10–20% 尚未证实。详见[本轮验证记录](docs/performance-stability-2026-10-26.md)。
-
+**1.6.2 / 250 · 3D 书架与中英文**：打开一本书的动画过去跨两个渲染器（书架画布转正 → 覆盖层放大贴图），中间必然有速度断点；现在整本书由 `ShelfVolumeArtist` 一个渲染器、一条 `ShelfOpenTimeline` 画到底，首帧与书架静止帧逐像素相同，归位是同一条路径的反向。修掉「退出阅读器后某本书变黑封面」（封面预热窗口按实际绘制槽位取，兜底色改纸色）。按需求去掉 3D 书脊上的书名，只保留编号与柱面明暗。中英文切换补齐：`tr()` 调用点 1300+、词表 2900+ 条、缺失 key 0，并修正英文模式下作品状态掉成「状态未知」的问题。详见 [1.6.2 更新说明](docs/release-1.6.2-2026-11-12.md)。
 **1.5.4 / 246**：现有抽纸变形、液态按钮、水滴选择、液态滑条及挤压开关保留在「高／极致」；「均衡／流畅／极简」使用普通过渡和基础控件。切换画质保留当前数值与选项。成人源仍默认启用，原更新安装流程保留，并包含启动异常保护与本地诊断导出。详见 [1.5.4 更新说明](docs/release-1.5.4-2026-10-26.md)。
 
 **1.5.5 / 247 · 覆盖升级修正**：恢复原正式版包名 `com.aistudio.novelreader.kxmpzq`，继续使用原固定签名；1.5.2 等同包名、同签名正式版可以直接覆盖升级并保留数据。保留 1.5.4 的动效分档和启动修复。已安装 `com.roxycon.ciallo.reader.probe` 包名的 1.5.3 对照包或 1.5.4 用户，需先在「设置 → 设备互传与备份」导出，再安装本版并导入；两个包名的数据不会自动互通。详见 [1.5.5 更新说明](docs/release-1.5.5-2026-10-26.md)。本次未进行报毒复测。
@@ -209,8 +186,8 @@ Novelia、Wenku8 Library、爱下电子书继续提供中文轻小说或网文�
 ## 安装
 
 - **系统要求：** Android 7.0（API 24）及以上。
-- **当前 Release：** 1.6.1（260）提供 arm64-v8a APK，适用于大多数 Android 手机和平板；Release 暂不包含 x86_64 模拟器版本。
-- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK，并在同一 Release 核对 `SHA256SUMS.txt`。
+- **当前 Release：** 提供 arm64-v8a APK，适用于大多数 Android 手机和平板；Release 暂不包含 x86_64 模拟器版本。
+- **获取 APK：** 前往[最新版 Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)下载 APK。当前版本也可[直接下载 v1.4.12](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.4.12/Ciallo-Reader-v1.4.12.apk)。
 - 下载后按 Android 提示允许安装该来源的应用，再打开 APK 安装。
 
 ## 快速开始
@@ -250,42 +227,9 @@ Windows 可使用 gradlew.bat :app:assembleDebug。遇到问题或想提出功�
 调试版使用独立包名，可与正式版并存。正式发布必须沿用固定签名密钥，禁止用临时调试签名发布；构建、备份与覆盖升级校验见 [签名说明](docs/app-signing.md)。
 
 - [发布版本与更新记录](CHANGELOG.md)
-- [界面动效与交互规范（开发者）](docs/UI_MOTION_INTERACTION_GUIDE.md)
 - [v1.4.1 更新说明与验证记录](docs/release-1.4.1-2026-10-15.md)
 - [v1.3.6 发布说明与验证记录](docs/release-1.3.6-2026-10-12.md)
 - [第三方组件与模型许可说明](docs/vendor-licenses/README.md)
-
-## 贡献者与致谢
-
-特别感谢 [mikufoxxx 与 Wenku8 Flutter 的贡献者](https://github.com/mikufoxxx/Wenku8_Flutter) 开源分享 UI、人机交互和动效实现。档案式排版、玻璃浮层、连续转场和图标反馈为这次重构提供了参考与灵感。
-
-项目里的不少改动来自 Issues：报告故障、补充书源、指出排版与兼容性问题。下面是反馈过问题的用户，编号对应各自提出的 issue。在此十分感谢！
-
-<table>
-  <tr>
-    <td align="center" width="112">
-      <a href="https://github.com/mahaix"><img src="https://github.com/mahaix.png" width="64" height="64" alt="mahaix 的头像" /><br /><sub><b>mahaix</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/1">#1</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/metahuman1016"><img src="https://github.com/metahuman1016.png" width="64" height="64" alt="metahuman1016 的头像" /><br /><sub><b>metahuman1016</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/2">#2</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/Wyingzik"><img src="https://github.com/Wyingzik.png" width="64" height="64" alt="Wyingzik 的头像" /><br /><sub><b>Wyingzik</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/3">#3</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/Lancher2048"><img src="https://github.com/Lancher2048.png" width="64" height="64" alt="Lancher2048 的头像" /><br /><sub><b>Lancher2048</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/4">#4</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/Yang-p-c"><img src="https://github.com/Yang-p-c.png" width="64" height="64" alt="Yang-p-c 的头像" /><br /><sub><b>Yang-p-c</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/5">#5</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/jesonab"><img src="https://github.com/jesonab.png" width="64" height="64" alt="jesonab 的头像" /><br /><sub><b>jesonab</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/6">#6</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/qianyunli114514"><img src="https://github.com/qianyunli114514.png" width="64" height="64" alt="qianyunli114514 的头像" /><br /><sub><b>qianyunli114514</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/7">#7</a></sub>
-    </td>
-  </tr>
-</table>
 
 ## 内容来源与许可
 

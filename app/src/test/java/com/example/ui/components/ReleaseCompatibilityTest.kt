@@ -44,24 +44,6 @@ class ReleaseCompatibilityTest {
         compose.onNodeWithText("second").assertExists()
     }
 
-    /**
-     * 图片位图必须跟着 key（path）走：换 key 时不能把旧值留在屏幕上。
-     * 回归 issue #6（极简渲染质量下连续插画全部显示第一张）。
-     */
-    @Test fun keyedProducerDropsThePreviousValueWhenItsKeyChanges() {
-        var path by mutableStateOf("a.png")
-        compose.setContent {
-            val bitmap by rememberKeyedAsyncState("empty", path) {
-                // 只为 a.png 产出结果：切到 b.png 时若仍保留 a.png 的旧值就会被断言抓到
-                if (path == "a.png") value = "decoded-a"
-            }
-            Text(bitmap)
-        }
-        compose.onNodeWithText("decoded-a").assertExists()
-        compose.runOnIdle { path = "b.png" }
-        compose.onNodeWithText("empty").assertExists()
-    }
-
     @Test fun publicActivityKeyHooksPreserveReaderPressAndRelease() {
         val activity = Robolectric.buildActivity(MainActivity::class.java).get()
         val events = mutableListOf<Pair<Boolean, Boolean>>()

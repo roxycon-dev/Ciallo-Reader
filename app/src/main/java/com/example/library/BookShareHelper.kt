@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.i18n.tr
+
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -96,7 +98,7 @@ object BookShareHelper {
     }
 
     internal suspend fun prepareShareIntent(context: Context, books: List<Book>): Intent = withContext(Dispatchers.IO) {
-        require(books.isNotEmpty()) { "请先选择要分享的书籍" }
+        require(books.isNotEmpty()) { tr("请先选择要分享的书籍") }
         cleanupTempShareDir(context)
         val targets = mutableListOf<ShareTarget>()
         try {
@@ -136,7 +138,7 @@ object BookShareHelper {
     private fun localFile(raw: String): File = File(if (raw.startsWith("file:")) Uri.parse(raw).path.orEmpty() else raw)
 
     private suspend fun originalFileTarget(context: Context, file: File, book: Book): ShareTarget {
-        require(file.canRead() && file.length() > 0) { "源文件为空或无法读取" }
+        require(file.canRead() && file.length() > 0) { tr("源文件为空或无法读取") }
         val mime = mimeForPath(file.name, book)
         val uri = try { FileProvider.getUriForFile(context, authority(context), file) }
         catch (_: IllegalArgumentException) {
@@ -187,7 +189,7 @@ object BookShareHelper {
             return rebuildTxt(context, book)
         }
 
-        throw IllegalStateException("源文件已不存在，无法分享（原文件可能已被移动或删除）")
+        throw IllegalStateException(tr("源文件已不存在，无法分享（原文件可能已被移动或删除）"))
     }
 
     /** 漫画：优先用下载任务里保留的原始归档；找不到则把解压页重新打成 CBZ。 */
@@ -205,13 +207,13 @@ object BookShareHelper {
             AppDatabase.getDatabase(context).bookDao().getChaptersListForBook(book.id)
         }.getOrDefault(emptyList())
             .map { ch ->
-                require(ch.content.isNotBlank()) { "部分漫画页面缺失，请重新下载后分享" }
+                require(ch.content.isNotBlank()) { tr("部分漫画页面缺失，请重新下载后分享") }
                 localFile(ch.content)
             }
         if (pages.isEmpty()) {
-            throw IllegalStateException("漫画页面文件缺失，无法分享")
+            throw IllegalStateException(tr("漫画页面文件缺失，无法分享"))
         }
-        require(pages.all { it.isFile && it.canRead() }) { "部分漫画页面缺失，请重新下载后分享" }
+        require(pages.all { it.isFile && it.canRead() }) { tr("部分漫画页面缺失，请重新下载后分享") }
 
         val out = File(context.cacheDir, "$SHARE_TEMP_DIR/${java.util.UUID.randomUUID()}_${sanitizeFileName(book.title)}.cbz")
         out.parentFile?.mkdirs()
@@ -252,11 +254,11 @@ object BookShareHelper {
         val out = File(context.cacheDir, "$SHARE_TEMP_DIR/${java.util.UUID.randomUUID()}_${sanitizeFileName(book.title)}.$ext")
         out.parentFile?.mkdirs()
         val input = context.contentResolver.openInputStream(uri)
-            ?: throw IllegalStateException("无法读取源文件，可能已被移动或删除")
+            ?: throw IllegalStateException(tr("无法读取源文件，可能已被移动或删除"))
         try { input.use { src ->
             FileOutputStream(out).use { dst -> copyOriginalBytes(src, dst) }
         }
-            require(out.length() > 0) { "源文件为空，无法分享" }
+            require(out.length() > 0) { tr("源文件为空，无法分享") }
         } catch (e: Exception) { out.delete(); throw e }
         val name = displayName(context, uri)?.let { "${sanitizeFileName(it.substringBeforeLast('.'))}.$ext" }
             ?: "${sanitizeFileName(book.title)}.$ext"
@@ -318,7 +320,7 @@ object BookShareHelper {
             AppDatabase.getDatabase(context).bookDao().getChaptersListForBook(book.id)
         }.getOrDefault(emptyList())
         if (chapters.isEmpty()) {
-            throw IllegalStateException("书籍内容为空，无法分享")
+            throw IllegalStateException(tr("书籍内容为空，无法分享"))
         }
         val out = File(context.cacheDir, "$SHARE_TEMP_DIR/${java.util.UUID.randomUUID()}_${sanitizeFileName(book.title)}.txt")
         out.parentFile?.mkdirs()

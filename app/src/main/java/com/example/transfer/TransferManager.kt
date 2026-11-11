@@ -1,5 +1,7 @@
 package com.example.transfer
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -90,7 +92,7 @@ class TransferManager private constructor(private val context:Context) {
     private fun nearbyGroup(group:NearbyGroup) {
         if(pendingNearby && !nearbyGroupSeen) {
             nearbyGroupSeen=true
-            nearbyStage(if(group.owner)"附近网络已建立，等待对方连接" else "附近网络已建立，正在连接对方")
+            nearbyStage(if(group.owner)tr("附近网络已建立，等待对方连接") else tr("附近网络已建立，正在连接对方"))
             nearbyTimeout(18_000,"附近网络已建立，但未能连接到对方的互传服务。请确认双方均已更新附近连接版本后重试")
         }
         if(group.owner || claimed || socket!=null || directJob?.isActive==true)return
@@ -130,7 +132,7 @@ class TransferManager private constructor(private val context:Context) {
             }
             if(outgoing==null)File(directory,"incoming.json").takeIf { it.isFile }?.let { incoming ->
                 runCatching {read(incoming)}.getOrNull()?.takeIf {!it.has("result")}?.let { saved ->
-                    mutableState.value=TransferSessionState(TransferPhase.WAITING_TO_RESUME,incoming=true,message="上次接收尚未完成，请让发送设备继续传输",peer=TransferPeer("resume",saved.optString("peerName","发送设备")))
+                    mutableState.value=TransferSessionState(TransferPhase.WAITING_TO_RESUME,incoming=true,message=tr("上次接收尚未完成，请让发送设备继续传输"),peer=TransferPeer("resume",saved.optString("peerName","发送设备")))
                 }
             }
         }
@@ -239,8 +241,8 @@ class TransferManager private constructor(private val context:Context) {
                 val preview=backup.inspectArchive(target)
                 if(preview.warnings.isNotEmpty()) {
                     localDecision=CompletableDeferred()
-                    mutableState.update { it.copy(phase=TransferPhase.AWAITING_CONFIRMATION,preview=preview,message="部分资源无法带走，请查看提示后确认继续") }
-                    require(withTimeout(120_000) { localDecision!!.await() }) { "已取消发送" }; localDecision=null
+                    mutableState.update { it.copy(phase=TransferPhase.AWAITING_CONFIRMATION,preview=preview,message=tr("部分资源无法带走，请查看提示后确认继续")) }
+                    require(withTimeout(120_000) { localDecision!!.await() }) { tr("已取消发送") }; localDecision=null
                 }
                 val token=ByteArray(32).also { SecureRandom().nextBytes(it) }.hex()
                 val session=JSONObject().put("sessionId",sessionId).put("token",token).put("file",target.absolutePath)
@@ -284,7 +286,7 @@ class TransferManager private constructor(private val context:Context) {
                 if(attempt<3) { change(TransferPhase.WAITING_TO_RESUME,"连接中断，正在尝试继续（${attempt+1}/3）",peer); delay((attempt+1)*1000L) }
             }
         }
-        change(TransferPhase.WAITING_TO_RESUME,"${last?.message?:"连接中断"}。可继续传输${if(peer.p2pAddress!=null)"或改用附近直连" else ""}",peer)
+        change(TransferPhase.WAITING_TO_RESUME,"${last?.message?:"连接中断"}。可继续传输${if(peer.p2pAddress!=null)tr("或改用附近直连") else ""}",peer)
     }
     private suspend fun connectSocket(peer:TransferPeer,onEstablished:()->Unit={}) {
         check(claim()) { "当前已有连接" }
@@ -320,7 +322,7 @@ class TransferManager private constructor(private val context:Context) {
                     if(authenticated)throw e
                 }
             }
-            throw last?:java.io.IOException("设备地址已失效，请重新发现设备")
+            throw last?:java.io.IOException(tr("设备地址已失效，请重新发现设备"))
         }
         finally {runCatching {tracked?.close()};if(connectingSocket===tracked)connectingSocket=null;if(!handedOff)claimed=false}
     }
@@ -353,11 +355,11 @@ class TransferManager private constructor(private val context:Context) {
                 if(persisted!=null && !persisted.has("result") && persisted.getString("sessionId")!=sessionId && System.currentTimeMillis()-persisted.getLong("createdAt")<TRANSFER_RETENTION)
                     throw RejectedException("接收设备有未完成任务，请先继续或取消该任务")
                 if(persisted?.optString("sessionId")==sessionId) {
-                    require(persisted.getString("token")==token && persisted.getString("peerFingerprint")==fingerprint) { "续传身份不匹配" }; persisted
+                    require(persisted.getString("token")==token && persisted.getString("peerFingerprint")==fingerprint) { tr("续传身份不匹配") }; persisted
                 } else JSONObject().put("sessionId",sessionId).put("token",token).put("createdAt",System.currentTimeMillis())
             }
             val locallyResuming=session.optString("peerFingerprint").isNotEmpty()
-            if(locallyResuming) require(session.getString("peerFingerprint")==fingerprint) { "设备身份已改变，请取消后重新发送" }
+            if(locallyResuming) require(session.getString("peerFingerprint")==fingerprint) { tr("设备身份已改变，请取消后重新发送") }
             send(output,JSONObject().put("type","pairing_state").put("resume",locallyResuming))
             val remotePairing=read(input);require(remotePairing.optString("type")=="pairing_state")
             val resuming=locallyResuming && remotePairing.getBoolean("resume")
@@ -366,7 +368,7 @@ class TransferManager private constructor(private val context:Context) {
                 localDecision=CompletableDeferred()
                 mutableState.value=TransferSessionState(TransferPhase.AWAITING_CONFIRMATION,remotePeer,
                     TransferProgress(TransferPhase.AWAITING_CONFIRMATION),code,incoming=!sending,
-                    message=if(sending)"核对两台设备上的校验码，确认发送" else "核对校验码，选择接收方式")
+                    message=if(sending)tr("核对两台设备上的校验码，确认发送") else tr("核对校验码，选择接收方式"))
                 // No user payload or manifest is sent before both parties authenticate the handshake.
                 connection.soTimeout=125_000
                 val consent=withTimeoutOrNull(120_000) { localDecision!!.await() }?:false
@@ -395,7 +397,7 @@ class TransferManager private constructor(private val context:Context) {
         }
     }
     private suspend fun sendFile(connection:SSLSocket,input:DataInputStream,output:DataOutputStream,session:JSONObject,peer:TransferPeer) {
-        val file=File(session.getString("file")); require(file.isFile && file.length()==session.getLong("size") && fileHash(file)==session.getString("sha256")) { "发送数据已改变，请重新准备" }
+        val file=File(session.getString("file")); require(file.isFile && file.length()==session.getLong("size") && fileHash(file)==session.getString("sha256")) { tr("发送数据已改变，请重新准备") }
         send(output,JSONObject().put("type","offer").put("size",file.length()).put("sha256",session.getString("sha256")))
         val ready=read(input)
         if(ready.optString("type")=="imported") { completeSender(ready); return }
@@ -408,7 +410,7 @@ class TransferManager private constructor(private val context:Context) {
                 currentCoroutineContext().ensureActive(); val n=data.read(buffer,0,minOf(CHUNK_SIZE.toLong(),file.length()-sent).toInt()); check(n>0)
                 send(output,JSONObject().put("type","chunk").put("offset",sent).put("length",n).put("sha256",sha256(buffer.copyOf(n))))
                 output.write(buffer,0,n); output.flush()
-                val ack=read(input); require(ack.getString("type")=="ack" && ack.getLong("offset")==sent+n) { "传输确认异常" }
+                val ack=read(input); require(ack.getString("type")=="ack" && ack.getLong("offset")==sent+n) { tr("传输确认异常") }
                 sent+=n
                 val now=System.nanoTime(); val speed=if(now>markTime)((sent-mark)*1_000_000_000L/(now-markTime))else 0
                 mutableState.update { it.copy(progress=TransferProgress(TransferPhase.TRANSFERRING,sent,file.length(),speed)) }
@@ -433,7 +435,7 @@ class TransferManager private constructor(private val context:Context) {
     }
     private fun completeSender(result:JSONObject) {
         mutableState.update { it.copy(phase=TransferPhase.COMPLETED,peerReceived=true,peerImported=true,
-            progress=it.progress.copy(phase=TransferPhase.COMPLETED),message="对方已完成导入",
+            progress=it.progress.copy(phase=TransferPhase.COMPLETED),message=tr("对方已完成导入"),
             result=ImportResult(result.optInt("added"),result.optInt("merged"),result.optInt("skipped"))) }
         outgoing?.optString("file")?.let { File(it).delete() }; File(directory,"outgoing.json").delete(); outgoing=null
         history("发送完成",state.value.peer?.name?:"设备")
@@ -442,18 +444,18 @@ class TransferManager private constructor(private val context:Context) {
         val offer=read(input); require(offer.getString("type")=="offer")
         val size=offer.getLong("size"); val hash=offer.getString("sha256")
         require(size in 1..MAX_ARCHIVE_BYTES && hash.matches(Regex("[a-f0-9]{64}")))
-        if(session.has("size")) require(session.getLong("size")==size && session.getString("sha256")==hash) { "续传数据已改变" }
+        if(session.has("size")) require(session.getLong("size")==size && session.getString("sha256")==hash) { tr("续传数据已改变") }
         session.put("size",size).put("sha256",hash).put("peerName",peer.name)
         session.optJSONObject("result")?.let { send(output,it); return }
         val file=File(directory,"${session.getString("sessionId")}.incoming")
         val offset=session.optLong("offset",0)
         require(offset in 0..size && (offset%CHUNK_SIZE==0L || offset==size))
-        if(offset>0) require(file.isFile && file.length()>=offset) { "续传缓存缺失，请重新发送" }
-        require(directory.usableSpace>size-offset+16L*1024*1024) { "接收设备存储空间不足" }
+        if(offset>0) require(file.isFile && file.length()>=offset) { tr("续传缓存缺失，请重新发送") }
+        require(directory.usableSpace>size-offset+16L*1024*1024) { tr("接收设备存储空间不足") }
         save(File(directory,"incoming.json"),session)
         startService()
         send(output,JSONObject().put("type","ready").put("offset",offset))
-        mutableState.update { it.copy(phase=TransferPhase.TRANSFERRING,incoming=true,peer=peer,message="正在接收数据") }
+        mutableState.update { it.copy(phase=TransferPhase.TRANSFERRING,incoming=true,peer=peer,message=tr("正在接收数据")) }
         RandomAccessFile(file,"rw").use { data -> data.setLength(offset); data.seek(offset); var received=offset; val buffer=ByteArray(CHUNK_SIZE); var mark=offset; var markTime=System.nanoTime()
             while(received<size) {
                 currentCoroutineContext().ensureActive()
@@ -470,14 +472,14 @@ class TransferManager private constructor(private val context:Context) {
         }
         require(read(input).getString("type")=="end")
         change(TransferPhase.VERIFYING,"校验完整数据包")
-        require(fileHash(file)==hash) { "完整文件校验失败，请重新发送" }
+        require(fileHash(file)==hash) { tr("完整文件校验失败，请重新发送") }
         val preview=backup.inspectArchive(file)
         send(output,JSONObject().put("type","received"))
-        mutableState.update { it.copy(phase=TransferPhase.RECEIVED,preview=preview,message="接收完成，准备导入") }
+        mutableState.update { it.copy(phase=TransferPhase.RECEIVED,preview=preview,message=tr("接收完成，准备导入")) }
         try {
             if(preview.containsProtected && !PrivacyManager(context).isEnabled()) {
                 importDecision=CompletableDeferred()
-                mutableState.update { it.copy(message="包含受保护内容，请先设置本机隐私 PIN，再继续导入") }
+                mutableState.update { it.copy(message=tr("包含受保护内容，请先设置本机隐私 PIN，再继续导入")) }
                 receiveMode=importDecision!!.await()
             }
             change(TransferPhase.IMPORTING,"正在导入已接收的数据")
@@ -485,7 +487,7 @@ class TransferManager private constructor(private val context:Context) {
             val receipt=JSONObject().put("type","imported").put("added",result.added).put("merged",result.merged).put("skipped",result.skipped)
             session.put("result",receipt); save(File(directory,"incoming.json"),session)
             // Persist success before notifying peer, so a lost final acknowledgement is safely replayable.
-            mutableState.update { it.copy(phase=TransferPhase.COMPLETED,result=result,message=if(receiveMode==ImportMode.REPLACE)"迁移完成，重新打开后应用所有设置" else "数据已合并到本机") }
+            mutableState.update { it.copy(phase=TransferPhase.COMPLETED,result=result,message=if(receiveMode==ImportMode.REPLACE)tr("迁移完成，重新打开后应用所有设置") else tr("数据已合并到本机")) }
             file.delete(); history("接收完成",peer.name); send(output,receipt)
         } catch(e:Exception) { runCatching { send(output,JSONObject().put("type","import_failed").put("message",e.message?:"导入失败")) }; throw e }
     }
@@ -505,7 +507,7 @@ class TransferManager private constructor(private val context:Context) {
         outgoing?.optString("file")?.let { File(it).delete() }; outgoing=null
         File(directory,"outgoing.json").delete()
         File(directory,"incoming.json").takeIf { it.isFile }?.let { runCatching { read(it).getString("sessionId") }.getOrNull()?.let { id -> if(id.matches(Regex("[a-f0-9-]{36}")))File(directory,"$id.incoming").delete() }; it.delete() }
-        mutableState.value=TransferSessionState(TransferPhase.CANCELLED,message="传输已取消，本机原有数据保留")
+        mutableState.value=TransferSessionState(TransferPhase.CANCELLED,message=tr("传输已取消，本机原有数据保留"))
         stopServiceIfIdle()
     }
     @Synchronized
@@ -528,7 +530,7 @@ class TransferManager private constructor(private val context:Context) {
                 importDecision = decision
                 mutableState.value = TransferSessionState(
                     TransferPhase.RECEIVED, incoming = true, preview = preview,
-                    message = "已识别 Ciallo 数据，请选择合并或整机迁移"
+                    message = tr("已识别 Ciallo 数据，请选择合并或整机迁移")
                 )
                 val mode = decision.await()
                 startService()
@@ -539,7 +541,7 @@ class TransferManager private constructor(private val context:Context) {
                 mutableState.update {
                     it.copy(
                         phase = TransferPhase.COMPLETED, result = result,
-                        message = if (mode == ImportMode.REPLACE) "迁移完成，重新打开后应用设置" else "数据已合并到本机"
+                        message = if (mode == ImportMode.REPLACE) tr("迁移完成，重新打开后应用设置") else tr("数据已合并到本机")
                     )
                 }
                 history("文件导入完成", "分享文件")
@@ -560,7 +562,11 @@ class TransferManager private constructor(private val context:Context) {
     fun history():List<String> = prefs.getString("history","").orEmpty().lineSequence().filter { it.isNotBlank() }.toList()
     private fun history(action:String,peer:String) { val text="${java.text.SimpleDateFormat("MM-dd HH:mm",java.util.Locale.CHINA).format(java.util.Date())}  $action · $peer"
         prefs.edit().putString("history",(listOf(text)+history()).take(20).joinToString("\n")).apply() }
-    private fun change(phase:TransferPhase,message:String,peer:TransferPeer?=state.value.peer) { mutableState.update { it.copy(phase=phase,message=message,peer=peer,progress=TransferProgress(phase)) } }
+    private fun change(phase:TransferPhase,message:String,peer:TransferPeer?=state.value.peer) {
+        // 文案在这里统一过一次词表：调用方继续写中文原文当 key，界面按当前语言显示。
+        val shown = com.example.i18n.tr(message)
+        mutableState.update { it.copy(phase=phase,message=shown,peer=peer,progress=TransferProgress(phase)) }
+    }
     private fun fail(e:Throwable) {
         if(state.value.phase==TransferPhase.CANCELLED || e is CancellationException)return
         val resumable=outgoing!=null || File(directory,"incoming.json").exists()
@@ -568,7 +574,7 @@ class TransferManager private constructor(private val context:Context) {
         val error=when { e is SecurityException -> TransferError.PERMISSION; e is RejectedException -> TransferError.REJECTED
             e.message?.contains("空间")==true -> TransferError.SPACE; e.message?.contains("校验")==true -> TransferError.CORRUPT
             e.message?.contains("版本")==true -> TransferError.VERSION; e is java.io.IOException -> TransferError.CONNECTION; else -> TransferError.UNKNOWN }
-        mutableState.update { it.copy(phase=phase,error=error,message=e.message?:"传输未完成，请重试",verificationCode=null) }
+        mutableState.update { it.copy(phase=phase,error=error,message=com.example.i18n.tr(e.message?:"传输未完成，请重试"),verificationCode=null) }
     }
     private fun peer(session:JSONObject)=peers.value.firstOrNull {it.id==session.optString("peerId")}
         ?:TransferPeer(session.getString("peerId"),session.getString("peerName"),session.optString("host").takeIf {it.isNotEmpty()},session.getInt("port"),session.optString("p2pAddress").takeIf {it.isNotEmpty()},

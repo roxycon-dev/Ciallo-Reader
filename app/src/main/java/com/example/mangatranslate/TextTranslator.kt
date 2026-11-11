@@ -1,5 +1,7 @@
 package com.example.mangatranslate
 
+import com.example.i18n.tr
+
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -87,7 +89,7 @@ class OnlineFallbackTranslator(
             lastFailure = TranslationFailure.Privacy
             return@withContext null
         }
-        require(texts.size <= 500 && texts.sumOf { it.length } <= 128_000) { "翻译请求过大" }
+        require(texts.size <= 500 && texts.sumOf { it.length } <= 128_000) { tr("翻译请求过大") }
         if (sourceLang == "zh") return@withContext texts
         val normalized = texts.map { it.trim() }
         val unique = normalized.filter { it.isNotBlank() }.distinct()
@@ -140,7 +142,7 @@ class OnlineFallbackTranslator(
           } catch (error: Exception) {
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             val failure = TranslationFailure.from(error)
-            lastFailure = if (failure.code == "auth") failure.copy(description = "免费服务拒绝请求，请切换网络或使用自定义 API") else failure
+            lastFailure = if (failure.code == "auth") failure.copy(rawDescription = "免费服务拒绝请求，请切换网络或使用自定义 API") else failure
             if (attempt == 1 || !failure.retryable || failure.code == "format") return null
             kotlinx.coroutines.delay(600L)
           }

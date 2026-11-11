@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.i18n.tr
+
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -16,9 +18,9 @@ import kotlinx.coroutines.sync.withPermit
 class ComicDownloadWorker(context:Context,params:WorkerParameters):CoroutineWorker(context,params) {
     override suspend fun getForegroundInfo():ForegroundInfo {
         if (android.os.Build.VERSION.SDK_INT>=26) applicationContext.getSystemService(NotificationManager::class.java)
-            .createNotificationChannel(NotificationChannel("comic_downloads","漫画下载",NotificationManager.IMPORTANCE_LOW))
+            .createNotificationChannel(NotificationChannel("comic_downloads",com.example.i18n.tr("漫画下载"),NotificationManager.IMPORTANCE_LOW))
         val notification=NotificationCompat.Builder(applicationContext,"comic_downloads")
-            .setSmallIcon(android.R.drawable.stat_sys_download).setContentTitle("正在下载漫画章节").setOngoing(true)
+            .setSmallIcon(android.R.drawable.stat_sys_download).setContentTitle(com.example.i18n.tr("正在下载漫画章节")).setOngoing(true)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel,"暂停",WorkManager.getInstance(applicationContext).createCancelPendingIntent(id)).build()
         return if(android.os.Build.VERSION.SDK_INT>=29) ForegroundInfo(id.hashCode() and Int.MAX_VALUE,notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         else ForegroundInfo(id.hashCode() and Int.MAX_VALUE,notification)
@@ -34,7 +36,7 @@ class ComicDownloadWorker(context:Context,params:WorkerParameters):CoroutineWork
                     val dao=AppDatabase.getDatabase(applicationContext).bookDao()
                     val dir=ComicDownloadManager.directory(applicationContext,key)
                     if(dao.getBookByFilePath(dir.absolutePath)==null) {
-                        val source=ComicDownloadManager.source(applicationContext,task.book.sourceId) ?: error("书源未安装，请重新启用该书源后重试")
+                        val source=ComicDownloadManager.source(applicationContext,task.book.sourceId) ?: error(com.example.i18n.tr("书源未安装，请重新启用该书源后重试"))
                         val images=when(val result=source.getChapterImages(task.chapter.id)) {
                             is SourceResult.Success -> result.data
                             is SourceResult.Error -> throw result.exception
@@ -54,8 +56,8 @@ class ComicDownloadWorker(context:Context,params:WorkerParameters):CoroutineWork
                 ComicDownloadManager.update(key) { it.copy(status=ComicDownloadStatus.PAUSED) }
                 throw e
             } catch(e:Exception) {
-                ComicDownloadManager.update(key) { it.copy(status=if(DownloadWorker.foregroundStartRestricted(e)) ComicDownloadStatus.PAUSED else ComicDownloadStatus.FAILED,error=DownloadWorker.failureMessage(e)) }
-                ComicDownloadManager.message(DownloadWorker.failureMessage(e))
+                ComicDownloadManager.update(key) { it.copy(status=ComicDownloadStatus.FAILED,error=e.message ?: "章节下载失败") }
+                ComicDownloadManager.message("下载失败：${e.message ?: "章节下载失败"}")
                 Result.failure()
             }
         }

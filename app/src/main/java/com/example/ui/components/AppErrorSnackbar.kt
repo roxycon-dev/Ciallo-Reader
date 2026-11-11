@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -43,11 +45,11 @@ fun AppErrorSnackbar(
     val friendlyMessage = remember(message) {
         val lower = message.lowercase()
         when {
-            lower.contains("timeout") || lower.contains("connect") -> "网络连接超时，请检查网络设置"
-            lower.contains("json") || lower.contains("format") -> "书源文件解析失败：JSON 格式非法"
-            lower.contains("backup") || lower.contains("restore") -> "备份恢复失败，请选择正确的备份包"
-            lower.contains("404") -> "书源接口未找到 (404)，该书源可能已失效"
-            lower.contains("500") || lower.contains("502") -> "远程服务器内部错误 (500/502)，请稍后再试"
+            lower.contains("timeout") || lower.contains("connect") -> tr("网络连接超时，请检查网络设置")
+            lower.contains("json") || lower.contains("format") -> tr("书源文件解析失败：JSON 格式非法")
+            lower.contains("backup") || lower.contains("restore") -> tr("备份恢复失败，请选择正确的备份包")
+            lower.contains("404") -> tr("书源接口未找到 (404)，该书源可能已失效")
+            lower.contains("500") || lower.contains("502") -> tr("远程服务器内部错误 (500/502)，请稍后再试")
             else -> message
         }
     }
@@ -87,7 +89,7 @@ fun AppErrorSnackbar(
                 ) {
                     Icon(
                         imageVector = Icons.Default.ErrorOutline,
-                        contentDescription = "错误",
+                        contentDescription = tr("错误"),
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(20.dp)
                     )
@@ -97,7 +99,7 @@ fun AppErrorSnackbar(
                 
                 Column {
                     Text(
-                        text = "操作出错",
+                        text = tr("操作出错"),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.error
@@ -124,7 +126,7 @@ fun AppErrorSnackbar(
                 PullOutTextButton(
                     onClick = {
                         clipboardManager.setText(AnnotatedString(message))
-                        AppToast.makeText(context, "错误日志已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                        AppToast.makeText(context, tr("错误日志已复制到剪贴板"), Toast.LENGTH_SHORT).show()
                         onActionClick?.invoke()
                     },
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
@@ -132,13 +134,13 @@ fun AppErrorSnackbar(
                 ) {
                     Icon(
                         imageVector = Icons.Default.ContentCopy,
-                        contentDescription = "复制日志",
+                        contentDescription = tr("复制日志"),
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.outline
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "复制日志",
+                        text = tr("复制日志"),
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.outline,
                         fontWeight = FontWeight.Bold
@@ -153,7 +155,7 @@ fun AppErrorSnackbar(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "关闭",
+                            contentDescription = tr("关闭"),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)
                         )

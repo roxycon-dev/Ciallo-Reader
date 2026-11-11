@@ -1,5 +1,7 @@
 package com.example.ui.mascot
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -131,7 +133,7 @@ fun BookmarkHappyAnimation(onComplete: () -> Unit) {
             Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = "✨ 书签已保存",
+                text = tr("✨ 书签已保存"),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF52D1AC),

@@ -1,5 +1,7 @@
 package com.example.download
 
+import com.example.i18n.tr
+
 /** HTTP byte ranges must describe exactly the requested tail of the same representation. */
 internal object DownloadTransferPolicy {
     data class Range(val start: Long, val end: Long, val total: Long)
@@ -14,8 +16,8 @@ internal object DownloadTransferPolicy {
 
     fun validateTail(header: String?, offset: Long, contentLength: Long): Long {
         val range = parseRange(header) ?: error("服务器返回了无效的续传范围")
-        require(range.start == offset && range.end == range.total - 1) { "服务器返回的续传位置不一致" }
-        require(contentLength < 0 || contentLength == range.end - range.start + 1) { "续传响应长度不一致" }
+        require(range.start == offset && range.end == range.total - 1) { tr("服务器返回的续传位置不一致") }
+        require(contentLength < 0 || contentLength == range.end - range.start + 1) { tr("续传响应长度不一致") }
         return range.total
     }
 

@@ -1,5 +1,7 @@
 package com.example.ui.mascot
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -153,7 +155,7 @@ fun BookCompleteAnimation(onComplete: () -> Unit) {
             ) {
                 Image(
                     painter = painterResource(id = currentDrawableRes),
-                    contentDescription = "Roxy 庆祝",
+                    contentDescription = tr("Roxy 庆祝"),
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -161,7 +163,7 @@ fun BookCompleteAnimation(onComplete: () -> Unit) {
             Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = "🎉 恭喜读完这本书！",
+                text = tr("🎉 恭喜读完这本书！"),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFFF0B95E),
@@ -171,43 +173,11 @@ fun BookCompleteAnimation(onComplete: () -> Unit) {
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "Roxy 为你欢呼 ～✨",
+                text = tr("Roxy 为你欢呼 ～✨"),
                 fontSize = 13.sp,
                 color = Color.White.copy(alpha = 0.85f),
                 textAlign = TextAlign.Center
             )
         }
-    }
-}
-
-
-/** One-shot GIF backed by the platform decoder; keep the original artwork as a static fallback. */
-@Composable
-internal fun RoxyCelebrationImage(modifier: Modifier = Modifier, contentDescription: String = "Roxy 庆祝") {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val reduced = com.example.ui.wenku.rememberWenkuAccessibility().reduceMotion
-    val animated = remember(context, reduced) {
-        if (reduced || android.os.Build.VERSION.SDK_INT < 28) null else runCatching {
-            android.graphics.ImageDecoder.decodeDrawable(
-                android.graphics.ImageDecoder.createSource(context.resources, com.example.R.raw.roxy_celebration)
-            ) as? android.graphics.drawable.AnimatedImageDrawable
-        }.getOrNull()
-    }
-    if (animated == null) {
-        Image(painterResource(MascotSpriteSheet.celebrateDrawable), contentDescription, modifier = modifier)
-    } else {
-        androidx.compose.ui.viewinterop.AndroidView(
-            factory = { viewContext ->
-                android.widget.ImageView(viewContext).apply {
-                    scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-                    this.contentDescription = contentDescription
-                    setImageDrawable(animated)
-                    animated.repeatCount = 0
-                    animated.start()
-                }
-            },
-            modifier = modifier,
-        )
-        DisposableEffect(animated) { onDispose { animated.stop() } }
     }
 }

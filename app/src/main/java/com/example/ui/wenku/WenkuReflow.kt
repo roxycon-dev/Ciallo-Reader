@@ -194,12 +194,7 @@ class WenkuReflowState {
     }
 
     internal fun observe(key: Any, coordinates: LayoutCoordinates) {
-        // 旋转 / 分屏 / Lookahead 的同一帧里，onGloballyPositioned 可能带着尚未附着或已脱离、
-        // 或尺寸暂时为 0 的节点进来：对未附着的 LayoutCoordinates 调 boundsInRoot() 会抛
-        // IllegalStateException；0 尺寸矩形则会污染下一轮重排的 paintedRect 插值。
-        // 这两种情况宁可不采样（沿用上一次有效值），也不猜、不吞异常。
-        val bounds = coordinates.attachedBoundsOrNull() ?: return
-        liveRects[key] = bounds
+        liveRects[key] = coordinates.boundsInRoot()
     }
 
     internal fun forget(key: Any) {
@@ -215,21 +210,10 @@ class WenkuReflowState {
     internal fun liveOf(key: Any): Rect? = liveRects[key]
 
     internal fun observeContainer(coordinates: LayoutCoordinates) {
-        // 容器同理：未附着或退化成 0 时不改写视口，否则 viewport() 会拿 Zero 容器去裁剪整屏。
-        val bounds = coordinates.attachedBoundsOrNull() ?: return
+        val bounds = coordinates.boundsInRoot()
         liveViewport = bounds
         containerRoot = bounds.topLeft
         containerSize = bounds.size
-    }
-
-    /** 已附着且为有限正尺寸的 root 矩形；否则返回 null（不抛异常、不写入退化矩形）。 */
-    private fun LayoutCoordinates.attachedBoundsOrNull(): Rect? {
-        if (!isAttached) return null
-        val bounds = boundsInRoot()
-        if (!bounds.width.isFinite() || !bounds.height.isFinite()) return null
-        if (!bounds.left.isFinite() || !bounds.top.isFinite()) return null
-        if (bounds.width <= 0f || bounds.height <= 0f) return null
-        return bounds
     }
 
     /**
@@ -428,28 +412,17 @@ fun WenkuReflowScope(
             return@LaunchedEffect
         }
         state.begin()
-        // 这一轮的身份；取消/收尾时只回收自己开的那一轮。
-        val ownedGeneration = state.generation
         state.pushClock(0f)
-        try {
-            // 等新约束 measure/layout 落位后再起跑（对应 library_workspace.dart:97 的 addPostFrameCallback）。
-            val startNanos = withFrameNanos { it }
-            var elapsedMs = 0f
-            while (elapsedMs < REFLOW_DURATION_MS) {
-                val now = withFrameNanos { it }
-                elapsedMs = (now - startNanos) / 1_000_000f
-                state.pushClock(elapsedMs / REFLOW_DURATION_MS)
-            }
-            state.pushClock(1f)
-            state.end()
-        } finally {
-            // 快速换排序键 / 离开组合 / 旋转同一帧换约束时这一轮会被取消，循环不会走到 end()；
-            // 若不清掉，state 会永远停在 active=true + 半程进度，之后每帧都按旧矩形裁剪。
-            // 只在「仍是当前生效的一轮」时收尾：新一轮已经 begin() 过的话 generation 不同，
-            // 这里绝不碰它（否则会把新一轮的旧矩形和时钟一起清空）。正常跑完时 end() 已把
-            // active 置 false，这里自然 no-op，不产生多余的状态写入。
-            if (state.active && state.generation == ownedGeneration) state.end()
+        // 等新约束 measure/layout 落位后再起跑（对应 library_workspace.dart:97 的 addPostFrameCallback）。
+        val startNanos = withFrameNanos { it }
+        var elapsedMs = 0f
+        while (elapsedMs < REFLOW_DURATION_MS) {
+            val now = withFrameNanos { it }
+            elapsedMs = (now - startNanos) / 1_000_000f
+            state.pushClock(elapsedMs / REFLOW_DURATION_MS)
         }
+        state.pushClock(1f)
+        state.end()
     }
     WenkuReflowViewport(state, modifier, content)
 }

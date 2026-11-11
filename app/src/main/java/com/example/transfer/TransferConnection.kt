@@ -1,5 +1,7 @@
 package com.example.transfer
 
+import com.example.i18n.tr
+
 import java.io.IOException
 import java.io.DataInputStream
 import java.io.DataOutputStream
@@ -21,9 +23,9 @@ internal object TransferConnection {
             raw.soTimeout=1_500
             NearbyHandshake.write(DataOutputStream(raw.outputStream),local)
             val remote=NearbyHandshake.read(DataInputStream(raw.inputStream))
-            require(remote.id!=local.id){"附近连接指向了本机"}
+            require(remote.id!=local.id){tr("附近连接指向了本机")}
             if(expectedId!=null && remote.id!=expectedId)throw SecurityException("附近网络中的设备与所选设备不一致")
-            if(local.sending && remote.sending && !remote.busy)throw IllegalStateException("双方都选择了发送，请让一台设备选择接收")
+            if(local.sending && remote.sending && !remote.busy)throw IllegalStateException(tr("双方都选择了发送，请让一台设备选择接收"))
             if(!NearbyHandshake.shouldStart(local,remote) || !claim()){raw.close();return null}
             track(raw)
             return NearbyAccepted(secure(context(),raw,true,8_000,track),remote)

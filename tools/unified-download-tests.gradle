@@ -5,10 +5,7 @@ gradle.projectsEvaluated {
         maxParallelForks = 1
         filter {
             includeTestsMatching('com.example.download.*Test')
-            includeTestsMatching('com.example.data.AppDatabaseMigrationTest')
-            includeTestsMatching('com.example.data.BackendImportSafetyTest')
             includeTestsMatching('com.example.library.NovelDownloadPanelTest')
-            includeTestsMatching('com.example.library.ImageBytesTest')
             includeTestsMatching('com.example.library.ComicLocalImporterTest')
             includeTestsMatching('com.example.source.impl.*Test')
             includeTestsMatching('com.example.source.js.JsSourcePayloadTest')

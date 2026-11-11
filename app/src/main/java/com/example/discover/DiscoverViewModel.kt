@@ -1,5 +1,7 @@
 package com.example.discover
 
+import com.example.i18n.tr
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.source.*
@@ -21,8 +23,6 @@ data class DiscoverState(val entries: List<DiscoverEntry> = emptyList(), val loa
 class DiscoverViewModel(private val manager: SourceManager, private val store: DiscoverStore, private val partition: DiscoverPartition = DiscoverPartition.COMIC) : ViewModel() {
     private val _state = MutableStateFlow(DiscoverState())
     val state = _state.asStateFlow()
-    // Successful requests outlive the lazy item and the detail route. Keep source headers in memory only.
-    internal val coverRequests = android.util.LruCache<String, coil.request.ImageRequest>(128)
     private var job: Job? = null
     private var sources: List<BookSource> = emptyList()
     private var query = DiscoverQuery(DiscoverDimension.UPDATES, "最新")
@@ -215,7 +215,7 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
                 else slots.withPermit { withTimeout(50_000) { source.discover(requested.copy(page = page, cursor = cursors[source.id], categoryIds = routes,
                     offset = if (append) _state.value.entries.count { it.book.sourceId == source.id } else 0)) } }
             }
-                catch (_: TimeoutCancellationException) { SourceResult.Error(SourceException.NetworkError("连接较慢，请稍后重试")) }
+                catch (_: TimeoutCancellationException) { SourceResult.Error(SourceException.NetworkError(tr("连接较慢，请稍后重试"))) }
                 catch (e: CancellationException) { throw e }
                 catch (e: Exception) { SourceResult.Error(SourceException.Unknown(e.message ?: "网络异常", e)) }
             completed.send(Triple(source.id, page, result))
@@ -248,9 +248,9 @@ class DiscoverViewModel(private val manager: SourceManager, private val store: D
                                 (previous?.capabilities?.get(kind).orEmpty() + next.capabilities[kind].orEmpty()).distinct() })
                     }
                     errors.remove(id)
-                    if (!data.supported) notices[id] = data.notice ?: "该站未提供当前榜单或时间范围"
+                    if (!data.supported) notices[id] = data.notice ?: com.example.i18n.tr("该站未提供当前榜单或时间范围")
                     else if (!data.notice.isNullOrBlank()) notices[id] = data.notice
-                    else if (data.entries.isEmpty() && !data.hasMore) notices[id] = "该站当前条件没有作品"
+                    else if (data.entries.isEmpty() && !data.hasMore) notices[id] = com.example.i18n.tr("该站当前条件没有作品")
                     else notices.remove(id)
                     val repeatedCursor = data.nextCursor?.let { !cursorHistory.getOrPut(id) { mutableSetOf() }.add(it) } == true
                     cursors[id] = data.nextCursor

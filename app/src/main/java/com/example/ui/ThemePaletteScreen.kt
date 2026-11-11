@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
@@ -40,7 +42,7 @@ import com.example.ui.wenku.WenkuSymbol
 import com.example.ui.wenku.rememberWenkuAccessibility
 import com.example.ui.wenku.wenkuPagePart
 
-private val paletteLabels = listOf("蓝", "紫", "绿", "粉", "橙")
+private val paletteLabels = listOf("蓝", "紫", "绿", "粉", "橙").map { com.example.i18n.tr(it) }
 
 @Composable
 internal fun ThemePaletteScreen(
@@ -51,39 +53,31 @@ internal fun ThemePaletteScreen(
     onBack: () -> Unit,
 ) {
     val palette = MaterialTheme.colorScheme
-    GlassManagementPage("主题配色方案", "APPEARANCE / PALETTE", onBack) { insets ->
+    GlassManagementPage(com.example.i18n.tr("主题配色方案"), "APPEARANCE / PALETTE", onBack) { insets ->
         Box(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
-            val preview: @Composable () -> Unit = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        WenkuSectionHeader("01", "TONAL PALETTE", "实时预览")
-                        Box(Modifier.wenkuPagePart(1)) { ThemePalettePreview(palette) }
-                    }
-            }
-            com.example.ui.adaptive.AdaptiveWorkspace(
-                modifier = Modifier.widthIn(max = 1060.dp).fillMaxSize(),
-                controls = { split ->
-                    if (split) Box(Modifier.fillMaxWidth().padding(start = 24.dp, top = 12.dp)) { preview() }
-                },
-            ) { split ->
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.widthIn(max = 680.dp).fillMaxSize(),
                 contentPadding = PaddingValues(start = 24.dp, top = 12.dp, end = 24.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                if (!split) item("preview") { preview() }
+                item("preview") {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        WenkuSectionHeader("01", "TONAL PALETTE", tr("实时预览"))
+                        Box(Modifier.wenkuPagePart(1)) { ThemePalettePreview(palette) }
+                    }
+                }
                 item("primary") {
                     PaletteOptions(
-                        "02", "PRIMARY COLOR", "主色调", BasePrimaryColors, primaryIndex,
+                        "02", "PRIMARY COLOR", com.example.i18n.tr("主色调"), BasePrimaryColors, primaryIndex,
                         Modifier.wenkuPagePart(2), onPrimaryChange,
                     )
                 }
                 item("secondary") {
                     PaletteOptions(
-                        "03", "ACCENT COLOR", "强调色", BaseSecondaryColors, secondaryIndex,
+                        "03", "ACCENT COLOR", com.example.i18n.tr("强调色"), BaseSecondaryColors, secondaryIndex,
                         Modifier.wenkuPagePart(3), onSecondaryChange,
                     )
                 }
-            }
             }
         }
     }
@@ -95,10 +89,10 @@ private fun ThemePalettePreview(colors: ColorScheme) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 WenkuIcon(WenkuSymbol.Book, size = 24.dp, tint = colors.primary, entrance = false)
-                Text("Ciallo 阅览室", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(tr("Ciallo 阅览室"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
             Text(
-                "配色会即时应用到页面、玻璃卡片和控件。",
+                com.example.i18n.tr("配色会即时应用到页面、玻璃卡片和控件。"),
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.onSurfaceVariant,
             )
@@ -184,7 +178,7 @@ private fun PaletteSwatch(
     WenkuGlassSurface(
         modifier = modifier.semantics(mergeDescendants = true) {
             selected = checked
-            stateDescription = if (checked) "已选择" else "未选择"
+            stateDescription = if (checked) tr("已选择") else tr("未选择")
             contentDescription = description
         },
         shape = RoundedCornerShape(12.dp),

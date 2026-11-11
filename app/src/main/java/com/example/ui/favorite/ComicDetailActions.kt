@@ -1,5 +1,7 @@
 package com.example.ui.favorite
 
+import com.example.i18n.tr
+
 import com.example.ui.components.PullOutTextButton
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -69,7 +71,7 @@ fun ComicBottomActionBar(
                 modifier = Modifier.weight(1f),
             )
             PullOutTextButton(onClick = onContinue) {
-                Text("从头重读", fontSize = 12.sp, color = MintPrimary, fontWeight = FontWeight.SemiBold)
+                Text(tr("从头重读"), fontSize = 12.sp, color = MintPrimary, fontWeight = FontWeight.SemiBold)
             }
         } else {
             GradientActionButton(
@@ -80,7 +82,7 @@ fun ComicBottomActionBar(
         }
         Spacer(modifier = Modifier.width(10.dp))
         AppActionButton(
-            text = "下载",
+            text = tr("下载"),
             onClick = onDownload,
             variant = AppButtonVariant.Secondary,
             buttonSize = AppButtonSize.Small,
@@ -109,8 +111,8 @@ fun SourceUnavailableBanner(
             color = MaterialTheme.colorScheme.error,
             modifier = Modifier.weight(1f),
         )
-        PullOutTextButton(onClick = onRetry) { Text("重试", fontSize = 12.sp) }
-        PullOutTextButton(onClick = onChangeSource) { Text("换源", fontSize = 12.sp) }
+        PullOutTextButton(onClick = onRetry) { Text(tr("重试"), fontSize = 12.sp) }
+        PullOutTextButton(onClick = onChangeSource) { Text(tr("换源"), fontSize = 12.sp) }
     }
 }
 

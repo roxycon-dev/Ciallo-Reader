@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.i18n.tr
+
 import android.net.Uri
 import android.content.Context
 import android.os.Handler
@@ -118,8 +120,8 @@ class ZLibraryNativeSession(
             try { attach(WebView(context.applicationContext)) }
             catch(e:Exception) {
                 searchFinished=true; mainHandler.removeCallbacksAndMessages(null)
-                onLoginResult(false,"系统 WebView 不可用，请更新 Android System WebView")
-                onSearchResults(emptyList(),"系统 WebView 不可用")
+                onLoginResult(false,tr("系统 WebView 不可用，请更新 Android System WebView"))
+                onSearchResults(emptyList(),tr("系统 WebView 不可用"))
             }
         }
     }
@@ -175,7 +177,7 @@ class ZLibraryNativeSession(
         // 硬超时兜底：无论页面/回调卡在哪个环节，15 秒后必须结束搜索状态
         mainHandler.postDelayed({
             if (generation == searchGeneration && !searchFinished) {
-                finishSearch(wv, emptyList(), "搜索超时，请重试或切换节点")
+                finishSearch(wv, emptyList(), com.example.i18n.tr("搜索超时，请重试或切换节点"))
             }
         }, SEARCH_TIMEOUT_MS)
     }
@@ -225,7 +227,7 @@ class ZLibraryNativeSession(
 
     fun login(email: String, password: String) {
         val wv = webView ?: run {
-            onLoginResult(false, "会话未就绪，请重试")
+            onLoginResult(false, tr("会话未就绪，请重试"))
             return
         }
         if (loginInProgress) return
@@ -255,10 +257,10 @@ class ZLibraryNativeSession(
                     try { wv.onPause() } catch (_: Exception) {}
                     if (isLoggedIn()) {
                         Log.d("ZLibLogin", "login success, cookies present")
-                        onLoginResult(true, "登录成功")
+                        onLoginResult(true, tr("登录成功"))
                     } else {
                         Log.d("ZLibLogin", "login failed, no session cookies")
-                        onLoginResult(false, "登录失败，请检查账号密码")
+                        onLoginResult(false, tr("登录失败，请检查账号密码"))
                     }
                 }
             }
@@ -274,7 +276,7 @@ class ZLibraryNativeSession(
                     wv.webViewClient = searchClient
                 }
                 try { wv.onPause() } catch (_: Exception) {}
-                onLoginResult(false, "登录超时，请检查网络后重试")
+                onLoginResult(false, tr("登录超时，请检查网络后重试"))
             }
         }, 20000)
     }
@@ -290,7 +292,7 @@ class ZLibraryNativeSession(
                 // 页面还没就绪/回调无结果：继续重试而不是永久转圈
                 pollTries++
                 if (pollTries >= MAX_POLL_TRIES) {
-                    finishSearch(wv, emptyList(), "页面无响应，请重试或切换节点")
+                    finishSearch(wv, emptyList(), com.example.i18n.tr("页面无响应，请重试或切换节点"))
                 } else {
                     schedulePoll(wv, url)
                 }
@@ -310,10 +312,10 @@ class ZLibraryNativeSession(
                 clickDiamWallGate(wv)
                 pollTries++
                 if (pollTries >= MAX_CHALLENGE_POLL_TRIES) {
-                    finishSearch(wv, emptyList(), "验证未通过，请重试或切换节点")
+                    finishSearch(wv, emptyList(), com.example.i18n.tr("验证未通过，请重试或切换节点"))
                     return@evaluateJavascript
                 }
-                onSearchResults(emptyList(), "正在通过验证…")
+                onSearchResults(emptyList(), tr("正在通过验证…"))
                 schedulePoll(wv, url)
                 return@evaluateJavascript
             }
@@ -326,7 +328,7 @@ class ZLibraryNativeSession(
             val noResult = !html.contains("z-bookcard") &&
                 noResultMarkers.any { html.contains(it, ignoreCase = true) }
             if (noResult) {
-                finishSearch(wv, emptyList(), "未找到相关书籍")
+                finishSearch(wv, emptyList(), com.example.i18n.tr("未找到相关书籍"))
                 return@evaluateJavascript
             }
 
@@ -344,7 +346,7 @@ class ZLibraryNativeSession(
                     } else {
                         pollTries++
                         if (pollTries >= MAX_POLL_TRIES) {
-                            finishSearch(wv, emptyList(), "未解析到书籍（可能结构变化或需要登录）")
+                            finishSearch(wv, emptyList(), com.example.i18n.tr("未解析到书籍（可能结构变化或需要登录）"))
                         } else {
                             schedulePoll(wv, url)
                         }

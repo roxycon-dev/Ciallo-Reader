@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -34,10 +36,10 @@ object Fb2Parser {
         try {
             Log.d(TAG, "[Fb2Parser] Starting FB2 import for $fileName")
             val bytes = context.contentResolver.openInputStream(uri)?.use { it.readImportBytes() }
-                ?: return@withContext Result.failure(Exception("无法读取 FB2 文件"))
+                ?: return@withContext Result.failure(Exception(tr("无法读取 FB2 文件")))
             val text = decodeFb2Text(bytes)
             if (!text.contains("<FictionBook", ignoreCase = true)) {
-                return@withContext Result.failure(Exception("不是有效的 FB2 文件"))
+                return@withContext Result.failure(Exception(tr("不是有效的 FB2 文件")))
             }
 
             val doc = Jsoup.parse(text, "", Parser.xmlParser())
@@ -135,7 +137,7 @@ object Fb2Parser {
             if (chapters.isEmpty()) {
                 if (targetBookId == null) bookDao.deleteBook(initialBook.copy(id = bookId))
                 File(context.filesDir, "fb2_images/$bookId").deleteRecursively()
-                return@withContext Result.failure(Exception("FB2 文件中未找到有效正文内容"))
+                return@withContext Result.failure(Exception(tr("FB2 文件中未找到有效正文内容")))
             }
 
             var coverUri: String? = null

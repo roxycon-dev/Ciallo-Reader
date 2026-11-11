@@ -1,5 +1,7 @@
 package com.example.source.zlibrary
 
+import com.example.i18n.tr
+
 import android.content.Context
 import com.example.source.zlibrary.network.ZLibraryDns
 import kotlinx.coroutines.Dispatchers
@@ -120,7 +122,7 @@ class EndpointHealthChecker(private val context: Context, direct: Boolean = fals
                     tlsOk = true,
                     httpCode = homeCode,
                     isRealZlib = false,
-                    error = if (homeCode != 200) "首页返回 HTTP $homeCode" else "非 Z-Library 站点（可能是停放域名）"
+                    error = if (homeCode != 200) com.example.i18n.homeHttpCode(homeCode) else tr("非 Z-Library 站点（可能是停放域名）")
                 )
             }
 
@@ -162,10 +164,10 @@ class EndpointHealthChecker(private val context: Context, direct: Boolean = fals
                 searchAvailable = searchResponse.code == 200 && stayedOnSearchPath &&
                     !serviceUnavailable && keywordRelevant
                 searchDetail = when {
-                    serviceUnavailable -> "搜索服务暂不可用（官网故障）"
+                    serviceUnavailable -> tr("搜索服务暂不可用（官网故障）")
                     searchResponse.code != 200 -> "搜索页 HTTP ${searchResponse.code}"
-                    !stayedOnSearchPath -> "搜索被重定向到主页（入口跳转域，非真实镜像）"
-                    !keywordRelevant -> "搜索结果与关键词无关（疑似主页充数）"
+                    !stayedOnSearchPath -> tr("搜索被重定向到主页（入口跳转域，非真实镜像）")
+                    !keywordRelevant -> tr("搜索结果与关键词无关（疑似主页充数）")
                     else -> ""
                 }
                 }
@@ -183,7 +185,7 @@ class EndpointHealthChecker(private val context: Context, direct: Boolean = fals
                 isRealZlib = true,
                 searchAvailable = searchAvailable,
                 error = when {
-                    !eapiOk && !searchAvailable -> "站点可达，但 API 与搜索均异常"
+                    !eapiOk && !searchAvailable -> tr("站点可达，但 API 与搜索均异常")
                     !searchAvailable -> searchDetail.ifBlank { "搜索服务暂不可用" }
                     else -> null
                 }

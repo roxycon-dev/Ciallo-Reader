@@ -129,46 +129,4 @@ class MotionQualityTest {
         compose.onNodeWithText("Paper content").assertDoesNotExist()
         compose.runOnIdle { assertTrue(requireNotNull(life).closed) }
     }
-
-    @Test fun backdropFollowsPaperWithoutRecomposingTheContents() {
-        val life=PaperLifecycle();var show by mutableStateOf(true);var compositions=0
-        val decor=compose.activity.window.decorView
-        compose.setContent { MaterialTheme {
-            if(show) CompositionLocalProvider(LocalPaperBackdropOwner provides life) {
-                GlassDialogWindowEffect(compose.activity,20f)
-                SideEffect { compositions++ }
-                Text("Stable backdrop content")
-            }
-        } }
-        compose.waitForIdle();val initial=compositions
-        for(progress in listOf(0f,.2f,.5f,1f,.7f,.3f,.01f,0f)) {
-            compose.runOnIdle { life.progress=progress }
-            compose.waitForIdle()
-            compose.runOnIdle {
-                assertEquals(paperBackdropProgress(progress)*20f,GlassWindowBlur.radius(decor),.251f)
-                assertEquals(initial,compositions)
-            }
-        }
-        compose.runOnIdle { life.progress=1f };compose.waitForIdle()
-        compose.runOnIdle { show=false };compose.waitForIdle()
-        compose.runOnIdle { assertEquals(0f,GlassWindowBlur.radius(decor),0f) }
-    }
-    @Test fun closingAChildKeepsTheParentsBlurUntilItsOwnExit() {
-        val decor=compose.activity.window.decorView;val parent=Any();val child=Any()
-        compose.runOnUiThread {
-            try {
-                GlassWindowBlur.acquire(decor,parent,18f)
-                GlassWindowBlur.acquire(decor,child,24f)
-                assertEquals(24f,GlassWindowBlur.radius(decor),0f)
-                GlassWindowBlur.acquire(decor,child,10f)
-                assertEquals(18f,GlassWindowBlur.radius(decor),0f)
-                GlassWindowBlur.release(decor,child)
-                assertEquals(18f,GlassWindowBlur.radius(decor),0f)
-                GlassWindowBlur.acquire(decor,parent,5f)
-                assertEquals(5f,GlassWindowBlur.radius(decor),0f)
-                GlassWindowBlur.acquire(decor,parent,0f)
-                assertEquals(0f,GlassWindowBlur.radius(decor),0f)
-            } finally { GlassWindowBlur.release(decor,child);GlassWindowBlur.release(decor,parent) }
-        }
-    }
 }

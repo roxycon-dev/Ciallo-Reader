@@ -346,3 +346,4 @@ object WenkuReaderPhysics {
         return !reversing && (distance >= commitDistance || fast)
     }
 }
+

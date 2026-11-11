@@ -1,5 +1,7 @@
 package com.example.source.zlibrary
 
+import com.example.i18n.tr
+
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
@@ -27,7 +29,7 @@ internal fun zLibraryDownloadPageError(html: String): String? {
     val text = org.jsoup.Jsoup.parse(html).text().lowercase()
     return when {
         listOf("daily limit", "download limit", "downloads limit", "download quota", "下载上限", "下载限额", "下载次数已达")
-            .any { it in text } -> "今日下载额度已用尽，请等待额度重置"
+            .any { it in text } -> tr("今日下载额度已用尽，请等待额度重置")
         else -> null
     }
 }

@@ -5,9 +5,6 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -19,7 +16,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.example.ui.comic.ComicReaderTestActivity
 import com.example.ui.reader.NovelInlineImage
-import com.example.ui.reader.NovelInlineImages
 import com.example.ui.reader.buildAnnotatedWithImages
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -100,49 +96,6 @@ class NovelInlineImageRenderTest {
             "NovelInlineImage 在 15s 内没有把解码后的图片节点挂进组合（token → 图片组件链路断裂）",
             mounted
         )
-    }
-
-    /**
-     * 回归 issue #6：极简渲染质量下翻页复用同一个组合槽位，`path` 变了但位图状态没换，
-     * 于是连续几张插图都显示第一张。判据：槽位 rebind 到新 path 后必须真的去解码新图
-     * （解码成功会写进 NovelImageCache）；修复前 `if (value == null)` 会一直挡住新解码。
-     */
-    @Test
-    fun inlineImageDecodesTheNewPathWhenTheSlotIsRebound() {
-        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<Context>()
-        val stamp = System.currentTimeMillis()
-        val fileA = File(context.filesDir, "slot_rebind_a_$stamp.png").apply { writeBytes(redPngBytes()) }
-        val fileB = File(context.filesDir, "slot_rebind_b_$stamp.png").apply { writeBytes(redPngBytes()) }
-        NovelInlineImages.NovelImageCache.clear()
-
-        var path by mutableStateOf(fileA.absolutePath)
-        compose.setContent {
-            Box(modifier = Modifier.size(60.dp).background(Color.White)) {
-                NovelInlineImage(path = path, onTap = {})
-            }
-        }
-        assertTrue(
-            "第一张图没有被解码（槽位初建时生产者未跑）",
-            waitForImageDecoded(fileA.absolutePath)
-        )
-
-        compose.runOnIdle { path = fileB.absolutePath }
-        assertTrue(
-            "槽位换绑定到新 path 后没有重新解码 —— 屏幕上会继续显示上一张的位图（issue #6）",
-            waitForImageDecoded(fileB.absolutePath)
-        )
-    }
-
-    private fun waitForImageDecoded(path: String, timeoutMs: Long = 15_000): Boolean {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline) {
-            // Robolectric 的 main looper 是暂停的：必须显式让组合推进一帧，
-            // 生产者（LaunchedEffect + Dispatchers.IO）的回写才会落到缓存里
-            compose.waitForIdle()
-            if (NovelInlineImages.NovelImageCache.get(path) != null) return true
-            Thread.sleep(80)
-        }
-        return false
     }
 
     @Test

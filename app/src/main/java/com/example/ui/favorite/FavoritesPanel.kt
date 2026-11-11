@@ -1,5 +1,7 @@
 package com.example.ui.favorite
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
@@ -199,7 +201,7 @@ fun FavoritesPanel(
                     .padding(horizontal = 12.dp, vertical = 6.dp),
             ) {
                 Text(
-                    text = if (refreshing) "检查中…" else "检查更新",
+                    text = if (refreshing) tr("检查中…") else tr("检查更新"),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     color = MintPrimary,
@@ -211,8 +213,8 @@ fun FavoritesPanel(
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 MascotEmptyState(
                     mascotResId = MascotSpriteSheet.idleDrawable,
-                    title = "「还没有喜欢的漫画」",
-                    description = "在漫画页点一下 ♡，喜欢的漫画都在这里 —— 不下载、不占空间，随时在线接着看。",
+                    title = tr("「还没有喜欢的漫画」"),
+                    description = tr("在漫画页点一下 ♡，喜欢的漫画都在这里 —— 不下载、不占空间，随时在线接着看。"),
                     actionLabel = "去书库逛逛",
                     onActionClick = onGoLibrary,
                     testTagPrefix = "favorites_empty_state",
@@ -361,7 +363,7 @@ fun FavoriteCard(
                         .background(Color(0xFFFF4D4F), RoundedCornerShape(6.dp))
                         .padding(horizontal = 5.dp, vertical = 2.dp),
                 ) {
-                    Text("更新", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(tr("更新"), fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
             // 未读话数
@@ -424,7 +426,7 @@ fun FavoriteCard(
                         .background(Color.Black.copy(alpha = 0.45f)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Filled.Warning, contentDescription = "来源失效", tint = Color(0xFFFFD166), modifier = Modifier.size(16.dp))
+                    Icon(Icons.Filled.Warning, contentDescription = com.example.i18n.AppLocale.t("来源失效"), tint = Color(0xFFFFD166), modifier = Modifier.size(16.dp))
                 }
             }
         }
@@ -443,7 +445,7 @@ fun FavoriteCard(
             text = buildString {
                 if (latestLabel != null) append(latestLabel)
                 if (readNum > 0) append(if (latestLabel != null) " · 读到目录第 ${readNum} 项" else "读到目录第 ${readNum} 项")
-                if (isEmpty()) append(if (dead) "来源暂不可用" else "尚未开始阅读")
+                if (isEmpty()) append(if (dead) tr("来源暂不可用") else tr("尚未开始阅读"))
             },
             fontSize = 10.sp,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
@@ -491,8 +493,8 @@ fun FavoritesEmptyState(onGoLibrary: () -> Unit, modifier: Modifier = Modifier) 
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         MascotEmptyState(
             mascotResId = MascotSpriteSheet.idleDrawable,
-            title = "「还没有喜欢的漫画」",
-            description = "在漫画页点一下 ♡，喜欢的漫画都在这里。",
+            title = tr("「还没有喜欢的漫画」"),
+            description = tr("在漫画页点一下 ♡，喜欢的漫画都在这里。"),
             actionLabel = "去书库逛逛",
             onActionClick = onGoLibrary,
             testTagPrefix = "favorites_empty_state",

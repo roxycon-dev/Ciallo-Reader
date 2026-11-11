@@ -92,12 +92,6 @@ internal object PullOutSources {
 }
 internal val LocalPaperOrigin = compositionLocalOf<PullOutSource?> { null }
 internal val LocalPaperOwner = compositionLocalOf<PaperLifecycle?> { null }
-// The window owns its backdrop even when the deforming panel is a descendant.
-internal val LocalPaperBackdropOwner = compositionLocalOf<PaperLifecycle?> { null }
-internal fun paperBackdropProgress(progress: Float): Float {
-    val p = progress.coerceIn(0f, 1f)
-    return p * p * (3f - 2f * p)
-}
 internal val LocalPaperFullSurface = compositionLocalOf { false }
 
 internal fun android.view.View.paperWindowOffset(screen: IntArray = IntArray(2), window: IntArray = IntArray(2)): Offset {
@@ -182,9 +176,7 @@ internal class PaperSpring {
     var position = 0f
     var velocity = 0f
     fun advance(target: Float, opening: Boolean, seconds: Float, lightweight: Boolean = false): Boolean {
-        // This solver is analytic/O(1): a missed frame needs one evaluation, not
-        // substeps. Capping dt discarded elapsed time and stretched exits on slow GPUs.
-        val dt = seconds.coerceAtLeast(0f)
+        val dt = seconds.coerceIn(0f, .033f)
         val coefficients = if (lightweight) { if (opening) fallbackOpen else fallbackClose } else if (opening) open else close
         val halfD = coefficients.halfD
         val x = position - target
@@ -272,8 +264,8 @@ private fun PaperVisibilityLegacy(visibleState: MutableTransitionState<Boolean>,
                     do {
                         val now = withFrameNanos { it }
                         destination = if (currentTarget) currentDragTarget else 0f
-                        // Consume real elapsed time in one analytic step, including dropped frames.
-                        val dt = ((now - last) / 1e9f).coerceAtLeast(0f)
+                        // A paused/overloaded device must not do an unbounded catch-up loop.
+                        val dt = ((now - last) / 1e9f).coerceIn(0f, .033f)
                         val moving = life.spring.advance(destination, currentTarget, dt, lightweight = !life.softPaper)
                         last = now; life.progress = life.spring.position
                     } while (moving)

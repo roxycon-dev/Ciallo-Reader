@@ -1,5 +1,7 @@
 package com.example
 
+import com.example.i18n.tr
+
 import com.example.ui.components.openPaperPage
 import com.example.discover.discoverUsesNovelDetails
 import com.example.ui.components.paperComposable
@@ -161,7 +163,6 @@ class MainActivity : ComponentActivity() {
         // Theme.MyApplication.Splash，底色与开屏页一致，交接无色差）。
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        com.example.data.StartupDiagnostics.breadcrumb(applicationContext, "main:onCreate")
         sharedDetail = com.example.library.SharedWorkLink.parse(intent.data)
         com.example.transfer.TransferManager.sharedUri(intent)?.let { com.example.transfer.TransferManager.get(this).openShared(it) }
         if(intent.getBooleanExtra("open_transfer",false)) com.example.transfer.TransferManager.get(this).show()
@@ -195,6 +196,9 @@ class MainActivity : ComponentActivity() {
         // 卡片微调 v2 默认档：一次性迁移（幂等）必须在 setContent 之前完成，
         // 避免在组合期执行持久化副作用
         com.example.data.PreferencesManager(this).migrateCardTweaksDefaultsV2()
+        // 界面语言：在 setContent 之前恢复，避免首帧先渲染中文再跳成英文。
+        com.example.i18n.AppLocale.language =
+            com.example.i18n.AppLanguage.of(com.example.data.PreferencesManager(this).appLanguage)
         // 冷启动兜底：清空书架分享的"用完即焚"临时文件，防止异常残留堆积
         Thread {
             try { com.example.library.BookShareHelper.cleanupTempShareDir(applicationContext) }
@@ -308,12 +312,16 @@ class MainActivity : ComponentActivity() {
                         fontScale = systemDensity.fontScale.coerceIn(0.85f, 1.15f)
                     )
                 }
+                // 语言跟着 AppLocale.language（可观察状态）走：设置页一改，全树重组。
+                val appLanguage = com.example.i18n.AppLocale.language
+                val stringTable = remember(appLanguage) { com.example.i18n.StringTable(appLanguage) }
 
                 CompositionLocalProvider(
                     LocalDensity provides clampedDensity,
                     LocalLiquidGlassState provides liquidGlass,
                     com.example.ui.components.LocalRenderQuality provides renderQuality,
-                    com.example.ui.components.LocalScrollTilt provides scrollTilt
+                    com.example.ui.components.LocalScrollTilt provides scrollTilt,
+                    com.example.i18n.LocalStrings provides stringTable
                 ) {
                     // 文档 §12.2：帧率降级。Compose 没有 Flutter 的 TickerMode 全局帧率，
                     // 这里用系统窗口首选刷新率表达同一意图：极简/流畅 → 60，均衡 → 90，
@@ -445,7 +453,7 @@ class MainActivity : ComponentActivity() {
                                     else com.example.ui.feedback.MutingHapticFeedback),
                             ) {
                         val navController = rememberNavController()
-                    // 每个 Tab 自己的 saveable 状态（滚动位置 / 3D-列表 / 筛选…）
+                    // 每个 Tab 自己的 saveable 状态（滚动位置 / 筛选…）
                     val tabStateHolder = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
                         val transferManager = remember { com.example.transfer.TransferManager.get(this@MainActivity) }
                         val transferOpen by transferManager.openPage.collectAsStateWithLifecycle()
@@ -457,11 +465,6 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         val sharedEntry by navController.currentBackStackEntryAsState()
-                        LaunchedEffect(sharedEntry?.destination?.route) {
-                            sharedEntry?.destination?.route?.let {
-                                com.example.data.StartupDiagnostics.breadcrumb(applicationContext, "route:$it")
-                            }
-                        }
                         val sharedSources by libraryViewModel.sourceManager.availableSources.collectAsStateWithLifecycle()
                         val sharedSourcesReady by libraryViewModel.sourcesReady.collectAsStateWithLifecycle()
                         LaunchedEffect(sharedDetail, sharedSources, sharedSourcesReady, sharedEntry) {
@@ -509,83 +512,36 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    var selectedCategoryForImport by rememberSaveable { mutableStateOf("全部") }
+                    var selectedCategoryForImport by remember { mutableStateOf("全部") }
 
-                    val importProgress by viewModel.importProgress.collectAsStateWithLifecycle()
-                    importProgress?.let { progress ->
-                        androidx.compose.material3.AlertDialog(
-                            onDismissRequest = {},
-                            title = { androidx.compose.material3.Text("正在导入书籍 ${progress.completed}/${progress.total}") },
-                            text = {
-                                androidx.compose.foundation.layout.Column {
-                                    androidx.compose.material3.LinearProgressIndicator(
-                                        progress = { progress.completed.toFloat() / progress.total.coerceAtLeast(1) }
-                                    )
-                                    androidx.compose.material3.Text(progress.fileName, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                                }
-                            },
-                            confirmButton = {}
-                        )
-                    }
-                    val importReport by viewModel.importReport.collectAsStateWithLifecycle()
-                    importReport?.let { report ->
-                        androidx.compose.material3.AlertDialog(
-                            onDismissRequest = viewModel::clearImportReport,
-                            title = { androidx.compose.material3.Text("导入结果") },
-                            text = { androidx.compose.material3.Text(report.message()) },
-                            confirmButton = {
-                                androidx.compose.material3.TextButton(onClick = viewModel::clearImportReport) {
-                                    androidx.compose.material3.Text("完成")
-                                }
-                            }
-                        )
-                    }
-                    val restoreOffer by viewModel.restoreOffer.collectAsStateWithLifecycle()
-                    val restoreBusy by viewModel.restoreBusy.collectAsStateWithLifecycle()
-                    val restoreCompleted by viewModel.restoreCompleted.collectAsStateWithLifecycle()
-                    val restoreFilePicker = rememberLauncherForActivityResult(
-                        contract = ActivityResultContracts.OpenDocument()
-                    ) { uri ->
-                        if (uri != null) viewModel.restoreFromUri(uri)
-                    }
-                    LaunchedEffect(restoreCompleted) {
-                        if (restoreCompleted > 0) {
-                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                libraryViewModel.sourceManager.reloadAfterTransfer()
-                                com.example.source.js.JsSourceRepo.loadCached(application, viewModel.prefs.showAdultSources)
-                                    .forEach { libraryViewModel.sourceManager.registerSource(it, defaultEnabled = true) }
-                            }
-                        }
-                    }
-                    restoreOffer?.let { snapshot ->
-                        androidx.compose.material3.AlertDialog(
-                            onDismissRequest = { viewModel.dismissRestoreOffer() },
-                            title = { androidx.compose.material3.Text("发现可恢复的备份") },
-                            text = {
-                                androidx.compose.material3.Text(
-                                    "书架是空的。备份目录里有 ${snapshot.name}（${
-                                        android.text.format.DateUtils.getRelativeTimeSpanString(snapshot.modifiedAt)
-                                    }），要恢复到这台设备吗？"
-                                )
-                            },
-                            confirmButton = {
-                                androidx.compose.material3.TextButton(
-                                    enabled = !restoreBusy,
-                                    onClick = { viewModel.acceptRestore() }
-                                ) { androidx.compose.material3.Text(if (restoreBusy) "正在恢复…" else "立即恢复") }
-                            },
-                            dismissButton = {
-                                androidx.compose.material3.TextButton(
-                                    enabled = !restoreBusy,
-                                    onClick = { viewModel.dismissRestoreOffer() }
-                                ) { androidx.compose.material3.Text("稍后") }
-                            }
-                        )
-                    }
                     val fileLauncher = rememberLauncherForActivityResult(
-                        contract = ActivityResultContracts.OpenMultipleDocuments()
-                    ) { uris ->
-                        viewModel.importBooks(uris, selectedCategoryForImport)
+                        contract = ActivityResultContracts.GetContent()
+                    ) { uri: Uri? ->
+                        uri?.let {
+                            try {
+                                contentResolver.takePersistableUriPermission(
+                                    it,
+                                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                )
+                            } catch (e: Exception) { e.printStackTrace() }
+
+                            var fileName = "book.txt"
+                            try {
+                                contentResolver.query(it, null, null, null, null)?.use { cursor ->
+                                    val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                                    if (cursor.moveToFirst() && nameIndex >= 0) {
+                                        fileName = cursor.getString(nameIndex) ?: "book.txt"
+                                    }
+                                }
+                            } catch (e: Throwable) {
+                                e.printStackTrace()
+                            }
+                            if (fileName == "book.txt") {
+                                fileName = it.lastPathSegment?.substringAfterLast('/') ?: "book.txt"
+                            }
+                            android.util.Log.d("BookImport", "[MainActivity] File selected: $fileName, uri: $it, category: $selectedCategoryForImport")
+                            viewModel.importBook(it, fileName, selectedCategoryForImport)
+                        }
                     }
 
                     var selectedTab by rememberSaveable { mutableIntStateOf(2) }
@@ -621,18 +577,35 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         startDestination = "splash",
                         enterTransition = {
-                            when (initialState.destination.route) {
-                                "splash" -> com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion)
+                            // 3D 书架的书已经在飞：封面此刻盖住整屏，页面横向滑入只会在边缘露馅，
+                            // 直接不播转场，等封面淡出时阅读器已经在原位了。
+                            when {
+                                com.example.ui.wenku.WenkuVolumeFlightBridge.suppressRouteMotion ->
+                                    androidx.compose.animation.EnterTransition.None
+                                initialState.destination.route == "splash" ->
+                                    com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion)
                                 else -> com.example.ui.components.paperPageEnter(navigationReduceMotion)
                             }
                         },
                         exitTransition = {
-                            com.example.ui.components.paperPageExit(
-                                navigationReduceMotion || initialState.destination.route == "splash"
-                            )
+                            if (com.example.ui.wenku.WenkuVolumeFlightBridge.suppressRouteMotion) {
+                                androidx.compose.animation.ExitTransition.None
+                            } else {
+                                com.example.ui.components.paperPageExit(
+                                    navigationReduceMotion || initialState.destination.route == "splash"
+                                )
+                            }
                         },
-                        popEnterTransition = { com.example.ui.components.paperPagePopEnter(navigationReduceMotion) },
-                        popExitTransition = { com.example.ui.components.paperPagePopExit(navigationReduceMotion) }
+                        popEnterTransition = {
+                            if (com.example.ui.wenku.WenkuVolumeFlightBridge.suppressRouteMotion) {
+                                androidx.compose.animation.EnterTransition.None
+                            } else com.example.ui.components.paperPagePopEnter(navigationReduceMotion)
+                        },
+                        popExitTransition = {
+                            if (com.example.ui.wenku.WenkuVolumeFlightBridge.suppressRouteMotion) {
+                                androidx.compose.animation.ExitTransition.None
+                            } else com.example.ui.components.paperPagePopExit(navigationReduceMotion)
+                        }
                     ) {
                         composable("splash") {
                             SplashScreen(
@@ -661,23 +634,6 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable("home") { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
-                            // Arm before composing the page, so composition/layout failures are covered too.
-                            val homeEntryToken = remember {
-                                com.example.data.StartupDiagnostics.breadcrumb(applicationContext, "home:compose:start")
-                                com.example.data.HomeRenderRecovery.arm()
-                            }
-                            DisposableEffect(homeEntryToken) {
-                                onDispose { com.example.data.HomeRenderRecovery.disarm(homeEntryToken) }
-                            }
-                            LaunchedEffect(homeEntryToken) {
-                                com.example.data.StartupDiagnostics.breadcrumb(applicationContext, "home:composition:applied")
-                                if (com.example.data.HomeRenderRecovery.consumeNotice(this@MainActivity)) {
-                                    AppToast.makeText(this@MainActivity,
-                                        "上次主页显示异常，已启用极简画质。可在设置中调整画质。", Toast.LENGTH_LONG).show()
-                                }
-                                kotlinx.coroutines.delay(com.example.data.HomeRenderRecovery.ENTRY_WINDOW_MS)
-                                com.example.data.HomeRenderRecovery.disarm(homeEntryToken)
-                            }
                             var discoveredNovel by remember { mutableStateOf<com.example.source.SearchBook?>(null) }
                             com.example.discover.DiscoverNovelDetails(discoveredNovel, libraryViewModel,
                                 onOpenDownloads = { navController.openPaperPage("downloads") },
@@ -696,17 +652,18 @@ class MainActivity : ComponentActivity() {
                                 tabFocusManager.clearFocus()
                                 if (selectedTab != 2) shelfSearch.close()
                             }
-                            val tabItems = remember {
+                            // key = 语言：切英文时重建列表，否则 remember 会把旧文案锁死
+                            val tabItems = remember(appLanguage) {
                                 listOf(
-                                    AppTabItem("书库", Icons.Outlined.Search, Icons.Filled.Search,
+                                    AppTabItem(stringTable.t("书库"), Icons.Outlined.Search, Icons.Filled.Search,
                                         wenkuSymbol = com.example.ui.wenku.WenkuSymbol.Search),
-                                    AppTabItem("发现", Icons.Outlined.Explore, Icons.Filled.Explore,
+                                    AppTabItem(stringTable.t("发现"), Icons.Outlined.Explore, Icons.Filled.Explore,
                                         wenkuSymbol = com.example.ui.wenku.WenkuSymbol.Discover),
-                                    AppTabItem("书架", Icons.Outlined.BookmarkBorder, Icons.Filled.Bookmark,
+                                    AppTabItem(stringTable.t("书架"), Icons.Outlined.BookmarkBorder, Icons.Filled.Bookmark,
                                         wenkuSymbol = com.example.ui.wenku.WenkuSymbol.Shelf),
-                                    AppTabItem("统计", Icons.Outlined.BarChart, Icons.Filled.BarChart,
+                                    AppTabItem(stringTable.t("统计"), Icons.Outlined.BarChart, Icons.Filled.BarChart,
                                         wenkuSymbol = com.example.ui.wenku.WenkuSymbol.Waveform),
-                                    AppTabItem("设置", Icons.Outlined.Settings, Icons.Filled.Settings,
+                                    AppTabItem(stringTable.t("设置"), Icons.Outlined.Settings, Icons.Filled.Settings,
                                         wenkuSymbol = com.example.ui.wenku.WenkuSymbol.Settings)
                                 )
                             }
@@ -792,13 +749,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            val widthClass = com.example.ui.adaptive.rememberWindowWidthClass()
-                            val rail = widthClass == com.example.ui.adaptive.WindowWidthClass.EXPANDED
-                            val homeBottomInset = if (rail) com.example.ui.theme.LocalAppBottomInsetNoTabBar.current
-                                else LocalAppBottomInset.current
-                            CompositionLocalProvider(LocalAppBottomInset provides homeBottomInset) {
-                            Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
-                            Box(Modifier.fillMaxSize().padding(start = if (rail) com.example.ui.components.AppRailWidth else 0.dp)) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                            Box(modifier = Modifier.fillMaxSize()) {
                             Scaffold(
                                 // Each tab owns its status-bar inset; applying it here too
                                 // leaves a second status-bar-sized gap above every header.
@@ -861,7 +813,7 @@ class MainActivity : ComponentActivity() {
                                                     },
                                                     onImportLocalBook = {
                                                         selectedCategoryForImport = "全部"
-                                                        fileLauncher.launch(arrayOf("*/*"))
+                                                        fileLauncher.launch("*/*")
                                                     },
                                                     /* 搜索结果卡片上的 ♡：直接收进「我喜欢的」 */
                                                     favoriteKeys = favoriteKeys,
@@ -878,11 +830,7 @@ class MainActivity : ComponentActivity() {
                                             1 -> {
                                                 val readingTitles by viewModel.readingTitles.collectAsStateWithLifecycle()
                                                 com.example.discover.DiscoverScreen(
-                                                downloadEntry = {
-                                                    com.example.library.DownloadCenterEntry(libraryViewModel) {
-                                                        navController.openPaperPage("downloads")
-                                                    }
-                                                },
+                                                onOpenDownloads = { navController.openPaperPage("downloads") },
                                                 readingTitles = readingTitles,
                                                 manager = libraryViewModel.sourceManager,
                                                 refreshRequest = discoverRefreshRequest,
@@ -914,7 +862,7 @@ class MainActivity : ComponentActivity() {
                                                 },
                                                 onImportClick = { category ->
                                                     selectedCategoryForImport = category
-                                                    fileLauncher.launch(arrayOf("*/*"))
+                                                    fileLauncher.launch("*/*")
                                                 },
                                                 onAddCategory = { name ->
                                                     viewModel.addCategory(name)
@@ -1190,37 +1138,29 @@ class MainActivity : ComponentActivity() {
                             val tabBarVisible by com.example.ui.shelf.ShelfChrome.tabBarVisible.collectAsStateWithLifecycle()
                             // 路由内的玻璃 sheet 会被 Tab 栏压住：有 sheet 打开时先让 Tab 栏让位。
                             val sheetOpen = com.example.ui.wenku.WenkuSheetRegistry.anyOpen
-                            val searchCoversDock = !rail && selectedTab == 2 && shelfSearch.mounted
-                            val selectTab: (Int) -> Unit = { tab ->
-                                if (tab == 1) {
-                                    val now = android.os.SystemClock.elapsedRealtime()
-                                    if (lastDiscoverTap > 0L && now - lastDiscoverTap in 1..400) { discoverRefreshRequest++; lastDiscoverTap = 0L }
-                                    else lastDiscoverTap = now
-                                } else lastDiscoverTap = 0L
-                                selectedTab = tab
-                            }
+                            val searchCoversDock = selectedTab == 2 && shelfSearch.mounted
                             PullOutVisibility(
                                 visible = tabBarVisible && !sheetOpen,
-                                modifier = Modifier.align(if (rail) Alignment.CenterStart else Alignment.BottomCenter)
-                                    .then(if (rail) Modifier.statusBarsPadding().navigationBarsPadding() else Modifier)
+                                modifier = Modifier.align(Alignment.BottomCenter)
                                     .then(if (searchCoversDock) Modifier
                                         .clearAndSetSemantics { }
                                         .wenkuBlockPointer()
                                         .graphicsLayer { alpha = 1f - shelfSearch.motion.value }
                                     else Modifier),
                             ) {
-                                if (rail) {
-                                    com.example.ui.components.AppNavigationRail(tabItems, selectedTab, selectTab)
-                                } else {
-                                    AppBottomTabBar(
-                                        items = tabItems,
-                                        selectedIndex = selectedTab,
-                                        onTabSelected = selectTab,
-                                        modifier = Modifier.widthIn(max = 560.dp),
-                                        collapseState = tabBarCollapseState,
-                                    )
-                                }
-                            }
+                                AppBottomTabBar(
+                                    items = tabItems,
+                                    selectedIndex = selectedTab,
+                                    onTabSelected = { tab ->
+                                        if (tab == 1) {
+                                            val now = android.os.SystemClock.elapsedRealtime()
+                                            if (lastDiscoverTap > 0L && now - lastDiscoverTap in 1..400) { discoverRefreshRequest++; lastDiscoverTap = 0L }
+                                            else lastDiscoverTap = now
+                                        } else lastDiscoverTap = 0L
+                                        selectedTab = tab
+                                    },
+                                    collapseState = tabBarCollapseState,
+                                )
                             }
                             }
                         }
@@ -1356,7 +1296,7 @@ class MainActivity : ComponentActivity() {
                             com.example.god.GodMomentEditHost(binding = binding, onSaved = { })
                         }
 
-                        paperComposable("reader", navController) { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null, com.example.ui.wenku.LocalWenkuMainSurface provides false) {
+                        paperComposable("reader", navController) { readerEntry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null, com.example.ui.wenku.LocalWenkuMainSurface provides false) {
                             val selectedBook by viewModel.selectedBook.collectAsStateWithLifecycle()
                             val chapters by viewModel.chapters.collectAsStateWithLifecycle()
                             val readerLoading by viewModel.readerLoading.collectAsStateWithLifecycle()
@@ -1374,6 +1314,36 @@ class MainActivity : ComponentActivity() {
                                     revisedBook != null && revisedBook.filePath != selectedBook?.filePath) viewModel.retrySelectedBook()
                             }
 
+                            val readerScope = androidx.compose.runtime.rememberCoroutineScope()
+                            // 归位飞行要先让封面盖住整屏（~120ms）再切路由；这段时间里连按返回
+                            // 不能再弹一次栈，否则会把书库一起弹掉。
+                            var closingReader by androidx.compose.runtime.remember {
+                                androidx.compose.runtime.mutableStateOf(false)
+                            }
+                            val closeReader: () -> Unit = {
+                                if (!closingReader && navController.currentBackStackEntry == readerEntry) {
+                                    val key = selectedBook?.id?.toString()
+                                    // 3D 书架：先让那本书的封面从阅读器这一侧淡入、盖住整屏，
+                                    // 再切路由（横向转场已关掉），所以退出时看到的是"书被放回书架"。
+                                    val volumeFlight = key != null &&
+                                        com.example.ui.wenku.WenkuVolumeFlightBridge.reverse(key)
+                                    key?.let { com.example.ui.wenku.WenkuFlightBridge.reverse(it) }
+                                    if (volumeFlight) {
+                                        closingReader = true
+                                        readerScope.launch {
+                                            kotlinx.coroutines.delay(
+                                                com.example.ui.wenku.ShelfOpenTimeline.CLOSE_COVER_IN_MS.toLong()
+                                            )
+                                            if (navController.currentBackStackEntry == readerEntry) {
+                                                navController.dismissPaperPage()
+                                            }
+                                        }
+                                    } else {
+                                        navController.dismissPaperPage()
+                                    }
+                                }
+                            }
+                            androidx.activity.compose.BackHandler(onBack = closeReader)
                             ReaderScreen(
                                 book = selectedBook,
                                 bookTitle = selectedBook?.title ?: "本地阅读",
@@ -1383,7 +1353,7 @@ class MainActivity : ComponentActivity() {
                                 readerLoadError = readerLoadError,
                                 onRetryLoad = viewModel::retrySelectedBook,
                                 onEnsureChapterLoaded = viewModel::ensureActiveChapter,
-                                onBack = { navController.dismissPaperPage() },
+                                onBack = closeReader,
                                 onUpdateProgress = { id, chapterIdx, offset, isFinished ->
                                     viewModel.updateProgress(id, chapterIdx, offset, isFinished)
                                 },
@@ -1483,7 +1453,7 @@ class MainActivity : ComponentActivity() {
                                     onOpenSourceManagement = { navController.openPaperPage("source_management") },
                                     onImportLocalBook = {
                                         selectedCategoryForImport = "全部"
-                                        fileLauncher.launch(arrayOf("*/*"))
+                                        fileLauncher.launch("*/*")
                                     },
                                     favoriteKeys = favoriteKeys,
                                     onToggleFavorite = { book, next -> viewModel.toggleFavorite(book, next) },
@@ -1647,7 +1617,7 @@ class MainActivity : ComponentActivity() {
                                     categories = (listOf(com.example.data.favorite.FAV_DEFAULT_CATEGORY) +
                                         comicFavoriteCategories.map { it.name }
                                             .filter { it != com.example.data.favorite.ALL_FAV_CATEGORY_NAME }).distinct(),
-                                    title = "放入「我喜欢的」哪个分类？",
+                                    title = tr("放入「我喜欢的」哪个分类？"),
                                     onPick = putInFavoriteCategory,
                                     onDismiss = { favoriteCategorySheet = false },
                                     onCreate = { name ->
@@ -1672,7 +1642,7 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onOpenCover = { book ->
                                     book.cover?.let { cover ->
-                                        val kind = if (comicIsTextMode) "小说封面" else "漫画封面"
+                                        val kind = if (comicIsTextMode) tr("小说封面") else tr("漫画封面")
                                         navController.openCoverGallery(cover, book.title, kind)
                                     }
                                 },
@@ -1687,7 +1657,7 @@ class MainActivity : ComponentActivity() {
                                         viewModel.setChapterBookmark(comicSourceId, comicId, chapterId, chapterIndex, bookmarked)
                                         AppToast.makeText(
                                             comicContext,
-                                            if (bookmarked) "已添加书签" else "已取消书签",
+                                            if (bookmarked) tr("已添加书签") else tr("已取消书签"),
                                             Toast.LENGTH_SHORT
                                         ).show()
                                     }
@@ -1698,7 +1668,7 @@ class MainActivity : ComponentActivity() {
                                 textMode = comicIsTextMode,
                                 onDownloadNovel = if (comicIsTextMode && com.example.source.WholeBookNovelSources.contains(comicBook?.sourceId)) ({
                                     comicBook?.let { libraryViewModel.startDownload(it, "epub") }
-                                    AppToast.makeText(comicContext, "已请求整本下载，可在下载管理查看进度", Toast.LENGTH_SHORT).show()
+                                    AppToast.makeText(comicContext, tr("已请求整本下载，可在下载管理查看进度"), Toast.LENGTH_SHORT).show()
                                 }) else null,
                                 onBack = { navController.dismissPaperPage() },
                                 onRetry = { comicBook?.let { libraryViewModel.openComic(it) } },
@@ -2027,10 +1997,15 @@ class MainActivity : ComponentActivity() {
                             active = selectedTab == 2 && sharedEntry?.destination?.route == "home"
                         )
                         com.example.ui.mascot.MascotOverlay()
+                        val flightBookKey = if (sharedEntry?.destination?.route == "reader") {
+                            val book by viewModel.selectedBook.collectAsStateWithLifecycle()
+                            book?.id?.toString()
+                        } else null
+                        com.example.ui.wenku.WenkuFlightOverlay(flightBookKey, Modifier.fillMaxSize())
+                        // 3D 书架的打开 / 归位：整本书由这一个覆盖层从书架姿态画到铺满全屏，
+                        // 与书架共用一个渲染器和一条时间轴（见 ShelfOpenTimeline）。
+                        com.example.ui.wenku.WenkuVolumeFlightOverlay(Modifier.fillMaxSize())
                     }
-                            // R14：封面飞行覆盖层必须挂在根部（NavHost 之外）。
-                            // 之前挂在 home 路由里，跳到阅读器时整块被移出组合，纸刚起飞就消失。
-                            com.example.ui.wenku.WenkuFlightOverlay(Modifier.fillMaxSize())
                 }
             }
         }

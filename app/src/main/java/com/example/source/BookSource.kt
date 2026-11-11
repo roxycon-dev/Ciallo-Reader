@@ -1,5 +1,7 @@
 package com.example.source
 
+import com.example.i18n.tr
+
 interface BookSource {
     val id: String
     val name: String
@@ -8,7 +10,7 @@ interface BookSource {
 
     val supportsDiscoverMetadata: Boolean get() = false
     suspend fun getDiscoverMetadata(bookId: String): SourceResult<SearchBook> =
-        SourceResult.Error(SourceException.ParseError("书源没有轻量元数据接口"))
+        SourceResult.Error(SourceException.ParseError(tr("书源没有轻量元数据接口")))
     suspend fun discoverCatalog(resolveDynamic: Boolean = false): SourceResult<com.example.discover.DiscoverCatalog> =
         SourceResult.Success(com.example.discover.DiscoverCatalog())
     suspend fun discover(query: com.example.discover.DiscoverQuery): SourceResult<com.example.discover.DiscoverPage> =

@@ -14,8 +14,8 @@
 - `ComicDownloadManager.kt`
 - `ComicDownloadWorker.kt`
 - `ComicLocalImporter.kt`
-- `DownloadGlassCard.kt`：已删除，统一使用下载中心
-- `NovelDownloadPanel.kt`：统一下载中心，小说/漫画懒加载任务列表、持久进度和逐次删除确认
+- `DownloadGlassCard.kt`：保留旧卡片调用兼容
+- `NovelDownloadPanel.kt`：整本下载持久任务列表、准备/失败反馈和文件明细
 - `FormatPickerDialog.kt`
 - `GenericCoverLoader.kt`
 - `ImageBytes.kt`
@@ -25,5 +25,3 @@
 ## 维护提示
 
 随 APK 打包的生产代码和资源应通过 `:app:assembleRelease` 验证；测试 fixtures 放在对应测试源集。
-
-`DownloadIndicatorState.kt` 汇总当前队列，历史完成记录保持入口箭头；只有观察到的活动任务完成才触发短确认。`DownloadCenterButton.kt` 负责独立事件时钟、图形过渡、数量及注意标记，始终导航到同一下载中心。

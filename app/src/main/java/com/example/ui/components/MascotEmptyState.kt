@@ -20,8 +20,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.MintPrimary
-import com.example.ui.wenku.LocalWenkuPaneVisible
-import com.example.ui.wenku.wenkuTabTitle
 import com.example.ui.mascot.MascotMood
 import com.example.ui.mascot.mascotMoodOf
 import me.trishiraj.shadowglow.consistentShadow
@@ -39,7 +37,7 @@ fun MascotEmptyState(
     // 根据素材情绪选择动效：呼吸/漂浮/弹跳/奔跑抖动/低落摇摆，让静态图“活”起来
     // 流畅档（渲染画质=低）：跳过全部装饰性循环动画，静态展示以省电省性能
     val mood = mascotMoodOf(mascotResId)
-    val mascotAnimOn = LocalWenkuPaneVisible.current && LocalRenderQuality.current > RenderQuality.LOW
+    val mascotAnimOn = LocalRenderQuality.current > RenderQuality.LOW
 
     val floatOffset: Float
     val breath: Float
@@ -137,7 +135,6 @@ fun MascotEmptyState(
             Box(
                 modifier = Modifier
                     .size(160.dp)
-                    .wenkuTabTitle(0, strength = .55f)
                     .clip(RoundedCornerShape(80.dp))
                     .background(
                         Brush.radialGradient(
@@ -176,7 +173,6 @@ fun MascotEmptyState(
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .wenkuTabTitle(1)
                     .testTag("${testTagPrefix}_title")
             )
 
@@ -192,7 +188,6 @@ fun MascotEmptyState(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .wenkuTabTitle(2, strength = .7f)
                     .testTag("${testTagPrefix}_description")
             )
 
@@ -203,7 +198,7 @@ fun MascotEmptyState(
                     onClick = onActionClick,
                     variant = AppButtonVariant.Primary,
                     buttonSize = AppButtonSize.Medium,
-                    modifier = Modifier.wenkuTabTitle(2, strength = .7f).testTag("${testTagPrefix}_action_button")
+                    modifier = Modifier.testTag("${testTagPrefix}_action_button")
                 )
             }
         }

@@ -3,180 +3,197 @@ package com.example.ui.wenku
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.referentialEqualityPolicy
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 
-/**
- * 封面飞行的「两端数据桥」。
- *
- * 参考实现里 Hero 飞行由 Flutter 的 Overlay 自己完成（`PaperCoverRender` 同时知道
- * 源与目标两端的矩形）；Compose 这边 NavHost 是分开的两棵树，必须有一个中立容器把
- * 两端的几何收集起来：
- *
- * 1. 点击书架卡片时 [begin]：登记书 key + 源矩形 + 封面位图（一次光栅化，见
- *    [WenkuCoverSnapshots]）；
- * 2. 目标页（阅读器）首次布局封面时 [arrive]：登记落点矩形；
- * 3. [WenkuFlightOverlay] 放在 `MainActivity` 根 Box，两端齐全才真正开画；
- * 4. 播完 [clear]，覆盖层卸下，期间不参与任何布局。
- *
- * 单槽、不排队：封面飞行是「用户打开某一本」的瞬时行为。`bookKey` 用来防止
- * 「书架点了 A、阅读器却因为别的原因打开了 B」时把 A 的纸飞进 B 的页面。
- */
 data class WenkuFlightRequest(
     val bookKey: String,
     val sourceBounds: Rect,
     val sourceImage: ImageBitmap?,
-    val sourceRadius: Dp = 14.dp,
+    val sourceRadius: Dp,
     val targetBounds: Rect? = null,
-    val targetImage: ImageBitmap? = null,
-    val targetRadius: Dp = 0.dp,
-    /** true = 阅读器 → 书架（840ms 反向）；false = 起飞（1000ms）。 */
-    val returning: Boolean = false
-) {
-    val ready: Boolean get() = targetBounds != null
-}
+    val returning: Boolean = false,
+    /**
+     * 归位落点。3D 书架上封面是一个斜切四边形，书本"立正"之后才是正对读者的矩形：
+     * 去程必须从后者起飞（否则飞行一开始就要把斜的书硬拉正，观感就是扭曲），
+     * 回程则应落回书架上的位置。两者不是同一个矩形，所以分开存。
+     */
+    val returnBounds: Rect? = null,
+    /** 3D 书架接手：时间轴不能有起步停顿。 */
+    val seamless: Boolean = false,
+)
 
-/**
- * 全局桥。只存一份请求：封面飞行是「用户打开某一本」的瞬时行为，不允许排队。
- * 状态用 Compose `mutableStateOf`，覆盖层读取它会自动参与重组。
- */
+/** The source and target always refer to the shelf and reader, respectively. */
 object WenkuFlightBridge {
-
-    var request by mutableStateOf<WenkuFlightRequest?>(null)
+    var request by mutableStateOf<WenkuFlightRequest?>(null, referentialEqualityPolicy())
         private set
+    private var last: WenkuFlightRequest? = null
 
-    /** 点击封面：登记起点。重复调用会覆盖上一次未完成的请求。 */
     fun begin(
         bookKey: String,
         bounds: Rect,
         image: ImageBitmap?,
-        radius: Dp = 14.dp
+        radius: Dp = 14.dp,
+        returnBounds: Rect? = null,
+        seamless: Boolean = false
     ) {
-        if (bounds.width <= 0f || bounds.height <= 0f) return
-        request = WenkuFlightRequest(
-            bookKey = bookKey,
-            sourceBounds = bounds,
-            sourceImage = image,
-            sourceRadius = radius
-        )
+        last = null
+        request = if (bounds.width > 0f && bounds.height > 0f) {
+            WenkuFlightRequest(
+                bookKey, bounds, image, radius,
+                returnBounds = returnBounds, seamless = seamless
+            )
+        } else null
     }
 
-    /**
-     * 目标页封面首次布局：登记落点。
-     *
-     * 只接受**同一个 bookKey** 的落点，且只登记一次（重复布局回调不重启动画）。
-     */
-    fun arrive(
-        bookKey: String,
-        bounds: Rect,
-        image: ImageBitmap? = null,
-        radius: Dp = 0.dp
-    ) {
-        val current = request ?: return
-        if (current.bookKey != bookKey) return
-        if (current.targetBounds != null) return
-        if (bounds.width <= 0f || bounds.height <= 0f) return
-        request = current.copy(
-            targetBounds = bounds,
-            targetImage = image ?: current.sourceImage,
-            targetRadius = radius
-        )
+    internal fun arrive(current: WenkuFlightRequest, viewport: Rect) {
+        if (request !== current || current.targetBounds != null) return
+        request = current.copy(targetBounds = viewport)
     }
 
-    /** 这本书是否正在飞（阅读器据此暂时让出自己的封面，避免两张封面叠在一起）。 */
-    fun isActiveFor(bookKey: String): Boolean = request?.bookKey == bookKey
-
-    /** 放弃当前请求（例如卡片其实没进阅读器，或者用户中途返回）。 */
-    fun cancel(bookKey: String? = null) {
-        val current = request ?: return
-        if (bookKey == null || current.bookKey == bookKey) request = null
+    fun reverse(bookKey: String) {
+        val previous = last
+        last = null
+        request = previous?.takeIf { it.bookKey == bookKey }?.copy(returning = true)
     }
 
-    /** 最近一次播完的飞行：返回时用它把纸从阅读器送回书架原位。 */
-    private var last: WenkuFlightRequest? = null
-
-    /** 目标端（阅读器）落点已知、且已经播完一次，才算「可以反向飞」。 */
-    fun canReturn(bookKey: String): Boolean =
-        last?.let { it.bookKey == bookKey && it.targetBounds != null } == true
-
-    /**
-     * 反向飞行：阅读器返回书架。
-     *
-     * 起点用上次的落点（整屏），终点用上次的起飞矩形（书架卡片），
-     * 方向交给 `WenkuCoverFlight(departing = false)` 走 840ms。
-     */
-    fun reverse(bookKey: String): Boolean {
-        val previous = last ?: return false
-        val target = previous.targetBounds ?: return false
-        if (previous.bookKey != bookKey) return false
-        request = previous.copy(
-            sourceBounds = target,
-            sourceImage = previous.targetImage ?: previous.sourceImage,
-            sourceRadius = previous.targetRadius,
-            targetBounds = previous.sourceBounds,
-            targetImage = previous.sourceImage,
-            targetRadius = previous.sourceRadius,
-            returning = true
-        )
-        return true
-    }
-
-    /** 覆盖层播完回调：清空当前请求，但记住这一次（供返回使用）。 */
-    fun finished() {
-        last = request
+    internal fun finished(current: WenkuFlightRequest) {
+        if (request !== current) return
+        if (!current.returning) last = current
         request = null
     }
 
-    fun clear() {
+    fun cancel() {
         request = null
+        last = null
+    }
+
+    internal fun cancel(current: WenkuFlightRequest) {
+        if (request === current) request = null
     }
 }
 
+/** Uniformly scale the cover inside its available bounds, keeping its centre fixed. */
+internal fun fitWenkuCover(bounds: Rect, coverSize: Size): Rect {
+    val scale = minOf(bounds.width / coverSize.width, bounds.height / coverSize.height)
+    val halfWidth = coverSize.width * scale / 2
+    val halfHeight = coverSize.height * scale / 2
+    return Rect(
+        bounds.center.x - halfWidth,
+        bounds.center.y - halfHeight,
+        bounds.center.x + halfWidth,
+        bounds.center.y + halfHeight,
+    )
+}
+
 /**
- * 覆盖层：两端齐了才画，播完自动清空。放在 `MainActivity` 的根 Box 里（覆盖 NavHost）。
+ * 把封面中心裁切到 `bounds` 的比例。
  *
- * 方向：`departing = true` 是「书架 → 阅读器」，走 1000ms 的 `COVER_FLIGHT_MS`；
- * 不是参考实现里 840ms 的返回方向。桥里存的矩形是 root 坐标，这里减去覆盖层自己的
- * root 原点后再交给 [WenkuCoverFlight]（它在自己的局部坐标系里画）。
+ * 飞行层只做"整张图等比缩放"，而列表卡片的封面是 `ContentScale.Crop`（铺满、裁掉溢出）。
+ * 两者比例不一致时，起飞第一帧就会看到封面比卡片小一圈、位置也对不上 —— 用户说的
+ * "位置不太对得上 / 第一帧突变" 就是它。这里在起飞前把贴图裁成卡片比例，
+ * 之后 `fitWenkuCover` 得到的就是卡片本身的矩形，首帧严丝合缝。
  */
+internal fun cropCoverToAspect(image: ImageBitmap?, bounds: Rect): ImageBitmap? {
+    if (image == null) return null
+    if (bounds.width <= 0f || bounds.height <= 0f) return image
+    val source = image.asAndroidBitmap()
+    if (source.width <= 0 || source.height <= 0) return image
+    val targetAspect = bounds.width / bounds.height
+    val sourceAspect = source.width.toFloat() / source.height.toFloat()
+    if (kotlin.math.abs(targetAspect - sourceAspect) / sourceAspect < .02f) return image
+    val cropWidth = if (sourceAspect > targetAspect) {
+        (source.height * targetAspect).toInt()
+    } else source.width
+    val cropHeight = if (sourceAspect > targetAspect) {
+        source.height
+    } else (source.width / targetAspect).toInt()
+    val width = cropWidth.coerceIn(1, source.width)
+    val height = cropHeight.coerceIn(1, source.height)
+    val x = (source.width - width) / 2
+    val y = (source.height - height) / 2
+    return runCatching {
+        android.graphics.Bitmap.createBitmap(source, x, y, width, height).asImageBitmap()
+    }.getOrNull() ?: image
+}
+
+/** The root viewport supplies the reader landing bounds independently of its route slide. */
 @Composable
-fun WenkuFlightOverlay(modifier: Modifier = Modifier) {
-    val current = WenkuFlightBridge.request ?: return
-    val target = current.targetBounds ?: return
-    // 先量出自己的原点再开画：第一帧只做布局，等 onGloballyPositioned 回来才启动动画，
-    // 否则动画可能在错误的原点下跑掉一帧。
-    var origin by remember { mutableStateOf<Offset?>(null) }
+fun WenkuFlightOverlay(readerBookKey: String?, modifier: Modifier = Modifier) {
+    val reduceMotion = rememberWenkuAccessibility().reduceMotion
+    var viewport by remember { mutableStateOf<Rect?>(null) }
+    val current = WenkuFlightBridge.request
+    DisposableEffect(Unit) { onDispose { WenkuFlightBridge.cancel() } }
+    LaunchedEffect(readerBookKey, current, viewport, reduceMotion) {
+        if (reduceMotion) {
+            WenkuFlightBridge.cancel()
+        } else if (current != null && !current.returning) {
+            // 立刻起飞：不等阅读器挂载。等 readerBookKey 到位再画的话，
+            // 观众会看到"转身结束 → 空白一瞬 → 封面才出现"，这就是两段动画的观感来源。
+            viewport?.let { WenkuFlightBridge.arrive(current, it) }
+            delay(WenkuMotion.COVER_FLIGHT_MS.toLong() + 240)
+            WenkuFlightBridge.cancel(current)
+        }
+    }
+
     Box(
-        modifier
-            .fillMaxSize()
-            .onGloballyPositioned { origin = it.positionInRoot() }
+        modifier.fillMaxSize().onGloballyPositioned { coordinates ->
+            val size = coordinates.size
+            if (size.width > 0 && size.height > 0) {
+                val bounds = Rect(coordinates.positionInRoot(), Size(size.width.toFloat(), size.height.toFloat()))
+                // A resize (fold, rotation or split screen) invalidates the shelf geometry as well.
+                if (viewport != null && viewport != bounds) WenkuFlightBridge.cancel()
+                viewport = bounds
+            }
+        }
     ) {
-        val o = origin ?: return@Box
-        WenkuCoverFlight(
-            visible = true,
-            source = WenkuCoverSource(
-                bounds = current.sourceBounds.translate(-o.x, -o.y),
-                image = current.sourceImage,
-                cornerRadius = current.sourceRadius
-            ),
-            target = WenkuCoverTarget(
-                bounds = target.translate(-o.x, -o.y),
-                image = current.targetImage ?: current.sourceImage,
-                cornerRadius = current.targetRadius
-            ),
-            departing = !current.returning,
-            modifier = Modifier.fillMaxSize(),
-            onFinished = { WenkuFlightBridge.finished() }
-        )
+        val root = viewport ?: return@Box
+        val request = current ?: return@Box
+        // 视口本身就是落点：不再等 arrive() 回调，避免"动画开始前空一帧"。
+        val target = request.targetBounds ?: root
+        if (reduceMotion) return@Box
+
+        // 书架一侧的真实矩形：去程是卡片封面，回程是书架落点。
+        val shelfBounds = request.returnBounds ?: request.sourceBounds
+        // 贴图先裁成书架封面的比例，起飞/落地两帧才和卡片完全重合（见 cropCoverToAspect）。
+        val image = remember(request) { cropCoverToAspect(request.sourceImage, shelfBounds) }
+        // With no snapshot, keep the same paper shape as the source card.
+        val coverSize = image?.let { Size(it.width.toFloat(), it.height.toFloat()) } ?: shelfBounds.size
+        key(request) {
+            WenkuCoverFlight(
+                visible = true,
+                source = WenkuCoverSource(
+                    bounds = fitWenkuCover(shelfBounds, coverSize)
+                        .translate(-root.left, -root.top),
+                    image = image,
+                    cornerRadius = request.sourceRadius,
+                ),
+                target = WenkuCoverTarget(
+                    bounds = fitWenkuCover(target, coverSize).translate(-root.left, -root.top),
+                    image = image,
+                    cornerRadius = 0.dp,
+                ),
+                departing = !request.returning,
+                seamless = request.seamless,
+                onFinished = { WenkuFlightBridge.finished(request) },
+            )
+        }
     }
 }

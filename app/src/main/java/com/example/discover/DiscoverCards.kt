@@ -1,5 +1,7 @@
 package com.example.discover
 
+import com.example.i18n.tr
+
 import com.example.ui.components.pullOutCombinedClickable
 import com.example.ui.components.pullOutClickable
 import androidx.compose.animation.core.*
@@ -27,14 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import android.util.LruCache
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import com.example.library.GenericCoverLoader
-import com.example.library.ZLibraryCoverLoader
-import com.example.source.BookSource
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.withTimeoutOrNull
 import com.example.source.SearchBook
 import com.example.source.isKnownComicAuthor
 import com.example.ui.feedback.*
@@ -47,17 +42,14 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
     followed: Boolean, unread: Boolean, reverseColors: Boolean, onClick: () -> Unit,
     onFollow: (Boolean) -> Unit, onBlock: () -> Unit, onMenu: (Rect) -> Unit, menuActive: Boolean,
     sourceLabel: (String) -> String, entryIndex: Int,
-    coverSource: BookSource?,
-    coverRequests: LruCache<String, ImageRequest>,
-    coverResumeCount: Int,
-) {
+    coverSource: (String) -> com.example.source.BookSource? = { null }) {
     val reduce = LocalReduceMotion.current
     val haptics = rememberAppHaptics()
     var bounds by remember { mutableStateOf(Rect.Zero) }
     val scale by animateFloatAsState(if (menuActive) .97f else 1f, tween(if (reduce) 0 else 120), label = "discoverPress")
     val primary = MaterialTheme.colorScheme.primary
     val sourceCount = work.variants.map { it.book.sourceId }.distinct().size
-    val source = if (sourceCount > 1) "$sourceCount 个源可读" else sourceLabel(work.book.sourceId)
+    val source = if (sourceCount > 1) com.example.i18n.sourcesReadable(sourceCount) else sourceLabel(work.book.sourceId)
     val medal = rank?.takeIf { it in 1..3 }?.let { DiscoverMedals[it - 1] }
     val shape = RoundedCornerShape(if (layout == DiscoverLayout.LARGE) 24.dp else if (layout == DiscoverLayout.GRID) 16.dp else 20.dp)
     Box(Modifier.fillMaxWidth().wenkuReveal(entryIndex).graphicsLayer { scaleX = scale; scaleY = scale }
@@ -76,7 +68,7 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
                     val displayRank = rank ?: work.variants.firstNotNullOfOrNull { it.rank?.takeIf { _ -> it.native } }
                     Row(Modifier.fillMaxWidth().height(160.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Box(Modifier.width(120.dp).fillMaxHeight()) {
-                            Cover(work.book, Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)), work.updatedAt, false, null, null, coverSource, coverRequests, coverResumeCount)
+                            Cover(work.book, Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)), work.updatedAt, false, null, null, coverSource)
                             if (displayRank != null) SourceBadge("No.$displayRank", Modifier.align(Alignment.BottomCenter).padding(4.dp))
                         }
                         Column(Modifier.weight(1f).padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -97,7 +89,7 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
                 }
                 DiscoverLayout.GRID -> {
                     Box(Modifier.fillMaxWidth().aspectRatio(3f / 4f)) {
-                        Cover(work.book, Modifier.fillMaxSize(), work.updatedAt, unread, null, null, coverSource, coverRequests, coverResumeCount)
+                        Cover(work.book, Modifier.fillMaxSize(), work.updatedAt, unread, null, null, coverSource)
                         SourceBadge(source, Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = if ((work.updatedAt ?: 0) >= (DiscoverEngine.rangeStart("今日", System.currentTimeMillis()) ?: Long.MAX_VALUE)) 32.dp else 8.dp))
                         FollowButton(followed, true, Modifier.align(Alignment.TopEnd)) { onFollow(!followed); haptics.perform(HapticKind.SUCCESS) }
                         Box(Modifier.fillMaxWidth().fillMaxHeight(.45f).align(Alignment.BottomCenter)
@@ -117,7 +109,7 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
                 }
                 DiscoverLayout.LARGE -> {
                     Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f)) {
-                        Cover(work.book, Modifier.fillMaxSize(), work.updatedAt, unread, null, null, coverSource, coverRequests, coverResumeCount)
+                        Cover(work.book, Modifier.fillMaxSize(), work.updatedAt, unread, null, null, coverSource)
                         Box(Modifier.fillMaxWidth().fillMaxHeight(.50f).align(Alignment.BottomCenter).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .90f)))))
                         SourceBadge(source, Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = 32.dp))
                         Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
@@ -142,87 +134,27 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
 }
 
 @Composable
-private fun Cover(
-    book: SearchBook,
-    modifier: Modifier,
-    updatedAt: Long?,
-    unread: Boolean,
-    rank: Int?,
-    medal: Color?,
-    source: BookSource?,
-    requests: LruCache<String, ImageRequest>,
-    resumeCount: Int,
-) {
-    val context = LocalContext.current.applicationContext
-    val url = book.cover?.takeIf(String::isNotBlank)
-    val cacheKey = url?.let { "${book.sourceId}|$it" }
-    var request by remember(cacheKey) { mutableStateOf(cacheKey?.let(requests::get)) }
-    var generation by remember(cacheKey) { mutableIntStateOf(0) }
-    var retried by remember(cacheKey) { mutableStateOf(false) }
-    var failed by remember(cacheKey) { mutableStateOf(false) }
-    var loaded by remember(cacheKey) { mutableStateOf(false) }
-    LaunchedEffect(cacheKey, source, generation) {
-        if (url == null || cacheKey == null || (generation == 0 && request != null)) return@LaunchedEffect
-        val headers = try {
-            withTimeoutOrNull(5_000) { source?.getCoverHeaders(url).orEmpty() }.orEmpty()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            emptyMap()
-        }
-        request = ImageRequest.Builder(context)
-            .data(url)
-            .memoryCacheKey(cacheKey)
-            .diskCacheKey(cacheKey)
-            .setParameter("discoverCoverAttempt", generation)
-            .apply { headers.forEach { (name, value) -> addHeader(name, value) } }
-            .build()
+private fun Cover(book: SearchBook, modifier: Modifier, updatedAt: Long?, unread: Boolean, rank: Int?, medal: Color?, source: (String) -> com.example.source.BookSource?) {
+    val context = LocalContext.current
+    var headers by remember(book.sourceId, book.cover) { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var headersReady by remember(book.sourceId, book.cover) { mutableStateOf(book.cover.isNullOrBlank()) }
+    LaunchedEffect(book.sourceId, book.cover) {
+        val url = book.cover ?: return@LaunchedEffect
+        try { headers = source(book.sourceId)?.getCoverHeaders(url).orEmpty() }
+        catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (_: Exception) { }
+        finally { headersReady = true }
     }
-    LaunchedEffect(failed) {
-        if (failed && !retried) {
-            delay(450)
-            retried = true
-            failed = false
-            generation++
-        }
-    }
-    LaunchedEffect(resumeCount) {
-        if (failed) {
-            retried = false
-            failed = false
-            generation++
-        }
-    }
-    val imageLoader = remember(context, book.sourceId) {
-        if (book.sourceId == "zlibrary") ZLibraryCoverLoader.get(context) else GenericCoverLoader.get(context)
-    }
+    val request = remember(book.cover, headers) { coil.request.ImageRequest.Builder(context).data(book.cover)
+        .apply { headers.forEach { (key, value) -> addHeader(key, value) } }.build() }
     Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
-        if (!loaded) Icon(Icons.Outlined.MenuBook, null, Modifier.align(Alignment.Center).size(32.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        request?.let { image ->
-            AsyncImage(
-                model = image,
-                imageLoader = imageLoader,
-                contentDescription = book.title,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-                onSuccess = {
-                    loaded = true
-                    failed = false
-                    cacheKey?.let { requests.put(it, image) }
-                },
-                onError = {
-                    loaded = false
-                    failed = true
-                    cacheKey?.let { requests.remove(it) }
-                },
-            )
-        }
+        if (headersReady) AsyncImage(request, book.title, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        if (book.cover.isNullOrBlank()) Icon(Icons.Outlined.MenuBook, null, Modifier.align(Alignment.Center).size(32.dp), tint = MaterialTheme.colorScheme.primary)
         if ((updatedAt ?: 0) >= (DiscoverEngine.rangeStart("今日", System.currentTimeMillis()) ?: Long.MAX_VALUE))
             Box(Modifier.align(Alignment.TopStart).padding(4.dp).size(16.dp).background(MaterialTheme.colorScheme.primary, CircleShape), contentAlignment = Alignment.Center) {
-                Text("今", fontSize = 10.sp, color = contrastInk(MaterialTheme.colorScheme.primary), fontWeight = FontWeight.Medium)
+                Text(tr("今"), fontSize = 10.sp, color = contrastInk(MaterialTheme.colorScheme.primary), fontWeight = FontWeight.Medium)
             }
-        if (unread) SourceBadge("● 未读", Modifier.align(Alignment.BottomEnd).padding(4.dp))
+        if (unread) SourceBadge(tr("● 未读"), Modifier.align(Alignment.BottomEnd).padding(4.dp))
         if (rank != null && medal != null) Box(Modifier.align(Alignment.TopStart).size(28.dp).background(Brush.linearGradient(listOf(medal, medal.copy(alpha = .64f))), CircleShape), contentAlignment = Alignment.Center) {
             Text(rank.toString(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = contrastInk(medal))
         }
@@ -237,8 +169,8 @@ private fun SourceBadge(label: String, modifier: Modifier) {
 private fun FollowButton(followed: Boolean, compact: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     // Foundation expands the small visual icon's touch target without stretching the title row.
     Box(modifier.size(if (compact) 48.dp else 28.dp).pullOutClickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick), contentAlignment = Alignment.Center) {
-        com.example.ui.components.AnimatedStateIcon(if (followed) Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder,
-            if (followed) "取消喜欢" else "加入我喜欢的", Modifier.size(20.dp),
+        Icon(if (followed) Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder,
+            if (followed) tr("取消喜欢") else tr("加入我喜欢的"), Modifier.size(20.dp),
             tint = if (followed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -310,7 +242,7 @@ private fun Trend(work: DiscoverWork, dimension: DiscoverDimension, reverse: Boo
         else -> "${if (value > 0) "▲" else "▼"}${String.format(java.util.Locale.CHINA, "%.1f", kotlin.math.abs(value))}%" }
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (value != null && value >= 100 && dimension != DiscoverDimension.RANKING)
-            Icon(Icons.Outlined.LocalFireDepartment, "飙升", Modifier.size(12.dp), tint = if (reverse) DiscoverFall else DiscoverRise)
+            Icon(Icons.Outlined.LocalFireDepartment, tr("飙升"), Modifier.size(12.dp), tint = if (reverse) DiscoverFall else DiscoverRise)
         Text(label, if (label == "NEW") Modifier.background(discoverTint(), CircleShape).padding(horizontal = 4.dp, vertical = 2.dp) else Modifier,
             fontSize = if (label == "NEW") 10.sp else 11.sp, fontFamily = FontFamily.Monospace,
             color = if (label == "NEW") discoverAccentText() else if (value == null || value == 0.0) idleColor ?: discoverInk().copy(alpha = .64f)

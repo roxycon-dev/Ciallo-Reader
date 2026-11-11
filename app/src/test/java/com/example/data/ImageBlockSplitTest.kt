@@ -32,12 +32,10 @@ class ImageBlockSplitTest {
 
     @Test
     fun imageBlocksSizedByAspectRatioClampedToMaxHeight() {
-        // densityScale = 2f：两张图的原图固有尺寸都大于内容宽，走"撑满内容宽 + 页高收敛"
         val blocks = NovelInlineImages.splitIntoBlocks(
             "[IMG:/a/tall.png|800|3200][IMG:/a/mid.png|600|800]",
             contentWidthPx = 1000f,
-            maxHeightPx = 2000f,
-            densityScale = 2f
+            maxHeightPx = 2000f
         )
         val tall = blocks[0] as InlineBlock.Image
         val mid = blocks[1] as InlineBlock.Image
@@ -47,40 +45,6 @@ class ImageBlockSplitTest {
         // 中图：宽撑满 1000，高按长宽比 1000*800/600 ≈ 1333
         assertEquals(1000f, mid.widthPx)
         assertEquals(1333.33f, mid.heightPx, 0.5f)
-    }
-
-    @Test
-    fun smallImageKeepsItsNaturalWidthInsteadOfFillingTheColumn() {
-        // 20×20 的分隔符（EPUB 里 note.png 这种）：不能被拉成整栏宽
-        val blocks = NovelInlineImages.splitIntoBlocks(
-            "[IMG:/a/note.png|20|20]",
-            contentWidthPx = 656f,
-            maxHeightPx = 1000f,
-            densityScale = 2f
-        )
-        val note = blocks[0] as InlineBlock.Image
-        assertEquals("小图应按原图尺寸显示（20 * 2）", 40f, note.widthPx)
-        assertEquals(40f, note.heightPx)
-
-        // 180×120 的小插图同理
-        val small = NovelInlineImages.splitIntoBlocks(
-            "[IMG:/a/small.png|180|120]",
-            contentWidthPx = 656f,
-            maxHeightPx = 1000f,
-            densityScale = 2f
-        )[0] as InlineBlock.Image
-        assertEquals(360f, small.widthPx)
-        assertEquals(240f, small.heightPx)
-
-        // 原图比内容宽时仍然撑满内容宽（大图行为不变）
-        val big = NovelInlineImages.splitIntoBlocks(
-            "[IMG:/a/big.png|1000|1480]",
-            contentWidthPx = 656f,
-            maxHeightPx = 1000f,
-            densityScale = 2f
-        )[0] as InlineBlock.Image
-        assertEquals(656f, big.widthPx)
-        assertEquals(971.0f, big.heightPx, 1f)
     }
 
     @Test

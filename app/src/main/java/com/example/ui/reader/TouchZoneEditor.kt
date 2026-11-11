@@ -1,5 +1,7 @@
 package com.example.ui.reader
 
+import com.example.i18n.tr
+
 import com.example.ui.design.DesignTokens
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutFilledTonalButton
@@ -140,7 +142,7 @@ fun TouchZoneEditor(
                         var measuring by remember { mutableStateOf(false) }
                         var rawDown by remember { mutableStateOf(Offset.Zero) }
                         var multiPointer by remember { mutableStateOf(false) }
-                        Box(Modifier.fillMaxSize().semantics { contentDescription = "真实阅读区域：拖动区域移动，四角缩放；校准时在选中区域滑动" }
+                        Box(Modifier.fillMaxSize().semantics { contentDescription = tr("真实阅读区域：拖动区域移动，四角缩放；校准时在选中区域滑动") }
                             .pointerInput(Unit) {
                                 awaitEachGesture {
                                     val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -225,17 +227,17 @@ fun TouchZoneEditor(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (!trying) PullOutIconButton(
                     icon = Icons.Default.Close,
-                    contentDescription = "取消编辑",
+                    contentDescription = tr("取消编辑"),
                     onClick = onDismiss
                 )
                 Column(Modifier.weight(1f).padding(vertical = DesignTokens.SpaceSm)) {
-                    Text(if (trying) "正在真实试读" else "自定义触控分区", style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
-                    Text(if (trying) "使用未保存的分区，可直接翻页" else if (calibrating) "试着用自己最舒适的方式滑动一页"
-                        else if (completed) "✓ 已记住你的手势 · 可继续微调" else "原尺寸阅读画面 · 拖动移动 / 四角缩放",
+                    Text(if (trying) tr("正在真实试读") else tr("自定义触控分区"), style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
+                    Text(if (trying) tr("使用未保存的分区，可直接翻页") else if (calibrating) tr("试着用自己最舒适的方式滑动一页")
+                        else if (completed) tr("✓ 已记住你的手势 · 可继续微调") else tr("原尺寸阅读画面 · 拖动移动 / 四角缩放"),
                         color = colors.primary, fontSize = DesignTokens.TypeCaption)
                 }
                 PullOutTextButton(onClick = { if (trying) trying = false else { onPreview(null, false); if (resetRequested) onRestoreDefault(); onSave(draft); onDismiss() } }) {
-                    Text(if (trying) "返回编辑" else "保存")
+                    Text(if (trying) tr("返回编辑") else tr("保存"))
                 }
             }
         }
@@ -244,12 +246,12 @@ fun TouchZoneEditor(
             .acrylicPanel(RoundedCornerShape(DesignTokens.RadiusLg), surfaceAlpha = .94f)
             .padding(horizontal = DesignTokens.SpaceMd), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                PullOutTextButton(onClick = { val added = TouchZone(); draft = visible + added; selectedId = added.id; startCalibration() }, enabled = visible.size < 64) { Text("添加分区") }
-                PullOutTextButton(onClick = { controlsExpanded = !controlsExpanded }) { Text(if (controlsExpanded) "收起工具" else "设置功能") }
-                PullOutTextButton(onClick = { calibrating = false; controlsExpanded = false; trying = true }) { Text("试读") }
+                PullOutTextButton(onClick = { val added = TouchZone(); draft = visible + added; selectedId = added.id; startCalibration() }, enabled = visible.size < 64) { Text(tr("添加分区")) }
+                PullOutTextButton(onClick = { controlsExpanded = !controlsExpanded }) { Text(if (controlsExpanded) tr("收起工具") else tr("设置功能")) }
+                PullOutTextButton(onClick = { calibrating = false; controlsExpanded = false; trying = true }) { Text(tr("试读")) }
                 PullOutIconButton(
                                     icon = Icons.Default.SwapVert,
-                                    contentDescription = "工具移到另一侧",
+                                    contentDescription = tr("工具移到另一侧"),
                                     onClick = { toolsAtTop = !toolsAtTop }
                                 )
             }
@@ -259,34 +261,34 @@ fun TouchZoneEditor(
                     if (selected != null) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("分区 ${visible.indexOf(selected) + 1}", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                            PullOutTextButton(onClick = { draft = visible.filterNot { it.id == selected.id } + selected }) { Text("置顶") }
+                            PullOutTextButton(onClick = { draft = visible.filterNot { it.id == selected.id } + selected }) { Text(tr("置顶")) }
                             PullOutIconButton(
                                 icon = Icons.Default.DeleteOutline,
-                                contentDescription = "删除分区",
+                                contentDescription = tr("删除分区"),
                                 onClick = { draft = visible.filterNot { it.id == selected.id }; selectedId = draft?.lastOrNull()?.id; calibrating = false }
                             )
                         }
-                        Text("点击行为", style = MaterialTheme.typography.labelLarge)
+                        Text(tr("点击行为"), style = MaterialTheme.typography.labelLarge)
                         ActionChoices(TouchAction.entries.filter { !comic || it != TouchAction.LISTEN }, selected.tap, { it.label }) { edit(selected.copy(tap = it)) }
-                        Text("滑动行为", style = MaterialTheme.typography.labelLarge)
+                        Text(tr("滑动行为"), style = MaterialTheme.typography.labelLarge)
                         ActionChoices(SwipeAction.entries, selected.swipe, { it.label }) {
                             edit(selected.copy(swipe = it)); if (it == SwipeAction.PAGE) startCalibration() else calibrating = false
                         }
                         if (selected.swipe == SwipeAction.PAGE) {
-                            Text(if (selected.distanceDp == null) "沿用原有阅读器判定 · 校准快速完成距离" else "触发距离 ${range.roundToInt()} dp", color = colors.primary, fontSize = DesignTokens.TypeCaption)
+                            Text(if (selected.distanceDp == null) tr("沿用原有阅读器判定 · 校准快速完成距离") else "触发距离 ${range.roundToInt()} dp", color = colors.primary, fontSize = DesignTokens.TypeCaption)
                             LiquidSlider(range.coerceIn(12f, 360f), { edit(selected.copy(distanceDp = it)); completed = false }, valueRange = 12f..360f, formatLabel = { "${it.roundToInt()} dp" })
-                            Text("仅调整快速翻页的完成距离；慢速拖角、卷起与回退保持原样，滑动不限方向。", fontSize = DesignTokens.TypeCaption, color = colors.onSurfaceVariant)
-                            PullOutTextButton(onClick = { startCalibration() }) { Icon(Icons.Default.Gesture, null); Text("重新校准") }
+                            Text(tr("仅调整快速翻页的完成距离；慢速拖角、卷起与回退保持原样，滑动不限方向。"), fontSize = DesignTokens.TypeCaption, color = colors.onSurfaceVariant)
+                            PullOutTextButton(onClick = { startCalibration() }) { Icon(Icons.Default.Gesture, null); Text(tr("重新校准")) }
                         }
                     }
-                    Text("后添加 / 置顶区域优先；空白区域不操作。点击和滑动独立，双指缩放优先。", fontSize = DesignTokens.TypeCaption, color = colors.onSurfaceVariant)
-                    PullOutTextButton(onClick = { draft = null; resetRequested = true; selectedId = resetZones.firstOrNull()?.id; calibrating = false; completed = false }) { Text("恢复原有默认") }
+                    Text(tr("后添加 / 置顶区域优先；空白区域不操作。点击和滑动独立，双指缩放优先。"), fontSize = DesignTokens.TypeCaption, color = colors.onSurfaceVariant)
+                    PullOutTextButton(onClick = { draft = null; resetRequested = true; selectedId = resetZones.firstOrNull()?.id; calibrating = false; completed = false }) { Text(tr("恢复原有默认")) }
                 }
             }
             if (!controlsExpanded && selected?.swipe == SwipeAction.PAGE) Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(if (calibrating && sample >= 12f) "本次 ${sample.roundToInt()} dp" else if (selected.distanceDp == null) "原有判定 · 可拖动范围条端点" else "触发距离 ${range.roundToInt()} dp",
+                Text(if (calibrating && sample >= 12f) "本次 ${sample.roundToInt()} dp" else if (selected.distanceDp == null) tr("原有判定 · 可拖动范围条端点") else "触发距离 ${range.roundToInt()} dp",
                     Modifier.weight(1f), color = colors.primary, fontSize = DesignTokens.TypeCaption)
-                PullOutTextButton(onClick = { if (calibrating) calibrating = false else startCalibration() }) { Text(if (calibrating) "手动调整" else "重新校准") }
+                PullOutTextButton(onClick = { if (calibrating) calibrating = false else startCalibration() }) { Text(if (calibrating) tr("手动调整") else tr("重新校准")) }
             }
         }
     }

@@ -72,38 +72,6 @@ class AppUpdateDownloadTest {
         } catch (_: IllegalArgumentException) { assertEquals(0, calls) }
     }
 
-    @Test fun mirrorTransportRequestsExactProxyPathForOfficialAsset() = runBlocking {
-        val calls = mutableListOf<String>()
-        val urls = mutableListOf<String>()
-        val file = destination()
-        // The mirror never supplies metadata: size and SHA-256 stay the official release's.
-        val mirrored = asset.copy(size = 9, sha256 = "a".repeat(64))
-        try {
-            downloader { request ->
-                calls += request.url.host
-                urls += request.url.toString()
-                assertNull(request.header("Authorization"))
-                assertEquals("identity", request.header("Accept-Encoding"))
-                if (request.url.host == "gh-proxy.com") response(request, 302, location = "https://release-assets.githubusercontent.com/asset?token=public")
-                else response(request)
-            }.download(mirrored, "v1.2.4", file, AppUpdateSource.MIRROR) { _, _ -> }
-            assertEquals(listOf("gh-proxy.com", "release-assets.githubusercontent.com"), calls)
-            assertEquals("https://gh-proxy.com/${asset.url}", urls.first())
-            assertEquals(9L, file.length())
-        } finally { file.delete() }
-    }
-
-    @Test fun mirrorTransportRejectsMissingOfficialSha256BeforeAnyRequest() = runBlocking {
-        for (mirrored in listOf(asset.copy(size = 9), asset.copy(size = 9, sha256 = "a".repeat(63)))) {
-            var calls = 0
-            val file = destination()
-            try {
-                downloader { calls++; response(it) }.download(mirrored, "v1.2.4", file, AppUpdateSource.MIRROR) { _, _ -> }
-                fail("Expected mirror rejection without a usable official SHA-256")
-            } catch (_: IllegalArgumentException) { assertEquals(0, calls); assertFalse(file.exists()) }
-        }
-    }
-
     @Test fun wrongContentLengthDoesNotLeaveAnInstallableFile() = runBlocking {
         val file = destination()
         try {

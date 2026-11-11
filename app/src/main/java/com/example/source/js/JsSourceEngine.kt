@@ -1,5 +1,7 @@
 package com.example.source.js
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.util.Log
 import com.dokar.quickjs.QuickJs
@@ -189,7 +191,7 @@ class JsSourceEngine(
                 for(i in 0..matcher.groupCount()) groups.put(matcher.group(i) ?: JSONObject.NULL)
                 JSONObject().put("index",matcher.start()).put("end",matcher.end()).put("groups",groups).toString()
             }
-            } catch(e: StackOverflowError) { throw IllegalArgumentException("书源正则回溯过深",e) }
+            } catch(e: StackOverflowError) { throw IllegalArgumentException(tr("书源正则回溯过深"),e) }
         }
         quickJs.function("__boundedRegexBatch") { args ->
             checkBudget()
@@ -215,7 +217,7 @@ class JsSourceEngine(
                     position = matcher.end()
                     if (matcher.start() == matcher.end() || captured >= 65536 || 'g' !in flags && 'y' !in flags) break
                 }
-            } catch (e: StackOverflowError) { throw IllegalArgumentException("书源正则回溯过深", e) }
+            } catch (e: StackOverflowError) { throw IllegalArgumentException(tr("书源正则回溯过深"), e) }
             out.toString()
         }
         // defineProperty returns globalThis. Do not send the global object (including
@@ -274,7 +276,7 @@ class JsSourceEngine(
             ) ?: ""
         }
         if (className.isBlank()) {
-            throw SourceException.ParseError("JS 书源未找到 ComicSource 类")
+            throw SourceException.ParseError(tr("JS 书源未找到 ComicSource 类"))
         }
         // 与 Venera 一致：源实例只创建一次、init() 一次，后续调用全部复用同一实例
         if (sourceKey in setOf("wnacg", "jm")) {

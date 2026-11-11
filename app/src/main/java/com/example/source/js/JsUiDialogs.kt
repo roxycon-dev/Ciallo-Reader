@@ -1,5 +1,7 @@
 package com.example.source.js
 
+import com.example.i18n.tr
+
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
@@ -57,7 +59,7 @@ suspend fun awaitJsInputDialog(
     imageBase64: String? = null
 ): String = withContext(Dispatchers.Main) {
     val activity = JsActivityTracker.currentActivity()
-        ?: throw IllegalStateException("无可用界面（请回到 App 后重试）")
+        ?: throw IllegalStateException(tr("无可用界面（请回到 App 后重试）"))
     suspendCancellableCoroutine { cont ->
         val density = activity.resources.displayMetrics.density
         val pad = (24 * density).toInt()
@@ -106,18 +108,15 @@ suspend fun awaitJsInputDialog(
 /** A user-operated site verification, with cookies kept in the app's browser jar. */
 @android.annotation.SuppressLint("SetJavaScriptEnabled")
 suspend fun awaitWebsiteVerification(url: String, userAgent: String): Boolean = withContext(Dispatchers.Main) {
-    require(android.net.Uri.parse(url).host in setOf("mycomic.com", "nhentai.net", "www.bilimanga.net"))
+    require(android.net.Uri.parse(url).host in setOf("mycomic.com", "nhentai.net"))
     val activity = JsActivityTracker.currentActivity()
-        ?: throw IllegalStateException("请回到应用后打开站点验证")
+        ?: throw IllegalStateException(tr("请回到应用后打开站点验证"))
     suspendCancellableCoroutine { continuation ->
         val main = Handler(Looper.getMainLooper())
         val cookies = CookieManager.getInstance().apply { setAcceptCookie(true) }
         val browser = WebView(activity).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
-            settings.allowFileAccess = false
-            settings.allowContentAccess = false
-            settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
             settings.userAgentString = userAgent
         }
         var mainPageOk = false
@@ -151,9 +150,7 @@ suspend fun awaitWebsiteVerification(url: String, userAgent: String): Boolean = 
             }
             override fun onPageFinished(view: WebView, currentUrl: String?) {
                 if (!mainPageOk || android.net.Uri.parse(currentUrl.orEmpty()).host != android.net.Uri.parse(url).host) return
-                val selector = if (android.net.Uri.parse(url).host == "www.bilimanga.net") "a[href*=\"/detail/\"]" else
-                    "a[href*=\"/cn/comics/\"],a[href^=\"/g/\"],div.gallery"
-                view.evaluateJavascript("Boolean(document.querySelector('$selector'))") { value ->
+                view.evaluateJavascript("Boolean(document.querySelector('a[href*=\"/cn/comics/\"],a[href^=\"/g/\"],div.gallery'))") { value ->
                     if (value == "true") complete(true)
                 }
             }

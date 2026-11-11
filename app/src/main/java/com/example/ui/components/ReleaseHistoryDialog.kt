@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import com.example.i18n.tr
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,10 +29,6 @@ import com.example.ui.wenku.WenkuTextButton
 
 internal data class ReleaseSummary(val version: String, val date: String, val summary: String)
 internal val releaseHistory = listOf(
-    ReleaseSummary("1.6.1", "11-10", "平板排版 · 旋转重排 · 启动检查更新 · 镜像下载"),
-    ReleaseSummary("1.6.0", "11-10", "Wenku8 UI · 平板布局 · 漫画预加载数量 · Roxy 动画"),
-    ReleaseSummary("1.5.16", "11-07", "EPUB 连续插图修复 · 保留插图原始尺寸"),
-    ReleaseSummary("1.5.15", "11-06", "Alice's Library · 自动备份"),
     ReleaseSummary("1.5.2", "10-26", "动效计算与缓冲复用 · 折叠分页保持 · 成人源固定启用"),
     ReleaseSummary("1.5.1", "10-23", "平板性能优化 · 滚动与章节复用 · 缓存预算"),
     ReleaseSummary("1.5.0", "10-21", "移除内置阅读指南 · 书架多选不再触发抽纸"),
@@ -94,14 +92,17 @@ internal fun ReleaseHistoryDialog(onDismiss: () -> Unit) {
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("更新目录", style = MaterialTheme.typography.titleMedium)
+                    Text(tr("更新目录"), style = MaterialTheme.typography.titleMedium)
                     Text("SYSTEM / RELEASES", style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 WenkuIconButton(Icons.Default.Close, "关闭更新目录", onClick = { close {} })
             }
-            Text("已安装版本 ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.labelMedium)
-            WenkuSectionHeader("01", "RELEASE NOTES", "版本记录")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(tr("已安装版本"), style = MaterialTheme.typography.bodySmall)
+                Text(BuildConfig.VERSION_NAME, style = MaterialTheme.typography.labelMedium)
+            }
+            WenkuSectionHeader("01", "RELEASE NOTES", tr("版本记录"))
             LazyColumn(
                 Modifier.weight(1f, fill = false).fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -117,7 +118,7 @@ internal fun ReleaseHistoryDialog(onDismiss: () -> Unit) {
                     }
                 }
             }
-            WenkuTextButton("关闭", { close {} }, Modifier.fillMaxWidth().padding(bottom = 6.dp))
+            WenkuTextButton(tr("关闭"), { close {} }, Modifier.fillMaxWidth().padding(bottom = 6.dp))
         }
     }
 }

@@ -1,5 +1,7 @@
 package com.example
 
+import com.example.i18n.tr
+
 import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
@@ -181,7 +183,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         when (val result = kotlinx.coroutines.withTimeout(30_000) { source?.getChapters(book.id) }) {
                             is com.example.source.SourceResult.Success -> result.data
                             is com.example.source.SourceResult.Error -> throw IllegalStateException(result.exception.message)
-                            else -> throw IllegalStateException("新来源暂不可用，请稍后重试")
+                            else -> throw IllegalStateException(tr("新来源暂不可用，请稍后重试"))
                         }
                     }
                     val detail = kotlinx.coroutines.withTimeoutOrNull(15_000) { source?.getDetail(book.id) }
@@ -452,7 +454,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun launchStartupTask(stage: String, task: suspend () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
-            diagnosedStartupTask(getApplication(), stage, task)
+            optionalStartupTask({ StartupDiagnostics.record(getApplication(), stage, it) }, task)
         }
     }
 
@@ -473,9 +475,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         launchStartupTask("reading-streak") {
             val streak = prefs.calculateStreak()
             _streakDays.value = streak
-        }
-        launchStartupTask("auto-backup") {
-            offerRestoreIfNeeded()
         }
     }
 
@@ -545,19 +544,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _importStatusMessage = MutableStateFlow<String?>(null)
     val importStatusMessage: StateFlow<String?> = _importStatusMessage
-
-    /** 自动备份：写在用户选的公共目录，卸载重装后靠它把书源和下载的书找回来。 */
-    val autoBackup by lazy { com.example.data.AutoBackup(application, backupManager) }
-
-    private val _restoreOffer = MutableStateFlow<com.example.data.AutoBackupStore.Snapshot?>(null)
-    val restoreOffer: StateFlow<com.example.data.AutoBackupStore.Snapshot?> = _restoreOffer
-
-    private val _restoreBusy = MutableStateFlow(false)
-    val restoreBusy: StateFlow<Boolean> = _restoreBusy
-
-    /** 恢复完成后自增，界面据此重载书源列表。 */
-    private val _restoreCompleted = MutableStateFlow(0)
-    val restoreCompleted: StateFlow<Int> = _restoreCompleted
 
     private var cachedMetadataList = emptyList<Chapter>()
     private var chapterMapping: LogicalChapterBook? = null
@@ -751,105 +737,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private val _importProgress = MutableStateFlow<BookImportProgress?>(null)
-    val importProgress: StateFlow<BookImportProgress?> = _importProgress
-
-    private val _importReport = MutableStateFlow<BookImportReport?>(null)
-    val importReport: StateFlow<BookImportReport?> = _importReport
-    fun clearImportReport() { _importReport.value = null }
-
-    fun importBooks(uris: List<Uri>, category: String = DEFAULT_CATEGORY) {
-        if (uris.isEmpty() || _importProgress.value != null) return
-        val files = uris.distinct()
-        _importProgress.value = BookImportProgress(0, files.size, "准备导入")
+    fun importBook(uri: Uri, fileName: String, category: String = DEFAULT_CATEGORY) {
         viewModelScope.launch {
             try {
-                val normalizedCategory = if (category == "全部" || category == "未分类") DEFAULT_CATEGORY else category
-                val report = withContext(Dispatchers.IO) {
-                    importBookBatch(files, onProgress = { _importProgress.value = it }) { uri, reportName ->
-                        val resolver = getApplication<Application>().contentResolver
-                        var name = uri.lastPathSegment?.substringAfterLast('/') ?: "book.txt"
-                        resolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-                            val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                            if (cursor.moveToFirst() && index >= 0) name = cursor.getString(index) ?: name
-                        }
-                        reportName(name)
-                        val book = repository.importBookFromUri(uri, name).getOrThrow()
-                        if (normalizedCategory != book.category) {
-                            database.bookDao().updateBook(book.copy(category = normalizedCategory))
-                        }
+                android.util.Log.d("BookImport", "[MainViewModel] Starting import: $fileName, category: $category")
+                val result = repository.importBookFromUri(uri, fileName)
+                result.onSuccess { book ->
+                    // 第七轮第 6.1/6.2 条：书籍单一归属真实分类；旧聚合词归一为"默认"
+                    val normalizedCategory = if (category == "全部" || category == "未分类") DEFAULT_CATEGORY else category
+                    val finalBook = if (normalizedCategory != book.category) {
+                        val updated = book.copy(category = normalizedCategory)
+                        database.bookDao().updateBook(updated)
+                        updated
+                    } else {
+                        book
                     }
+                    android.util.Log.d("BookImport", "[MainViewModel] Import success: ${finalBook.title}")
+                    _importStatusMessage.value = "《${finalBook.title}》 导入成功"
+                }.onFailure {
+                    android.util.Log.e("BookImport", "[MainViewModel] Import failure", it)
+                    _importStatusMessage.value = "导入失败: ${it.localizedMessage ?: "未知错误"}"
                 }
-                if (files.size > 1) _importReport.value = report
-                else _importStatusMessage.value = report.message()
-            } finally {
-                _importProgress.value = null
+            } catch (t: Throwable) {
+                android.util.Log.e("BookImport", "[MainViewModel] Uncaught exception in import coroutine", t)
+                _importStatusMessage.value = "导入出错: ${t.localizedMessage ?: "发生未知异常"}"
             }
         }
     }
 
     fun clearImportMessage() {
         _importStatusMessage.value = null
-    }
-
-    /** 启动阶段调用：能自动备份就备一份，书架为空且目录里有备份时提示恢复。 */
-    suspend fun offerRestoreIfNeeded() {
-        runCatching { autoBackup.runIfDue() }
-        runCatching {
-            if (autoBackup.shouldOfferRestore()) {
-                val latest = autoBackup.latest() ?: return@runCatching
-                autoBackup.markRestoreOffered()
-                _restoreOffer.value = latest
-            }
-        }
-    }
-
-    fun dismissRestoreOffer() {
-        if (_restoreBusy.value) return
-        _restoreOffer.value = null
-    }
-
-    /** 用备份目录里最新的那份覆盖恢复。 */
-    fun acceptRestore() {
-        val snapshot = _restoreOffer.value ?: return
-        _restoreOffer.value = null
-        viewModelScope.launch(Dispatchers.IO) {
-            _restoreBusy.value = true
-            try {
-                autoBackup.restore(snapshot.name)
-                _restoreCompleted.value += 1
-                _importStatusMessage.value = "已从备份恢复"
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                _importStatusMessage.value = e.message ?: "恢复失败"
-            } finally {
-                _restoreBusy.value = false
-            }
-        }
-    }
-
-    /** 用户自己挑备份文件（重装后目录授权已失效时走这里）。 */
-    fun restoreFromUri(uri: android.net.Uri) {
-        _restoreOffer.value = null
-        viewModelScope.launch(Dispatchers.IO) {
-            _restoreBusy.value = true
-            val temp = java.io.File(getApplication<android.app.Application>().filesDir, "picked_restore_${System.nanoTime()}.zip")
-            try {
-                val copied = getApplication<android.app.Application>().contentResolver.openInputStream(uri)?.use { input ->
-                    temp.outputStream().use { out -> input.copyTo(out) }
-                }
-                require(copied != null && temp.length() > 0L) { "无法读取所选备份文件" }
-                backupManager.importArchive(temp, com.example.transfer.ImportMode.REPLACE)
-                _restoreCompleted.value += 1
-                _importStatusMessage.value = "已从备份恢复"
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                _importStatusMessage.value = e.message ?: "恢复失败"
-            } finally {
-                runCatching { temp.delete() }
-                _restoreBusy.value = false
-            }
-        }
     }
 
     private val progressSaveJobs = java.util.concurrent.ConcurrentHashMap<Int, Job>()

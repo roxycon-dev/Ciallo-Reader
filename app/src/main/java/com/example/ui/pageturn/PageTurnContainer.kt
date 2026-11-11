@@ -1,5 +1,7 @@
 package com.example.ui.pageturn
 
+import com.example.i18n.tr
+
 import com.example.ui.reader.TouchZone
 import com.example.ui.reader.TouchAction
 import com.example.ui.reader.SwipeAction
@@ -65,12 +67,16 @@ import kotlin.math.abs
  */
 private const val BACKSIDE_CONTENT_ALPHA = 0.88f
 
-enum class PageTurnType(val id: Int, val title: String, val description: String) {
+/** 展示文案在读取时翻译：枚举在类加载期初始化，构造期翻译会把语言冻住。 */
+enum class PageTurnType(val id: Int, private val rawTitle: String, private val rawDescription: String) {
     SIMULATE(0, "仿真3D卷页", "真实书本折角弯曲与纸张阴影"),
     COVER(1, "覆盖翻页", "无缝推开上页，经典质感"),
     SLIDE(2, "平移翻页", "左右双页平滑滑移"),
     FADE(3, "渐变淡出", "优雅透明度切换"),
-    SCROLL(4, "上下滚动", "连续纵向滚动阅读")
+    SCROLL(4, "上下滚动", "连续纵向滚动阅读");
+
+    val title: String get() = com.example.i18n.tr(rawTitle)
+    val description: String get() = com.example.i18n.tr(rawDescription)
 }
 
 @Composable
@@ -465,14 +471,14 @@ fun PageTurnContainer(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier.size(32.dp)
                         ) {
-                            com.example.ui.components.AppProgressIndicator(
+                            CircularProgressIndicator(
                                 progress = { pullProgress },
                                 modifier = Modifier.fillMaxSize(),
                                 color = if (isCharged) MintGold else MintPrimary,
                                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
                                 strokeWidth = 3.dp
                             )
-                            com.example.ui.components.AnimatedStateIcon(
+                            Icon(
                                 imageVector = if (isBookmarked) Icons.Filled.BookmarkRemove else Icons.Filled.BookmarkAdded,
                                 contentDescription = null,
                                 tint = if (isCharged) MintGold else MintPrimary,
@@ -486,10 +492,10 @@ fun PageTurnContainer(
 
                         Text(
                             text = when {
-                                isCharged && isBookmarked -> "松开即可取消书签"
-                                isCharged && !isBookmarked -> "松开即可保存书签"
-                                isBookmarked -> "下拉取消书签"
-                                else -> "下拉添加书签"
+                                isCharged && isBookmarked -> tr("松开即可取消书签")
+                                isCharged && !isBookmarked -> tr("松开即可保存书签")
+                                isBookmarked -> tr("下拉取消书签")
+                                else -> tr("下拉添加书签")
                             },
                             fontSize = 13.sp,
                             fontWeight = if (isCharged) FontWeight.Bold else FontWeight.Medium,

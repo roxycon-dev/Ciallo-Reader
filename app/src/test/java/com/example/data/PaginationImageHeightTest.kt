@@ -89,11 +89,9 @@ class PaginationImageHeightTest {
         assertTrue("分页应产生多页", pages.size > 1)
         assertEquals("分页不能丢字或重复", content, pages.joinToString(""))
         compose.runOnIdle {
-            // 与 rememberChapterPages 同一个 density（小图按原图尺寸显示，测量口径必须一致）
-            val densityScale = compose.activity.resources.displayMetrics.density
             pages.forEachIndexed { index, page ->
                 val measuredHeight = NovelInlineImages.splitIntoBlocks(
-                    page, widthPx.toFloat(), heightPx.toFloat(), densityScale
+                    page, widthPx.toFloat(), heightPx.toFloat()
                 ).sumOf { block ->
                     when (block) {
                         is NovelInlineImages.InlineBlock.Text -> pageTextMeasurer.measure(

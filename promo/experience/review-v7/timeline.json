@@ -1,0 +1,110 @@
+[
+  {
+    "label": "翻开你的阅读世界",
+    "id": "opening",
+    "start": 0,
+    "duration": 2.2
+  },
+  {
+    "label": "多源聚合 / 多语言",
+    "id": "worlds",
+    "start": 2.2,
+    "duration": 3.3
+  },
+  {
+    "label": "书源管理 / JSON",
+    "id": "sources",
+    "start": 5.5,
+    "duration": 1.6
+  },
+  {
+    "label": "多源搜索",
+    "id": "search",
+    "start": 7.1,
+    "duration": 2.4
+  },
+  {
+    "label": "详情 / 章节 / 在线阅读",
+    "id": "chapters",
+    "start": 9.5,
+    "duration": 1.6
+  },
+  {
+    "label": "漫画",
+    "id": "comic-hit",
+    "start": 11.1,
+    "duration": 0.65
+  },
+  {
+    "label": "漫画阅读 / 进度定位",
+    "id": "comic",
+    "start": 11.75,
+    "duration": 2.4
+  },
+  {
+    "label": "漫画模式 / 翻译 / 手势",
+    "id": "controls",
+    "start": 14.15,
+    "duration": 4.8
+  },
+  {
+    "label": "小说",
+    "id": "novel-hit",
+    "start": 18.95,
+    "duration": 0.75
+  },
+  {
+    "label": "小说阅读 / 排版 / 主题",
+    "id": "novel",
+    "start": 19.7,
+    "duration": 2.8
+  },
+  {
+    "label": "书签 / Roxy",
+    "id": "bookmark",
+    "start": 22.5,
+    "duration": 0.9
+  },
+  {
+    "label": "下载 / 暂停 / 完成",
+    "id": "download",
+    "start": 23.4,
+    "duration": 2.4
+  },
+  {
+    "label": "书架分类 / 本地导入",
+    "id": "shelf",
+    "start": 25.799999999999997,
+    "duration": 1.6
+  },
+  {
+    "label": "主题 / 强调色",
+    "id": "color",
+    "start": 27.4,
+    "duration": 2.8
+  },
+  {
+    "label": "玻璃质感",
+    "id": "glass",
+    "start": 30.2,
+    "duration": 1.6
+  },
+  {
+    "label": "继续阅读",
+    "id": "resume",
+    "start": 31.8,
+    "duration": 1.6
+  },
+  {
+    "label": "日历 / 时长 / 趋势",
+    "id": "stats",
+    "start": 33.4,
+    "duration": 2.6
+  },
+  {
+    "label": "Ciallo阅读 / 获取",
+    "id": "end",
+    "start": 36,
+    "duration": 2.6
+  }
+]

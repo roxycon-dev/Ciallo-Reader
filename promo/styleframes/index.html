@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ciallo阅读 · 视觉关键帧</title>
+  <style>
+    @font-face { font-family: NotoSansSC; src: url('../../app/src/main/res/font/noto_sans_sc_regular.otf'); }
+    @font-face { font-family: NotoSerifSC; src: url('../../app/src/main/res/font/noto_serif_sc_regular.otf'); }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #171a1f; color: #fff; font-family: NotoSansSC, sans-serif; }
+    .frame { position: relative; width: 1920px; height: 1080px; overflow: hidden; isolation: isolate; }
+    .eyebrow { font-size: 21px; letter-spacing: .24em; text-transform: uppercase; font-weight: 500; }
+    .en { font-family: NotoSansSC, sans-serif; letter-spacing: -.035em; }
+    .cn { font-family: NotoSerifSC, serif; letter-spacing: -.065em; }
+    .tiny-line { width: 62px; height: 2px; background: currentColor; opacity: .58; }
+    .phone { position: absolute; width: 429px; height: 930px; border-radius: 56px; border: 7px solid #2e3238; background: #101114; box-shadow: inset 0 0 0 2px #85898a, 0 60px 120px #0008, 0 6px 22px #0006; overflow: hidden; }
+    .phone img { display: block; width: 100%; height: 100%; object-fit: fill; }
+    .phone .screen-shade { position: absolute; inset: 0; pointer-events: none; }
+    .phone .glare { position: absolute; z-index: 3; width: 320px; height: 900px; left: -70px; top: -130px; transform: rotate(23deg); background: linear-gradient(90deg, transparent, #fff2, transparent); pointer-events: none; }
+    .hairline { position: absolute; height: 1px; background: #fff4; }
+
+    /* 01. Phone reveal. Live device image will be inserted after privacy review. */
+    #hero { background: radial-gradient(ellipse 700px 600px at 75% 50%, #445463 0%, #1b222a 48%, #090b0e 100%); }
+    #hero:before { content: ''; position: absolute; width: 1040px; height: 740px; border-radius: 50%; top: 182px; left: 650px; background: #a2d6d240; filter: blur(130px); }
+    #hero .hero-copy { position: absolute; left: 164px; top: 247px; z-index: 4; }
+    #hero .eyebrow { color: #c6d1d4; }
+    #hero h1 { font-size: 112px; line-height: 1.15; margin: 62px 0 32px; font-weight: 600; }
+    #hero .en { font-size: 33px; color: #b9c5c7; }
+    #hero .tiny-line { margin-top: 78px; color: #a4d7cf; }
+    #hero .phone { right: 271px; top: 81px; transform: rotate(8deg); }
+    #hero .phone img { filter: none; transform: none; }
+    #hero .phone .screen-shade { background: linear-gradient(115deg, #e9ffff19 0%, transparent 38%, #07101114 100%); }
+    #hero .hero-glass { position: absolute; z-index: 0; width: 442px; height: 442px; border-radius: 50%; border: 1.5px solid #defaf25c; left: 1115px; top: 315px; box-shadow: inset 18px 13px 60px #ffffff16, inset -20px -32px 55px #0b252668, 0 0 90px #82d6c725; backdrop-filter: blur(13px); }
+    #hero .phone { z-index: 2; }
+    #hero .brand-mark { position: absolute; z-index: 5; left: 1341px; top: 800px; font-size: 17px; color: #d4e6e3; letter-spacing: .08em; }
+
+    /* 02. Glass close-up. Live device image will be inserted after privacy review. */
+    #glass { color: #172025; background: radial-gradient(ellipse 1200px 920px at 73% 46%, #d9f1eb 0%, #f7fbfa 46%, #ffffff 79%); }
+    #glass:before { content: ''; position: absolute; width: 820px; height: 820px; top: 120px; right: -230px; border-radius: 50%; background: radial-gradient(circle, #43aa9470, #7ec9b82b 48%, transparent 68%); filter: blur(34px); }
+    #glass .glass-copy { position: absolute; left: 164px; top: 224px; z-index: 4; width: 700px; }
+    #glass .eyebrow { color: #3c887d; }
+    #glass h2 { font-size: 94px; line-height: 1.27; font-weight: 600; margin: 63px 0 32px; }
+    #glass .en { color: #58726d; font-size: 32px; }
+    #glass .tiny-line { margin-top: 76px; color: #1b937e; }
+    #glass .phone { right: 310px; top: 66px; transform: rotate(-7deg); border-color: #b2bdc0; box-shadow: inset 0 0 0 3px #fff, 0 55px 110px #36554a38, 0 6px 20px #22372b33; }
+    #glass .phone img { object-position: 50% 66%; }
+    #glass .phone .screen-shade { background: linear-gradient(135deg, #ffffff18, transparent 53%, #063a2c17); }
+    #glass .glass-lens { position: absolute; z-index: 0; right: 65px; top: 603px; width: 790px; height: 236px; border-radius: 62px; background-image: linear-gradient(125deg, #ffffff23 0%, transparent 52%, #ffffff20 100%); background-size: cover; background-position: center; border: 1.5px solid #ffffffd0; box-shadow: inset 0 1px 9px #fff, inset 0 -12px 40px #256e6033, 0 31px 60px #397c6860; transform: rotate(-7deg); }
+    #glass .phone { z-index: 2; }
+
+    /* 03. A real mascot asset provides the human beat before the brand finish. */
+    #roxy { background: radial-gradient(ellipse 740px 650px at 74% 55%, #2b384b 0%, #141920 45%, #090b0f 100%); }
+    #roxy:before { content: ''; position: absolute; width: 920px; height: 700px; left: 110px; top: 180px; border-radius: 50%; background: #6d8ea72b; filter: blur(140px); }
+    #roxy .roxy-copy { position: absolute; top: 238px; left: 164px; z-index: 4; }
+    #roxy h2 { font-size: 99px; line-height: 1.22; font-weight: 600; margin: 60px 0 31px; }
+    #roxy .en { font-size: 33px; color: #c5d2da; }
+    #roxy .tiny-line { margin-top: 76px; color: #a7cbe6; }
+    #roxy .mascot-glass { position: absolute; right: 199px; top: 96px; width: 660px; height: 852px; border-radius: 64px; border: 1.5px solid #d8e9fc50; background: linear-gradient(140deg, #ffffff17, #a6c3da08 45%, #151b2533); box-shadow: inset 0 2px 35px #ffffff20, inset 0 -35px 50px #0003, 0 48px 100px #0008; backdrop-filter: blur(15px); }
+    #roxy .mascot-glass:before { content: ''; position: absolute; inset: 24px; border-radius: 43px; border: 1px solid #ffffff1e; }
+    #roxy .phone { right: 120px; top: 88px; transform: rotate(5deg) scale(.86); transform-origin: top right; border-color: #717f92; opacity: .78; }
+    #roxy .mascot { position: absolute; z-index: 5; height: 790px; width: auto; right: 420px; top: 133px; filter: drop-shadow(0 35px 35px #0009); }
+    #roxy .bottom-brand { position: absolute; z-index: 4; left: 165px; bottom: 95px; display: flex; align-items: baseline; gap: 34px; }
+    #roxy .bottom-brand strong { font-size: 37px; font-weight: 600; }
+    #roxy .bottom-brand span { font-size: 21px; color: #bbccd2; letter-spacing: .02em; }
+  </style>
+</head>
+<body>
+  <section class="frame" id="hero" aria-label="手机开场">
+    <div class="hero-copy"><div class="eyebrow">CialloReader · Product Film</div><h1 class="cn">Ciallo<br>阅读</h1><div class="en">Where stories unfold.</div><div class="tiny-line"></div></div>
+    <div class="hero-glass"></div>
+    <div class="phone"><img src="assets/home-09.png" alt="用户录制的当前 Ciallo 阅读书架画面"><div class="screen-shade"></div><div class="glare"></div></div>
+    <div class="brand-mark">01 / REVEAL</div>
+  </section>
+  <section class="frame" id="glass" aria-label="玻璃界面特写">
+    <div class="glass-copy"><div class="eyebrow">Designed for reading</div><h2 class="cn">轻一点，<br>更沉浸。</h2><div class="en">A reading space that feels alive.</div><div class="tiny-line"></div></div>
+    <div class="phone"><img src="assets/glass-18.png" alt="用户录制的当前 Ciallo 阅读玻璃设置界面"><div class="screen-shade"></div><div class="glare"></div></div>
+    <div class="glass-lens"></div>
+  </section>
+  <section class="frame" id="roxy" aria-label="Roxy 与品牌收尾">
+    <div class="roxy-copy"><div class="eyebrow">A world of stories</div><h2 class="cn">故事，<br>正在展开。</h2><div class="en">Open a page. Enter a world.</div><div class="tiny-line"></div></div>
+    <div class="mascot-glass"></div><div class="phone"><img src="../captures/real-device/roxy-onboarding.png" alt="实机拍摄的 Roxy 引导画面"><div class="glare"></div></div><img class="mascot" src="../../app/src/main/res/drawable-nodpi/mascot_reading.webp" alt="应用内置的 Roxy 官方形象">
+    <div class="bottom-brand"><strong>Ciallo阅读</strong><span>CialloReader</span></div>
+  </section>
+</body>
+</html>

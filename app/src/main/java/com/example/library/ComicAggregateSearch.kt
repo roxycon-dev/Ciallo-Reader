@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.i18n.tr
+
 import com.example.source.BookSource
 import com.example.source.SearchBook
 import com.example.source.SourceException
@@ -95,7 +97,7 @@ internal class ComicAggregateSearch(
                             publish(loading = true)
                         }
                         is SourceResult.Error -> { lastError = result.exception.message; lastFailure = result.exception }
-                        null -> { lastError = "搜索超时"; lastFailure = SourceException.NetworkError("搜索超时") }
+                        null -> { lastError = "搜索超时"; lastFailure = SourceException.NetworkError(tr("搜索超时")) }
                     }
                 }
 
@@ -116,7 +118,7 @@ internal class ComicAggregateSearch(
                 slots.withPermit {
                     withContext(dispatcher) {
                         withTimeoutOrNull(timeoutFor(source)) { source.search(keyword) }
-                            ?: SourceResult.Error(SourceException.NetworkError("搜索超时"))
+                            ?: SourceResult.Error(SourceException.NetworkError(tr("搜索超时")))
                     }
                 }
             }

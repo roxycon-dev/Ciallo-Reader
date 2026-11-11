@@ -45,7 +45,18 @@ fun AppIconButton(
     enabled: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    PullOutIconButton(onClick, modifier, enabled, content = content)
+    Box(
+        modifier = modifier
+            .size(48.dp)
+            .clickableWithFeedback(
+                enabled = enabled,
+                bounded = false, // Unbounded borderless ripple
+                onClick = paperClick(onClick)
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        content()
+    }
 }
 
 /**
