@@ -24,7 +24,7 @@ internal object TransferConnection {
             NearbyHandshake.write(DataOutputStream(raw.outputStream),local)
             val remote=NearbyHandshake.read(DataInputStream(raw.inputStream))
             require(remote.id!=local.id){tr("附近连接指向了本机")}
-            if(expectedId!=null && remote.id!=expectedId)throw SecurityException("附近网络中的设备与所选设备不一致")
+            if(expectedId!=null && remote.id!=expectedId)throw SecurityException(tr("附近网络中的设备与所选设备不一致"))
             if(local.sending && remote.sending && !remote.busy)throw IllegalStateException(tr("双方都选择了发送，请让一台设备选择接收"))
             if(!NearbyHandshake.shouldStart(local,remote) || !claim()){raw.close();return null}
             track(raw)
@@ -50,10 +50,10 @@ internal object TransferConnection {
         val raw=Socket()
         try {
             track(raw)
-            stage("正在连接设备")
+            stage(tr("正在连接设备"))
             bind(raw)
             raw.connect(InetSocketAddress(route.host,route.port),connectTimeout)
-            stage("正在建立加密连接")
+            stage(tr("正在建立加密连接"))
             return secure(context,raw,true,handshakeTimeout,track)
         } catch(e:Exception) {
             runCatching {raw.close()}
@@ -69,15 +69,15 @@ internal object TransferConnection {
         val tls=context.socketFactory.createSocket(raw,raw.inetAddress.hostAddress,raw.port,true) as SSLSocket
         try {
             track(tls)
-            if(tls.isClosed)throw java.net.SocketException("连接已取消")
+            if(tls.isClosed)throw java.net.SocketException(tr("连接已取消"))
             tls.useClientMode=client
             if(!client)tls.needClientAuth=true
             TransferTls.configure(tls)
             tls.soTimeout=timeout
             tls.startHandshake()
-            if(tls.isClosed)throw java.net.SocketException("连接已取消")
+            if(tls.isClosed)throw java.net.SocketException(tr("连接已取消"))
             if(!tls.session.isValid || tls.session.protocol=="NONE")
-                throw javax.net.ssl.SSLHandshakeException("加密握手未完成或已取消")
+                throw javax.net.ssl.SSLHandshakeException(tr("加密握手未完成或已取消"))
             return tls
         } catch(e:Exception){runCatching {tls.close()};throw e}
     }

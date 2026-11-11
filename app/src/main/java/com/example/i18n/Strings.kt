@@ -2822,6 +2822,32 @@ private val EN: Map<String, String> = mapOf(
     "自定义 JSON 源搜不到？" to "Custom JSON source finds nothing?",
     "先确认 listSelector / detailUrl 与站点当前 HTML 匹配，推荐先用 @css: 规则，并用浏览器开发者工具核对元素类名；需要登录或 JS 渲染的站点暂不支持。" to
         "Check that listSelector / detailUrl match the site's current HTML. Prefer @css: rules and verify class names in the browser dev tools. Sites that need sign-in or JS rendering are not supported yet.",
+    // ── 互传 / 附近连接（收尾） ─────────────────────────────────
+    "URL 缺少 host" to "The URL has no host",
+    "不支持的设置类型" to "Unsupported settings type",
+    "加密握手未完成或已取消" to "The encrypted handshake did not finish or was cancelled",
+    "局域网发现不可用" to "LAN discovery is unavailable",
+    "局域网广播失败，可使用附近直连或分享文件" to
+        "LAN broadcast failed — use a direct nearby link or share a file",
+    "授权附近设备后，还可启用离线直连" to "Grant the nearby-devices permission to also enable a direct offline link",
+    "无法读取" to "Could not read",
+    "未发现对方的附近连接地址，请重新发现" to "The other device's nearby address was not found — discover again",
+    "未能开始局域网发现，请重试或使用附近直连" to
+        "Could not start LAN discovery — retry or use a direct nearby link",
+    "正在连接设备" to "Connecting to the device",
+    "设备不支持附近直连，可使用同 Wi-Fi 互传" to
+        "This device does not support direct nearby links — same-Wi-Fi transfer still works",
+    "连接已取消" to "Connection cancelled",
+    "部分原文件或封面已缺失，将在发送前列出" to "Some originals or covers are missing; they will be listed before sending",
+    "部分外部资源体积将在打包时确认" to "Some external sizes are confirmed while packaging",
+    "部分外部资源暂时无法读取" to "Some external resources cannot be read right now",
+    "附近广播更新失败，请重新开启接收" to "Could not update the nearby broadcast — turn receiving off and on",
+    "附近网络中的设备与所选设备不一致" to "The device on the nearby link is not the one selected",
+    "附近连接服务尚未就绪，请重新发现" to "The nearby service is not ready — discover again",
+    "附近连接监听服务未就绪，同 Wi-Fi 互传仍可使用" to
+        "The nearby listener is not ready; same-Wi-Fi transfer still works",
+    "数据包保存失败" to "Could not save the package",
+    "设置保存失败" to "Could not save settings",
 )
 
 

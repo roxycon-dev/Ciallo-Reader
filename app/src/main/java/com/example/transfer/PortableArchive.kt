@@ -39,12 +39,12 @@ internal object PortableArchive {
             for(key in listOf("custom_splash_poster_uri","custom_app_background_uri","custom_font_path"))prefs.getString(key,null)?.takeIf {it.isNotBlank()}?.let(paths::add)
         }
         for(path in paths) {
-            if(path.startsWith("content://"))try {context.contentResolver.openAssetFileDescriptor(Uri.parse(path),"r")?.use { if(it.length>=0)bytes+=it.length else warnings.add("部分外部资源体积将在打包时确认") }?:warnings.add("部分外部资源暂时无法读取")}
-            catch(_:Exception){warnings.add("部分外部资源暂时无法读取")}
+            if(path.startsWith("content://"))try {context.contentResolver.openAssetFileDescriptor(Uri.parse(path),"r")?.use { if(it.length>=0)bytes+=it.length else warnings.add(tr("部分外部资源体积将在打包时确认")) }?:warnings.add(tr("部分外部资源暂时无法读取"))}
+            catch(_:Exception){warnings.add(tr("部分外部资源暂时无法读取"))}
             else if(!path.startsWith("http")) {
                 val file=File(path.removePrefix("file://"))
                 if(file.isFile)bytes+=file.length()else if(file.isDirectory)bytes+=file.walkTopDown().filter {it.isFile && !it.name.endsWith(".part") && !it.name.endsWith(".tmp")}.sumOf {it.length()}
-                else warnings.add("部分原文件或封面已缺失，将在发送前列出")
+                else warnings.add(tr("部分原文件或封面已缺失，将在发送前列出"))
             }
         }
         val protectedFavorites=context.getSharedPreferences("novel_reader_prefs",0).getBoolean("favorites_protected",false)
@@ -84,7 +84,7 @@ internal object PortableArchive {
                 return try {
                     if(!file.exists()) context.contentResolver.openInputStream(Uri.parse(path))?.use { input ->
                         file.outputStream().use { ArchiveBudget(512L*1024*1024, 512L*1024*1024, 1).copyEntry(input, it) }
-                    } ?: error("无法读取")
+                    } ?: error(tr("无法读取"))
                     resources["files/external/$key"] = file
                     "@FILES@/external/$key"
                 } catch(e: Exception) { if(e is kotlinx.coroutines.CancellationException) throw e
