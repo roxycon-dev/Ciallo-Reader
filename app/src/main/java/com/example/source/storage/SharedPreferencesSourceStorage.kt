@@ -1,5 +1,7 @@
 package com.example.source.storage
 
+import com.example.i18n.tr
+
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -40,7 +42,7 @@ class SharedPreferencesSourceStorage(context: Context) : SourceStorage {
 
     override suspend fun saveCustomSourceJson(sourceId: String, jsonContent: String) = withContext(Dispatchers.IO) {
         synchronized(storageLock) {
-            require(jsonContent.toByteArray().size <= 2 * 1024 * 1024) { "书源配置超过 2MiB" }
+            require(jsonContent.toByteArray().size <= 2 * 1024 * 1024) { tr("书源配置超过 2MiB") }
             val atomic = android.util.AtomicFile(configFile(sourceId))
             val out = atomic.startWrite()
             try { out.write(jsonContent.toByteArray(Charsets.UTF_8)); atomic.finishWrite(out) }
@@ -57,7 +59,7 @@ class SharedPreferencesSourceStorage(context: Context) : SourceStorage {
             prefs.all.forEach { (key, value) ->
                 if (key.startsWith("custom_source_json_") && value is String) {
                     val id = key.removePrefix("custom_source_json_")
-                    require(value.toByteArray().size <= 2 * 1024 * 1024) { "书源配置超过 2MiB" }
+                    require(value.toByteArray().size <= 2 * 1024 * 1024) { tr("书源配置超过 2MiB") }
                     val atomic = android.util.AtomicFile(configFile(id))
                     val out = atomic.startWrite()
                     try { out.write(value.toByteArray(Charsets.UTF_8)); atomic.finishWrite(out) }

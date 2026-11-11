@@ -1,5 +1,7 @@
 package com.example.ui.favorite
 
+import com.example.i18n.tr
+
 import com.example.ui.components.PullOutButton
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutBottomSheet
@@ -47,20 +49,20 @@ fun DuplicateComicSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).navigationBarsPadding()) {
-            Text("可能重复的作品",
+            Text(tr("可能重复的作品"),
                 style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
             Text("「${request.book.title}」 · ${sourceName(request.book.sourceId)}",
                 style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
-            Text("喜欢里有名称相似的作品。选一本替换并迁移阅读标记，或让两个来源并存。",
+            Text(tr("喜欢里有名称相似的作品。选一本替换并迁移阅读标记，或让两个来源并存。"),
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             PullOutTextButton(enabled = !request.busy, onClick = { manual = !manual; selected = null }) {
-                Text(if (manual) "返回相似作品" else "另一种译名？手动选旧收藏")
+                Text(if (manual) tr("返回相似作品") else tr("另一种译名？手动选旧收藏"))
             }
             if (manual) {
                 OutlinedTextField(value = query, onValueChange = { query = it }, enabled = !request.busy,
-                    label = { Text("搜喜欢里的书名或作者") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    label = { Text(tr("搜喜欢里的书名或作者")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
             }
             if (shown.isNotEmpty()) {
@@ -93,11 +95,11 @@ fun DuplicateComicSheet(
                     }
                 }
             } else if (manual) {
-                Text("没有匹配的旧收藏，换个关键词试试", style = MaterialTheme.typography.bodySmall)
+                Text(tr("没有匹配的旧收藏，换个关键词试试"), style = MaterialTheme.typography.bodySmall)
             }
             selected?.let {
                 Spacer(Modifier.height(12.dp))
-                Text("会保留旧收藏的分类，按话号 / 卷号 / 标题迁移已读和书签。页码从对应话的第一页开始；未匹配记录保留在旧来源。",
+                Text(tr("会保留旧收藏的分类，按话号 / 卷号 / 标题迁移已读和书签。页码从对应话的第一页开始；未匹配记录保留在旧来源。"),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             request.error?.let { Text(it, modifier = Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.error) }
@@ -107,18 +109,18 @@ fun DuplicateComicSheet(
                     verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(10.dp))
-                    Text("正在保存与迁移…")
+                    Text(tr("正在保存与迁移…"))
                 }
             } else {
                 selected?.let { favorite ->
-                    PullOutButton(onClick = { onConfirm(favorite) }, modifier = Modifier.fillMaxWidth()) { Text("替换这一本并迁移阅读记录") }
+                    PullOutButton(onClick = { onConfirm(favorite) }, modifier = Modifier.fillMaxWidth()) { Text(tr("替换这一本并迁移阅读记录")) }
                 }
                 if (selected == null) {
-                    PullOutButton(onClick = { onConfirm(null) }, modifier = Modifier.fillMaxWidth()) { Text("依然添加 · 两本并存") }
+                    PullOutButton(onClick = { onConfirm(null) }, modifier = Modifier.fillMaxWidth()) { Text(tr("依然添加 · 两本并存")) }
                 } else {
-                    PullOutTextButton(onClick = { onConfirm(null) }, modifier = Modifier.fillMaxWidth()) { Text("依然添加 · 两本并存") }
+                    PullOutTextButton(onClick = { onConfirm(null) }, modifier = Modifier.fillMaxWidth()) { Text(tr("依然添加 · 两本并存")) }
                 }
-                PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss), modifier = Modifier.fillMaxWidth()) { Text("取消") }
+                PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss), modifier = Modifier.fillMaxWidth()) { Text(tr("取消")) }
             }
             Spacer(Modifier.height(12.dp))
         }

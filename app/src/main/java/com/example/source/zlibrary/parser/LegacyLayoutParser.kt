@@ -1,5 +1,7 @@
 package com.example.source.zlibrary.parser
 
+import com.example.i18n.tr
+
 import com.example.source.SearchBook
 import com.example.source.SourceException
 import com.example.source.zlibrary.ParsedBookDetail
@@ -73,7 +75,7 @@ class LegacyLayoutParser : ZLibraryLayoutParser {
 
     override fun parseDetail(doc: Document, baseUrl: String): ParsedBookDetail {
         val dlAnchor = doc.firstRealDownloadLink()
-            ?: throw SourceException.ParseError("未找到通用下载链接")
+            ?: throw SourceException.ParseError(tr("未找到通用下载链接"))
 
         var dlUrl = dlAnchor.attr("href")
         if (!dlUrl.startsWith("http")) dlUrl = formatUrl(baseUrl, dlUrl)

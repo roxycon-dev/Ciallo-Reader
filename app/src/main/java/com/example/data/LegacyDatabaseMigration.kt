@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 

@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -45,11 +47,11 @@ object MobiParser {
         try {
             Log.d(TAG, "[MobiParser] Starting MOBI import for $fileName, uri: $uri")
             val bytes = context.contentResolver.openInputStream(uri)?.use { it.readImportBytes() }
-                ?: return@withContext Result.failure(Exception("无法读取 MOBI 文件"))
+                ?: return@withContext Result.failure(Exception(tr("无法读取 MOBI 文件")))
 
             val parsed = parseMobi(bytes)
             if (parsed == null) {
-                return@withContext Result.failure(Exception("不是有效的 MOBI/AZW3 文件"))
+                return@withContext Result.failure(Exception(tr("不是有效的 MOBI/AZW3 文件")))
             }
             if (parsed.failureReason != null) {
                 return@withContext Result.failure(Exception(parsed.failureReason))
@@ -91,7 +93,7 @@ object MobiParser {
             val chapters = splitHtmlIntoChapters(htmlWithImages, bookId)
             if (chapters.isEmpty()) {
                 if (targetBookId == null) bookDao.deleteBook(initialBook.copy(id = bookId))
-                return@withContext Result.failure(Exception("MOBI 文件中未找到有效正文内容"))
+                return@withContext Result.failure(Exception(tr("MOBI 文件中未找到有效正文内容")))
             }
 
             var coverUri: String? = null
@@ -359,7 +361,7 @@ object MobiParser {
                 val out = ByteArrayOutputStream()
                 for (i in startRecord..endRecord) {
                     out.write(trimTrailing(records[i], header))
-                    require(out.size() <= 64 * 1024 * 1024) { "MOBI正文过大" }
+                    require(out.size() <= 64 * 1024 * 1024) { tr("MOBI正文过大") }
                 }
                 out.toByteArray()
             }
@@ -378,7 +380,7 @@ object MobiParser {
                     var rec = trimTrailing(records[i], header)
                     if (useSkip2 && rec.size > 2) rec = rec.copyOfRange(2, rec.size)
                     out.write(decodePalmDoc(rec))
-                    require(out.size() <= 64 * 1024 * 1024) { "MOBI正文过大" }
+                    require(out.size() <= 64 * 1024 * 1024) { tr("MOBI正文过大") }
                 }
                 out.toByteArray()
             }
@@ -388,7 +390,7 @@ object MobiParser {
                 val out = ByteArrayOutputStream()
                 for (i in startRecord..endRecord) {
                     out.write(huff.unpack(trimTrailing(records[i], header)))
-                    require(out.size() <= 64 * 1024 * 1024) { "MOBI正文过大" }
+                    require(out.size() <= 64 * 1024 * 1024) { tr("MOBI正文过大") }
                 }
                 out.toByteArray()
             }
@@ -521,12 +523,12 @@ object MobiParser {
 
         private fun loadHuff(data: ByteArray) {
             if (data.size < 16 || readU32(data, 0) != 0x48554646L || readU32(data, 4) != 24L) {
-                throw IllegalStateException("无效的 HUFF 头")
+                throw IllegalStateException(tr("无效的 HUFF 头"))
             }
             val off1 = readU32(data, 8).toInt()
             val off2 = readU32(data, 12).toInt()
             if (off1 < 0 || off2 < 0 || off1 + 256 * 4 > data.size || off2 + 64 * 4 > data.size) {
-                throw IllegalStateException("HUFF 表偏移越界")
+                throw IllegalStateException(tr("HUFF 表偏移越界"))
             }
             for (i in 0 until 256) {
                 dict1.add(dictUnpack(readU32(data, off1 + i * 4)))
@@ -558,8 +560,8 @@ object MobiParser {
         private fun dictUnpack(v: Long): DictRecord {
             val codelen = (v and 0x1F).toInt()
             val term = v and 0x80
-            if (codelen == 0) throw IllegalStateException("无效的 HUFF codelen")
-            if (codelen <= 8 && term == 0L) throw IllegalStateException("无效的 HUFF term")
+            if (codelen == 0) throw IllegalStateException(tr("无效的 HUFF codelen"))
+            if (codelen <= 8 && term == 0L) throw IllegalStateException(tr("无效的 HUFF term"))
             var maxcode = (v shr 8) + 1L
             maxcode = (maxcode shl (32 - codelen)) - 1L
             return DictRecord(codelen, term, maxcode)
@@ -567,7 +569,7 @@ object MobiParser {
 
         private fun loadCdic(data: ByteArray) {
             if (data.size < 16 || readU32(data, 0) != 0x43444943L || readU32(data, 4) != 16L) {
-                throw IllegalStateException("无效的 CDIC 头")
+                throw IllegalStateException(tr("无效的 CDIC 头"))
             }
             val phrases = readU32(data, 8).toInt()
             val bits = readU32(data, 12).toInt()
@@ -584,14 +586,14 @@ object MobiParser {
             val blen = readU16(data, 16 + offset)
             val len = blen and 0x7FFF
             if (18 + offset + len > data.size) {
-                throw IllegalStateException("CDIC 切片越界")
+                throw IllegalStateException(tr("CDIC 切片越界"))
             }
             val sliceData = data.copyOfRange(18 + offset, 18 + offset + len)
             return Slice(sliceData, if (blen and 0x8000 != 0) 1 else 0)
         }
 
         fun unpack(input: ByteArray, depth: Int = 0): ByteArray {
-            require(depth <= 64) { "HUFF短语递归过深" }
+            require(depth <= 64) { tr("HUFF短语递归过深") }
             var out = ByteArray(4096)
             var op = 0
             var bitsleft = input.size * 8
@@ -622,14 +624,14 @@ object MobiParser {
                 if (r !in dictionary.indices) break
                 var slice = dictionary[r]
                 if (slice.flag == 0) {
-                    require(expanding.add(r)) { "HUFF短语循环引用" }
+                    require(expanding.add(r)) { tr("HUFF短语循环引用") }
                     val newData = try { unpack(slice.data, depth + 1) } finally { expanding.remove(r) }
                     cachedBytes += newData.size
-                    require(cachedBytes <= 32L * 1024 * 1024) { "HUFF字典膨胀过大" }
+                    require(cachedBytes <= 32L * 1024 * 1024) { tr("HUFF字典膨胀过大") }
                     slice = Slice(newData, 1)
                     dictionary[r] = slice
                 }
-                require(op.toLong() + slice.data.size <= 8L * 1024 * 1024) { "HUFF记录膨胀过大" }
+                require(op.toLong() + slice.data.size <= 8L * 1024 * 1024) { tr("HUFF记录膨胀过大") }
                 if (op + slice.data.size > out.size) {
                     out = out.copyOf(maxOf(out.size * 2, op + slice.data.size))
                 }

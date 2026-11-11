@@ -1,5 +1,7 @@
 package com.example.god
 
+import com.example.i18n.tr
+
 import com.example.ui.wenku.wenkuTabTitle
 import com.example.ui.wenku.wenkuPagePart
 import com.example.ui.wenku.WenkuSymbol
@@ -88,7 +90,7 @@ fun GodRankingCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // 标题走 titleLarge 槽位（17sp/负字距），不再手写 16sp+Bold
                 Text(
-                    text = "神回排行榜",
+                    text = tr("神回排行榜"),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -96,7 +98,7 @@ fun GodRankingCard(
                 GodCountPill(count = moments.size)
                 Spacer(Modifier.weight(1f))
                 PullOutTextButton(onClick = onOpenAll) {
-                    Text("查看全部", style = MaterialTheme.typography.labelMedium)
+                    Text(tr("查看全部"), style = MaterialTheme.typography.labelMedium)
                 }
             }
             Spacer(Modifier.height(14.dp))
@@ -218,7 +220,7 @@ fun GodRankingScreen(
                 navigationIcon = {
                     PullOutIconButton(
                         icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "返回",
+                        contentDescription = tr("返回"),
                         onClick = onBack,
                         tint = MaterialTheme.colorScheme.onBackground,
                         glyphSize = 22.dp
@@ -260,7 +262,7 @@ fun GodRankingScreen(
                     onClick = onOpenStyleSettings,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("陈列方式", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                        Text(tr("陈列方式"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                         Spacer(Modifier.weight(1f))
                         Text(style.label, color = GodGold.LightEnd, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         if (onOpenStyleSettings != null) {
@@ -329,7 +331,7 @@ private fun GodRankingHero(
             drawCircle(gold[1].copy(alpha = 0.18f), 82.dp.toPx(), Offset(cx, cy))
         }
         Column(Modifier.padding(22.dp)) {
-            Text("THE MOMENTS / 精选记录", color = gold[0], fontSize = 10.sp, letterSpacing = 2.sp)
+            Text(tr("THE MOMENTS / 精选记录"), color = gold[0], fontSize = 10.sp, letterSpacing = 2.sp)
             Spacer(Modifier.height(11.dp))
             Text(
                 "值得重读的，\n都在这里。",

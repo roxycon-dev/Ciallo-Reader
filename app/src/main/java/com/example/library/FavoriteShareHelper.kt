@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.i18n.tr
+
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -39,7 +41,7 @@ object FavoriteShareHelper {
 
     internal suspend fun prepareShareIntent(context: Context, favorites: List<FavoriteEntity>, source: (String) -> BookSource?): Intent =
         withContext(Dispatchers.IO) {
-            require(favorites.isNotEmpty()) { "请先选择要分享的作品" }
+            require(favorites.isNotEmpty()) { tr("请先选择要分享的作品") }
             val prefs = context.getSharedPreferences("work_detail_share_links", Context.MODE_PRIVATE)
             val semaphore = Semaphore(3)
             val links = withTimeout(25_000) {
@@ -51,7 +53,7 @@ object FavoriteShareHelper {
                                 ?: DetailLink.valid(prefs.getString(key, null))
                                 ?: try { withTimeout(4_000) {
                                     val raw = source(favorite.sourceId)?.getShareUrl(favorite.comicId)
-                                    require(raw == null || DetailLink.valid(raw) != null) { "书源详情链接无效" }
+                                    require(raw == null || DetailLink.valid(raw) != null) { tr("书源详情链接无效") }
                                     DetailLink.valid(raw)
                                 } }
                                    catch (_: TimeoutCancellationException) { null }

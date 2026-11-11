@@ -1,0 +1,24 @@
+[
+  {
+    "file": "cinema-source-rows.webp",
+    "derived_from": "native-source-more.webp",
+    "crop_ltrb": [
+      52,
+      580,
+      1170,
+      1170
+    ],
+    "original_recording": "see native-manifest.json"
+  },
+  {
+    "file": "cinema-source-import.webp",
+    "derived_from": "native-source-more.webp",
+    "crop_ltrb": [
+      52,
+      2125,
+      1170,
+      2305
+    ],
+    "original_recording": "see native-manifest.json"
+  }
+]

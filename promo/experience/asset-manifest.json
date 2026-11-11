@@ -1,0 +1,169 @@
+[
+  {
+    "file": "shelf.webp",
+    "source": "04_shelf.mp4",
+    "second": 1.6,
+    "crop_ltrb": null,
+    "width": 1224,
+    "height": 2700,
+    "reason": "Settled bookshelf; no transition or notification."
+  },
+  {
+    "file": "glass.webp",
+    "source": "11_glass_ui.mp4",
+    "second": 18.0,
+    "crop_ltrb": null,
+    "width": 1224,
+    "height": 2700,
+    "reason": "Settled native glass controls; original color and pixels."
+  },
+  {
+    "file": "reader.webp",
+    "source": "07_comic_glass.mp4",
+    "second": 4.0,
+    "crop_ltrb": null,
+    "width": 1224,
+    "height": 2700,
+    "reason": "Native reader settings with underlying manga; no added mask."
+  },
+  {
+    "file": "comic-page.webp",
+    "source": "06_comic_read.mp4",
+    "second": 10.0,
+    "crop_ltrb": [
+      0,
+      460,
+      1224,
+      2250
+    ],
+    "width": 1224,
+    "height": 1790,
+    "reason": "Later fully loaded page. Original black letterboxing excluded by composition."
+  },
+  {
+    "file": "comic-detail-a.webp",
+    "source": "06_comic_read.mp4",
+    "second": 10.0,
+    "crop_ltrb": [
+      700,
+      1560,
+      1210,
+      2230
+    ],
+    "width": 510,
+    "height": 670,
+    "reason": "Roxy illustration in the genuine later manga page."
+  },
+  {
+    "file": "comic-detail-b.webp",
+    "source": "06_comic_read.mp4",
+    "second": 2.2,
+    "crop_ltrb": [
+      780,
+      1410,
+      1150,
+      2215
+    ],
+    "width": 370,
+    "height": 805,
+    "reason": "Character close-up from a settled manga page; no loading or page-turn glitch."
+  },
+  {
+    "file": "comic-detail-c.webp",
+    "source": "06_comic_read.mp4",
+    "second": 10.0,
+    "crop_ltrb": [
+      80,
+      610,
+      840,
+      1110
+    ],
+    "width": 760,
+    "height": 500,
+    "reason": "Architecture from the same authentic manga page."
+  },
+  {
+    "file": "novel-controls.webp",
+    "source": "09_novel_settings.mp4",
+    "second": 9.4,
+    "crop_ltrb": [
+      0,
+      1740,
+      1224,
+      2660
+    ],
+    "width": 1224,
+    "height": 920,
+    "reason": "Native settings panel only; no body prose, no censorship layer."
+  },
+  {
+    "file": "search.webp",
+    "source": "02_search.mp4",
+    "second": 3.2,
+    "crop_ltrb": [
+      0,
+      230,
+      1224,
+      445
+    ],
+    "width": 1224,
+    "height": 215,
+    "reason": "Complete search row after actual query entry."
+  },
+  {
+    "file": "download.webp",
+    "source": "03_detail_download.mp4",
+    "second": 19.8,
+    "crop_ltrb": [
+      0,
+      2020,
+      1224,
+      2700
+    ],
+    "width": 1224,
+    "height": 680,
+    "reason": "Download drawer with settled progress state."
+  },
+  {
+    "file": "roxy.webp",
+    "source": "app/src/main/res/drawable-nodpi/mascot_reading.webp",
+    "reason": "Original bundled application mascot artwork."
+  },
+  {
+    "file": "roxy-hello.webp",
+    "source": "app/src/main/res/drawable-nodpi/mascot_celebrate.webp",
+    "reason": "Original bundled application mascot artwork."
+  },
+  {
+    "file": "comic-first.webp",
+    "source": "06_comic_read.mp4",
+    "second": 2.9,
+    "crop_ltrb": [
+      0,
+      460,
+      1224,
+      2250
+    ],
+    "width": 1224,
+    "height": 1790,
+    "reason": "Settled genuine device frame, no blur, redraw, or interpolated turn."
+  },
+  {
+    "file": "comic-native.webp",
+    "source": "06_comic_read.mp4",
+    "second": 11.3,
+    "crop_ltrb": null,
+    "width": 1224,
+    "height": 2700,
+    "reason": "Settled genuine device frame, no blur, redraw, or interpolated turn."
+  },
+  {
+    "file": "download-native.webp",
+    "source": "03_detail_download.mp4",
+    "second": 19.8,
+    "crop_ltrb": null,
+    "width": 1224,
+    "height": 2700,
+    "reason": "Settled genuine device frame, no blur, redraw, or interpolated turn."
+  }
+]

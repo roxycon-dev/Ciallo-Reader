@@ -1,5 +1,7 @@
 package com.example.god
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
@@ -276,13 +278,13 @@ fun GodPullOverlay(
                 color = gold[0],
             )
             Text(
-                text = if (state.armed) "松手，收藏这一刻" else "继续滑动",
+                text = if (state.armed) tr("松手，收藏这一刻") else tr("继续滑动"),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White,
             )
             Text(
-                text = if (state.armed) "神回已就绪" else "标记为神回",
+                text = if (state.armed) tr("神回已就绪") else tr("标记为神回"),
                 fontSize = 10.sp,
                 color = Color.White.copy(alpha = 0.72f),
             )
@@ -294,7 +296,7 @@ fun GodPullOverlay(
 @Composable
 fun GodHintCapsule(
     visible: Boolean,
-    text: String = "继续滑动 · 标记神回",
+    text: String = tr("继续滑动 · 标记神回"),
     modifier: Modifier = Modifier,
 ) {
     val alpha by animateFloatAsState(

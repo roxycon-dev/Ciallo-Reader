@@ -1,5 +1,7 @@
 package com.example.source.impl
 
+import com.example.i18n.tr
+
 import com.example.source.*
 import kotlinx.coroutines.CancellationException
 import okhttp3.HttpUrl
@@ -13,19 +15,19 @@ import org.jsoup.Jsoup
 /** Anonymous public catalogues; chapter text is supplied by the named third-party API. */
 internal class FanqieGateway(private val http: OkHttpClient) {
     private val notice = "搜索与目录来自番茄公开接口，书荒殿补充检索；正文由张老师API提供。接口可能缺章或停止服务，更新与覆盖以实际返回为准。"
-    private fun id(value: String) = value.also { require(it.matches(Regex("[0-9]{18,20}"))) { "番茄小说标识无效" } }
+    private fun id(value: String) = value.also { require(it.matches(Regex("[0-9]{18,20}"))) { tr("番茄小说标识无效") } }
     private suspend fun json(url: HttpUrl): JSONObject = guestNovelIoRetry {
         val request = Request.Builder().url(url).header("Accept", "application/json")
             .header("User-Agent", "Mozilla/5.0").header("Referer", "https://${url.host}/").build()
         http.newCall(request).executeCancellable().use { response ->
-            require(response.request.url.host == url.host && response.request.url.scheme == "https") { "番茄接口跳转地址异常" }
+            require(response.request.url.host == url.host && response.request.url.scheme == "https") { tr("番茄接口跳转地址异常") }
             if (!response.isSuccessful) throw SourceException.NetworkError("番茄接口返回 HTTP ${response.code}")
             val body = response.readSourceText(6 * 1024 * 1024)
-            if (body.isBlank()) throw java.io.IOException("番茄接口暂时返回空响应")
+            if (body.isBlank()) throw java.io.IOException(tr("番茄接口暂时返回空响应"))
             SourceResponse.jsonObject(body).also {
                 // This gateway intermittently returns code -1 before the next public GET succeeds.
-                if (it.optInt("code", -1) == -1) throw java.io.IOException("番茄接口暂时无法提供此内容，请稍后重试或换源")
-                require(it.optInt("code", -1) in setOf(0, 200)) { "番茄接口暂时无法提供此内容，请稍后重试或换源" }
+                if (it.optInt("code", -1) == -1) throw java.io.IOException(tr("番茄接口暂时无法提供此内容，请稍后重试或换源"))
+                require(it.optInt("code", -1) in setOf(0, 200)) { tr("番茄接口暂时无法提供此内容，请稍后重试或换源") }
             }
         }
     }
@@ -38,10 +40,10 @@ internal class FanqieGateway(private val http: OkHttpClient) {
     private fun book(data: JSONObject, index: Boolean = false): SearchBook {
         val bookId = id(text(data, if (index) "bookId" else "book_id"))
         val title = Jsoup.parse(text(data, if (index) "bookTitle" else "title", "book_name")).text()
-        require(title.isNotBlank() && !title.contains("***")) { "番茄未返回可用书名，作品可能已下架" }
+        require(title.isNotBlank() && !title.contains("***")) { tr("番茄未返回可用书名，作品可能已下架") }
         val intro = text(data, if (index) "bookIntro" else "abstract")
         val status = if (index) text(data, "bookStatus") else when (text(data, "creation_status")) {
-            "0" -> "已完结"; "1" -> "连载中"; else -> "状态未知"
+            "0" -> tr("已完结"); "1" -> tr("连载中"); else -> tr("状态未知")
         }
         return SearchBook(bookId, "fanqie", title, text(data, if (index) "authorName" else "author"),
             cover = text(data, if (index) "coverImgUrl" else "thumb_url").takeIf(String::isNotBlank),
@@ -94,7 +96,7 @@ internal class FanqieGateway(private val http: OkHttpClient) {
         val result = primary ?: run {
             val url = "https://www.shuhuangdian.com/api/book".toHttpUrl().newBuilder().addQueryParameter("id", "fq$bookId").build()
             val item = json(url).getJSONObject("data").getJSONObject("bookInfo")
-            require(item.optString("bookId") == bookId && item.optString("site") == "番茄") { "番茄详情归属异常" }
+            require(item.optString("bookId") == bookId && item.optString("site") == "番茄") { tr("番茄详情归属异常") }
             book(item, true)
         }
         val toc = chapters(bookId)
@@ -114,7 +116,7 @@ internal class FanqieGateway(private val http: OkHttpClient) {
         val expected = data.getJSONArray("allItemIds").let { a -> (0 until a.length()).map { id(a.getString(it)) } }
         val volumes = data.getJSONArray("chapterListWithVolume")
         val rows = (0 until volumes.length()).flatMap { array(volumes.getJSONArray(it)) }
-        require(expected.size in 1..30_000 && expected.distinct().size == expected.size && rows.map { it.optString("itemId") } == expected) { "番茄目录为空、重复或不完整" }
+        require(expected.size in 1..30_000 && expected.distinct().size == expected.size && rows.map { it.optString("itemId") } == expected) { tr("番茄目录为空、重复或不完整") }
         return rows.mapIndexed { i, item ->
             // isChapterLock marks the web reader's app-only preview, including free chapters.
             // The public text gateway is independent of that web presentation flag.
@@ -123,7 +125,7 @@ internal class FanqieGateway(private val http: OkHttpClient) {
                 "此书含付费章节，不能免登录完整下载"
             }
             val title = item.optString("title").trim()
-            require(title.isNotBlank()) { "番茄章节标题缺失" }
+            require(title.isNotBlank()) { tr("番茄章节标题缺失") }
             ComicChapter("https://fanqienovel.com/reader/${id(item.getString("itemId"))}", title,
                 volume = item.optString("volume_name"), order = i.toFloat())
         }
@@ -136,10 +138,10 @@ internal class FanqieGateway(private val http: OkHttpClient) {
         return parseParts(data)
     }
     internal fun parseParts(data: JSONObject): List<NovelPart> {
-        require(data.optInt("code", -1) in setOf(0, 200)) { "番茄正文接口暂时不可用" }
+        require(data.optInt("code", -1) in setOf(0, 200)) { tr("番茄正文接口暂时不可用") }
         val html = data.opt("content") as? String ?: (data.optJSONObject("data")?.opt("content") as? String).orEmpty()
         val doc = Jsoup.parseBodyFragment(html)
-        require(doc.select("script,style,iframe,canvas,img").isEmpty()) { "番茄返回了不支持的正文格式" }
+        require(doc.select("script,style,iframe,canvas,img").isEmpty()) { tr("番茄返回了不支持的正文格式") }
         val paragraphs = if (doc.select("p").isNotEmpty()) doc.select("p").map { it.wholeText().trim() }
             else doc.body().wholeText().lineSequence().map(String::trim).toList()
         val lines = paragraphs.filter(String::isNotBlank)

@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.AnimatedContent
 import com.example.ui.components.AppIconButton
 import androidx.compose.animation.core.tween
@@ -81,11 +83,11 @@ fun ReadingCalendarCard(
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
-                    Text("阅读日历", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(tr("阅读日历"), fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 SegmentedPillSelector(
-                    options = listOf(0 to "月", 1 to "年"),
+                    options = listOf(0 to tr("月"), 1 to tr("年")),
                     selected = if (showYear) 1 else 0,
                     onSelect = { showYear = it == 1 },
                     modifier = Modifier.width(120.dp)
@@ -97,7 +99,7 @@ fun ReadingCalendarCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AppIconButton(
                     icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                    contentDescription = "上个月/年",
+                    contentDescription = tr("上个月/年"),
                     onClick = {
                         if (showYear) viewYear-- else {
                             if (viewMonth == Calendar.JANUARY) { viewMonth = Calendar.DECEMBER; viewYear-- } else viewMonth--
@@ -105,7 +107,7 @@ fun ReadingCalendarCard(
                     }
                 )
                 Text(
-                    text = if (showYear) "$viewYear 年" else "${viewYear}年${viewMonth + 1}月",
+                    text = if (showYear) com.example.i18n.yearLabel("$viewYear") else com.example.i18n.yearMonthLabel("$viewYear", viewMonth + 1),
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
                     modifier = Modifier.weight(1f),
@@ -113,7 +115,7 @@ fun ReadingCalendarCard(
                 )
                 AppIconButton(
                     icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = "下个月/年",
+                    contentDescription = tr("下个月/年"),
                     onClick = {
                         if (showYear) viewYear++ else {
                             if (viewMonth == Calendar.DECEMBER) { viewMonth = Calendar.JANUARY; viewYear++ } else viewMonth++
@@ -127,7 +129,7 @@ fun ReadingCalendarCard(
                         viewYear = today.get(Calendar.YEAR)
                         viewMonth = today.get(Calendar.MONTH)
                     }) {
-                        Text("回到今天", fontSize = 12.sp)
+                        Text(tr("回到今天"), fontSize = 12.sp)
                     }
                 }
             }
@@ -201,7 +203,7 @@ private fun MonthGrid(
 
     Column {
         Row(Modifier.fillMaxWidth()) {
-            listOf("一", "二", "三", "四", "五", "六", "日").forEach {
+            listOf("一", "二", "三", "四", "五", "六", "日").map { com.example.i18n.weekdayShort(it) }.forEach {
                 Text(
                     text = it,
                     fontSize = 10.sp,
@@ -395,7 +397,7 @@ private fun YearHeatmap(
                                     // 放不下就不画，宁缺毋滥（避免又挤成一团模糊）
                                     if (w >= 26.dp) {
                                         Text(
-                                            text = "${m + 1}月",
+                                            text = com.example.i18n.monthName(m + 1),
                                             fontSize = 10.sp,
                                             lineHeight = 12.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -440,7 +442,7 @@ private fun YearHeatmap(
 
             // 图例
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("少", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr("少"), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 HEAT_LEVELS.forEach { a ->
                     Spacer(modifier = Modifier.width(4.dp))
                     Box(
@@ -451,7 +453,7 @@ private fun YearHeatmap(
                     )
                 }
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("多", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr("多"), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -495,7 +497,7 @@ private fun YearCell(
     )
 }
 
-private val WEEKDAY_LABELS = listOf("一", "二", "三", "四", "五", "六", "日")
+private val WEEKDAY_LABELS = listOf("一", "二", "三", "四", "五", "六", "日").map { com.example.i18n.weekdayShort(it) }
 
 /** 年视图网格：列 = 周，行 = 星期（周一起始）。 */
 private class YearGrid(

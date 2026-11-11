@@ -1,5 +1,7 @@
 package com.example.source.impl
 
+import com.example.i18n.tr
+
 import android.content.Context
 import com.example.source.*
 import com.example.source.js.JsSourceProxy
@@ -66,7 +68,7 @@ class PublicNovelSource(
     private val fanqie by lazy { FanqieGateway(http) }
 
     private fun validId(id: String): String = id.also {
-        require(it.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { "小说标识无效" }
+        require(it.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { tr("小说标识无效") }
     }
     internal fun bookUrl(bookId: String): HttpUrl = if (site == PublicNovelSite.FANQIE)
         baseUrl.newBuilder().addPathSegment("page").addPathSegment(validId(bookId)).build()
@@ -77,7 +79,7 @@ class PublicNovelSource(
         else baseUrl.newBuilder().addPathSegment("n").addPathSegment(validId(bookId))
             .apply { if (site == PublicNovelSite.QUANBEN) addPathSegment("") }.build()
     internal fun bookId(url: HttpUrl): String {
-        require(url.host == baseUrl.host && url.scheme == baseUrl.scheme) { "小说地址不属于当前源" }
+        require(url.host == baseUrl.host && url.scheme == baseUrl.scheme) { tr("小说地址不属于当前源") }
         val pattern = when (site) {
             PublicNovelSite.FANQIE -> "^/page/([0-9]{18,20})$"
             PublicNovelSite.IHUABEN, PublicNovelSite.LINOVEL -> "^/book/([0-9]+)\\.html$"
@@ -106,17 +108,17 @@ class PublicNovelSource(
             PublicNovelSite.SFACG -> setOf("s.sfacg.com", "book.sfacg.com")
             else -> emptySet()
         }
-        require(url.host in hosts && url.scheme == baseUrl.scheme) { "源站页面地址异常" }
+        require(url.host in hosts && url.scheme == baseUrl.scheme) { tr("源站页面地址异常") }
         val request = Request.Builder().url(url).header("User-Agent", userAgent)
             .header("Referer", baseUrl.toString()).header("Accept", "text/html").build()
         http.newCall(request).executeCancellable().use { response ->
             require(response.isSuccessful) { "$name 暂时无法免登录访问（HTTP ${response.code}）" }
-            require(response.request.url.host in hosts) { "源站跳转到了其他网站" }
+            require(response.request.url.host in hosts) { tr("源站跳转到了其他网站") }
             val html = response.readSourceText(6 * 1024 * 1024)
             SourceResponse.problem(html)?.let { error(it) }
-            require(!html.contains('\uFFFD')) { "源站文字编码异常，未导入不完整文本" }
+            require(!html.contains('\uFFFD')) { tr("源站文字编码异常，未导入不完整文本") }
             val doc = Jsoup.parse(html, url.toString())
-            require(!doc.title().contains("找不到") && !doc.title().contains("Redirecting", true)) { "源站未返回小说页面" }
+            require(!doc.title().contains("找不到") && !doc.title().contains("Redirecting", true)) { tr("源站未返回小说页面") }
             doc
         }
     }
@@ -124,6 +126,7 @@ class PublicNovelSource(
         try { SourceResult.Success(block()) }
         catch (e: CancellationException) { throw e }
         catch (e: SourceException) { SourceResult.Error(e) }
+        catch (e: java.io.IOException) { SourceResult.Error(SourceException.NetworkError(e.message ?: "$name 网络中断", e)) }
         catch (e: Exception) { SourceResult.Error(SourceException.ParseError(e.message ?: "$name 读取失败")) }
     }
     private fun meta(doc: Document, key: String) = doc.selectFirst("meta[property='$key']")?.attr("content").orEmpty()
@@ -241,7 +244,7 @@ class PublicNovelSource(
             author = meta(doc, "og:novel:author")
             synopsis = doc.selectFirst(".description")?.text().orEmpty()
         }
-        require(title.isNotBlank()) { "未找到小说标题" }
+        require(title.isNotBlank()) { tr("未找到小说标题") }
         val toc = if (site == PublicNovelSite.CZBOOKS) parseChapters(bookId, doc) else chapters(bookId)
         return SearchBook(bookId, id, title, author, cover = meta(doc, "og:image").takeIf { it.isNotBlank() },
             description = synopsis, format = "epub", language = "中文", novelInfo = NovelInfo(synopsis = synopsis,
@@ -256,39 +259,39 @@ class PublicNovelSource(
         if (site == PublicNovelSite.LINOVEL) {
             val doc = page(bookUrl(bookId))
             val volumes = doc.select(".catalog-list .volume-wrp")
-            require(volumes.isNotEmpty()) { "轻之文库未返回完整分卷目录" }
+            require(volumes.isNotEmpty()) { tr("轻之文库未返回完整分卷目录") }
             val numbered = volumes.map { volume ->
                 val title = volume.selectFirst(".volume .title")?.text().orEmpty()
                 val number = Regex("^第([0-9]+)卷").find(title)?.groupValues?.get(1)?.toIntOrNull()
                     ?: error("分卷顺序无法确认，未下载乱序小说")
                 Triple(number, title, volume)
             }
-            require(numbered.map { it.first }.distinct().size == numbered.size) { "分卷编号重复，无法确认顺序" }
+            require(numbered.map { it.first }.distinct().size == numbered.size) { tr("分卷编号重复，无法确认顺序") }
             val chapters = numbered.sortedBy { it.first }.flatMap { (_, volumeTitle, volume) ->
                 volume.select(".chapter-list a[href]").map { a ->
                     val link = baseUrl.resolve(a.attr("href")) ?: error("章节地址无效")
-                    require(link.host == baseUrl.host && Regex("^/book/$bookId/[0-9]+\\.html$").matches(link.encodedPath)) { "轻之文库章节归属异常" }
+                    require(link.host == baseUrl.host && Regex("^/book/$bookId/[0-9]+\\.html$").matches(link.encodedPath)) { tr("轻之文库章节归属异常") }
                     require(a.select(".icon-lock, .vip").isEmpty() && a.text().isNotBlank() && !a.text().contains("删掉了")) {
                         "源站目录含锁定、删除或无标题章节，不能完整下载"
                     }
                     ComicChapter(link.toString(), a.ownText(), volume = volumeTitle, order = 0f)
                 }
             }
-            require(chapters.size in 1..30_000 && chapters.map { it.id }.distinct().size == chapters.size) { "轻之文库目录为空或重复" }
+            require(chapters.size in 1..30_000 && chapters.map { it.id }.distinct().size == chapters.size) { tr("轻之文库目录为空或重复") }
             return chapters.mapIndexed { i, c -> c.copy(order = i.toFloat()) }
         }
         if (site == PublicNovelSite.SFACG) {
             val doc = page(baseUrl.newBuilder().addPathSegment("i").addPathSegment(validId(bookId)).addPathSegment("").build())
             val links = doc.select(".mulu_list a[href]")
-            require(links.isNotEmpty()) { "SF 未返回完整目录" }
+            require(links.isNotEmpty()) { tr("SF 未返回完整目录") }
             require(links.none { it.select(".icon-lock2, .icon-lock, .vip").isNotEmpty() }) {
                 "此书含 VIP 或锁定章节，不能免登录完整下载；请另选全本公开作品"
             }
             return links.mapIndexed { i, a ->
                 val link = baseUrl.resolve(a.attr("href")) ?: error("章节地址无效")
-                require(link.host == baseUrl.host && Regex("^/c/[0-9]+/$").matches(link.encodedPath) && a.text().isNotBlank()) { "SF 目录结构变化" }
+                require(link.host == baseUrl.host && Regex("^/c/[0-9]+/$").matches(link.encodedPath) && a.text().isNotBlank()) { tr("SF 目录结构变化") }
                 ComicChapter(link.toString(), a.text(), order = i.toFloat())
-            }.also { require(it.size <= 30_000 && it.map { c -> c.id }.distinct().size == it.size) { "SF 目录异常" } }
+            }.also { require(it.size <= 30_000 && it.map { c -> c.id }.distinct().size == it.size) { tr("SF 目录异常") } }
         }
         if (site == PublicNovelSite.IHUABEN) {
             val url = baseUrl.newBuilder().addPathSegments("book/chapters").addPathSegment(validId(bookId)).build()
@@ -297,19 +300,19 @@ class PublicNovelSource(
                 require(response.isSuccessful) { "话本目录请求失败（HTTP ${response.code}）" }
                 SourceResponse.jsonObject(response.readSourceText(6 * 1024 * 1024))
             }
-            require(data.optInt("code", -1) == 0) { "话本未返回公开目录" }
+            require(data.optInt("code", -1) == 0) { tr("话本未返回公开目录") }
             val items = data.getJSONArray("chapters")
-            require(items.length() in 1..30_000) { "话本目录为空或过大" }
+            require(items.length() in 1..30_000) { tr("话本目录为空或过大") }
             return (0 until items.length()).map { i ->
                 val item = items.getJSONObject(i)
                 require(item.optString("chapterType") == "FREE" && item.optString("status") == "PUBLISHED") {
                     "此书含付费或非公开章节，不能免登录完整下载；请另选全本公开作品"
                 }
-                require(item.optString("bookId") == bookId) { "话本目录归属异常" }
+                require(item.optString("bookId") == bookId) { tr("话本目录归属异常") }
                 val chapter = item.getLong("chapterId")
-                require(chapter > 0 && item.optString("title").isNotBlank()) { "章节标识或标题为空" }
+                require(chapter > 0 && item.optString("title").isNotBlank()) { tr("章节标识或标题为空") }
                 ComicChapter(baseUrl.resolve("book/$bookId/$chapter.html")!!.toString(), item.getString("title"), order = i.toFloat())
-            }.also { require(it.map { c -> c.id }.distinct().size == it.size) { "话本目录有重复章节地址" } }
+            }.also { require(it.map { c -> c.id }.distinct().size == it.size) { tr("话本目录有重复章节地址") } }
         }
         val url = if (site == PublicNovelSite.QUANBEN) bookUrl(bookId).newBuilder().addPathSegment("list.html").build() else bookUrl(bookId)
         return parseChapters(bookId, page(url))
@@ -320,11 +323,11 @@ class PublicNovelSource(
         val chapters = root.select("a[href]").mapNotNull { a ->
             val url = baseUrl.resolve(a.attr("href")) ?: return@mapNotNull null
             if (url.host != baseUrl.host || !url.encodedPath.startsWith("/n/${validId(bookId)}/") || a.text().isBlank()) return@mapNotNull null
-            require(!a.text().contains("[锁]") && !a.hasClass("vip")) { "此书含非公开章节，不能免登录整本下载" }
+            require(!a.text().contains("[锁]") && !a.hasClass("vip")) { tr("此书含非公开章节，不能免登录整本下载") }
             ComicChapter(url.toString(), a.text(), order = 0f)
         }
-        require(chapters.isNotEmpty() && chapters.map { it.id }.distinct().size == chapters.size) { "小说目录为空或存在重复章节地址" }
-        require(chapters.size <= 30_000) { "小说目录过大" }
+        require(chapters.isNotEmpty() && chapters.map { it.id }.distinct().size == chapters.size) { tr("小说目录为空或存在重复章节地址") }
+        require(chapters.size <= 30_000) { tr("小说目录过大") }
         return chapters.mapIndexed { index, c -> c.copy(order = index.toFloat()) }
     }
 
@@ -343,7 +346,7 @@ class PublicNovelSource(
         val copy = root.clone()
         copy.select("script, style, noscript, #ad, ins, iframe").remove()
         if (site == PublicNovelSite.IHUABEN) copy.select(".avatar, .num, .passage-cosplay-preview").remove()
-        require(copy.select("canvas, svg, video, audio").isEmpty()) { "章节包含尚不支持的正文格式，未生成残缺下载" }
+        require(copy.select("canvas, svg, video, audio").isEmpty()) { tr("章节包含尚不支持的正文格式，未生成残缺下载") }
         val parts = extractParts(copy)
         validateParts(parts)
         // Do not silently accept a teaser in place of a chapter.
@@ -368,7 +371,7 @@ class PublicNovelSource(
         validId(bookId)
         DownloadInfo(bookUrl(bookId).newBuilder().fragment("ciallo-public-epub-v1").build().toString(), "$bookId.epub", "epub")
     }
-    override suspend fun getChapterImages(chapterId: String): SourceResult<List<String>> = SourceResult.Error(SourceException.ParseError("请使用小说阅读器"))
+    override suspend fun getChapterImages(chapterId: String): SourceResult<List<String>> = SourceResult.Error(SourceException.ParseError(tr("请使用小说阅读器")))
     override suspend fun login(credential: LoginCredential) = SourceResult.Success(true)
     override suspend fun logout() = Unit
     override suspend fun isLoggedIn() = true
@@ -392,7 +395,7 @@ internal fun extractParts(root: Element): List<NovelPart> {
                 "img" -> {
                     flush()
                     val url = node.absUrl("data-original").ifBlank { node.absUrl("data-src") }.ifBlank { node.absUrl("src") }
-                    require(url.startsWith("https://") || url.startsWith("http://")) { "插图地址不可用" }
+                    require(url.startsWith("https://") || url.startsWith("http://")) { tr("插图地址不可用") }
                     parts += NovelPart.Image(url)
                 }
                 else -> {
@@ -408,7 +411,7 @@ internal fun extractParts(root: Element): List<NovelPart> {
 }
 
 internal fun validateParts(parts: List<NovelPart>) {
-    require(parts.isNotEmpty()) { "源站章节为空" }
+    require(parts.isNotEmpty()) { tr("源站章节为空") }
     parts.filterIsInstance<NovelPart.Text>().forEach { part ->
         require(part.value.none { it == '\uFFFD' || it == '\u0000' || it in '\uE000'..'\uF8FF' || (it.code < 32 && !it.isWhitespace()) }) {
             "正文包含乱码或加密字形，未保存损坏文本"

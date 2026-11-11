@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import android.content.Context
 import com.example.BuildConfig
 import com.example.source.SharedHttpTransport
@@ -147,17 +149,17 @@ internal class GithubUpdateChecker(
 
     private fun httpFailure(code: Int) = when (code) {
         403, 429 -> "GitHub 接口访问受限或请求过多（HTTP $code）"
-        404 -> "尚未找到正式发布版本（HTTP 404）"
+        404 -> tr("尚未找到正式发布版本（HTTP 404）")
         else -> "GitHub 请求未成功（HTTP $code）"
     }
 
     private fun failureReason(e: Exception): String = when (e) {
         is CheckFailure -> e.reason
-        is java.net.UnknownHostException -> "GitHub 域名解析失败"
-        is java.io.InterruptedIOException -> "连接 GitHub 超时"
-        is java.net.ConnectException -> "无法连接 GitHub，请检查网络或系统代理"
-        is javax.net.ssl.SSLException -> "GitHub 安全连接失败"
-        is org.json.JSONException -> "GitHub 版本资料格式异常"
-        else -> "无法读取 GitHub 更新信息"
+        is java.net.UnknownHostException -> tr("GitHub 域名解析失败")
+        is java.io.InterruptedIOException -> tr("连接 GitHub 超时")
+        is java.net.ConnectException -> tr("无法连接 GitHub，请检查网络或系统代理")
+        is javax.net.ssl.SSLException -> tr("GitHub 安全连接失败")
+        is org.json.JSONException -> tr("GitHub 版本资料格式异常")
+        else -> tr("无法读取 GitHub 更新信息")
     }
 }

@@ -1,5 +1,7 @@
 package com.example.god
 
+import com.example.i18n.tr
+
 import com.example.ui.components.pullOutCombinedClickable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -111,8 +113,8 @@ fun GodChapterCard(
             .pullOutCombinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
-                onClickLabel = "阅读",
-                onLongClickLabel = "编辑神回",
+                onClickLabel = tr("阅读"),
+                onLongClickLabel = tr("编辑神回"),
             )
             .background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
@@ -258,7 +260,7 @@ fun GodBadge(modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            Text("神回", color = Color(0xFF3B2A08), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text(tr("神回"), color = Color(0xFF3B2A08), fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Text("✦", color = Color(0xFF3B2A08), fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
     }

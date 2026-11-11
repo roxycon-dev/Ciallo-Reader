@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
@@ -98,12 +100,12 @@ fun ReadingTrendCard(
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
-                    Text("阅读趋势", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Text("时长走势与高峰时段", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(tr("阅读趋势"), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(tr("时长走势与高峰时段"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 SegmentedPillSelector(
-                    options = listOf(0 to "周", 1 to "月", 2 to "年"),
+                    options = listOf(0 to tr("周"), 1 to tr("月"), 2 to tr("年")),
                     selected = tab,
                     onSelect = { tab = it },
                     // A7：原固定 150.dp，窄屏 / 大字体下会把标题挤到换行。
@@ -167,7 +169,7 @@ fun ReadingTrendCard(
                 }
                 if (series.all { it.second <= 0L }) {
                     Text(
-                        text = "还没有阅读时长——去读一页，让曲线开始生长",
+                        text = tr("还没有阅读时长——去读一页，让曲线开始生长"),
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.align(Alignment.Center)
@@ -178,7 +180,7 @@ fun ReadingTrendCard(
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("阅读高峰时段", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(tr("阅读高峰时段"), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Spacer(modifier = Modifier.weight(1f))
                 if (peakTotal > 0 && peakMaxHour != null) {
                     Text(
@@ -216,7 +218,7 @@ fun ReadingTrendCard(
                 )
             } else {
                 Text(
-                    text = "暂无时段数据（更新后开始记录每次阅读的起止时间）",
+                    text = tr("暂无时段数据（更新后开始记录每次阅读的起止时间）"),
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 8.dp)

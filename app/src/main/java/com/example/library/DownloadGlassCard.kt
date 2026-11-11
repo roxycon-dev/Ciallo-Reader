@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.i18n.tr
+
 import com.example.ui.components.PullOutIconButton
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedVisibility
@@ -128,11 +130,11 @@ fun DownloadGlassCard(
     )
 
     val statusText = when (state) {
-        is DownloadState.Pending -> "等待下载…"
-        is DownloadState.Downloading -> "下载中"
-        is DownloadState.Paused -> "已暂停"
-        is DownloadState.Success -> "下载完成"
-        is DownloadState.Error -> "下载失败"
+        is DownloadState.Pending -> tr("等待下载…")
+        is DownloadState.Downloading -> tr("下载中")
+        is DownloadState.Paused -> tr("已暂停")
+        is DownloadState.Success -> tr("下载完成")
+        is DownloadState.Error -> tr("下载失败")
         else -> ""
     }
     val statusColor = when (state) {
@@ -168,7 +170,7 @@ fun DownloadGlassCard(
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "下载管理中心",
+                        text = tr("下载管理中心"),
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp,
                         color = MaterialTheme.colorScheme.onSurface
@@ -177,7 +179,7 @@ fun DownloadGlassCard(
                     if (onDismiss != null) {
                         PullOutIconButton(
                             icon = Icons.Default.Close,
-                            contentDescription = "关闭",
+                            contentDescription = tr("关闭"),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             onClick = com.example.ui.components.paperDismiss(onDismiss)
                         )
@@ -188,15 +190,15 @@ fun DownloadGlassCard(
 
                 MascotEmptyState(
                     mascotResId = MascotSpriteSheet.idleDrawable,
-                    title = "暂无进行中的下载任务",
-                    description = "在书库中搜索图书并点击“下载”，离线书籍将自动同步存入本地书架。",
+                    title = tr("暂无进行中的下载任务"),
+                    description = tr("在书库中搜索图书并点击“下载”，离线书籍将自动同步存入本地书架。"),
                     testTagPrefix = "download_panel_empty"
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
                 AppActionButton(
-                    text = "知道了",
+                    text = tr("知道了"),
                     onClick = { onDismiss?.invoke() },
                     variant = AppButtonVariant.Secondary,
                     modifier = Modifier.fillMaxWidth()
@@ -241,7 +243,7 @@ fun DownloadGlassCard(
                     if (onDismiss != null) {
                         PullOutIconButton(
                             icon = Icons.Default.Close,
-                            contentDescription = "关闭",
+                            contentDescription = tr("关闭"),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             onClick = com.example.ui.components.paperDismiss(onDismiss)
                         )
@@ -285,7 +287,7 @@ fun DownloadGlassCard(
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "剩余 ${formatSize(remaining)} / 共 ${formatSize(state.totalBytes)}",
+                            text = com.example.i18n.remainingOfTotal(formatSize(remaining), formatSize(state.totalBytes)),
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -313,10 +315,10 @@ fun DownloadGlassCard(
                         )
                     }
                     is DownloadState.Paused -> {
-                        Text("已暂停", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(tr("已暂停"), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     else -> {
-                        Text("准备中…", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(tr("准备中…"), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } }
 
@@ -335,9 +337,9 @@ fun DownloadGlassCard(
                         if (primaryAction != null) {
                             AppActionButton(
                                 text = when (state) {
-                                    is DownloadState.Paused -> "继续下载"
-                                    is DownloadState.Error -> "重试"
-                                    else -> "暂停"
+                                    is DownloadState.Paused -> tr("继续下载")
+                                    is DownloadState.Error -> tr("重试")
+                                    else -> tr("暂停")
                                 },
                                 onClick = primaryAction,
                                 variant = AppButtonVariant.Secondary,
@@ -348,7 +350,7 @@ fun DownloadGlassCard(
                         }
                         if (onCancel != null) {
                             AppActionButton(
-                                text = "取消",
+                                text = tr("取消"),
                                 onClick = onCancel,
                                 variant = AppButtonVariant.Destructive,
                                 buttonSize = AppButtonSize.Small,

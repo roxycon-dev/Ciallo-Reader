@@ -1,5 +1,7 @@
 package com.example.source.impl
 
+import com.example.i18n.tr
+
 import com.example.discover.*
 import com.example.source.SearchBook
 import kotlinx.coroutines.async
@@ -46,14 +48,14 @@ internal class Wenku8Discovery(
         suspend fun list(page: Int) = json(home.resolve("/api/books")!!.newBuilder().addQueryParameter("page", page.toString()).addQueryParameter("limit", "60").build())
         val first = list(1)
         val pages = first.getInt("pages")
-        require(pages in 1..120) { "文库目录规模已变化，请更新书源适配" }
+        require(pages in 1..120) { tr("文库目录规模已变化，请更新书源适配") }
         val rows = objects(first.getJSONArray("items")) + coroutineScope {
             (2..pages).toList().chunked(4).flatMap { batch ->
                 batch.map { page -> async { objects(list(page).getJSONArray("items")) } }.awaitAll().flatten()
             }
         }
         val distinct = rows.distinctBy { it.getLong("id") }
-        require(distinct.size == first.getInt("total")) { "文库目录在加载时发生变化，请刷新后重试" }
+        require(distinct.size == first.getInt("total")) { tr("文库目录在加载时发生变化，请刷新后重试") }
         // Keep metadata only. No EPUBs, covers, chapter bodies or per-book detail calls.
         runCatching {
             cacheFile.parentFile?.mkdirs()
@@ -68,7 +70,7 @@ internal class Wenku8Discovery(
         val catalog = catalog()
         if (q.feedId == null && !catalog.supports(q.dimension, q.range)) return DiscoverPage(supported = false, catalog = catalog)
         val selected = (listOfNotNull(q.categoryId) + q.categoryIds).toSet()
-        require(selected.all { id -> catalog.categories.any { it.id == id } }) { "文库标签已变化，请重新选择" }
+        require(selected.all { id -> catalog.categories.any { it.id == id } }) { tr("文库标签已变化，请重新选择") }
         val updates = q.feedId == "updates" || (q.feedId == null && q.dimension == DiscoverDimension.UPDATES)
         val growth = q.feedId == null && q.range == "飙升"
         val filtered = index().filter { o ->
@@ -81,14 +83,14 @@ internal class Wenku8Discovery(
         }.thenByDescending { it.optString("updatedAt") }.thenByDescending { it.optLong("id") })
         else filtered.sortedWith(compareByDescending<JSONObject> { grade(it.optString("heat"), growth) }
             .thenByDescending { grade(it.optString("heat"), !growth) }.thenByDescending { it.optLong("id") })
-        val origin = if (updates) "文库更新日期" else if (q.feedId == "native") "文库热度与上升等级推荐" else if (growth) "文库热度上升等级" else "文库热度等级"
+        val origin = if (updates) tr("文库更新日期") else if (q.feedId == "native") tr("文库热度与上升等级推荐") else if (growth) tr("文库热度上升等级") else tr("文库热度等级")
         val rows = ordered.drop((q.page - 1) * 24).take(24).mapIndexed { i, o ->
             val b = book(o).let { b -> b.copy(novelInfo = b.novelInfo?.copy(tags = tags(o))) }
             DiscoverEntry(b, updatedAt = DiscoverEngine.parseDate(o.optString("updatedAt")), nativeOrder = q.offset + i,
                 native = true, origin = origin, statistic = o.optString("heat").takeIf(String::isNotBlank))
         }
         return DiscoverPage(rows, hasMore = q.page * 24 < ordered.size, catalog = catalog, native = true,
-            notice = if (updates) "按文库公开更新日期整理" else "按文库公开热度及上升等级整理；同等级不代表精确点击名次")
+            notice = if (updates) tr("按文库公开更新日期整理") else tr("按文库公开热度及上升等级整理；同等级不代表精确点击名次"))
     }
     private fun objects(a: JSONArray) = (0 until a.length()).map { a.getJSONObject(it) }
     private fun tags(o: JSONObject) = o.optJSONArray("tags")?.let { a -> (0 until a.length()).flatMap { splitTags(a.optString(it)) } }.orEmpty()

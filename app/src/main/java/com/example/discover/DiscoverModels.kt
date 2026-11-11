@@ -1,5 +1,7 @@
 package com.example.discover
 
+import com.example.i18n.tr
+
 import com.example.source.SearchBook
 import com.example.source.isKnownComicAuthor
 import java.text.Normalizer
@@ -7,13 +9,33 @@ import java.util.Calendar
 import java.util.TimeZone
 import java.util.Locale
 
-enum class DiscoverDimension(val label: String, val ranges: List<String>) {
+/**
+ * 发现页的维度。
+ *
+ * `ranges` 是**数据键**（`DiscoverEngine.rangeStart` 用它算日期窗口），必须保持中文；
+ * 显示时走 [discoverRangeLabel] 翻译，两者不能混用。
+ * `label` 用 getter：枚举在类加载期初始化，构造期翻译会把语言永久冻住。
+ */
+enum class DiscoverDimension(private val rawLabel: String, val ranges: List<String>) {
     UPDATES("更新", listOf("最新", "今日", "近 3 天", "本周")),
     DISCUSSION("热议", listOf("24h", "7d", "30d")),
     RANKING("榜单", listOf("热门", "飙升", "新作", "完结")),
-    CLICKS("点击", listOf("日", "周", "月", "总"))
+    CLICKS("点击", listOf("日", "周", "月", "总"));
+
+    val label: String get() = tr(rawLabel)
 }
-enum class DiscoverLayout(val label: String) { LIST("列表"), GRID("双列网格"), LARGE("大图") }
+
+/** 日期范围 chip 的显示文案：`range` 本身是数据键，不能直接翻译。 */
+fun discoverRangeLabel(range: String): String = when (range) {
+    "24h", "7d", "30d" -> range
+    else -> tr(range)
+}
+
+enum class DiscoverLayout(private val rawLabel: String) {
+    LIST("列表"), GRID("双列网格"), LARGE("大图");
+
+    val label: String get() = tr(rawLabel)
+}
 data class DiscoverQuery(val dimension: DiscoverDimension, val range: String, val page: Int = 1,
     val cursor: String? = null, val offset: Int = 0, val feedId: String? = null, val categoryId: String? = null,
     val includeAdult: Boolean = true, val standardCategories: Set<String> = emptySet(),
@@ -174,10 +196,5 @@ object DiscoverEngine {
         }
         return null
     }
-    fun compact(value: Long?): String = when {
-        value == null -> "未提供"
-        value >= 100_000_000 -> String.format(Locale.CHINA, "%.1f亿", value / 100_000_000.0)
-        value >= 10_000 -> String.format(Locale.CHINA, "%.1f万", value / 10_000.0)
-        else -> value.toString()
-    }
+    fun compact(value: Long?): String = com.example.i18n.compactCount(value)
 }

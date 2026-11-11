@@ -78,6 +78,12 @@ class AppUpdateDialogTest {
         clickAndAwait("取消下载", "cancel")
     }
 
+    @Test fun hidingDownloadClosesPanelWithoutCancellingTransfer() {
+        show(AppUpdateStage.DOWNLOADING)
+        clickAndAwait("收起", "dismiss")
+        compose.onNodeWithTag("update_progress").assertDoesNotExist()
+    }
+
     @Test fun permissionDeniedOffersAuthorizationExportAndBrowserWithoutLoop() {
         show(AppUpdateStage.NEED_PERMISSION)
         assertEquals(null, action)

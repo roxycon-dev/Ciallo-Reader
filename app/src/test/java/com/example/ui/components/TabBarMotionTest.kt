@@ -2,6 +2,11 @@ package com.example.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Text
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.ui.wenku.WenkuPlaneTabSwitcher
+import com.example.ui.wenku.wenkuPlaneLayer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.runtime.*
@@ -32,6 +37,66 @@ import java.io.File
 @OptIn(com.github.takahirom.roborazzi.ExperimentalRoborazziApi::class)
 class TabBarMotionTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun aTransparentIncomingPaneRevealsWallpaperInsteadOfTheOldPage() {
+        compose.setContent {
+            MyApplicationTheme {
+                Box(Modifier.fillMaxSize().background(Color.White)) {
+                    Box(Modifier.fillMaxSize()
+                        .wenkuPlaneLayer({ .27f }, incoming = false, occludeOutgoing = true)
+                        .background(Color.Red))
+                    Box(Modifier.fillMaxSize()
+                        .wenkuPlaneLayer({ .27f }, incoming = true)
+                        .background(Color.Blue.copy(alpha = .5f)))
+                }
+            }
+        }
+        val capture = File.createTempFile("wenku-tab-plane", ".png")
+        val pixels = try {
+            compose.onRoot().captureRoboImage(capture.absolutePath,
+                roborazziOptions = RoborazziOptions(taskType = RoborazziTaskType.Record))
+            requireNotNull(android.graphics.BitmapFactory.decodeFile(capture.absolutePath))
+        } finally {
+            capture.delete()
+        }
+        val revealed = Color(pixels.getPixel(pixels.width / 8, pixels.height * 2 / 3))
+        val leaving = Color(pixels.getPixel(pixels.width * 9 / 10, pixels.height * 2 / 3))
+        assertTrue("The incoming plane should blend with white wallpaper, found $revealed", revealed.green > .35f && revealed.blue > .9f)
+        assertTrue("The outgoing plane remains on the other side of the cut, found $leaving", leaving.red > .9f && leaving.blue < .15f)
+    }
+
+    @Test fun visitedPaneKeepsItsCompositionAndPausesWhileOffstage() {
+        val selected = mutableIntStateOf(0)
+        val mounts = mutableListOf<Int>()
+        val paneLifecycles = mutableMapOf<Int, Lifecycle>()
+        compose.setContent {
+            MyApplicationTheme {
+                WenkuPlaneTabSwitcher(selected.intValue, Modifier.fillMaxSize(), { from, to -> to - from }) { tab ->
+                    val lifecycle = LocalLifecycleOwner.current.lifecycle
+                    DisposableEffect(tab, lifecycle) {
+                        mounts += tab
+                        paneLifecycles[tab] = lifecycle
+                        onDispose { }
+                    }
+                    Text("Pane " + tab)
+                }
+            }
+        }
+        compose.onNodeWithText("Pane 0").assertIsDisplayed()
+        compose.runOnIdle { selected.intValue = 1 }
+        compose.onNodeWithText("Pane 1").assertIsDisplayed()
+        compose.onNodeWithText("Pane 0").assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(Lifecycle.State.CREATED, paneLifecycles.getValue(0).currentState)
+            selected.intValue = 0
+        }
+        compose.onNodeWithText("Pane 0").assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(listOf(0, 1), mounts)
+            assertTrue(paneLifecycles.getValue(0).currentState.isAtLeast(Lifecycle.State.STARTED))
+        }
+    }
+
     private fun lineCenter(): Float {
         val root = generateSequence(File(requireNotNull(System.getProperty("user.dir")))) { it.parentFile }
             .first { File(it, "gradlew.bat").exists() }

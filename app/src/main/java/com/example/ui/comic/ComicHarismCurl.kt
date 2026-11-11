@@ -1,5 +1,7 @@
 package com.example.ui.comic
 
+import com.example.i18n.tr
+
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.reader.TouchZone
 import com.example.ui.reader.TouchAction
@@ -1739,8 +1741,8 @@ internal fun ComicHarismCurlReader(
         if (curlPageFailed && !zoomOverlay) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("本页加载失败", color = Color(0xFFFF9A9A))
-                    PullOutTextButton(onClick = { pageRetry++ }) { Text("点击重试", color = Color.White) }
+                    Text(tr("本页加载失败"), color = Color(0xFFFF9A9A))
+                    PullOutTextButton(onClick = { pageRetry++ }) { Text(tr("点击重试"), color = Color.White) }
                 }
             }
         }

@@ -1,16 +1,18 @@
 package com.example.discover
 
+import com.example.i18n.tr
+
 /** A ranking's meaning takes precedence over a leftover status selection. */
 internal data class DiscoverStatusScope(val completedOnly: Boolean = false, val newWorks: Boolean = false) {
     val showStatusChoices get() = !completedOnly && !newWorks
     val hint get() = when {
-        completedOnly -> "仅显示已确认完结的作品"
-        newWorks -> "按原站新上架排序，作品可能仍在连载"
+        completedOnly -> tr("仅显示已确认完结的作品")
+        newWorks -> tr("按原站新上架排序，作品可能仍在连载")
         else -> null
     }
     fun effectiveStatus(selection: String): String = when {
-        completedOnly -> "完结"
-        newWorks -> "全部"
+        completedOnly -> tr("完结")
+        newWorks -> tr("全部")
         else -> selection
     }
 }

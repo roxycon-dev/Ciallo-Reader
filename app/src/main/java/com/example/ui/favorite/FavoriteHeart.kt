@@ -1,5 +1,7 @@
 package com.example.ui.favorite
 
+import com.example.i18n.tr
+
 import com.example.ui.components.pullOutCombinedClickable
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
@@ -149,8 +151,8 @@ fun FavoriteHeartButton(
             .semantics {
                 role = Role.Button
                 contentDescription = if (!enabled) disabledHint
-                else if (favorite) "已喜欢，点击取消喜欢"
-                else "喜欢，加入我喜欢的"
+                else if (favorite) tr("已喜欢，点击取消喜欢")
+                else tr("喜欢，加入我喜欢的")
             }
             .pullOutCombinedClickable(
                 interactionSource = interaction,
@@ -182,7 +184,7 @@ fun FavoriteHeartButton(
             if (showLabel) {
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = if (favorite) "已喜欢" else "喜欢",
+                    text = if (favorite) tr("已喜欢") else tr("喜欢"),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = tint,

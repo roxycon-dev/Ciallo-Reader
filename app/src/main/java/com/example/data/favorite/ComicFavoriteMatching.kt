@@ -1,5 +1,7 @@
 package com.example.data.favorite
 
+import com.example.i18n.tr
+
 import com.example.source.SearchBook
 import com.example.source.anilist.TitleNormalizer
 import com.example.source.isKnownComicAuthor
@@ -30,7 +32,7 @@ object ComicFavoriteMatching {
             when {
                 title in titles -> DuplicateComicCandidate(favorite, "书名或已知别名相同", 1.0)
                 title.length >= 4 && similarity >= 0.82 -> DuplicateComicCandidate(favorite,
-                    if (sameAuthor) "书名相似，作者相同" else "书名相似，请核对作品", similarity)
+                    if (sameAuthor) tr("书名相似，作者相同") else tr("书名相似，请核对作品"), similarity)
                 else -> null
             }
         }.sortedByDescending { it.score }

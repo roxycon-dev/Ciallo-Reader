@@ -1,5 +1,7 @@
 package com.example
 
+import com.example.i18n.tr
+
 import com.example.ui.components.openPaperPage
 import com.example.discover.discoverUsesNovelDetails
 import com.example.ui.components.paperComposable
@@ -194,6 +196,9 @@ class MainActivity : ComponentActivity() {
         // 卡片微调 v2 默认档：一次性迁移（幂等）必须在 setContent 之前完成，
         // 避免在组合期执行持久化副作用
         com.example.data.PreferencesManager(this).migrateCardTweaksDefaultsV2()
+        // 界面语言：在 setContent 之前恢复，避免首帧先渲染中文再跳成英文。
+        com.example.i18n.AppLocale.language =
+            com.example.i18n.AppLanguage.of(com.example.data.PreferencesManager(this).appLanguage)
         // 冷启动兜底：清空书架分享的"用完即焚"临时文件，防止异常残留堆积
         Thread {
             try { com.example.library.BookShareHelper.cleanupTempShareDir(applicationContext) }
@@ -307,12 +312,16 @@ class MainActivity : ComponentActivity() {
                         fontScale = systemDensity.fontScale.coerceIn(0.85f, 1.15f)
                     )
                 }
+                // 语言跟着 AppLocale.language（可观察状态）走：设置页一改，全树重组。
+                val appLanguage = com.example.i18n.AppLocale.language
+                val stringTable = remember(appLanguage) { com.example.i18n.StringTable(appLanguage) }
 
                 CompositionLocalProvider(
                     LocalDensity provides clampedDensity,
                     LocalLiquidGlassState provides liquidGlass,
                     com.example.ui.components.LocalRenderQuality provides renderQuality,
-                    com.example.ui.components.LocalScrollTilt provides scrollTilt
+                    com.example.ui.components.LocalScrollTilt provides scrollTilt,
+                    com.example.i18n.LocalStrings provides stringTable
                 ) {
                     // 文档 §12.2：帧率降级。Compose 没有 Flutter 的 TickerMode 全局帧率，
                     // 这里用系统窗口首选刷新率表达同一意图：极简/流畅 → 60，均衡 → 90，
@@ -444,7 +453,7 @@ class MainActivity : ComponentActivity() {
                                     else com.example.ui.feedback.MutingHapticFeedback),
                             ) {
                         val navController = rememberNavController()
-                    // 每个 Tab 自己的 saveable 状态（滚动位置 / 3D-列表 / 筛选…）
+                    // 每个 Tab 自己的 saveable 状态（滚动位置 / 筛选…）
                     val tabStateHolder = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
                         val transferManager = remember { com.example.transfer.TransferManager.get(this@MainActivity) }
                         val transferOpen by transferManager.openPage.collectAsStateWithLifecycle()
@@ -568,18 +577,35 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         startDestination = "splash",
                         enterTransition = {
-                            when (initialState.destination.route) {
-                                "splash" -> com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion)
+                            // 3D 书架的书已经在飞：封面此刻盖住整屏，页面横向滑入只会在边缘露馅，
+                            // 直接不播转场，等封面淡出时阅读器已经在原位了。
+                            when {
+                                com.example.ui.wenku.WenkuVolumeFlightBridge.suppressRouteMotion ->
+                                    androidx.compose.animation.EnterTransition.None
+                                initialState.destination.route == "splash" ->
+                                    com.example.ui.feedback.NavigationMotion.enter(navigationReduceMotion)
                                 else -> com.example.ui.components.paperPageEnter(navigationReduceMotion)
                             }
                         },
                         exitTransition = {
-                            com.example.ui.components.paperPageExit(
-                                navigationReduceMotion || initialState.destination.route == "splash"
-                            )
+                            if (com.example.ui.wenku.WenkuVolumeFlightBridge.suppressRouteMotion) {
+                                androidx.compose.animation.ExitTransition.None
+                            } else {
+                                com.example.ui.components.paperPageExit(
+                                    navigationReduceMotion || initialState.destination.route == "splash"
+                                )
+                            }
                         },
-                        popEnterTransition = { com.example.ui.components.paperPagePopEnter(navigationReduceMotion) },
-                        popExitTransition = { com.example.ui.components.paperPagePopExit(navigationReduceMotion) }
+                        popEnterTransition = {
+                            if (com.example.ui.wenku.WenkuVolumeFlightBridge.suppressRouteMotion) {
+                                androidx.compose.animation.EnterTransition.None
+                            } else com.example.ui.components.paperPagePopEnter(navigationReduceMotion)
+                        },
+                        popExitTransition = {
+                            if (com.example.ui.wenku.WenkuVolumeFlightBridge.suppressRouteMotion) {
+                                androidx.compose.animation.ExitTransition.None
+                            } else com.example.ui.components.paperPagePopExit(navigationReduceMotion)
+                        }
                     ) {
                         composable("splash") {
                             SplashScreen(
@@ -626,17 +652,18 @@ class MainActivity : ComponentActivity() {
                                 tabFocusManager.clearFocus()
                                 if (selectedTab != 2) shelfSearch.close()
                             }
-                            val tabItems = remember {
+                            // key = 语言：切英文时重建列表，否则 remember 会把旧文案锁死
+                            val tabItems = remember(appLanguage) {
                                 listOf(
-                                    AppTabItem("书库", Icons.Outlined.Search, Icons.Filled.Search,
+                                    AppTabItem(stringTable.t("书库"), Icons.Outlined.Search, Icons.Filled.Search,
                                         wenkuSymbol = com.example.ui.wenku.WenkuSymbol.Search),
-                                    AppTabItem("发现", Icons.Outlined.Explore, Icons.Filled.Explore,
+                                    AppTabItem(stringTable.t("发现"), Icons.Outlined.Explore, Icons.Filled.Explore,
                                         wenkuSymbol = com.example.ui.wenku.WenkuSymbol.Discover),
-                                    AppTabItem("书架", Icons.Outlined.BookmarkBorder, Icons.Filled.Bookmark,
+                                    AppTabItem(stringTable.t("书架"), Icons.Outlined.BookmarkBorder, Icons.Filled.Bookmark,
                                         wenkuSymbol = com.example.ui.wenku.WenkuSymbol.Shelf),
-                                    AppTabItem("统计", Icons.Outlined.BarChart, Icons.Filled.BarChart,
+                                    AppTabItem(stringTable.t("统计"), Icons.Outlined.BarChart, Icons.Filled.BarChart,
                                         wenkuSymbol = com.example.ui.wenku.WenkuSymbol.Waveform),
-                                    AppTabItem("设置", Icons.Outlined.Settings, Icons.Filled.Settings,
+                                    AppTabItem(stringTable.t("设置"), Icons.Outlined.Settings, Icons.Filled.Settings,
                                         wenkuSymbol = com.example.ui.wenku.WenkuSymbol.Settings)
                                 )
                             }
@@ -1269,7 +1296,7 @@ class MainActivity : ComponentActivity() {
                             com.example.god.GodMomentEditHost(binding = binding, onSaved = { })
                         }
 
-                        paperComposable("reader", navController) { CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null, com.example.ui.wenku.LocalWenkuMainSurface provides false) {
+                        paperComposable("reader", navController) { readerEntry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null, com.example.ui.wenku.LocalWenkuMainSurface provides false) {
                             val selectedBook by viewModel.selectedBook.collectAsStateWithLifecycle()
                             val chapters by viewModel.chapters.collectAsStateWithLifecycle()
                             val readerLoading by viewModel.readerLoading.collectAsStateWithLifecycle()
@@ -1287,6 +1314,36 @@ class MainActivity : ComponentActivity() {
                                     revisedBook != null && revisedBook.filePath != selectedBook?.filePath) viewModel.retrySelectedBook()
                             }
 
+                            val readerScope = androidx.compose.runtime.rememberCoroutineScope()
+                            // 归位飞行要先让封面盖住整屏（~120ms）再切路由；这段时间里连按返回
+                            // 不能再弹一次栈，否则会把书库一起弹掉。
+                            var closingReader by androidx.compose.runtime.remember {
+                                androidx.compose.runtime.mutableStateOf(false)
+                            }
+                            val closeReader: () -> Unit = {
+                                if (!closingReader && navController.currentBackStackEntry == readerEntry) {
+                                    val key = selectedBook?.id?.toString()
+                                    // 3D 书架：先让那本书的封面从阅读器这一侧淡入、盖住整屏，
+                                    // 再切路由（横向转场已关掉），所以退出时看到的是"书被放回书架"。
+                                    val volumeFlight = key != null &&
+                                        com.example.ui.wenku.WenkuVolumeFlightBridge.reverse(key)
+                                    key?.let { com.example.ui.wenku.WenkuFlightBridge.reverse(it) }
+                                    if (volumeFlight) {
+                                        closingReader = true
+                                        readerScope.launch {
+                                            kotlinx.coroutines.delay(
+                                                com.example.ui.wenku.ShelfOpenTimeline.CLOSE_COVER_IN_MS.toLong()
+                                            )
+                                            if (navController.currentBackStackEntry == readerEntry) {
+                                                navController.dismissPaperPage()
+                                            }
+                                        }
+                                    } else {
+                                        navController.dismissPaperPage()
+                                    }
+                                }
+                            }
+                            androidx.activity.compose.BackHandler(onBack = closeReader)
                             ReaderScreen(
                                 book = selectedBook,
                                 bookTitle = selectedBook?.title ?: "本地阅读",
@@ -1296,7 +1353,7 @@ class MainActivity : ComponentActivity() {
                                 readerLoadError = readerLoadError,
                                 onRetryLoad = viewModel::retrySelectedBook,
                                 onEnsureChapterLoaded = viewModel::ensureActiveChapter,
-                                onBack = { navController.dismissPaperPage() },
+                                onBack = closeReader,
                                 onUpdateProgress = { id, chapterIdx, offset, isFinished ->
                                     viewModel.updateProgress(id, chapterIdx, offset, isFinished)
                                 },
@@ -1560,7 +1617,7 @@ class MainActivity : ComponentActivity() {
                                     categories = (listOf(com.example.data.favorite.FAV_DEFAULT_CATEGORY) +
                                         comicFavoriteCategories.map { it.name }
                                             .filter { it != com.example.data.favorite.ALL_FAV_CATEGORY_NAME }).distinct(),
-                                    title = "放入「我喜欢的」哪个分类？",
+                                    title = tr("放入「我喜欢的」哪个分类？"),
                                     onPick = putInFavoriteCategory,
                                     onDismiss = { favoriteCategorySheet = false },
                                     onCreate = { name ->
@@ -1585,7 +1642,7 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onOpenCover = { book ->
                                     book.cover?.let { cover ->
-                                        val kind = if (comicIsTextMode) "小说封面" else "漫画封面"
+                                        val kind = if (comicIsTextMode) tr("小说封面") else tr("漫画封面")
                                         navController.openCoverGallery(cover, book.title, kind)
                                     }
                                 },
@@ -1600,7 +1657,7 @@ class MainActivity : ComponentActivity() {
                                         viewModel.setChapterBookmark(comicSourceId, comicId, chapterId, chapterIndex, bookmarked)
                                         AppToast.makeText(
                                             comicContext,
-                                            if (bookmarked) "已添加书签" else "已取消书签",
+                                            if (bookmarked) tr("已添加书签") else tr("已取消书签"),
                                             Toast.LENGTH_SHORT
                                         ).show()
                                     }
@@ -1611,7 +1668,7 @@ class MainActivity : ComponentActivity() {
                                 textMode = comicIsTextMode,
                                 onDownloadNovel = if (comicIsTextMode && com.example.source.WholeBookNovelSources.contains(comicBook?.sourceId)) ({
                                     comicBook?.let { libraryViewModel.startDownload(it, "epub") }
-                                    AppToast.makeText(comicContext, "已请求整本下载，可在下载管理查看进度", Toast.LENGTH_SHORT).show()
+                                    AppToast.makeText(comicContext, tr("已请求整本下载，可在下载管理查看进度"), Toast.LENGTH_SHORT).show()
                                 }) else null,
                                 onBack = { navController.dismissPaperPage() },
                                 onRetry = { comicBook?.let { libraryViewModel.openComic(it) } },
@@ -1940,10 +1997,15 @@ class MainActivity : ComponentActivity() {
                             active = selectedTab == 2 && sharedEntry?.destination?.route == "home"
                         )
                         com.example.ui.mascot.MascotOverlay()
+                        val flightBookKey = if (sharedEntry?.destination?.route == "reader") {
+                            val book by viewModel.selectedBook.collectAsStateWithLifecycle()
+                            book?.id?.toString()
+                        } else null
+                        com.example.ui.wenku.WenkuFlightOverlay(flightBookKey, Modifier.fillMaxSize())
+                        // 3D 书架的打开 / 归位：整本书由这一个覆盖层从书架姿态画到铺满全屏，
+                        // 与书架共用一个渲染器和一条时间轴（见 ShelfOpenTimeline）。
+                        com.example.ui.wenku.WenkuVolumeFlightOverlay(Modifier.fillMaxSize())
                     }
-                            // R14：封面飞行覆盖层必须挂在根部（NavHost 之外）。
-                            // 之前挂在 home 路由里，跳到阅读器时整块被移出组合，纸刚起飞就消失。
-                            com.example.ui.wenku.WenkuFlightOverlay(Modifier.fillMaxSize())
                 }
             }
         }

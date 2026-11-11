@@ -1,5 +1,7 @@
 package com.example.transfer
 
+import com.example.i18n.tr
+
 import android.database.Cursor
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.BackupArchive
@@ -16,7 +18,7 @@ internal object ArchiveRows {
             Cursor.FIELD_TYPE_INTEGER -> cursor.getLong(i)
             Cursor.FIELD_TYPE_FLOAT -> cursor.getDouble(i)
             Cursor.FIELD_TYPE_STRING -> cursor.getString(i)
-            else -> error("不支持的数据库类型")
+            else -> error(com.example.i18n.tr("不支持的数据库类型"))
         })
     }
     fun all(db: SupportSQLiteDatabase, table: String, where: String = "1", args: Array<out Any?> = emptyArray()): List<JSONObject> {
@@ -34,7 +36,7 @@ internal object ArchiveRows {
                 is String -> statement.bindString(i+1, value)
                 is Float, is Double -> statement.bindDouble(i+1, (value as Number).toDouble())
                 is Number -> statement.bindLong(i+1, value.toLong())
-                else -> error("无效数据库字段")
+                else -> error(com.example.i18n.tr("无效数据库字段"))
             }
         }; return statement.executeInsert() }
     }
@@ -42,17 +44,17 @@ internal object ArchiveRows {
         val text = StringBuilder()
         while(true) { val ch = reader.read(); if(ch < 0) return text.toString().takeIf { it.isNotEmpty() }
             if(ch == 10) return text.toString()
-            require(text.length < 512 * 1024) { "数据行过大" }; text.append(ch.toChar()) }
+            require(text.length < 512 * 1024) { tr("数据行过大") }; text.append(ch.toChar()) }
     }
     fun forEach(file: File, table: String? = null, action: (String, JSONObject, JSONObject) -> Unit) {
         file.bufferedReader().use { reader ->
-            val header = JSONObject(boundedLine(reader) ?: error("缺少数据头"))
-            require(header.getInt("version") in 1..2 && header.getInt("schema") in 12..13) { "不支持的数据版本，请升级应用" }
+            val header = JSONObject(boundedLine(reader) ?: error(com.example.i18n.tr("缺少数据头")))
+            require(header.getInt("version") in 1..2 && header.getInt("schema") in 12..13) { tr("不支持的数据版本，请升级应用") }
             var count = 0
             while(true) { val line = boundedLine(reader) ?: break
-                require(++count <= 1_000_000) { "数据条目过多" }
+                require(++count <= 1_000_000) { tr("数据条目过多") }
                 val envelope = JSONObject(line); val name = envelope.getString("table")
-                require(name in tables) { "包含未知数据表" }
+                require(name in tables) { tr("包含未知数据表") }
                 if(table == null || name == table) action(name, envelope.getJSONObject("row"), envelope)
             }
         }

@@ -66,7 +66,7 @@ class FanqieGatewayTest {
                 assertTrue(html.contains("中文内联正文。"))
                 assertTrue(html.contains("第二段😀。"))
             }
-        } finally { output.delete() }
+        } finally { output.delete(); com.example.download.GuestNovelCheckpoint.clear(output) }
     }
     @Test fun rejectsPaidIncompleteAndDuplicateDirectoriesAndBrokenContent() {
         val gateway = FanqieGateway(OkHttpClient())

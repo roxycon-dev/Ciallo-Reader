@@ -1,5 +1,7 @@
 package com.example.ui.shelf
 
+import com.example.i18n.tr
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -251,7 +253,7 @@ private fun ShelfSearchResults(
                 if (localResults.isEmpty() && favoriteResults.isEmpty()) {
                     item(key = "empty") {
                         Text(
-                            if (searchTerm.isEmpty()) "暂无可搜索的书籍" else "没有找到匹配的书籍",
+                            if (searchTerm.isEmpty()) "暂无可搜索的书籍" else tr("没有找到匹配的书籍"),
                             Modifier.fillMaxWidth().padding(top = 20.dp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

@@ -1,9 +1,10 @@
 package com.example.ui.privacy
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTouchInput
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -36,7 +37,7 @@ class PrivacyPinOverlayTest {
         rule.setContent {
             PrivacyPinOverlay(
                 mode = PinEntryMode.SETUP,
-                onPinSet = { setPin = it },
+                onPinSet = { setPin = it; true },
                 onPinVerified = { false },
                 onDismiss = { },
             )
@@ -57,7 +58,7 @@ class PrivacyPinOverlayTest {
         rule.setContent {
             PrivacyPinOverlay(
                 mode = PinEntryMode.SETUP,
-                onPinSet = { setPin = it },
+                onPinSet = { setPin = it; true },
                 onPinVerified = { false },
                 onDismiss = { },
             )
@@ -85,7 +86,6 @@ class PrivacyPinOverlayTest {
         rule.setContent {
             PrivacyPinOverlay(
                 mode = PinEntryMode.VERIFY,
-                onPinSet = { },
                 onPinVerified = { it == "135790" },
                 onDismiss = { dismissed = true },
             )
@@ -96,23 +96,56 @@ class PrivacyPinOverlayTest {
         rule.onNodeWithText("密码错误，请重试").assertExists()
         assertFalse(dismissed)
         keypadPin("135790")
-        rule.waitForIdle()
+        rule.waitUntil(5000) { dismissed }
         assertTrue(dismissed)
     }
 
     @Test
-    fun verifyFlow_seventhDigitIgnored() {
+    fun verifyFlow_pendingCheckDisablesKeypadAndClosesOnce() {
         var dismissed = false
+        var checks = 0
+        val result = CompletableDeferred<Boolean>()
         rule.setContent {
             PrivacyPinOverlay(
                 mode = PinEntryMode.VERIFY,
-                onPinSet = { },
-                onPinVerified = { it == "135790" },
+                onPinVerified = { checks++; result.await() },
                 onDismiss = { dismissed = true },
             )
         }
-        keypadPin("1357901") // 第 7 位应被忽略（输满自动提交）
-        rule.waitForIdle()
+        keypadPin("135790")
+        rule.onNodeWithText("1").assertIsNotEnabled()
+        assertFalse(dismissed)
+        result.complete(true)
+        rule.waitUntil(5000) { dismissed }
         assertTrue(dismissed)
+        assertEquals(1, checks)
+    }
+
+    @Test
+    fun changeFlow_retriesSaveAndHandsOffAfterDismiss() {
+        val events = mutableListOf<String>()
+        var changes = 0
+        rule.setContent {
+            PrivacyPinOverlay(
+                mode = PinEntryMode.CHANGE_OLD,
+                onPinVerified = { it == "135790" },
+                onPinChanged = { old, next ->
+                    assertEquals("135790", old)
+                    assertEquals("246800", next)
+                    ++changes == 2
+                },
+                onDismiss = { events.add("dismiss") },
+                onAccepted = { events.add("accepted") },
+            )
+        }
+        keypadPin("135790")
+        rule.onNodeWithText("输入新密码").assertExists()
+        keypadPin("246800")
+        keypadPin("246800")
+        rule.onNodeWithText("密码保存失败，请重试").assertExists()
+        keypadPin("246800")
+        keypadPin("246800")
+        rule.waitUntil(5000) { events.size == 2 }
+        assertEquals(listOf("dismiss", "accepted"), events)
     }
 }

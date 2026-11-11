@@ -1,5 +1,7 @@
 package com.example.mangatranslate
 
+import com.example.i18n.tr
+
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -53,7 +55,7 @@ object OrtSessions {
     /** 包住每次 ONNX 推理调用。 */
     inline fun <T> track(session: OrtSession, block: () -> T): T {
         synchronized(lock) {
-            check(cache.values.any { it === session }) { "翻译会话已释放，请重新开启翻译" }
+            check(cache.values.any { it === session }) { tr("翻译会话已释放，请重新开启翻译") }
             globalInFlight.incrementAndGet()
         }
         try {

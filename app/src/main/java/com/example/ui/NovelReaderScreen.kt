@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
@@ -97,11 +99,11 @@ internal fun NovelReaderScreen(
                         state.loading || page != null -> OnlineNovelSkeleton(
                             title = title,
                             modifier = if (state.loading && page == null) {
-                                Modifier.semantics { contentDescription = "正在加载正文" }
+                                Modifier.semantics { contentDescription = com.example.i18n.AppLocale.t("正在加载正文") }
                             } else Modifier.clearAndSetSemantics { }
                         )
                         state.error != null -> OnlineNovelFailure(state.error, onRetry, Modifier.align(Alignment.Center))
-                        else -> Text("本章没有内容", Modifier.align(Alignment.Center), color = colors.onSurfaceVariant)
+                        else -> Text(tr("本章没有内容"), Modifier.align(Alignment.Center), color = colors.onSurfaceVariant)
                     }
                 }
             }
@@ -152,18 +154,18 @@ internal fun NovelReaderScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background.copy(alpha = .97f)),
                 navigationIcon = {
-                    AppIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", onBack, tint = colors.onSurface)
+                    AppIconButton(Icons.AutoMirrored.Filled.ArrowBack, tr("返回"), onBack, tint = colors.onSurface)
                 },
                 actions = {
                     PullOutTextButton(
                         onClick = { fontSizeSp = (fontSizeSp - 1f).coerceAtLeast(12f) },
                         enabled = fontSizeSp > 12f,
-                        modifier = Modifier.semantics { contentDescription = "缩小字号" }
+                        modifier = Modifier.semantics { contentDescription = com.example.i18n.AppLocale.t("缩小字号") }
                     ) { Text("A−") }
                     PullOutTextButton(
                         onClick = { fontSizeSp = (fontSizeSp + 1f).coerceAtMost(26f) },
                         enabled = fontSizeSp < 26f,
-                        modifier = Modifier.semantics { contentDescription = "放大字号" }
+                        modifier = Modifier.semantics { contentDescription = com.example.i18n.AppLocale.t("放大字号") }
                     ) { Text("A+") }
                 }
             )
@@ -185,7 +187,7 @@ internal fun NovelReaderScreen(
             val showNotice = (state.loading && delayedLoading) || state.error != null
             val notice = when {
                 state.error != null -> state.error to true
-                state.loading && delayedLoading -> "正在准备章节，当前正文仍可阅读" to false
+                state.loading && delayedLoading -> tr("正在准备章节，当前正文仍可阅读") to false
                 else -> null
             }
             var displayedNotice by remember { mutableStateOf("" to false) }
@@ -208,7 +210,7 @@ internal fun NovelReaderScreen(
                     Text(displayedNotice.first, modifier = Modifier.weight(1f, fill = false), fontSize = 13.sp, maxLines = 3,
                         overflow = TextOverflow.Ellipsis)
                     if (displayedNotice.second) {
-                        AppIconButton(Icons.Filled.Refresh, "重试", onRetry, enabled = state.error != null, tint = colors.primary)
+                        AppIconButton(Icons.Filled.Refresh, tr("重试"), onRetry, enabled = state.error != null, tint = colors.primary)
                     }
                 }
             }
@@ -231,7 +233,7 @@ private fun OnlineNovelBody(
 ) {
     val paragraphs = remember(page.text) { page.text.split("\n\n").map(String::trim).filter(String::isNotEmpty) }
     val colors = MaterialTheme.colorScheme
-    val input = if (active) Modifier.pullOutClickable(onClickLabel = "切换阅读控件", onClick = onToggleChrome)
+    val input = if (active) Modifier.pullOutClickable(onClickLabel = tr("切换阅读控件"), onClick = onToggleChrome)
         else Modifier.clearAndSetSemantics { }.wenkuBlockPointer()
     WenkuLoadedContentSequence(contentKey = page.chapter.id, modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -255,7 +257,7 @@ private fun OnlineNovelBody(
                     modifier = if (motion) Modifier.wenkuReveal(index + 1) else Modifier
                 )
             }
-            if (paragraphs.isEmpty()) item(key = "empty") { Text("本章没有内容", color = colors.onSurfaceVariant) }
+            if (paragraphs.isEmpty()) item(key = "empty") { Text(tr("本章没有内容"), color = colors.onSurfaceVariant) }
             item(key = "nav") {
                 Row(
                     Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -305,9 +307,9 @@ private fun OnlineNovelControls(
                     .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                AppIconButton(Icons.Filled.SkipPrevious, "上一章", onPrevious, enabled = canPrevious, tint = colors.onSurface)
+                AppIconButton(Icons.Filled.SkipPrevious, tr("上一章"), onPrevious, enabled = canPrevious, tint = colors.onSurface)
                 WenkuReaderProgressSlider(
-                    value = value, label = "本章进度", format = { "${(it * 100).roundToInt()}%" },
+                    value = value, label = tr("本章进度"), format = { "${(it * 100).roundToInt()}%" },
                     tint = colors.onSurface, enabled = scrollable, modifier = Modifier.weight(1f),
                     onValueChange = { preview = it },
                     onCommit = {
@@ -316,7 +318,7 @@ private fun OnlineNovelControls(
                         if (target != null && lastItem > 0) onSeek((target * lastItem).roundToInt())
                     }
                 )
-                AppIconButton(Icons.Filled.SkipNext, "下一章", onNext, enabled = canNext, tint = colors.onSurface)
+                AppIconButton(Icons.Filled.SkipNext, tr("下一章"), onNext, enabled = canNext, tint = colors.onSurface)
             }
         }
         WenkuReaderChromeLayer(chrome, visible, part = WenkuReaderChromePart.Dock) {

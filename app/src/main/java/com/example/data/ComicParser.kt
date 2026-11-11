@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -29,7 +31,7 @@ object ComicParser {
             var coverFile: File? = null
             try {
                 val extension = fileName.substringAfterLast('.').lowercase()
-                require(extension in setOf("pdf", "cbz", "zip")) { "请转换为CBZ、ZIP或PDF格式后导入。" }
+                require(extension in setOf("pdf", "cbz", "zip")) { tr("请转换为CBZ、ZIP或PDF格式后导入。") }
                 check(comicDir.mkdirs()) { "无法创建漫画目录" }
                 // Own the original alongside extracted pages. Sharing PDF/CBZ must retain its bytes.
                 val original = File(comicDir, "original/${File(fileName).name.replace(Regex("[\\\\/:*?\"<>|]"), "_")}")
@@ -41,7 +43,7 @@ object ComicParser {
                         coroutineContext.ensureActive()
                         val count = src.read(buffer)
                         if (count < 0) break
-                        require(comicDir.usableSpace >= count + 16L * 1024 * 1024) { "存储空间不足" }
+                        require(comicDir.usableSpace >= count + 16L * 1024 * 1024) { tr("存储空间不足") }
                         out.write(buffer, 0, count)
                     }
                 } }
@@ -52,7 +54,7 @@ object ComicParser {
                         ?: error("无法打开PDF文件")
                     descriptor.use { pfd ->
                         PdfRenderer(pfd).use { renderer ->
-                            require(renderer.pageCount <= 10_000) { "PDF页数超过安全上限" }
+                            require(renderer.pageCount <= 10_000) { tr("PDF页数超过安全上限") }
                             for (i in 0 until renderer.pageCount) {
                                 coroutineContext.ensureActive()
                                 renderer.openPage(i).use { page ->
@@ -68,7 +70,7 @@ object ComicParser {
                                         file.outputStream().use { out ->
                                             check(bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)) { "PDF页面保存失败" }
                                         }
-                                        require(comicDir.usableSpace >= 16L * 1024 * 1024) { "存储空间不足" }
+                                        require(comicDir.usableSpace >= 16L * 1024 * 1024) { tr("存储空间不足") }
                                         pages.add("page_$i.jpg" to file)
                                     } finally { bitmap.recycle() }
                                 }
@@ -106,9 +108,9 @@ object ComicParser {
                         } catch (e: CancellationException) { throw e }
                         catch (e: Exception) { lastFailure = e }
                     }
-                    if (!extracted) throw lastFailure ?: IllegalStateException("无法解压漫画文件")
+                    if (!extracted) throw lastFailure ?: IllegalStateException(tr("无法解压漫画文件"))
                 }
-                require(pages.isNotEmpty()) { "未在文件中找到有效漫画页面" }
+                require(pages.isNotEmpty()) { tr("未在文件中找到有效漫画页面") }
                 pages.sortWith { a, b -> naturalOrderCompare(a.first, b.first) }
                 val coverDir = File(context.filesDir, "comic_covers").apply { mkdirs() }
                 val cover = File(coverDir, "cover_${UUID.randomUUID()}.jpg")

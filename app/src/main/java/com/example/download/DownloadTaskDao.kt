@@ -32,14 +32,15 @@ interface DownloadTaskDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdate(task: DownloadTaskEntity)
 
-    @Query("UPDATE download_tasks SET status = :status, downloadedBytes = :downloadedBytes, totalBytes = :totalBytes, errorMessage = :errorMessage, updatedAt = :updatedAt WHERE id = :id")
+    @Query("UPDATE download_tasks SET status = :status, downloadedBytes = :downloadedBytes, totalBytes = :totalBytes, errorMessage = :errorMessage, progress = CASE WHEN :progress >= 0 THEN :progress WHEN :totalBytes > 0 THEN MIN(1.0, CAST(:downloadedBytes AS REAL) / :totalBytes) ELSE progress END, updatedAt = :updatedAt WHERE id = :id")
     suspend fun updateProgressAndStatus(
         id: String,
         status: DownloadStatus,
         downloadedBytes: Long,
         totalBytes: Long,
         errorMessage: String?,
-        updatedAt: Long = System.currentTimeMillis()
+        updatedAt: Long = System.currentTimeMillis(),
+        progress: Float = -1f
     )
 
     @Query("DELETE FROM download_tasks WHERE id = :id")

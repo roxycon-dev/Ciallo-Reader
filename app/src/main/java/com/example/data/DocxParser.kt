@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -35,12 +37,12 @@ object DocxParser {
         try {
             Log.d(TAG, "[DocxParser] Starting DOCX import for $fileName")
             val docx = readDocxContent(context, uri, 0)
-                ?: return@withContext Result.failure(Exception("无法读取 DOCX 文件（缺少 word/document.xml）"))
+                ?: return@withContext Result.failure(Exception(tr("无法读取 DOCX 文件（缺少 word/document.xml）")))
             val xml = docx.documentXml
 
             val paragraphs = parseParagraphsWithImages(xml, docx.relTargets)
             if (paragraphs.isEmpty()) {
-                return@withContext Result.failure(Exception("DOCX 文件中未找到有效正文内容"))
+                return@withContext Result.failure(Exception(tr("DOCX 文件中未找到有效正文内容")))
             }
 
             val title = paragraphs.firstOrNull { it.isHeading }?.text
@@ -100,7 +102,7 @@ object DocxParser {
 
             if (chapters.isEmpty()) {
                 if (targetBookId == null) bookDao.deleteBook(initialBook.copy(id = bookId))
-                return@withContext Result.failure(Exception("DOCX 文件中未找到有效正文内容"))
+                return@withContext Result.failure(Exception(tr("DOCX 文件中未找到有效正文内容")))
             }
 
             bookDao.insertChapters(chapters)

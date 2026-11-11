@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.i18n.tr
+
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutAlertDialog
 import com.example.ui.components.Slider
@@ -131,6 +133,7 @@ fun SettingsTabScreen(
     favoritesProtected: Boolean = false,
     onSetFavoritesProtected: (Boolean) -> Unit = {},
 ) {
+    val str = com.example.i18n.LocalStrings.current
     var showDiscoverSettings by remember { mutableStateOf(false) }
     if (showDiscoverSettings) com.example.discover.DiscoverSettings { showDiscoverSettings = false }
     var showReleaseHistory by remember { mutableStateOf(false) }
@@ -194,9 +197,9 @@ fun SettingsTabScreen(
                 val localUriStr = Uri.fromFile(file).toString()
                 splashPosterUri = localUriStr
                 prefs.customSplashPosterUri = localUriStr
-                AppToast.makeText(context, "海报已设置", Toast.LENGTH_SHORT).show()
+                AppToast.makeText(context, tr("海报已设置"), Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                AppToast.makeText(context, "图片设置失败", Toast.LENGTH_SHORT).show()
+                AppToast.makeText(context, tr("图片设置失败"), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -228,9 +231,9 @@ fun SettingsTabScreen(
                 prefs.appBackgroundMode = 1
                 appBgMode = 1
                 AppBackgroundController.update(1, localUriStr, appBgDim)
-                AppToast.makeText(context, "背景已设置", Toast.LENGTH_SHORT).show()
+                AppToast.makeText(context, tr("背景已设置"), Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                AppToast.makeText(context, "背景设置失败", Toast.LENGTH_SHORT).show()
+                AppToast.makeText(context, tr("背景设置失败"), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -263,7 +266,7 @@ fun SettingsTabScreen(
                 // Wenku 纸片箭头 + 三拍按下手势（图标名走集中映射表）。
                 AppIconButton(
                     icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
+                    contentDescription = str.t("返回"),
                     onClick = backAction,
                     tint = MaterialTheme.colorScheme.onSurface,
                     glyphSize = 22.dp
@@ -276,7 +279,7 @@ fun SettingsTabScreen(
                 TabScreenHeader(
                     collapsedSource = settingsHeaderCollapsedSource,
                     modifier = Modifier.statusBarsPadding(),
-                    title = "设置",
+                    title = str.t("设置"),
                     subtitle = "SETTINGS & PREFERENCES",
                     titleColor = glassTitleColor(),
                     leading = settingsLeading
@@ -297,42 +300,86 @@ LazyColumn(
 
                 if (onOpenThemePalette != null || onOpenCardTweaks != null) {
                     item(key = "appearance_heading") {
-                        WenkuSectionHeader("01", "APPEARANCE", "外观与主题")
+                        WenkuSectionHeader("01", "APPEARANCE", str.t("外观与主题"))
                     }
                     onOpenThemePalette?.let { open ->
                         item(key = "theme_palette") {
                             SettingsNavigationCard(
-                                "主题配色方案", WenkuSymbol.Brightness,
+                                str.t("主题配色方案"), WenkuSymbol.Brightness,
                                 modifier = Modifier.wenkuPagePart(1),
-                                subtitle = "预览和调整主色调与强调色", onClick = open,
+                                subtitle = str.t("预览和调整主色调与强调色"), onClick = open,
                             )
                         }
                     }
                     onOpenCardTweaks?.let { open ->
                         item(key = "card_appearance") {
                             SettingsNavigationCard(
-                                "自定义卡片参数", WenkuSymbol.Layers,
+                                str.t("自定义卡片参数"), WenkuSymbol.Layers,
                                 modifier = Modifier.wenkuPagePart(2),
-                                subtitle = "调整玻璃、圆角与按压反馈", onClick = open,
+                                subtitle = str.t("调整玻璃、圆角与按压反馈"), onClick = open,
+                            )
+                        }
+                    }
+                }
+
+                item(key = "language_section") {
+                    // 语言：默认中文，可切英文。用的是设置页既有的分段选择器（LiquidSegmentedSelector），
+                    // 与str.t("屏幕方向")str.t("渲染画质")完全同一套手感，没有另造控件。
+                    WenkuSectionHeader("02", "LANGUAGE", str.t("语言"))
+                }
+                item(key = "language_card") {
+                    GlassCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = str.t("界面语言"),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
+                            Text(
+                                text = str.t("切换后立即生效，无需重启。"),
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            SegmentedPillSelector(
+                                options = listOf(0 to str.t("中文"), 1 to "English"),
+                                selected = if (com.example.i18n.AppLocale.language ==
+                                    com.example.i18n.AppLanguage.EN
+                                ) 1 else 0,
+                                onSelect = { index ->
+                                    val language = if (index == 1) {
+                                        com.example.i18n.AppLanguage.EN
+                                    } else {
+                                        com.example.i18n.AppLanguage.ZH
+                                    }
+                                    com.example.i18n.AppLocale.language = language
+                                    prefs.appLanguage = language.tag
+                                },
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
                 }
 
                 item(key = "discover_settings") {
-                    SettingsSectionHeader("书库与发现")
+                    SettingsSectionHeader(str.t("书库与发现"))
                     SettingsNavigationCard(
-                        title = "发现设置",
+                        title = str.t("发现设置"),
                         symbol = WenkuSymbol.Discover,
                         modifier = Modifier.wenkuPagePart(3),
-                        subtitle = "浏览布局、推荐偏好与屏蔽管理",
+                        subtitle = str.t("浏览布局、推荐偏好与屏蔽管理"),
                         onClick = { showDiscoverSettings = true }
                     )
                 }
 
                 // Section 1: Splash Poster
                 item {
-                    SettingsSectionHeader("开屏海报设置")
+                    SettingsSectionHeader(str.t("开屏海报设置"))
                 }
 
                 item {
@@ -347,7 +394,7 @@ LazyColumn(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text("自定义开屏海报", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                    Text(str.t("自定义开屏海报"), fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                 }
 
                                 Row {
@@ -356,15 +403,15 @@ LazyColumn(
                                             onClick = {
                                                 splashPosterUri = null
                                                 prefs.customSplashPosterUri = null
-                                                AppToast.makeText(context, "已还原默认海报", Toast.LENGTH_SHORT).show()
+                                                AppToast.makeText(context, tr("已还原默认海报"), Toast.LENGTH_SHORT).show()
                                             },
                                             modifier = Modifier.padding(end = 4.dp)
                                         ) {
-                                            Text("清除")
+                                            Text(str.t("清除"))
                                         }
                                     }
                                     AppActionButton(
-                                        text = "选择相册图片",
+                                        text = str.t("选择相册图片"),
                                         onClick = { posterLauncher.launch("image/*") },
                                         variant = AppButtonVariant.Primary,
                                         buttonSize = AppButtonSize.Small
@@ -384,7 +431,7 @@ LazyColumn(
                                 ) {
                                     AsyncImage(
                                         model = splashPosterUri,
-                                        contentDescription = "海报预览",
+                                        contentDescription = str.t("海报预览"),
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier.fillMaxSize()
                                     )
@@ -400,7 +447,7 @@ LazyColumn(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("纯净模式", fontWeight = FontWeight.SemiBold)
+                                Text(tr("纯净模式"), fontWeight = FontWeight.SemiBold)
                                 AppSwitch(
                                     checked = splashPureMode,
                                     onCheckedChange = {
@@ -415,7 +462,7 @@ LazyColumn(
 
                 // Section: 软件背景
                 item {
-                    SettingsSectionHeader("软件背景设置")
+                    SettingsSectionHeader(str.t("软件背景设置"))
                 }
 
                 item {
@@ -424,10 +471,10 @@ LazyColumn(
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text("软件背景", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text(str.t("软件背景"), fontWeight = FontWeight.Bold, fontSize = 15.sp)
                             Spacer(modifier = Modifier.height(10.dp))
                             SegmentedPillSelector(
-                                options = listOf(0 to "默认", 1 to "自定义"),
+                                options = listOf(0 to tr("默认"), 1 to tr("自定义")),
                                 selected = appBgMode,
                                 onSelect = { mode ->
                                     appBgMode = mode
@@ -456,7 +503,7 @@ LazyColumn(
                                         // 实时预览：背景图 + 遮罩 + 模拟内容卡片，直观感受可读性
                                         AsyncImage(
                                             model = appBgUri,
-                                            contentDescription = "背景预览",
+                                            contentDescription = str.t("背景预览"),
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier.fillMaxSize()
                                         )
@@ -494,7 +541,7 @@ LazyColumn(
                                         modifier = Modifier.fillMaxWidth(),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text("背景遮罩强度", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(str.t("背景遮罩强度"), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                         Spacer(modifier = Modifier.weight(1f))
                                         Text("$appBgDim%", fontSize = 12.sp, color = MintPrimary, fontWeight = FontWeight.Bold)
                                     }
@@ -525,7 +572,7 @@ LazyColumn(
                                 }
                                 Row(modifier = Modifier.fillMaxWidth()) {
                                     AppActionButton(
-                                        text = if (appBgUri.isNullOrEmpty()) "选择背景图片" else "更换图片",
+                                        text = if (appBgUri.isNullOrEmpty()) str.t("选择背景图片") else str.t("更换图片"),
                                         onClick = { bgLauncher.launch("image/*") },
                                         variant = AppButtonVariant.Primary,
                                         buttonSize = AppButtonSize.Small,
@@ -534,14 +581,14 @@ LazyColumn(
                                     if (!appBgUri.isNullOrEmpty()) {
                                         Spacer(modifier = Modifier.width(10.dp))
                                         AppActionButton(
-                                            text = "恢复默认",
+                                            text = str.t("恢复默认"),
                                             onClick = {
                                                 appBgUri = null
                                                 prefs.customAppBackgroundUri = null
                                                 prefs.appBackgroundMode = 0
                                                 appBgMode = 0
                                                 AppBackgroundController.update(0, null, appBgDim)
-                                                AppToast.makeText(context, "已恢复默认背景", Toast.LENGTH_SHORT).show()
+                                                AppToast.makeText(context, tr("已恢复默认背景"), Toast.LENGTH_SHORT).show()
                                             },
                                             variant = AppButtonVariant.Secondary,
                                             buttonSize = AppButtonSize.Small,
@@ -556,7 +603,7 @@ LazyColumn(
 
                 // Section 2: Orientation Lock
                 item {
-                    SettingsSectionHeader("屏幕方向")
+                    SettingsSectionHeader(str.t("屏幕方向"))
                 }
 
                 item {
@@ -573,14 +620,14 @@ LazyColumn(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Filled.ScreenRotation, contentDescription = null, tint = MintPrimary)
                                     Spacer(modifier = Modifier.width(12.dp))
-                                    Text("方向锁定", fontWeight = FontWeight.SemiBold)
+                                    Text(str.t("方向锁定"), fontWeight = FontWeight.SemiBold)
                                 }
                             }
 
                             Spacer(modifier = Modifier.height(12.dp))
 
                             SegmentedPillSelector(
-                                options = listOf(0 to "跟随系统", 1 to "锁定竖屏", 2 to "锁定横屏"),
+                                options = listOf(0 to str.t("跟随系统"), 1 to str.t("锁定竖屏"), 2 to str.t("锁定横屏")),
                                 selected = orientationLockVal,
                                 onSelect = onOrientationLockChange
                             )
@@ -590,7 +637,7 @@ LazyColumn(
 
                 // Section 2.5: 画面与性能（渲染画质四档）
                 item {
-                    SettingsSectionHeader("画面与性能")
+                    SettingsSectionHeader(str.t("画面与性能"))
                 }
 
                 item {
@@ -603,8 +650,8 @@ LazyColumn(
                                 Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = MintPrimary)
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
-                                    Text("渲染画质", fontWeight = FontWeight.SemiBold)
-                                    Text("极致在实时玻璃上增加边缘折射", style = MaterialTheme.typography.bodySmall,
+                                    Text(str.t("渲染画质"), fontWeight = FontWeight.SemiBold)
+                                    Text(tr("极致在实时玻璃上增加边缘折射"), style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
@@ -613,11 +660,11 @@ LazyColumn(
 
                             SegmentedPillSelector(
                                 options = listOf(
-                                    -1 to "极简",
-                                    0 to "流畅",
-                                    1 to "均衡",
-                                    2 to "高",
-                                    3 to "极致"
+                                    -1 to str.t("极简"),
+                                    0 to str.t("流畅"),
+                                    1 to str.t("均衡"),
+                                    2 to str.t("高"),
+                                    3 to str.t("极致")
                                 ),
                                 selected = renderQualityVal.coerceIn(-1, 3),
                                 onSelect = onRenderQualityChange
@@ -647,7 +694,7 @@ LazyColumn(
                                     Icon(Icons.Filled.Vibration, contentDescription = null, tint = MintPrimary)
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
-                                        Text("触控反馈", fontWeight = FontWeight.SemiBold)
+                                        Text(str.t("触控反馈"), fontWeight = FontWeight.SemiBold)
                                     }
                                 }
                                 AppSwitch(
@@ -661,7 +708,7 @@ LazyColumn(
 
                 // Section 3: Page Turn Effect
                 item {
-                    SettingsSectionHeader("翻页效果")
+                    SettingsSectionHeader(str.t("翻页效果"))
                 }
 
                 item {
@@ -702,7 +749,7 @@ LazyColumn(
 
                 // Section 5: Health & Eye Protection
                 item {
-                    SettingsSectionHeader("护眼与提醒")
+                    SettingsSectionHeader(str.t("护眼与提醒"))
                 }
 
                 item {
@@ -719,14 +766,14 @@ LazyColumn(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Filled.Timer, contentDescription = null, tint = MintPrimary)
                                     Spacer(modifier = Modifier.width(12.dp))
-                                    Text("定时休息", fontWeight = FontWeight.SemiBold)
+                                    Text(str.t("定时休息"), fontWeight = FontWeight.SemiBold)
                                 }
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
 
                             SegmentedPillSelector(
-                                options = listOf(0 to "关", 15 to "15分", 30 to "30分", 45 to "45分", 60 to "60分"),
+                                options = listOf(0 to str.t("关"), 15 to str.t("15分"), 30 to str.t("30分"), 45 to str.t("45分"), 60 to str.t("60分")),
                                 selected = if (restReminderMinutes in listOf(0, 15, 30, 45, 60)) restReminderMinutes else -1,
                                 onSelect = {
                                     restReminderMinutes = it
@@ -743,7 +790,7 @@ LazyColumn(
                             ) {
                                 Text(
                                     text = if (restReminderMinutes in listOf(0, 15, 30, 45, 60)) {
-                                        "自定义提醒时间"
+                                        str.t("自定义提醒时间")
                                     } else {
                                         "当前自定义：$restReminderMinutes 分钟"
                                     },
@@ -751,7 +798,7 @@ LazyColumn(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 AppActionButton(
-                                    text = "自定义",
+                                    text = tr("自定义"),
                                     onClick = { showCustomMinutes = true },
                                     variant = AppButtonVariant.Secondary,
                                     buttonSize = AppButtonSize.Small
@@ -770,7 +817,7 @@ LazyColumn(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Filled.Nightlight, contentDescription = null, tint = MintPrimary)
                                     Spacer(modifier = Modifier.width(12.dp))
-                                    Text("夜间模式", fontWeight = FontWeight.SemiBold)
+                                    Text(str.t("夜间模式"), fontWeight = FontWeight.SemiBold)
                                 }
                                 AppSwitch(
                                     checked = autoNightMode,
@@ -793,7 +840,7 @@ LazyColumn(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Filled.RemoveRedEye, contentDescription = null, tint = MintPrimary)
                                     Spacer(modifier = Modifier.width(12.dp))
-                                    Text("护眼滤镜", fontWeight = FontWeight.SemiBold)
+                                    Text(str.t("护眼滤镜"), fontWeight = FontWeight.SemiBold)
                                 }
                                 AppSwitch(
                                     checked = blueLightFilter,
@@ -822,7 +869,7 @@ LazyColumn(
                                     Icon(Icons.Filled.Wifi, contentDescription = null, tint = MintPrimary)
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
-                                        Text("仅 Wi-Fi 预加载漫画", fontWeight = FontWeight.SemiBold)
+                                        Text(str.t("仅 Wi-Fi 预加载漫画"), fontWeight = FontWeight.SemiBold)
                                     }
                                 }
                                 AppSwitch(
@@ -841,7 +888,7 @@ LazyColumn(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("当前强度", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(str.t("当前强度"), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                     Text(
                                         "${(blueLightAlpha * 100).toInt()}%",
                                         fontSize = 12.sp,
@@ -874,7 +921,7 @@ LazyColumn(
 
                 // Section 5.5: 隐私与安全（第七轮第 6.4 条）
                 item {
-                    SettingsSectionHeader("隐私与安全")
+                    SettingsSectionHeader(str.t("隐私与安全"))
                 }
                 item {
                     GlassCard(
@@ -893,16 +940,16 @@ LazyColumn(
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text("隐私模式", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                                Text(str.t("隐私模式"), fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                                 Text(
-                                    if (privacyModeEnabled) "已开启 · 分类密码保护与无痕阅读"
-                                    else "设置 6 位密码，为分类加锁",
+                                    if (privacyModeEnabled) str.t("已开启 · 分类密码保护与无痕阅读")
+                                    else str.t("设置 6 位密码，为分类加锁"),
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             // 第十一轮第 4 条：隐私模式开启/关闭的行内过渡动画——
-                            // 尾部控件（开关 ↔ "管理"入口）与副标题随状态淡入淡出切换，不再硬跳变
+                            // 尾部控件（开关 ↔ str.t("管理")入口）与副标题随状态淡入淡出切换，不再硬跳变
                             AnimatedContent(
                                 targetState = privacyModeEnabled,
                                 transitionSpec = {
@@ -929,7 +976,7 @@ LazyColumn(
                             } else {
                                 // 已开启：验证密码后进入隐私管理悬浮窗口
                                 WenkuTextButton(
-                                    "管理",
+                                    str.t("管理"),
                                     onClick = { showManageVerify = true },
                                     compact = true,
                                     wenkuSymbol = WenkuSymbol.Shield,
@@ -942,13 +989,13 @@ LazyColumn(
 
                 // Section 6: Cache Management
                 item {
-                    SettingsSectionHeader("存储管理")
+                    SettingsSectionHeader(str.t("存储管理"))
                 }
                 item {
                     onOpenCacheManager?.let { open ->
                         SettingsNavigationCard(
-                            title = "缓存管理",
-                            subtitle = "查看存储占用与离线文件",
+                            title = str.t("缓存管理"),
+                            subtitle = str.t("查看存储占用与离线文件"),
                             symbol = WenkuSymbol.Folder,
                             onClick = open
                         )
@@ -956,9 +1003,9 @@ LazyColumn(
                 }
 
                 item(key="user_backup") {
-                    SettingsSectionHeader("数据管理")
+                    SettingsSectionHeader(str.t("数据管理"))
                     SettingsNavigationCard(
-                        "设备互传与备份", WenkuSymbol.Sync,
+                        str.t("设备互传与备份"), WenkuSymbol.Sync,
                         modifier = Modifier.testTag("device_transfer_entry"),
                         onClick = { com.example.transfer.TransferManager.get(context).show() }
                     )
@@ -966,19 +1013,19 @@ LazyColumn(
 
                 // Section 7: Library Help & Manual
                 item {
-                    SettingsSectionHeader("帮助手册")
+                    SettingsSectionHeader(str.t("帮助手册"))
                 }
 
                 item {
                     SettingsNavigationCard(
-                        "书库使用手册", WenkuSymbol.Help,
+                        str.t("书库使用手册"), WenkuSymbol.Help,
                         modifier = Modifier.testTag("library_help_entry_card"),
                         onClick = { showHelpBottomSheet = true }
                     )
                 }
 
                 // Section 8: About
-                item { SettingsSectionHeader("关于") }
+                item { SettingsSectionHeader(str.t("关于")) }
                 item {
                     GlassCard(
                         modifier = Modifier.fillMaxWidth().testTag("software-info"),
@@ -998,11 +1045,11 @@ LazyColumn(
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text("Ciallo Reader", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                                    Text("版本 $versionName", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(str.version(versionName), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 Spacer(Modifier.width(8.dp))
                             WenkuTextButton(
-                                text = if (updateChecking) "检查中…" else "检查更新",
+                                text = if (updateChecking) str.t("检查中…") else str.t("检查更新"),
                                 enabled = !updateChecking,
                                 compact = true,
                                 wenkuSymbol = WenkuSymbol.Refresh,
@@ -1024,16 +1071,16 @@ LazyColumn(
                                 Text(message, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             val updateUriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-                            if (updateMessage != null && appUpdateState.release == null && !updateMessage!!.contains("最新版本")) {
-                                WenkuTextButton("GitHub 发布页", onClick = {
+                            if (updateMessage != null && appUpdateState.release == null && !updateMessage!!.contains(str.t("最新版本"))) {
+                                WenkuTextButton(str.t("GitHub 发布页"), onClick = {
                                     runCatching { updateUriHandler.openUri(com.example.data.UPDATE_REPOSITORY + "/releases/latest") }.onFailure {
-                                        AppToast.makeText(context, "无法打开发布页，请检查浏览器。", Toast.LENGTH_SHORT).show()
+                                        AppToast.makeText(context, tr("无法打开发布页，请检查浏览器。"), Toast.LENGTH_SHORT).show()
                                     }
                                 }, compact = true, wenkuSymbol = WenkuSymbol.External)
                             }
                             if (appUpdateState.release != null) {
                                 WenkuTextButton(
-                                    if (appUpdateState.transferring) "查看下载进度" else if (appUpdateState.hasPackage) "继续安装更新" else "查看更新",
+                                    if (appUpdateState.transferring) tr("查看下载进度") else if (appUpdateState.hasPackage) tr("继续安装更新") else tr("查看更新"),
                                     onClick = appUpdate::show,
                                     compact = true,
                                     wenkuSymbol = if (appUpdateState.hasPackage) WenkuSymbol.Upload else WenkuSymbol.Download,
@@ -1042,7 +1089,7 @@ LazyColumn(
                             Spacer(Modifier.height(12.dp))
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                             Spacer(Modifier.height(12.dp))
-                            WenkuTextButton("导出启动诊断", onClick = {
+                            WenkuTextButton(str.t("导出启动诊断"), onClick = {
                                 scope.launch {
                                     try {
                                         val uri = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -1056,24 +1103,24 @@ LazyColumn(
                                             .setType("text/plain")
                                             .putExtra(android.content.Intent.EXTRA_STREAM, uri)
                                             .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        share.clipData = android.content.ClipData.newRawUri("启动诊断", uri)
-                                        context.startActivity(android.content.Intent.createChooser(share, "导出启动诊断"))
+                                        share.clipData = android.content.ClipData.newRawUri(str.t("启动诊断"), uri)
+                                        context.startActivity(android.content.Intent.createChooser(share, str.t("导出启动诊断")))
                                     } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                                     catch (_: Exception) {
-                                        AppToast.makeText(context, "无法导出诊断，请稍后重试", Toast.LENGTH_SHORT).show()
+                                        AppToast.makeText(context, tr("无法导出诊断，请稍后重试"), Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             }, compact = true, wenkuSymbol = WenkuSymbol.Share)
-                            Text("仅含设备版本和错误堆栈，不含书籍、账号或阅读记录。由你选择是否分享。",
+                            Text(tr("仅含设备版本和错误堆栈，不含书籍、账号或阅读记录。由你选择是否分享。"),
                                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.height(12.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                WenkuTextButton("更新目录", onClick = { showReleaseHistory = true },
+                                WenkuTextButton(str.t("更新目录"), onClick = { showReleaseHistory = true },
                                     modifier = Modifier.weight(1f), compact = true, wenkuSymbol = WenkuSymbol.Document)
                                 val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
                                 WenkuTextButton("GitHub", onClick = {
                                     runCatching { uriHandler.openUri(com.example.data.UPDATE_REPOSITORY) }
-                                        .onFailure { AppToast.makeText(context, "无法打开 GitHub", Toast.LENGTH_SHORT).show() }
+                                        .onFailure { AppToast.makeText(context, tr("无法打开 GitHub"), Toast.LENGTH_SHORT).show() }
                                 }, modifier = Modifier.weight(1f), compact = true, wenkuSymbol = WenkuSymbol.External)
                             }
                         }
@@ -1106,12 +1153,12 @@ LazyColumn(
     if (showAddCategoryDialog) {
         PullOutAlertDialog(
             onDismissRequest = { showAddCategoryDialog = false },
-            title = { Text("新建分类", fontWeight = FontWeight.Bold) },
+            title = { Text(tr("新建分类"), fontWeight = FontWeight.Bold) },
             text = {
                 OutlinedTextField(
                     value = newCategoryText,
                     onValueChange = { newCategoryText = it },
-                    label = { Text("名称") },
+                    label = { Text(tr("名称")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1119,13 +1166,13 @@ LazyColumn(
             confirmButton = {
                 DialogLiquidGlass(fillMaxSize = false) {
                     AppActionButton(
-                        text = "新建",
+                        text = tr("新建"),
                         onClick = {
                             if (newCategoryText.isNotBlank()) {
                                 onAddCategory(newCategoryText.trim())
                                 newCategoryText = ""
                                 showAddCategoryDialog = false
-                                AppToast.makeText(context, "新建成功", Toast.LENGTH_SHORT).show()
+                                AppToast.makeText(context, tr("新建成功"), Toast.LENGTH_SHORT).show()
                             }
                         },
                         variant = AppButtonVariant.Primary,
@@ -1135,7 +1182,7 @@ LazyColumn(
             },
             dismissButton = {
                 PullOutTextButton(onClick = { showAddCategoryDialog = false }) {
-                    Text("取消")
+                    Text(tr("取消"))
                 }
             },
             shape = RoundedCornerShape(16.dp)
@@ -1173,7 +1220,7 @@ LazyColumn(
             mode = com.example.ui.privacy.PinEntryMode.CHANGE_OLD,
             onPinChanged = onChangePrivacyPin,
             onPinVerified = onVerifyPrivacyPin,
-            onAccepted = { AppToast.makeText(context, "密码已更新", Toast.LENGTH_SHORT).show() },
+            onAccepted = { AppToast.makeText(context, tr("密码已更新"), Toast.LENGTH_SHORT).show() },
             onDismiss = { showChangePin = false },
         )
     }
@@ -1195,7 +1242,7 @@ LazyColumn(
                 showManageWindow = false
                 if (closePrivacyManagement) {
                     closePrivacyManagement = false
-                    AppToast.makeText(context, "隐私模式已关闭", Toast.LENGTH_SHORT).show()
+                    AppToast.makeText(context, tr("隐私模式已关闭"), Toast.LENGTH_SHORT).show()
                 }
             },
         )

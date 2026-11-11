@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.i18n.tr
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -53,7 +55,7 @@ fun ComicReaderScreen(
                 .background(Color.Black),
             contentAlignment = Alignment.Center
         ) {
-            Text("未找到漫画内容", color = Color.White)
+            Text(tr("未找到漫画内容"), color = Color.White)
         }
         return
     }

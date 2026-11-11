@@ -1,5 +1,7 @@
 package com.example
 
+import com.example.i18n.tr
+
 import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
@@ -181,7 +183,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         when (val result = kotlinx.coroutines.withTimeout(30_000) { source?.getChapters(book.id) }) {
                             is com.example.source.SourceResult.Success -> result.data
                             is com.example.source.SourceResult.Error -> throw IllegalStateException(result.exception.message)
-                            else -> throw IllegalStateException("新来源暂不可用，请稍后重试")
+                            else -> throw IllegalStateException(tr("新来源暂不可用，请稍后重试"))
                         }
                     }
                     val detail = kotlinx.coroutines.withTimeoutOrNull(15_000) { source?.getDetail(book.id) }

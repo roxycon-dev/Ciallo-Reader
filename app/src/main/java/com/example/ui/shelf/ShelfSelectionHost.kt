@@ -1,5 +1,7 @@
 package com.example.ui.shelf
 
+import com.example.i18n.tr
+
 
 import com.example.ui.components.pullOutClickable
 import androidx.activity.compose.BackHandler
@@ -230,7 +232,7 @@ fun ShelfSelectBadge(
                 CircleShape,
             )
             .semantics {
-                contentDescription = if (selected) "已选中${indexLabel ?: ""}" else "未选中"
+                contentDescription = if (selected) "已选中${indexLabel ?: ""}" else tr("未选中")
             },
         contentAlignment = Alignment.Center,
     ) {
@@ -395,12 +397,12 @@ fun MultiSelectTopBar(
                 .padding(horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AppIconButton(Icons.Filled.Close, "退出多选", onClick = onClose,
+            AppIconButton(Icons.Filled.Close, tr("退出多选"), onClick = onClose,
                 enabled = enabled, wenkuSymbol = WenkuSymbol.Close)
             Spacer(modifier = Modifier.width(10.dp))
             // 「已选择」退成次级信息，把视觉重心让给数字徽标
             Text(
-                text = "已选择",
+                text = tr("已选择"),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f),
@@ -422,14 +424,14 @@ fun MultiSelectTopBar(
             }
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = "本",
+                text = tr("本"),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f),
             )
             Spacer(modifier = Modifier.weight(1f))
             WenkuTextButton(
-                if (allSelected) "取消全选" else "全选",
+                if (allSelected) tr("取消全选") else tr("全选"),
                 onClick = onToggleAll, selected = allSelected, compact = true, enabled = enabled,
                 wenkuSymbol = if (allSelected) WenkuSymbol.Selected else WenkuSymbol.Circle,
             )
@@ -548,7 +550,7 @@ fun MoreActionSheet(
     onPick: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    WenkuActionSheet("更多操作", onDismiss) {
+    WenkuActionSheet(tr("更多操作"), onDismiss) {
         actions.forEach { (title, symbol) ->
             WenkuTextButton(title, onClick = paperDismiss { onPick(title) },
                 modifier = Modifier.fillMaxWidth(), wenkuSymbol = symbol,
@@ -575,7 +577,7 @@ fun CategoryPickerSheet(
         }
         if (onCreate != null) {
             WenkuTextButton(
-                if (creating) "收起新建分类" else "新建分类",
+                if (creating) tr("收起新建分类") else tr("新建分类"),
                 onClick = { creating = !creating },
                 modifier = Modifier.fillMaxWidth(), compact = true, selected = creating,
                 wenkuSymbol = if (creating) WenkuSymbol.Up else WenkuSymbol.Add,
@@ -595,7 +597,7 @@ fun CategoryPickerSheet(
                         }
                     }
                     OutlinedTextField(newName, { newName = it }, Modifier.fillMaxWidth(),
-                        label = { Text("分类名称") }, singleLine = true, shape = RoundedCornerShape(16.dp),
+                        label = { Text(tr("分类名称")) }, singleLine = true, shape = RoundedCornerShape(16.dp),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = { submit() }))
                     WenkuTextButton(

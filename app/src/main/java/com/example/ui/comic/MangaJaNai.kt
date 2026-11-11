@@ -20,7 +20,7 @@ import kotlin.math.min
 import kotlin.math.sqrt
 import kotlin.math.roundToInt
 
-internal class MangaJaNaiBudgetExceeded : IOException("增强超时，已保留原图")
+internal class MangaJaNaiBudgetExceeded : IOException(com.example.i18n.tr("增强超时，已保留原图"))
 
 /** Author's mobile SPAN model, bundled for reliable offline operation.
  * Measured neural work budget, original-detail residual composition and one shared session.
@@ -109,7 +109,7 @@ internal object MangaJaNai {
 
     /** APK includes the lightweight weights; never wait for a network model download. */
     internal fun model(): File {
-        val app = context ?: throw IOException("增强引擎尚未初始化")
+        val app = context ?: throw IOException(com.example.i18n.tr("增强引擎尚未初始化"))
         val directory = File(app.filesDir, "mangajanai").apply { mkdirs() }
         val file = File(directory, "janai-span-v3-f32.onnx")
         val stamp = "${file.absolutePath}:${file.lastModified()}:${file.length()}"
@@ -122,9 +122,9 @@ internal object MangaJaNai {
             app.assets.open("comic_enhancement/janai-span-mobile.onnx").use { source ->
                 part.outputStream().use { target -> source.copyTo(target, 64 * 1024) }
             }
-            if (!verify(part)) throw IOException("增强模型校验失败")
-            if (file.exists() && !file.delete()) throw IOException("无法替换增强模型")
-            if (!part.renameTo(file)) throw IOException("无法保存增强模型")
+            if (!verify(part)) throw IOException(com.example.i18n.tr("增强模型校验失败"))
+            if (file.exists() && !file.delete()) throw IOException(com.example.i18n.tr("无法替换增强模型"))
+            if (!part.renameTo(file)) throw IOException(com.example.i18n.tr("无法保存增强模型"))
             verifiedStamp = "${file.absolutePath}:${file.lastModified()}:${file.length()}"
             return file
         } finally { part.delete() }
@@ -174,7 +174,7 @@ internal object MangaJaNai {
                         synchronized(options) { if (optionsOpen) runCatching { options.setTerminate(true) } }
                     }, (deadline - System.nanoTime()).coerceAtLeast(1L), java.util.concurrent.TimeUnit.NANOSECONDS)
                     try {
-                    report("引擎准备中…")
+                    report(com.example.i18n.tr("引擎准备中…"))
                     engine.prepare(file, tensor, tensorOut, buffer, options, deadline)
                     val neuralBudget = minOf(3_200_000_000L, deadline - System.nanoTime() - 700_000_000L)
                     if (neuralBudget <= 0) throw MangaJaNaiBudgetExceeded()
@@ -221,7 +221,7 @@ internal object MangaJaNai {
                             tile.setPixels(pixels, 0, coreSide, 0, 0, tw, th)
                             canvas.drawBitmap(tile, Rect(0, 0, tw, th), RectF(x * 2f, y * 2f, x * 2f + tw, y * 2f + th), paint)
                             val percent = ++completed * 100 / total
-                            if (percent != lastPercent) { lastPercent = percent; report("增强 $percent%") }
+                            if (percent != lastPercent) { lastPercent = percent; report(com.example.i18n.enhanceProgress(percent)) }
                         }
                         val (ow, oh) = outputSize(src.width, src.height)
                         val output = combineMangaJaNaiDetail(src, reduced, neural, ow, oh, strength)
@@ -240,21 +240,21 @@ internal object MangaJaNai {
             }
         } catch (error: MangaJaNaiBudgetExceeded) {
             runtime?.penalizeTimeout()
-            report("增强超时 · 已保留原图")
+            report(com.example.i18n.tr("增强超时 · 已保留原图"))
             throw error // No partial/fallback bitmap is cached or counted as a completed AI page.
         } catch (error: InterruptedException) { throw error }
         catch (error: OutOfMemoryError) {
             runtime?.close(); runtime = null; tileCache.clear()
-            report("内存不足 · 已保留原图")
-            throw IOException("增强内存不足", error)
+            report(com.example.i18n.tr("内存不足 · 已保留原图"))
+            throw IOException(com.example.i18n.tr("增强内存不足"), error)
         }
         catch (error: LinkageError) {
             runtime?.close(); runtime = null; tileCache.clear()
-            report("增强不可用 · 已保留原图")
-            throw IOException("当前设备无法加载增强引擎", error)
+            report(com.example.i18n.tr("增强不可用 · 已保留原图"))
+            throw IOException(com.example.i18n.tr("当前设备无法加载增强引擎"), error)
         } catch (error: Exception) {
             runtime?.close(); runtime = null; tileCache.clear()
-            report("增强失败 · 已保留原图")
+            report(com.example.i18n.tr("增强失败 · 已保留原图"))
             throw error
         } finally { try { releaseWhenIdle() } finally { lock.unlock() } }
     }

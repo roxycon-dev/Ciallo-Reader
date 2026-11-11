@@ -20,8 +20,10 @@ import com.example.source.DownloadInfo
 import com.example.source.LoginCredential
 import com.example.source.SearchBook
 import com.example.source.SourceCapabilities
+import com.example.source.SourceException
 import com.example.source.SourceResult
 import com.example.ui.comic.ComicReaderTestActivity
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Before
@@ -174,6 +176,42 @@ class LibraryNavigationTest {
         assertReaderSession(textMode = true)
     }
 
+    @Test fun novelChapterFailureKeepsThePageAndRetryCommitsTitleAndTextTogether() {
+        compose.runOnIdle { sharedLibrary.openComic(novelSource.book("staged")) }
+        compose.waitUntil(10_000) { sharedLibrary.comicChapters.value.size == 2 }
+        val (first, next) = sharedLibrary.comicChapters.value
+        compose.runOnIdle { sharedLibrary.loadChapterText(first) }
+        compose.waitUntil(10_000) { sharedLibrary.onlineNovelChapter.value.page?.chapter == first }
+
+        val response = CompletableDeferred<SourceResult<String>>()
+        compose.runOnIdle {
+            novelSource.chapterText = { response.await() }
+            sharedLibrary.loadChapterText(next)
+            val pending = sharedLibrary.onlineNovelChapter.value
+            assertEquals(first, pending.page?.chapter)
+            assertEquals("text:${first.id}", pending.page?.text)
+            assertEquals(next, pending.requested)
+            assertTrue(pending.loading)
+            sharedLibrary.loadChapterText(next)
+            assertSame(pending, sharedLibrary.onlineNovelChapter.value)
+        }
+        response.complete(SourceResult.Error(SourceException.NetworkError("fixture failed")))
+        compose.waitUntil(10_000) { sharedLibrary.onlineNovelChapter.value.error == "fixture failed" }
+        assertEquals(first, sharedLibrary.onlineNovelChapter.value.page?.chapter)
+
+        compose.runOnIdle {
+            novelSource.chapterText = { SourceResult.Success("retried") }
+            sharedLibrary.loadChapterText(next)
+        }
+        compose.waitUntil(10_000) { sharedLibrary.onlineNovelChapter.value.page?.chapter == next }
+        assertEquals(OnlineNovelPage(next, "retried", 1), sharedLibrary.onlineNovelChapter.value.page)
+        assertFalse(sharedLibrary.onlineNovelChapter.value.loading)
+        compose.runOnIdle {
+            sharedLibrary.openComic(novelSource.book("other"))
+            assertEquals(OnlineNovelChapterState(), sharedLibrary.onlineNovelChapter.value)
+        }
+    }
+
     private fun assertReaderSession(textMode: Boolean) {
         openInitialDetail()
         lateinit var model: LibraryViewModel
@@ -199,7 +237,7 @@ class LibraryNavigationTest {
         }
         compose.onNodeWithText("$route:nested").assertIsDisplayed()
         compose.waitUntil(10_000) {
-            if (textMode) model.novelChapterText.value == "text:nested-1"
+            if (textMode) model.onlineNovelChapter.value.page?.text == "text:nested-1"
             else model.comicChapterImages.value == listOf("image:nested-1")
         }
         compose.runOnIdle {
@@ -246,15 +284,19 @@ class LibraryNavigationTest {
         val calls = java.util.concurrent.CopyOnWriteArrayList<String>()
         override val name = id
         override val capabilities = SourceCapabilities(supportComic = !textMode, supportOnlineText = textMode)
+        var chapterText: suspend (String) -> SourceResult<String> = { SourceResult.Success("text:$it") }
         fun book(bookId: String) = SearchBook(bookId, id, bookId, "fixture")
         override suspend fun search(keyword: String): SourceResult<List<SearchBook>> {
             calls += keyword
             return SourceResult.Success(listOf(book(keyword)))
         }
         override suspend fun getDetail(bookId: String) = SourceResult.Success(book(bookId))
-        override suspend fun getChapters(bookId: String) = SourceResult.Success(listOf(ComicChapter("$bookId-1", "第一话")))
+        override suspend fun getChapters(bookId: String) = SourceResult.Success(
+            if (textMode) listOf(ComicChapter("$bookId-1", "第一话"), ComicChapter("$bookId-2", "第二话"))
+            else listOf(ComicChapter("$bookId-1", "第一话"))
+        )
         override suspend fun getChapterImages(chapterId: String) = SourceResult.Success(listOf("image:$chapterId"))
-        override suspend fun getChapterText(chapterId: String) = SourceResult.Success("text:$chapterId")
+        override suspend fun getChapterText(chapterId: String) = chapterText(chapterId)
         override suspend fun getDownloadInfo(bookId: String): SourceResult<DownloadInfo> = error("No downloads in this fixture")
         override suspend fun login(credential: LoginCredential) = SourceResult.Success(true)
         override suspend fun logout() = Unit

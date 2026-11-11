@@ -1,5 +1,7 @@
 package com.example.ui.reader
 
+import com.example.i18n.tr
+
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
@@ -119,7 +121,7 @@ fun NovelImageFullscreenViewer(path: String, onDismiss: () -> Unit) {
 
     ImageGalleryDialog(onDismiss) { close ->
         ArchiveImageGallery(
-            title = "章节插图",
+            title = tr("章节插图"),
             bitmap = bitmap,
             loading = loading,
             onBack = close,
@@ -224,7 +226,7 @@ private fun ArchiveImageGallery(
                 actions = {
                     WenkuIconButton(
                         Icons.Filled.Download,
-                        if (saving) "正在保存图片" else "保存图片",
+                        if (saving) tr("正在保存图片") else tr("保存图片"),
                         onClick = {
                             if (!saving && bitmap != null) {
                                 saving = true
@@ -236,7 +238,7 @@ private fun ArchiveImageGallery(
                                                 false
                                             }
                                         }
-                                        AppToast.makeText(context, if (saved) "已保存到相册" else "保存图片失败", Toast.LENGTH_SHORT).show()
+                                        AppToast.makeText(context, if (saved) tr("已保存到相册") else tr("保存图片失败"), Toast.LENGTH_SHORT).show()
                                     } finally {
                                         saving = false
                                     }
@@ -263,8 +265,8 @@ private fun ArchiveImageGallery(
                 )
                 loading -> CircularProgressIndicator(color = colors.ink)
                 else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("图片读取失败", color = colors.inkSecondary)
-                    if (onRetry != null) WenkuTextButton("重试", onRetry, wenkuSymbol = WenkuSymbol.Refresh)
+                    Text(tr("图片读取失败"), color = colors.inkSecondary)
+                    if (onRetry != null) WenkuTextButton(tr("重试"), onRetry, wenkuSymbol = WenkuSymbol.Refresh)
                 }
             }
         }

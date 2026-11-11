@@ -1,5 +1,7 @@
 package com.example.mangatranslate
 
+import com.example.i18n.tr
+
 import android.content.Context
 import com.example.source.executeCancellable
 import kotlinx.coroutines.ensureActive
@@ -40,7 +42,7 @@ object TranslateModelManager {
             "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx/resolve/28fe5895c24fd108c19eb3e8479f4ab385fbfc62/inference.onnx",
         ),
         minBytes = 9_000_000L,
-        label = "文字检测模型",
+        label = tr("文字检测模型"),
         sha256 = "d73e0058b7a8086bbd57f3d10b8bcd4ff95363f67e06e2762b5e814fe9c9410e",
     )
     val recModel = ModelSpec(
@@ -50,7 +52,7 @@ object TranslateModelManager {
             "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx/resolve/b8f84f0b80c529de40b4fbb3544b84fa7233a513/inference.onnx",
         ),
         minBytes = 19_000_000L,
-        label = "文字识别模型",
+        label = tr("文字识别模型"),
         sha256 = "5435fd747c9e0efe15a96d0b378d5bd157e9492ed8fd80edf08f30d02fa24634",
     )
 
@@ -81,7 +83,7 @@ object TranslateModelManager {
             "https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.0.7/manga-bubble-seg-yolo26n.onnx",
         ),
         minBytes = 4_000_000L,
-        label = "气泡分割模型",
+        label = tr("气泡分割模型"),
         sha256 = "a01ad9477fac2b8815c2308c827c0a60a898f457a6692717201123911ba819c0",
     )
 
@@ -195,7 +197,7 @@ object TranslateModelManager {
             // The .tmp hash entry does not apply after rename. Populate final-file verification
             // before emitting Ready, so the UI's first schedule cannot see an unverified model.
             if (!isReady(appContext)) {
-                val error = "模型完整性验证失败，请重新下载"
+                val error = com.example.i18n.tr("模型完整性验证失败，请重新下载")
                 _state.value = DownloadState.Failed(error)
                 return@withContext error
             }
@@ -227,7 +229,7 @@ object TranslateModelManager {
                 continue
             }
             if (target.exists()) target.delete()
-            if (!tmp.renameTo(target)) return@withContext "模型文件保存失败，请重试"
+            if (!tmp.renameTo(target)) return@withContext com.example.i18n.tr("模型文件保存失败，请重试")
             onProgress(1f)
             return@withContext null
         }
@@ -249,17 +251,17 @@ object TranslateModelManager {
                 .build()
             client.newCall(request).executeCancellable().use { response ->
                 if (!response.isSuccessful) return "HTTP ${response.code}（${url.substringAfter("//").take(28)}…）"
-                val body = response.body ?: return "空响应体"
+                val body = response.body ?: return com.example.i18n.tr("空响应体")
                 tmp.outputStream().use { out ->
                     body.byteStream().use { ins ->
                         val buf = ByteArray(64 * 1024)
                         var read: Int
                         var written = 0L
                         val declared = body.contentLength()
-                        require(declared <= 128L * 1024 * 1024) { "模型文件过大" }
+                        require(declared <= 128L * 1024 * 1024) { tr("模型文件过大") }
                         while (ins.read(buf).also { read = it } != -1) {
                             kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                            require(written + read <= 128L * 1024 * 1024) { "模型文件过大" }
+                            require(written + read <= 128L * 1024 * 1024) { tr("模型文件过大") }
                             out.write(buf, 0, read)
                             written += read
                             val frac = if (declared > 0) written.toFloat() / declared
@@ -267,7 +269,7 @@ object TranslateModelManager {
                             onProgress(frac)
                             _state.value = DownloadState.Downloading(spec.label, frac)
                         }
-                        require(declared <= 0 || written == declared) { "模型下载不完整" }
+                        require(declared <= 0 || written == declared) { tr("模型下载不完整") }
                         out.flush()
                     }
                 }
@@ -283,7 +285,7 @@ object TranslateModelManager {
     /** 仅允许 https 公网 CDN（Mimosa 约束：拒绝 localhost/环回/私网/保留地址）。 */
     private fun validateUrl(raw: String): String {
         val u = java.net.URI(raw)
-        require(u.scheme == "https") { "仅允许 https 下载源" }
+        require(u.scheme == "https") { tr("仅允许 https 下载源") }
         val host = u.host?.lowercase() ?: error("URL 缺少 host")
         val notAllowed = host == "localhost" ||
             host == "127.0.0.1" || host == "::1" || host == "[::1]" ||

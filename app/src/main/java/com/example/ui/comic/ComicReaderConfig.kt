@@ -292,13 +292,23 @@ data class ComicReaderConfig(
 }
 
 /** 阅读模式：单页/双页/条漫/无缝滚动/磁吸 */
-enum class ComicMode(val label: String) {
-    SINGLE("单页"), DOUBLE("双页"), WEBTOON("条漫"), CONTINUOUS("无缝滚动"), MAGNETIC("磁吸")
+enum class ComicMode(private val raw: String) {
+    SINGLE("单页"), DOUBLE("双页"), WEBTOON("条漫"), CONTINUOUS("无缝滚动"), MAGNETIC("磁吸");
+    /**
+     * 显示文案在**读取时**翻译，不能在枚举构造器里翻译：
+     * 枚举在类加载期就初始化，那时语言可能还是默认值，翻出来会被永久冻住。
+     */
+    val label: String get() = com.example.i18n.tr(raw)
 }
 
 /** 阅读方向 */
-enum class ComicDirection(val label: String) {
-    LTR("左 → 右"), RTL("右 → 左"), TTB("上 → 下")
+enum class ComicDirection(private val raw: String) {
+    LTR("左 → 右"), RTL("右 → 左"), TTB("上 → 下");
+    /**
+     * 显示文案在**读取时**翻译，不能在枚举构造器里翻译：
+     * 枚举在类加载期就初始化，那时语言可能还是默认值，翻出来会被永久冻住。
+     */
+    val label: String get() = com.example.i18n.tr(raw)
 }
 
 /**
@@ -311,23 +321,38 @@ enum class ComicDirection(val label: String) {
  * - STRETCH 拉伸：不保持比例强制铺满；
  * - CUSTOM 自定义（第 26 条）：基础档 × 用户缩放系数。
  */
-enum class ComicFit(val label: String) {
+enum class ComicFit(private val raw: String) {
     FIT_WIDTH("适应宽度"), FIT_HEIGHT("适应高度"), ORIGINAL("原始大小"), FILL("铺满裁切"), STRETCH("拉伸铺满"),
-    FIT_PAGE("整页"), CUSTOM("自定义"),
+    FIT_PAGE("整页"), CUSTOM("自定义");
+    /**
+     * 显示文案在**读取时**翻译，不能在枚举构造器里翻译：
+     * 枚举在类加载期就初始化，那时语言可能还是默认值，翻出来会被永久冻住。
+     */
+    val label: String get() = com.example.i18n.tr(raw)
 }
 
 /** 双页对齐（两页高度不一致时） */
-enum class ComicDoubleAlign(val label: String) {
-    TOP("顶部对齐"), CENTER("居中对齐"), BOTTOM("底部对齐")
+enum class ComicDoubleAlign(private val raw: String) {
+    TOP("顶部对齐"), CENTER("居中对齐"), BOTTOM("底部对齐");
+    /**
+     * 显示文案在**读取时**翻译，不能在枚举构造器里翻译：
+     * 枚举在类加载期就初始化，那时语言可能还是默认值，翻出来会被永久冻住。
+     */
+    val label: String get() = com.example.i18n.tr(raw)
 }
 
 /** 自动裁边模式 */
-enum class ComicCropMode(val label: String) {
-    OFF("关闭"), WHITE("裁白边"), BLACK("裁黑边"), AUTO("自动识别")
+enum class ComicCropMode(private val raw: String) {
+    OFF("关闭"), WHITE("裁白边"), BLACK("裁黑边"), AUTO("自动识别");
+    /**
+     * 显示文案在**读取时**翻译，不能在枚举构造器里翻译：
+     * 枚举在类加载期就初始化，那时语言可能还是默认值，翻出来会被永久冻住。
+     */
+    val label: String get() = com.example.i18n.tr(raw)
 }
 
 /** 保留历史枚举值兼容设置；四档分别提供抑噪锐化、CNN 修复、CNN 放大和 EASU 重建。 */
-enum class ComicEnhanceMode(val label: String, val desc: String) {
+enum class ComicEnhanceMode(private val raw: String, private val rawDesc: String) {
     OFF("关闭", ""),
     CAS("锐化", "线条更清晰"),
     ANIME4K("线条", "轻量修复"),
@@ -339,31 +364,57 @@ enum class ComicEnhanceMode(val label: String, val desc: String) {
     val isJaNai get() = this == MANGAJANAI || this == MANGAJANAI_FULL
     companion object {
         val visibleModes = listOf(OFF, CAS, ANIME4K, SUPER_RES, MANGAJANAI, MANGAJANAI_FULL)
-    }
+    };
+    /**
+     * 显示文案在**读取时**翻译，不能在枚举构造器里翻译：
+     * 枚举在类加载期就初始化，那时语言可能还是默认值，翻出来会被永久冻住。
+     */
+    val label: String get() = com.example.i18n.tr(raw)
+    val desc: String get() = com.example.i18n.tr(rawDesc)
 }
 
 /** 阅读背景 */
-enum class ComicBgType(val label: String) {
-    BLACK("纯黑"), WHITE("纯白"), GRAY("深灰"), PAPER("纸张纹理"), DYNAMIC("沉浸动态")
+enum class ComicBgType(private val raw: String) {
+    BLACK("纯黑"), WHITE("纯白"), GRAY("深灰"), PAPER("纸张纹理"), DYNAMIC("沉浸动态");
+    /**
+     * 显示文案在**读取时**翻译，不能在枚举构造器里翻译：
+     * 枚举在类加载期就初始化，那时语言可能还是默认值，翻出来会被永久冻住。
+     */
+    val label: String get() = com.example.i18n.tr(raw)
 }
 
 /** 场景（环境音 + 特效，两者独立开关） */
-enum class ComicScene(val label: String) {
+enum class ComicScene(private val raw: String) {
     NONE("关闭"),
     RAIN("雨夜"), SNOW("落雪"), SAKURA("樱花"), FIREFLY("萤火"),
-    OCEAN("海边"), CAMPFIRE("篝火"), NIGHT("夏夜")
+    OCEAN("海边"), CAMPFIRE("篝火"), NIGHT("夏夜");
+    /**
+     * 显示文案在**读取时**翻译，不能在枚举构造器里翻译：
+     * 枚举在类加载期就初始化，那时语言可能还是默认值，翻出来会被永久冻住。
+     */
+    val label: String get() = com.example.i18n.tr(raw)
 }
 
 /** 翻页动画 */
-enum class ComicPageAnim(val label: String) {
-    NONE("无动画"), SLIDE("平移"), FADE("渐变"), CURL("仿真翻页")
+enum class ComicPageAnim(private val raw: String) {
+    NONE("无动画"), SLIDE("平移"), FADE("渐变"), CURL("仿真翻页");
+    /**
+     * 显示文案在**读取时**翻译，不能在枚举构造器里翻译：
+     * 枚举在类加载期就初始化，那时语言可能还是默认值，翻出来会被永久冻住。
+     */
+    val label: String get() = com.example.i18n.tr(raw)
 }
 
 /** 手势动作（可配置） */
-enum class ComicGestureAction(val label: String) {
+enum class ComicGestureAction(private val raw: String) {
     NONE("无操作"),
     PREV("上一页"), NEXT("下一页"),
-    TOGGLE_CONTROLS("呼出/隐藏控制"), TOC("目录"), SETTINGS("设置"), EXIT("退出")
+    TOGGLE_CONTROLS("呼出/隐藏控制"), TOC("目录"), SETTINGS("设置"), EXIT("退出");
+    /**
+     * 显示文案在**读取时**翻译，不能在枚举构造器里翻译：
+     * 枚举在类加载期就初始化，那时语言可能还是默认值，翻出来会被永久冻住。
+     */
+    val label: String get() = com.example.i18n.tr(raw)
 }
 
 /**

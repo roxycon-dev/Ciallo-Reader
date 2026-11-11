@@ -50,3 +50,7 @@ docs/screenshots/*
 /.*.log
 /artifacts/
 /.source-verification/
+
+# JVM crash dumps from unit-test runs
+app/hs_err_pid*.log
+app/replay_pid*.log

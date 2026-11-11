@@ -1,5 +1,7 @@
 package com.example.source.impl
 
+import com.example.i18n.tr
+
 import com.example.discover.*
 import com.example.source.*
 import kotlinx.coroutines.async
@@ -120,7 +122,7 @@ internal class HtmlNovelDiscovery(
         val catalog = catalog()
         if (query.feedId == null && !catalog.supports(query.dimension, query.range))
             return@coroutineScope DiscoverPage(supported = false,
-                notice = if (sourceId == "quanben") "全本小说网未公开更新榜或热度榜，可查看原站推荐和分类目录" else "该书源未提供当前榜单或时间范围", catalog = catalog)
+                notice = if (sourceId == "quanben") tr("全本小说网未公开更新榜或热度榜，可查看原站推荐和分类目录") else tr("该书源未提供当前榜单或时间范围"), catalog = catalog)
         if (query.categoryId != null && catalog.categories.none { it.id == query.categoryId })
             return@coroutineScope DiscoverPage(supported = false, notice = "原站分类已变化，请重新选择", catalog = catalog)
         val starts = if (query.cursor != null) decodeCursor(query.cursor) else if (query.page == 1) {
@@ -137,7 +139,7 @@ internal class HtmlNovelDiscovery(
             val rows = if (sourceId == "sfacg" && target.encodedPath == "/API/HTML5.ashx") sfBooks(doc) else books(doc, catalog.categories.firstOrNull { c ->
                 safe(c.id)?.let { target.encodedPath.startsWith(it.encodedPath) && (it.encodedQuery == null || it.encodedQuery == target.encodedQuery) } == true
             }?.label)
-            require((sourceId == "sfacg" && target.encodedPath == "/API/HTML5.ashx") || rows.isNotEmpty() || Regex("暂无|没有|无结果|沒有").containsMatchIn(doc.text())) { "源站未返回可识别的小说列表" }
+            require((sourceId == "sfacg" && target.encodedPath == "/API/HTML5.ashx") || rows.isNotEmpty() || Regex("暂无|没有|无结果|沒有").containsMatchIn(doc.text())) { tr("源站未返回可识别的小说列表") }
             val next = doc.select("a[href]").firstNotNullOfOrNull { a ->
                 if (a.attr("rel").equals("next", true) || a.text().trim() in setOf("下一页", "下页", "下一頁", "Next", "›", "»"))
                     safe(a.absUrl("href"))?.takeIf { it != target && identify(it) == null } else null

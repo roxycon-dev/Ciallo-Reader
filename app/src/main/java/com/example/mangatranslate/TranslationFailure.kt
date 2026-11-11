@@ -1,7 +1,20 @@
 package com.example.mangatranslate
 
-/** Safe, actionable diagnostics. Never expose the response body, endpoint or API key. */
-data class TranslationFailure(val code: String, val description: String, val retryable: Boolean = false) {
+/**
+ * Safe, actionable diagnostics. Never expose the response body, endpoint or API key.
+ *
+ * `description` 在**读取时**翻译：下面这些常量在类加载期就构造好了，在构造参数里调 `tr()`
+ * 会把语言永久冻住（切到英文后仍是中文）。所以存原文、用 getter 翻译。
+ */
+data class TranslationFailure(
+    private val rawCode: String,
+    private val rawDescription: String,
+    val retryable: Boolean = false
+) {
+    val code: String get() = rawCode
+
+    val description: String get() = com.example.i18n.tr(rawDescription)
+
     fun exception() = TranslationException(this)
 
     companion object {

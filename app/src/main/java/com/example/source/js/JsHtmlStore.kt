@@ -1,5 +1,7 @@
 package com.example.source.js
 
+import com.example.i18n.tr
+
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Comment
 import org.jsoup.nodes.Document
@@ -33,11 +35,11 @@ class JsHtmlStore {
      */
     fun parse(jsKey: Int, html: String): Int {
         com.example.source.SourceResponse.problem(html)?.let { throw com.example.source.SourceException.ParseError(it) }
-        require(html.length <= 2 * 1024 * 1024) { "书源 HTML 超过 2Mi 字符" }
+        require(html.length <= 2 * 1024 * 1024) { tr("书源 HTML 超过 2Mi 字符") }
         dispose(jsKey)
         val doc = Jsoup.parse(html)
         val size = html.length * 2L + doc.getAllElements().size * 512L
-        require(size <= maxRetainedBytes) { "书源 HTML 解析内存预算不足" }
+        require(size <= maxRetainedBytes) { tr("书源 HTML 解析内存预算不足") }
         docs[jsKey] = doc
         documentIds[doc] = jsKey
         sizes[jsKey] = size

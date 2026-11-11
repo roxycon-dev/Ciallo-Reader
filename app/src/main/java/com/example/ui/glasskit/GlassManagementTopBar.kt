@@ -1,5 +1,7 @@
 package com.example.ui.glasskit
 
+import com.example.i18n.tr
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,7 +84,7 @@ internal fun GlassManagementTopBar(
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         },
-        navigationIcon = { AppIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", onClick = onBack) },
+        navigationIcon = { AppIconButton(Icons.AutoMirrored.Filled.ArrowBack, tr("返回"), onClick = onBack) },
         actions = actions,
         scrollBehavior = scrollBehavior,
         expandedHeight = 48.dp,

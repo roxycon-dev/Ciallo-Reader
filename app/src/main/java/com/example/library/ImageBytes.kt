@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.i18n.tr
+
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
@@ -33,7 +35,7 @@ object ImageBytes {
                     while (true) {
                         val read = input.read(buffer)
                         if (read < 0) break
-                        require(output.size().toLong() + read <= expandedLimit) { "图片解压体积过大" }
+                        require(output.size().toLong() + read <= expandedLimit) { tr("图片解压体积过大") }
                         output.write(buffer, 0, read)
                     }
                     output.toByteArray()
@@ -46,7 +48,7 @@ object ImageBytes {
 
     /** 图片字节统一归一化：gzip 解压 + AVIF 转 PNG（BitmapFactory 在部分设备不支持 AVIF）。 */
     fun normalizeImage(bytes: ByteArray, contentEncoding: String? = null): ByteArray = synchronized(normalizationLock) {
-        require(bytes.size<=32L*1024*1024) { "图片文件过大" }
+        require(bytes.size<=32L*1024*1024) { tr("图片文件过大") }
         var result = if (contentEncoding?.contains("br", ignoreCase = true) == true) {
             brotliDecompress(bytes) ?: bytes
         } else {
@@ -57,7 +59,7 @@ object ImageBytes {
                 if (Build.VERSION.SDK_INT >= 28) {
                     val source = android.graphics.ImageDecoder.createSource(ByteBuffer.wrap(result))
                     val bmp = android.graphics.ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-                        require(info.size.width.toLong()*info.size.height <= minOf(32L*1024*1024,Runtime.getRuntime().maxMemory()/8)/4) { "AVIF 图片过大" }
+                        require(info.size.width.toLong()*info.size.height <= minOf(32L*1024*1024,Runtime.getRuntime().maxMemory()/8)/4) { tr("AVIF 图片过大") }
                         decoder.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
                     }
                     try {
@@ -86,7 +88,7 @@ object ImageBytes {
                         while (true) {
                             val read = input.read(buffer)
                             if (read < 0) break
-                            require(output.size().toLong() + read <= expandedLimit) { "图片解压体积过大" }
+                            require(output.size().toLong() + read <= expandedLimit) { tr("图片解压体积过大") }
                         output.write(buffer, 0, read)
                         }
                         output.toByteArray()

@@ -1,0 +1,12 @@
+{
+  "name": "ciallo-promo-styleframes",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "^1.55.0"
+  }
+}
+

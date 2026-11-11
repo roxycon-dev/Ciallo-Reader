@@ -9,6 +9,7 @@
 ## 内容
 - `BackendDownloadPolicyTest.kt`
 - `BackendDownloadWorkerTest.kt`
+- `GuestNovelResumeTest.kt`：番茄逐章下载中断、暂停续传、目录变化、断点损坏及有限网络重试
 - `CorruptedFileTest.kt`
 - `README.md`
 

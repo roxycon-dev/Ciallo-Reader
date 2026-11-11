@@ -1,5 +1,7 @@
 package com.example.download
 
+import com.example.i18n.tr
+
 import androidx.room.withTransaction
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -11,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import androidx.work.WorkInfo
 import com.example.data.AppDatabase
 import com.example.data.BookRepository
 import com.example.source.executeCancellable
@@ -36,6 +39,14 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
         private val slots = Semaphore(2)
         private val taskLocks = Array(32) { kotlinx.coroutines.sync.Mutex() }
         private const val CHANNEL = "book_downloads"
+
+        internal fun shouldRetryPublicNovel(sourceId: String, error: Exception, attempt: Int): Boolean {
+            if (sourceId !in com.example.source.impl.PublicNovelSources.ids || attempt >= 5) return false
+            if (error.message?.contains("ENOSPC", true) == true) return false
+            return error is java.io.IOException && error !is java.io.FileNotFoundException ||
+                error is com.example.source.SourceException.NetworkError &&
+                (error.cause is java.io.IOException || Regex("HTTP (?:408|429|5[0-9]{2})\\b").containsMatchIn(error.message.orEmpty()))
+        }
 
         internal suspend fun <T> withTaskLock(taskId: String, block: suspend () -> T): T {
             val lock = taskLocks[(taskId.hashCode() and Int.MAX_VALUE) % taskLocks.size]
@@ -101,31 +112,32 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
             setForeground(getForegroundInfo())
             slots.withPermit {
                 currentCoroutineContext().ensureActive()
-                dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), total, null)
+                dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING,
+                    if (task.sourceId in com.example.source.impl.PublicNovelSources.ids) maxOf(temp.length(), task.downloadedBytes) else temp.length(), total, null)
                 // Failed imports can be retried from the completed file without consuming another download.
                 val metadata = runCatching { JSONObject(resume.readText()) }.getOrNull()
                 var guestIntegrityChecked = false
                 if (!(finalFile.isFile && metadata?.optString("url") == task.downloadUrl && metadata.optBoolean("complete"))) {
                     val publicNovel = com.example.source.impl.PublicNovelSources.create(context, task.sourceId)
                     if (publicNovel != null) {
-                        require(format == "epub") { "此源整本下载格式为 EPUB" }
+                        require(format == "epub") { tr("此源整本下载格式为 EPUB") }
                         GuestNovelEpub.write(publicNovel, task.downloadUrl, temp) { completed, count ->
                             currentCoroutineContext().ensureActive()
                             DownloadProgressBroadcaster.updateState(taskId,
                                 DownloadState.Downloading(temp.length(), 0L, completed.toFloat() / count))
-                            dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), 0L, null)
+                            dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), 0L, null, progress=completed.toFloat()/count)
                         }
                         resume.writeText(JSONObject().put("url", task.downloadUrl).put("complete", false).toString())
                     } else if (task.sourceId == com.example.source.impl.XbookcnSource.SOURCE_ID) {
                         // 书阁没有整本文件，逐章抓取后本地打包；原 PublicNovel 分支保持不变。
-                        require(format == "epub") { "此源整本下载格式为 EPUB" }
+                        require(format == "epub") { tr("此源整本下载格式为 EPUB") }
                         XbookcnEpub.write(
                             com.example.source.impl.XbookcnSource(context), task.downloadUrl, temp
                         ) { completed, count ->
                             currentCoroutineContext().ensureActive()
                             DownloadProgressBroadcaster.updateState(taskId,
                                 DownloadState.Downloading(temp.length(), 0L, completed.toFloat() / count))
-                            dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), 0L, null)
+                            dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), 0L, null, progress=completed.toFloat()/count)
                         }
                         resume.writeText(JSONObject().put("url", task.downloadUrl).put("complete", false).toString())
                     } else {
@@ -162,7 +174,7 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                                 401, 403 -> if (com.example.source.WholeBookNovelSources.contains(task.sourceId))
                                     "源站拒绝免登录下载，请稍后重试或换源（HTTP ${response.code}）"
                                     else "下载授权已失效，请重新登录或重新获取链接（HTTP ${response.code}）"
-                                429 -> "请求过于频繁，请稍后重试（HTTP 429）"
+                                429 -> tr("请求过于频繁，请稍后重试（HTTP 429）")
                                 else -> "下载失败（HTTP ${response.code}）"
                             } }
                             if (isHtmlError(response, format)) {
@@ -173,18 +185,18 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                             val body = response.body ?: error("下载响应为空")
                             val append = response.code == 206 && offset > 0
                             if (response.code == 206) {
-                                require(append) { "服务器意外返回部分文件" }
+                                require(append) { tr("服务器意外返回部分文件") }
                                 total = DownloadTransferPolicy.validateTail(response.header("Content-Range"), offset, body.contentLength())
                                 val returned = DownloadTransferPolicy.validator(response.header("ETag"), response.header("Last-Modified"))
-                                require(returned == null || returned == validator) { "续传文件版本发生变化，请重新下载" }
+                                require(returned == null || returned == validator) { tr("续传文件版本发生变化，请重新下载") }
                                 val previousTotal = metadata?.optLong("total", 0L) ?: 0L
-                                require(previousTotal <= 0 || previousTotal == total) { "续传文件大小发生变化" }
+                                require(previousTotal <= 0 || previousTotal == total) { tr("续传文件大小发生变化") }
                             } else {
-                                require(response.code == 200) { "服务器未返回完整文件" }
+                                require(response.code == 200) { tr("服务器未返回完整文件") }
                                 offset = 0L
                                 total = body.contentLength()
                             }
-                            require(total <= 0 || downloads.usableSpace >= total - offset + 16L * 1024 * 1024) { "存储空间不足，请清理后重试" }
+                            require(total <= 0 || downloads.usableSpace >= total - offset + 16L * 1024 * 1024) { tr("存储空间不足，请清理后重试") }
                             // Truncate before replacing metadata: a crash cannot pair an old prefix with a new validator.
                             FileOutputStream(temp, append).use { out ->
                                 val nextValidator = DownloadTransferPolicy.validator(response.header("ETag"), response.header("Last-Modified"))
@@ -201,7 +213,7 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                                         if (read < 0) break
                                         out.write(buffer, 0, read)
                                         downloaded += read
-                                        require(total <= 0 || downloaded <= total) { "下载数据超过声明长度" }
+                                        require(total <= 0 || downloaded <= total) { tr("下载数据超过声明长度") }
                                         val now = android.os.SystemClock.elapsedRealtime()
                                         if (now - lastUi >= 300) {
                                             lastUi = now
@@ -215,7 +227,7 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                                     }
                                 }
                                 out.flush()
-                                require(total <= 0 || downloaded == total) { "文件下载不完整，请恢复下载" }
+                                require(total <= 0 || downloaded == total) { tr("文件下载不完整，请恢复下载") }
                             }
                             false
                         }
@@ -235,6 +247,9 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                         }
                     }
                     }
+                    // EOF is a distinct phase; it is not a transfer stuck at 99%.
+                    dao.updateProgressAndStatus(taskId, DownloadStatus.DOWNLOADING, temp.length(), temp.length(), null, progress=1f)
+                    DownloadProgressBroadcaster.updateState(taskId, DownloadState.Downloading(temp.length(),temp.length(),1f))
                     val integrity = DownloadFileValidator.validateFileIntegrity(temp, format)
                     require(integrity.valid) { integrity.htmlErrorHint ?: "下载文件格式校验失败" }
                     val actualFormat = integrity.actualFormat ?: format
@@ -244,14 +259,14 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                     check(!actualFile.exists() || actualFile.delete()) { "无法替换旧下载文件" }
                     check(temp.renameTo(actualFile)) { "无法保存下载文件" }
                     dao.insertOrUpdate(task.copy(status = DownloadStatus.DOWNLOADING, format = actualFormat,
-                        filePath = actualFile.absolutePath, downloadedBytes = actualFile.length(), totalBytes = actualFile.length()))
+                        filePath = actualFile.absolutePath, downloadedBytes = actualFile.length(), totalBytes = actualFile.length(), progress=1f))
                     val completeMetadata = runCatching { JSONObject(resume.readText()) }.getOrDefault(JSONObject())
                     resume.writeText(completeMetadata.put("complete", true).toString())
                 }
                 var latest = dao.getTaskById(taskId) ?: error("下载任务已取消")
                 val file = File(latest.filePath)
                 val integrity = DownloadFileValidator.validateFileIntegrity(file, latest.format)
-                require(integrity.valid) { "下载文件损坏，请重新下载" }
+                require(integrity.valid) { tr("下载文件损坏，请重新下载") }
                 latest = latest.copy(format = integrity.actualFormat ?: latest.format)
                 if (!guestIntegrityChecked) verifyGuestNovel(file, task.sourceId, latest.format, task.downloadUrl)
                 val novelStore = NovelDownloadStore(context)
@@ -287,37 +302,32 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                     if (novel != null) novelStore.imported(taskId)
                     db.withTransaction {
                         dao.insertOrUpdate(latest.copy(status = DownloadStatus.COMPLETED, errorMessage = null,
-                            downloadedBytes = file.length(), totalBytes = file.length()))
+                            downloadedBytes = file.length(), totalBytes = file.length(), progress=1f))
                     }
                     secrets.remove("download:$taskId")
+                    GuestNovelCheckpoint.clear(temp)
                     DownloadProgressBroadcaster.updateState(taskId, DownloadState.Success(file.absolutePath))
                 }
                 Result.success()
             }
         } catch (e: CancellationException) {
-            withContext(NonCancellable) {
-                // Explicit cancel deleted the row; never recreate or rebroadcast it.
-                val latest = dao.getTaskById(taskId)
-                if (latest != null && latest.status in setOf(DownloadStatus.DOWNLOADING, DownloadStatus.PAUSED)) {
-                    dao.updateProgressAndStatus(taskId, DownloadStatus.PAUSED, temp.length(), total, null)
-                    DownloadProgressBroadcaster.updateState(taskId, DownloadState.Paused(temp.length(), total))
-                }
-            }
+            recordInterruption(taskId, temp, total)
             throw e
         } catch (e: Exception) {
             // Cancelling a blocking socket can throw IOException before the next suspension.
             // Preserve the resumable file and record PAUSED before any cancellable DAO read.
             if (!currentCoroutineContext().isActive) {
-                withContext(NonCancellable) {
-                    val latest = dao.getTaskById(taskId)
-                    if (latest != null && latest.status in setOf(DownloadStatus.DOWNLOADING, DownloadStatus.PAUSED)) {
-                        dao.updateProgressAndStatus(taskId, DownloadStatus.PAUSED, temp.length(), total, null)
-                        DownloadProgressBroadcaster.updateState(taskId, DownloadState.Paused(temp.length(), total))
-                    }
-                }
+                recordInterruption(taskId, temp, total)
                 currentCoroutineContext().ensureActive()
             }
             val message = if (e.message?.contains("ENOSPC", true) == true) "存储空间不足，请清理后重试" else e.message ?: "下载或入库失败"
+            if (shouldRetryPublicNovel(task.sourceId, e, runAttemptCount)) {
+                val latest = dao.getTaskById(taskId) ?: return@withContext Result.success()
+                dao.updateProgressAndStatus(taskId, DownloadStatus.PENDING,
+                    maxOf(temp.length(), latest.downloadedBytes), total, "网络暂时中断，将从已保存章节继续下载")
+                DownloadProgressBroadcaster.updateState(taskId, DownloadState.Pending)
+                return@withContext Result.retry()
+            }
             // A task may outlive its signed CDN URL. Refresh its authorization and
             // mirror together instead of endlessly resuming the same stale URL.
             if (task.sourceId == "zlibrary" && recoveries < 2 &&
@@ -369,6 +379,20 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
         }
     }
 
+    private suspend fun recordInterruption(taskId: String, temp: File, total: Long) = withContext(NonCancellable) {
+        val dao = AppDatabase.getDatabase(context).downloadTaskDao()
+        // Explicit cancel may have deleted the row; never recreate it.
+        val latest = dao.getTaskById(taskId)
+        if (latest != null && latest.status in setOf(DownloadStatus.DOWNLOADING, DownloadStatus.PAUSED)) {
+            val bytes = if (latest.sourceId in com.example.source.impl.PublicNovelSources.ids)
+                maxOf(temp.length(), latest.downloadedBytes) else temp.length()
+            val waitingForNetwork = stopReason == WorkInfo.STOP_REASON_CONSTRAINT_CONNECTIVITY
+            dao.updateProgressAndStatus(taskId, if (waitingForNetwork) DownloadStatus.PENDING else DownloadStatus.PAUSED, bytes, total, null)
+            DownloadProgressBroadcaster.updateState(taskId,
+                if (waitingForNetwork) DownloadState.Pending else DownloadState.Paused(bytes, total))
+        }
+    }
+
     /** Cancellation closes the active socket even during a blocking body read. */
     private suspend fun <T> withResponse(request: Request, sourceId: String, block: suspend (Response) -> T): T {
         val origin=request.url
@@ -392,7 +416,7 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
             val summary = GuestNovelIntegrity.epub(file)
             if (sourceId == "auto_novel") {
                 val path = downloadUrl.toHttpUrl().pathSegments
-                require(path.size >= 5 && path[0] == "api" && path[1] == "novel" && path[4] == "file") { "Novelia 下载地址异常" }
+                require(path.size >= 5 && path[0] == "api" && path[1] == "novel" && path[4] == "file") { tr("Novelia 下载地址异常") }
                 val toc = when (val result = com.example.source.impl.AutoNovelSource(context).getChapters(path[2] + "/" + path[3])) {
                     is com.example.source.SourceResult.Success -> result.data
                     is com.example.source.SourceResult.Error -> throw result.exception

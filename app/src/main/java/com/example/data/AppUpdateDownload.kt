@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
@@ -32,8 +34,8 @@ internal class AppUpdateDownload(
 ) {
     suspend fun download(asset: UpdateApkAsset, tag: String, destination: File, onProgress: (Long, Long?) -> Unit) =
         withContext(Dispatchers.IO) {
-            require(officialUpdateAsset(tag, asset.name, asset.url)) { "安装包地址不属于此版本的官方发布" }
-            require(asset.size == null || asset.size in 1..MAX_UPDATE_BYTES) { "安装包大小异常" }
+            require(officialUpdateAsset(tag, asset.name, asset.url)) { tr("安装包地址不属于此版本的官方发布") }
+            require(asset.size == null || asset.size in 1..MAX_UPDATE_BYTES) { tr("安装包大小异常") }
             val proxy = SystemProxyResolver.resolve(context.applicationContext)
             val transport = client.newBuilder().followRedirects(false).followSslRedirects(false)
                 .apply { if (proxy != null) proxy(proxy) }.build()
@@ -64,8 +66,8 @@ internal class AppUpdateDownload(
                                     check(response.code == 200) { "安装包下载失败（HTTP ${response.code}），可重试或使用浏览器下载" }
                                     val body = response.body ?: error("安装包下载为空")
                                     val length = body.contentLength().takeIf { it >= 0 }
-                                    require(length == null || length in 1..MAX_UPDATE_BYTES) { "安装包大小异常" }
-                                    if (asset.size != null && length != null) require(asset.size == length) { "安装包大小与发布信息不符" }
+                                    require(length == null || length in 1..MAX_UPDATE_BYTES) { tr("安装包大小异常") }
+                                    if (asset.size != null && length != null) require(asset.size == length) { tr("安装包大小与发布信息不符") }
                                     val total = asset.size ?: length
                                     var received = 0L
                                     var lastProgress = 0L
@@ -78,7 +80,7 @@ internal class AppUpdateDownload(
                                                 val read = input.read(buffer)
                                                 if (read < 0) break
                                                 received += read
-                                                require(received <= MAX_UPDATE_BYTES && (total == null || received <= total)) { "安装包大小异常" }
+                                                require(received <= MAX_UPDATE_BYTES && (total == null || received <= total)) { tr("安装包大小异常") }
                                                 output.write(buffer, 0, read)
                                                 val now = System.nanoTime()
                                                 if (now - lastProgress >= 100_000_000) {
@@ -99,7 +101,7 @@ internal class AppUpdateDownload(
                     }
                     if (!moved) { finished = true; break }
                 }
-                check(finished) { "下载跳转次数过多，请使用浏览器下载" }
+                check(finished) { tr("下载跳转次数过多，请使用浏览器下载") }
             } finally {
                 if (!finished) destination.delete()
             }
@@ -123,18 +125,18 @@ internal fun updateFileSha256(file: File): String {
 internal class UpdateApkVerifier(private val context: Context) {
     @Suppress("DEPRECATION")
     fun verify(file: File, release: UpdateRelease): Long {
-        require(file.length() in 1..MAX_UPDATE_BYTES) { "安装包为空或过大" }
+        require(file.length() in 1..MAX_UPDATE_BYTES) { tr("安装包为空或过大") }
         val asset = release.apk ?: error("此版本没有可用安装包")
-        require(asset.size == null || file.length() == asset.size) { "安装包大小校验失败" }
-        if (asset.sha256 != null) require(updateFileSha256(file) == asset.sha256) { "安装包完整性校验失败，请重新下载" }
+        require(asset.size == null || file.length() == asset.size) { tr("安装包大小校验失败") }
+        if (asset.sha256 != null) require(updateFileSha256(file) == asset.sha256) { tr("安装包完整性校验失败，请重新下载") }
         val pm = context.packageManager
         val flags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
         val archive = pm.getPackageArchiveInfo(file.absolutePath, flags) ?: error("下载文件不是有效的 Android 安装包")
         val installed = pm.getPackageInfo(context.packageName, flags)
-        require(archive.packageName == context.packageName) { "安装包不属于 Ciallo Reader" }
-        require(archive.versionName == release.version) { "安装包版本与更新信息不符" }
-        require(code(archive) > code(installed)) { "安装包不是比当前更新的版本" }
-        require((archive.applicationInfo?.minSdkVersion ?: 24) <= Build.VERSION.SDK_INT) { "新版本不支持当前 Android 系统" }
+        require(archive.packageName == context.packageName) { tr("安装包不属于 Ciallo Reader") }
+        require(archive.versionName == release.version) { tr("安装包版本与更新信息不符") }
+        require(code(archive) > code(installed)) { tr("安装包不是比当前更新的版本") }
+        require((archive.applicationInfo?.minSdkVersion ?: 24) <= Build.VERSION.SDK_INT) { tr("新版本不支持当前 Android 系统") }
         val original = signatures(installed)
         require(original.isNotEmpty() && original == signatures(archive)) {
             "新版本签名与当前应用不一致，无法直接覆盖安装。请先备份数据，再查看发布页的迁移说明"

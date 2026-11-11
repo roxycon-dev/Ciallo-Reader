@@ -1,5 +1,7 @@
 package com.example.source.impl
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.util.LruCache
 import com.example.data.readImportBytes
@@ -102,7 +104,7 @@ class XbookcnSource(
     }
 
     override suspend fun getChapterImages(chapterId: String): SourceResult<List<String>> =
-        SourceResult.Error(SourceException.ParseError("书阁是文字小说源，请使用小说阅读器"))
+        SourceResult.Error(SourceException.ParseError(tr("书阁是文字小说源，请使用小说阅读器")))
 
     override suspend fun getDownloadInfo(bookId: String): SourceResult<DownloadInfo> = result {
         requireBookId(bookId)
@@ -161,13 +163,13 @@ class XbookcnSource(
                 kotlinx.coroutines.delay(800)
             }
         }
-        throw last ?: SourceException.NetworkError("书阁请求失败")
+        throw last ?: SourceException.NetworkError(tr("书阁请求失败"))
     }
 
     private class RetryableStatus(val code: Int) : java.io.IOException("书阁返回 HTTP $code")
 
     private suspend fun fetchHtmlOnce(path: String): String = withContext(Dispatchers.IO) {
-        require(path.startsWith("/")) { "书源内部路径无效" }
+        require(path.startsWith("/")) { tr("书源内部路径无效") }
         val url = (baseUrl + path).toHttpUrl()
 
         fun buildRequest(cookie: String?): Request = Request.Builder().url(url)
@@ -190,10 +192,10 @@ class XbookcnSource(
             if (res.code == 429 || res.code >= 500) throw RetryableStatus(res.code)
             if (!res.isSuccessful) throw SourceException.NetworkError("书阁返回 HTTP ${res.code}")
             if (res.request.url.host != url.host) {
-                throw SourceException.NetworkError("书阁跳转到了站外地址")
+                throw SourceException.NetworkError(tr("书阁跳转到了站外地址"))
             }
             res.body?.byteStream()?.use { it.readImportBytes(8 * 1024 * 1024).toString(Charsets.UTF_8) }
-                ?: throw java.io.IOException("书阁返回空页面")
+                ?: throw java.io.IOException(tr("书阁返回空页面"))
         }
 
         var html = read(http.newCall(buildRequest(null)).executeCancellable())
@@ -238,7 +240,7 @@ class XbookcnSource(
             } catch (e: SourceException) {
                 SourceResult.Error(e)
             } catch (e: java.io.IOException) {
-                SourceResult.Error(SourceException.NetworkError("书阁连接失败，请稍后重试", e))
+                SourceResult.Error(SourceException.NetworkError(tr("书阁连接失败，请稍后重试"), e))
             } catch (e: Exception) {
                 SourceResult.Error(SourceException.ParseError(e.message ?: "书阁页面解析失败"))
             }
@@ -260,15 +262,15 @@ class XbookcnSource(
         private val CHAPTER_ID = Regex("^([0-9a-f]{6,16})/([0-9]{1,7})$")
 
         internal fun requireBookId(bookId: String) {
-            if (!BOOK_ID.matches(bookId)) throw SourceException.ParseError("书阁作品标识无效")
+            if (!BOOK_ID.matches(bookId)) throw SourceException.ParseError(tr("书阁作品标识无效"))
         }
 
         internal fun parseChapterId(chapterId: String): Pair<String, Int> {
             val match = CHAPTER_ID.matchEntire(chapterId)
-                ?: throw SourceException.ParseError("书阁章节标识无效")
+                ?: throw SourceException.ParseError(tr("书阁章节标识无效"))
             val number = match.groupValues[2].toIntOrNull()
             if (number == null || number !in 1..100_000) {
-                throw SourceException.ParseError("书阁章节序号无效")
+                throw SourceException.ParseError(tr("书阁章节序号无效"))
             }
             return match.groupValues[1] to number
         }
@@ -313,7 +315,7 @@ internal object XbookcnParser {
         val header = doc.selectFirst("main > header") ?: doc.selectFirst("header")
         val title = header?.selectFirst("h1")?.text()?.trim()
             ?.takeIf { it.isNotBlank() }
-            ?: throw SourceException.ParseError("书阁未返回作品标题，页面可能已变化")
+            ?: throw SourceException.ParseError(tr("书阁未返回作品标题，页面可能已变化"))
         val author = header.select("a[href^=/author/]").firstOrNull()?.text()?.trim().orEmpty()
         val metaText = header.select("p").firstOrNull()?.text().orEmpty()
         val synopsis = header.selectFirst("p.mt-3")?.text()?.trim()?.takeIf { it.isNotBlank() }
@@ -379,16 +381,16 @@ internal object XbookcnParser {
     fun chapterText(html: String): String {
         val doc = Jsoup.parse(html)
         val article = doc.selectFirst("article.reading-text") ?: doc.selectFirst("article")
-            ?: throw SourceException.ParseError("书阁未返回正文，页面可能已变化")
+            ?: throw SourceException.ParseError(tr("书阁未返回正文，页面可能已变化"))
         val paragraphs = article.select("p").map { element: Element ->
             element.text().filter { it == '\n' || it == '\t' || it.code >= 32 }.trim()
         }.filter { it.isNotBlank() }
         if (paragraphs.isEmpty()) {
-            throw SourceException.ParseError("本章正文为空，可能已下架或需要登录")
+            throw SourceException.ParseError(tr("本章正文为空，可能已下架或需要登录"))
         }
         val text = paragraphs.joinToString("\n\n")
         if (listOf("请登录后阅读", "請登入後閱讀", "购买本章", "購買本章", "本章未完").any(text::contains)) {
-            throw SourceException.ParseError("该章节未完整公开，书源无法读取")
+            throw SourceException.ParseError(tr("该章节未完整公开，书源无法读取"))
         }
         return text
     }

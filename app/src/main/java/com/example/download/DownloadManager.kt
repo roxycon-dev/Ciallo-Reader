@@ -1,11 +1,14 @@
 package com.example.download
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.util.Log
 import androidx.work.*
 import com.example.data.AppDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -42,7 +45,7 @@ class DownloadManager(private val context: Context) {
     private val enqueueMutex = taskMutex
     private val secrets = com.example.data.EncryptedSecretStore(context)
 
-    val allTasksFlow: Flow<List<DownloadTaskEntity>> = taskDao.getAllTasksFlow()
+    val allTasksFlow: Flow<List<DownloadTaskEntity>> = taskDao.getAllTasksFlow().map { tasks -> tasks.filter { it.format != "comic" } }
     val downloadStates: StateFlow<Map<String, DownloadState>> = DownloadProgressBroadcaster.states
 
     init {
@@ -62,7 +65,7 @@ class DownloadManager(private val context: Context) {
             taskMutex.withLock {
                 val unfinished = taskDao.getAllTasksSync()
                 Log.i(TAG, "Restoring unfinished tasks from DB. Count=${unfinished.size}")
-                for (task in unfinished) {
+                for (task in unfinished.filter { it.format != "comic" }) {
                     if (task.status in setOf(DownloadStatus.PENDING, DownloadStatus.DOWNLOADING)) {
                         val work = workManager.getWorkInfosForUniqueWork("download_${task.id}").get()
                         if (work.any { !it.state.isFinished }) continue
@@ -85,19 +88,8 @@ class DownloadManager(private val context: Context) {
                             DownloadState.Paused(task.downloadedBytes, task.totalBytes)
                         )
                     } else if (task.status == DownloadStatus.COMPLETED) {
-                        // 书已不在书架的残留任务不能广播 Success，否则书库搜索
-                        // 会一直显示「已存入书架」且无法重新下载；清掉任务行即可恢复下载。
-                        if (bookExistsForTask(task)) {
-                            val finalFile = File(task.filePath)
-                            Log.i(TAG, "Restoring COMPLETED task state in broadcaster: bookId=${task.id}")
-                            DownloadProgressBroadcaster.updateState(
-                                task.id,
-                                DownloadState.Success(finalFile.absolutePath)
-                            )
-                        } else {
-                            Log.i(TAG, "Dropping stale COMPLETED task (book removed from shelf): bookId=${task.id}")
-                            taskDao.deleteTaskById(task.id)
-                        }
+                        // History belongs to the download center, independently of shelf ownership.
+                        DownloadProgressBroadcaster.updateState(task.id, DownloadState.Success(task.filePath))
                     }
             }
             }
@@ -164,7 +156,7 @@ class DownloadManager(private val context: Context) {
 
             val downloadsDir = File(context.filesDir, "downloads")
             val finalFormat = request.format.trim().lowercase()
-            require(finalFormat.matches(Regex("[a-z0-9]{1,10}"))) { "下载格式无效" }
+            require(finalFormat.matches(Regex("[a-z0-9]{1,10}"))) { tr("下载格式无效") }
             val finalFilePath = if (replaceNovel) File(downloadsDir, "${sanitizeFileName(id)}_${System.nanoTime()}.$finalFormat").absolutePath
                 else existing?.filePath ?: File(downloadsDir, "${sanitizeFileName(id)}.$finalFormat").absolutePath
 
@@ -267,12 +259,13 @@ class DownloadManager(private val context: Context) {
                 workManager.cancelUniqueWork("download_$bookId").result.get()
                 DownloadWorker.withTaskLock(bookId) {
                     val task = taskDao.getTaskById(bookId) ?: return@withTaskLock
-                    if (task.status == DownloadStatus.COMPLETED) return@withTaskLock
+                    val completed = task.status == DownloadStatus.COMPLETED
                     val finalFile = File(task.filePath)
                     val downloadsDir = File(context.filesDir, "downloads")
                     File(downloadsDir, "${finalFile.nameWithoutExtension}.tmp").delete()
                     File(downloadsDir, "${finalFile.nameWithoutExtension}.resume").delete()
-                    finalFile.delete()
+                    GuestNovelCheckpoint.clear(finalFile)
+                    if (!completed && !bookExistsForTask(task)) finalFile.delete()
                     taskDao.deleteTaskById(bookId)
                     secrets.remove("download:$bookId")
                     DownloadProgressBroadcaster.removeState(bookId)
@@ -293,7 +286,7 @@ class DownloadManager(private val context: Context) {
             val values=org.json.JSONObject(headers)
             if(!referer.isNullOrBlank()) values.put("Referer",referer)
             val raw=values.toString()
-            require(raw.length<=32*1024) { "下载请求头过大" }
+            require(raw.length<=32*1024) { tr("下载请求头过大") }
             if(values.length()>0) secrets.write("download:$bookId",raw) else secrets.remove("download:$bookId")
         }
         val constraints = Constraints.Builder()
@@ -309,6 +302,7 @@ class DownloadManager(private val context: Context) {
 
         val workRequest = OneTimeWorkRequestBuilder<DownloadWorker>()
             .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, java.util.concurrent.TimeUnit.SECONDS)
             .setInputData(inputData)
             .build()
 

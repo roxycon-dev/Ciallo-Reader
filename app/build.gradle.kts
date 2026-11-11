@@ -88,8 +88,8 @@ android {
     applicationId = "com.aistudio.novelreader.kxmpzq"
     minSdk = 24
     targetSdk = 35
-    versionCode = 247
-    versionName = "1.5.5"
+    versionCode = 250
+    versionName = "1.6.2"
     externalNativeBuild {
       cmake { arguments += "-DANDROID_STL=c++_static" }
     }
@@ -204,7 +204,20 @@ android {
     compose = true
     buildConfig = true
   }
-  testOptions { unitTests { isIncludeAndroidResources = true } }
+  testOptions {
+    unitTests {
+      isIncludeAndroidResources = true
+      all {
+        // JBR 21.0.10 的 C2 在编译 SQLiteStatement.executeInsert 时会 EXCEPTION_ACCESS_VIOLATION，
+        // 整个测试 JVM 被杀掉（表现为"只跑了 183 个用例"而不是 600 个）。
+        // 只把这个方法排除出 C2 编译，比整体降到 C1 更划算：Compose 测试不会因为解释执行变慢而超时。
+        it.jvmArgs(
+          "-XX:CompileCommand=exclude,android.database.sqlite.SQLiteStatement::executeInsert",
+          "-XX:+UseSerialGC",
+        )
+      }
+    }
+  }
 }
 
 // P5 防回归：需要 Compose 可组合项编译指标（跳过率/可重启性）时用

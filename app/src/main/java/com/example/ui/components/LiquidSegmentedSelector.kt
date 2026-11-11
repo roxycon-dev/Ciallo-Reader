@@ -67,7 +67,10 @@ internal fun LiquidSegmentedSelector(
     val reduceMotion = LocalReduceMotion.current
     val quality = LocalRenderQuality.current
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val visualOptions = remember(options, rtl) { if (rtl) options.reversed() else options }
+    // 分段控件的显示文字统一在这里过一遍词表：调用方（阅读设置、排序、筛选）都不用改，
+    // 而词表是白名单——数据类文案（分类名、书名）没有条目就原样返回。
+    val translated = options.map { it.copy(label = com.example.i18n.tr(it.label)) }
+    val visualOptions = remember(translated, rtl) { if (rtl) translated.reversed() else translated }
     val holder = remember { arrayOfNulls<LiquidSegmentView>(1) }
     val select = rememberUpdatedState(onSelect)
     val currentSelected = rememberUpdatedState(selected)

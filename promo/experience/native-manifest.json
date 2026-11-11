@@ -1,0 +1,363 @@
+[
+  {
+    "file": "native-source-picker.webp",
+    "source": "11_glass_ui.mp4",
+    "second": 2,
+    "crop_ltrb": [
+      0,
+      1250,
+      1224,
+      2680
+    ],
+    "width": 1224,
+    "height": 1430
+  },
+  {
+    "file": "native-source-manage.webp",
+    "source": "11_glass_ui.mp4",
+    "second": 4.8,
+    "crop_ltrb": null,
+    "width": 1224,
+    "height": 2700
+  },
+  {
+    "file": "native-source-more.webp",
+    "source": "11_glass_ui.mp4",
+    "second": 7.4,
+    "crop_ltrb": null,
+    "width": 1224,
+    "height": 2700
+  },
+  {
+    "file": "native-search.webp",
+    "source": "02_search.mp4",
+    "second": 6.5,
+    "crop_ltrb": null,
+    "width": 1224,
+    "height": 2700
+  },
+  {
+    "file": "native-search-more.webp",
+    "source": "02_search.mp4",
+    "second": 8.8,
+    "crop_ltrb": null,
+    "width": 1224,
+    "height": 2700
+  },
+  {
+    "file": "native-source-jump.webp",
+    "source": "03_detail_download.mp4",
+    "second": 7.8,
+    "crop_ltrb": [
+      0,
+      70,
+      1224,
+      1800
+    ],
+    "width": 1224,
+    "height": 1730
+  },
+  {
+    "file": "native-detail.webp",
+    "source": "03_detail_download.mp4",
+    "second": 12.2,
+    "crop_ltrb": null,
+    "width": 1224,
+    "height": 2700
+  },
+  {
+    "file": "native-chapters.webp",
+    "source": "03_detail_download.mp4",
+    "second": 12.2,
+    "crop_ltrb": [
+      0,
+      1260,
+      1224,
+      2700
+    ],
+    "width": 1224,
+    "height": 1440
+  },
+  {
+    "file": "native-downloading.webp",
+    "source": "03_detail_download.mp4",
+    "second": 14.4,
+    "crop_ltrb": [
+      0,
+      1920,
+      1224,
+      2690
+    ],
+    "width": 1224,
+    "height": 770
+  },
+  {
+    "file": "native-download-paused.webp",
+    "source": "03_detail_download.mp4",
+    "second": 19.8,
+    "crop_ltrb": [
+      0,
+      2180,
+      1224,
+      2700
+    ],
+    "width": 1224,
+    "height": 520
+  },
+  {
+    "file": "native-download-done.webp",
+    "source": "03_detail_download.mp4",
+    "second": 21.0,
+    "crop_ltrb": [
+      0,
+      2180,
+      1224,
+      2700
+    ],
+    "width": 1224,
+    "height": 520
+  },
+  {
+    "file": "native-comic-modes.webp",
+    "source": "07_comic_glass.mp4",
+    "second": 2.3,
+    "crop_ltrb": [
+      0,
+      0,
+      1224,
+      1950
+    ],
+    "width": 1224,
+    "height": 1950
+  },
+  {
+    "file": "native-comic-layout.webp",
+    "source": "07_comic_glass.mp4",
+    "second": 4.0,
+    "crop_ltrb": [
+      0,
+      0,
+      1224,
+      1950
+    ],
+    "width": 1224,
+    "height": 1950
+  },
+  {
+    "file": "native-comic-image.webp",
+    "source": "07_comic_glass.mp4",
+    "second": 8.1,
+    "crop_ltrb": [
+      0,
+      0,
+      1224,
+      1950
+    ],
+    "width": 1224,
+    "height": 1950
+  },
+  {
+    "file": "native-comic-translate.webp",
+    "source": "07_comic_glass.mp4",
+    "second": 10.4,
+    "crop_ltrb": [
+      0,
+      0,
+      1224,
+      1950
+    ],
+    "width": 1224,
+    "height": 1950
+  },
+  {
+    "file": "native-comic-ocr.webp",
+    "source": "07_comic_glass.mp4",
+    "second": 11.0,
+    "crop_ltrb": [
+      0,
+      0,
+      1224,
+      1950
+    ],
+    "width": 1224,
+    "height": 1950
+  },
+  {
+    "file": "native-comic-theme.webp",
+    "source": "07_comic_glass.mp4",
+    "second": 12.3,
+    "crop_ltrb": [
+      0,
+      0,
+      1224,
+      1950
+    ],
+    "width": 1224,
+    "height": 1950
+  },
+  {
+    "file": "native-comic-auto.webp",
+    "source": "07_comic_glass.mp4",
+    "second": 14.3,
+    "crop_ltrb": [
+      0,
+      0,
+      1224,
+      1950
+    ],
+    "width": 1224,
+    "height": 1950
+  },
+  {
+    "file": "native-comic-gesture.webp",
+    "source": "07_comic_glass.mp4",
+    "second": 15.5,
+    "crop_ltrb": [
+      0,
+      0,
+      1224,
+      1950
+    ],
+    "width": 1224,
+    "height": 1950
+  },
+  {
+    "file": "native-novel-type.webp",
+    "source": "09_novel_settings.mp4",
+    "second": 20.0,
+    "crop_ltrb": [
+      0,
+      450,
+      1224,
+      2650
+    ],
+    "width": 1224,
+    "height": 2200
+  },
+  {
+    "file": "native-novel-layout.webp",
+    "source": "09_novel_settings.mp4",
+    "second": 23.2,
+    "crop_ltrb": [
+      0,
+      450,
+      1224,
+      2650
+    ],
+    "width": 1224,
+    "height": 2200
+  },
+  {
+    "file": "native-novel-text.webp",
+    "source": "10_roxy.mp4",
+    "second": 0.5,
+    "crop_ltrb": [
+      0,
+      0,
+      1224,
+      1050
+    ],
+    "width": 1224,
+    "height": 1050
+  },
+  {
+    "file": "native-bookmark.webp",
+    "source": "10_roxy.mp4",
+    "second": 2.65,
+    "crop_ltrb": [
+      326,
+      970,
+      914,
+      1680
+    ],
+    "width": 588,
+    "height": 710
+  },
+  {
+    "file": "native-theme-green.webp",
+    "source": "11_glass_ui.mp4",
+    "second": 13.3,
+    "crop_ltrb": null,
+    "width": 1224,
+    "height": 2700
+  },
+  {
+    "file": "native-theme-orange.webp",
+    "source": "11_glass_ui.mp4",
+    "second": 14.8,
+    "crop_ltrb": null,
+    "width": 1224,
+    "height": 2700
+  },
+  {
+    "file": "native-glass-controls.webp",
+    "source": "11_glass_ui.mp4",
+    "second": 20.5,
+    "crop_ltrb": null,
+    "width": 1224,
+    "height": 2700
+  },
+  {
+    "file": "native-progress.webp",
+    "source": "06_comic_read.mp4",
+    "second": 11.3,
+    "crop_ltrb": [
+      0,
+      2300,
+      1224,
+      2700
+    ],
+    "width": 1224,
+    "height": 400
+  },
+  {
+    "file": "native-import.webp",
+    "source": "04_shelf.mp4",
+    "second": 1.6,
+    "crop_ltrb": [
+      0,
+      220,
+      1224,
+      690
+    ],
+    "width": 1224,
+    "height": 470
+  },
+  {
+    "file": "native-stats.webp",
+    "source": "12_history_stats.mp4",
+    "second": 1.6,
+    "crop_ltrb": null,
+    "width": 432,
+    "height": 960
+  },
+  {
+    "file": "native-calendar.webp",
+    "source": "12_history_stats.mp4",
+    "second": 3.3,
+    "crop_ltrb": null,
+    "width": 432,
+    "height": 960
+  },
+  {
+    "file": "native-trends.webp",
+    "source": "12_history_stats.mp4",
+    "second": 6.8,
+    "crop_ltrb": null,
+    "width": 432,
+    "height": 960
+  },
+  {
+    "file": "native-resume.webp",
+    "source": "12_history_stats.mp4",
+    "second": 0.1,
+    "crop_ltrb": [
+      0,
+      0,
+      432,
+      510
+    ],
+    "width": 432,
+    "height": 510
+  }
+]

@@ -1,5 +1,7 @@
 package com.example.transfer
 
+import com.example.i18n.tr
+
 import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -136,15 +138,15 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
     }
     private fun action(operation:String)=object:WifiP2pManager.ActionListener {
         override fun onSuccess() {}
-        override fun onFailure(reason:Int) { mutableMessage.value=when(reason) { WifiP2pManager.P2P_UNSUPPORTED -> "设备不支持 Wi-Fi Direct，请连接同一 Wi-Fi 或热点"; WifiP2pManager.BUSY -> "Wi-Fi 正忙，请稍后重试"; else -> "${operation}未成功，请检查 Wi-Fi、附近设备权限和位置开关" } }
+        override fun onFailure(reason:Int) { mutableMessage.value=when(reason) { WifiP2pManager.P2P_UNSUPPORTED -> tr("设备不支持 Wi-Fi Direct，请连接同一 Wi-Fi 或热点"); WifiP2pManager.BUSY -> tr("Wi-Fi 正忙，请稍后重试"); else -> "${operation}未成功，请检查 Wi-Fi、附近设备权限和位置开关" } }
     }
     private fun p2pError(reason:Int):String=when(reason) {
-        WifiP2pManager.P2P_UNSUPPORTED -> "系统未提供 Wi-Fi Direct 连接能力"
-        WifiP2pManager.BUSY -> "附近连接请求被系统拒绝：连接服务正忙。可重新连接"
+        WifiP2pManager.P2P_UNSUPPORTED -> tr("系统未提供 Wi-Fi Direct 连接能力")
+        WifiP2pManager.BUSY -> tr("附近连接请求被系统拒绝：连接服务正忙。可重新连接")
         else -> "系统未能发起附近连接（错误 $reason）。可重新连接"
     }
     private fun permissionRevoked(): String {
-        val message = "附近设备权限已被系统撤回，请重新授权；同 Wi-Fi 互传仍可使用"
+        val message = tr("附近设备权限已被系统撤回，请重新授权；同 Wi-Fi 互传仍可使用")
         mutableMessage.value = message
         onP2pError(message)
         return message
@@ -228,8 +230,8 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
         connector?.observe()
     }
     fun connect(peer:TransferPeer) {
-        require(allowed(context)){"请先授权附近设备"}
-        require(peer.nearbyProtocol>=NearbyHandshake.VERSION){"该任务或对方使用旧版附近连接。请双方更新至 1.4.5 或更新版本，取消旧任务后重新发现设备"}
+        require(allowed(context)){tr("请先授权附近设备")}
+        require(peer.nearbyProtocol>=NearbyHandshake.VERSION){tr("该任务或对方使用旧版附近连接。请双方更新至 1.4.5 或更新版本，取消旧任务后重新发现设备")}
         val address=peer.p2pAddress?:error("未发现对方的附近连接地址，请重新发现")
         val link=connector?:error("附近连接服务尚未就绪，请重新发现")
         link.connect(address)

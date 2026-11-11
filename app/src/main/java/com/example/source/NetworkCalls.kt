@@ -1,5 +1,7 @@
 package com.example.source
 
+import com.example.i18n.tr
+
 import kotlinx.coroutines.*
 import okhttp3.Call
 import okhttp3.Response
@@ -56,15 +58,15 @@ internal object SourceNetworkPolicy {
             (raw.size==16 && (raw[0].toInt() and 0xfe)==0xfc)
     }
     fun checkAddress(host: String, address: java.net.InetAddress, allowedPrivateHost: String?) {
-        require(!privateAddress(address) || host.lowercase()==allowedPrivateHost) { "书源跳转或 DNS 指向未配置的内网地址" }
+        require(!privateAddress(address) || host.lowercase()==allowedPrivateHost) { tr("书源跳转或 DNS 指向未配置的内网地址") }
     }
     fun check(url:okhttp3.HttpUrl,allowedPrivateHost:String?) {
-        require(url.scheme=="https" || url.scheme=="http") { "仅支持 HTTP/HTTPS 书源" }
+        require(url.scheme=="https" || url.scheme=="http") { tr("仅支持 HTTP/HTTPS 书源") }
         val host=url.host.lowercase()
         val local=host=="localhost" || host.endsWith(".localhost") || host.endsWith(".local") ||
             host=="::1" || host=="0.0.0.0" || host.startsWith("127.") || host.startsWith("10.") || host.startsWith("192.168.") || host.startsWith("169.254.") ||
             Regex("^172\\.(1[6-9]|2[0-9]|3[01])\\.").containsMatchIn(host)
         val ipv6Private=if(host.contains(':')) runCatching { privateAddress(java.net.InetAddress.getByName(host)) }.getOrDefault(true) else false
-        require(!(local || ipv6Private) || host==allowedPrivateHost) { "书源规则尝试访问未配置的内网地址" }
+        require(!(local || ipv6Private) || host==allowedPrivateHost) { tr("书源规则尝试访问未配置的内网地址") }
     }
 }

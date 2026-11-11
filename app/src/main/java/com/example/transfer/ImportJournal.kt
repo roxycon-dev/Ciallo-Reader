@@ -17,8 +17,8 @@ internal object ImportJournal {
     }
     suspend fun prepare(context: Context, db: SupportSQLiteDatabase, stageName: String, keepUndo: Boolean) {
         val dir = directory(context)
-        check(!File(dir, "pending.json").exists()) { "上一次导入需要先恢复" }
-        if(dir.exists())check(dir.deleteRecursively()) { "无法清理上次未开始提交的临时快照" }
+        check(!File(dir, "pending.json").exists()) { com.example.i18n.tr("上一次导入需要先恢复") }
+        if(dir.exists())check(dir.deleteRecursively()) { com.example.i18n.tr("无法清理上次未开始提交的临时快照") }
         dir.mkdirs()
         ArchiveRows.snapshot(db, File(dir, "database.rows"))
         val prefs = JSONObject()
@@ -45,7 +45,7 @@ internal object ImportJournal {
         if(pending.optBoolean("keep")) {
             val undo = File(context.filesDir, "transfer_undo")
             undo.deleteRecursively()
-            check(dir.renameTo(undo)) { "无法保留迁移回退快照" }
+            check(dir.renameTo(undo)) { com.example.i18n.tr("无法保留迁移回退快照") }
             File(undo, "pending.json").delete(); File(undo, "committed").delete()
         } else dir.deleteRecursively()
     }
@@ -72,7 +72,7 @@ internal object ImportJournal {
     fun hasUndo(context: Context): Boolean = File(context.filesDir, "transfer_undo/database.rows").isFile
     fun activateUndo(context: Context) {
         val undo = File(context.filesDir, "transfer_undo")
-        check(hasUndo(context)) { "没有可用的回退快照" }
+        check(hasUndo(context)) { com.example.i18n.tr("没有可用的回退快照") }
         val dir = directory(context); check(!File(dir,"pending.json").exists())
         dir.deleteRecursively(); check(undo.renameTo(dir))
         atomic(File(dir, "pending.json"), JSONObject().put("stage", "").put("keep", false).toString())

@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -15,14 +17,14 @@ internal suspend fun loadReaderChapterWindow(
     readParts: suspend (List<Int>) -> List<Chapter>,
 ): ReaderChapterWindow = withContext(Dispatchers.Default) {
     val metadata = mapping.chapters
-    check(currentIndex in metadata.indices) { "没有可读取的章节" }
+    check(currentIndex in metadata.indices) { tr("没有可读取的章节") }
     val targets = ((currentIndex - 1)..(currentIndex + 1)).filter { it in metadata.indices }
     val reusable = targets.filter { it in loaded && it in previous.indices }.toSet()
     val missing = targets.filterNot { it in reusable }
     val orders = missing.flatMap { mapping.logicalToPhysicalOrders[it].asIterable() }.distinct()
     val parts = if (orders.isEmpty()) emptyMap() else readParts(orders).associateBy { it.chapterOrder }
     val complete = reusable + missing.filter { index -> mapping.logicalToPhysicalOrders[index].all { it in parts } }
-    check(currentIndex in complete) { "当前章节数据缺失，请重试加载" }
+    check(currentIndex in complete) { tr("当前章节数据缺失，请重试加载") }
     val chapters = metadata.toMutableList()
     for (index in targets) {
         ensureActive()

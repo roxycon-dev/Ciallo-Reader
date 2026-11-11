@@ -1,5 +1,7 @@
 package com.example.source.js
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -71,13 +73,13 @@ class JsMessageHandler(
     private val imageBudget: Long get() = minOf(64L * 1024 * 1024, Runtime.getRuntime().maxMemory() / 6)
     private fun checkImageAllocation(width: Int, height: Int) = synchronized(images) {
         val pixels=width.toLong()*height
-        require(pixels<=imageBudget/4) { "脚本图片尺寸过大" }
+        require(pixels<=imageBudget/4) { tr("脚本图片尺寸过大") }
         val requested=pixels*4
         require(width>0 && height>0 && requested<=imageBudget &&
             images.values.distinct().sumOf { it.allocationByteCount.toLong() }+requested<=imageBudget) { "脚本图像内存预算不足" }
     }
     private fun putImage(bmp: Bitmap): Int = synchronized(images) {
-        require(images.size<48) { "脚本创建的图片过多" }
+        require(images.size<48) { tr("脚本创建的图片过多") }
         val key=imageKeyGen.incrementAndGet()
         images[key]=bmp
         key
@@ -249,7 +251,7 @@ class JsMessageHandler(
         builder.addNetworkInterceptor { chain ->
             val request = chain.request()
             if (insecure && request.headers.names().any { it.equals("Cookie", true) || it.equals("Authorization", true) })
-                throw java.io.IOException("不安全 TLS 书源不能发送登录凭据，请启用证书验证")
+                throw java.io.IOException(tr("不安全 TLS 书源不能发送登录凭据，请启用证书验证"))
             chain.proceed(request)
         }
         if (sourceKey == "aimanhua" && !insecure) {
@@ -657,7 +659,7 @@ class JsMessageHandler(
                 if (directMirror) publicDirectRoutes.remove(host)
                 lastError = when {
                     pageProblem != null -> pageProblem
-                    empty -> "源站返回空响应，重新连接后仍未收到页面"
+                    empty -> tr("源站返回空响应，重新连接后仍未收到页面")
                     response.error != null -> "网络连接失败：${response.error}"
                     else -> "源站返回 HTTP ${response.status}"
                 }
@@ -756,7 +758,7 @@ class JsMessageHandler(
                         val bytes = ByteArray(buffer.position())
                         buffer.rewind()
                         buffer.get(bytes)
-                        require(bodyOut.size().toLong()+bytes.size<=16L*1024*1024) { "JS 网络响应超过 16MiB" }
+                        require(bodyOut.size().toLong()+bytes.size<=16L*1024*1024) { tr("JS 网络响应超过 16MiB") }
                         bodyOut.write(bytes)
                     }
                     request?.read(java.nio.ByteBuffer.allocateDirect(64 * 1024))

@@ -1,5 +1,7 @@
 package com.example.source.importer
 
+import com.example.i18n.tr
+
 import com.example.data.readImportBytes
 import android.content.Context
 import android.net.Uri
@@ -74,7 +76,7 @@ object SourceImporter {
         withContext(Dispatchers.IO) {
             try {
                 val inputStream = context.contentResolver.openInputStream(uri)
-                    ?: return@withContext SourceResult.Error(SourceException.ParseError("无法打开选择的文件"))
+                    ?: return@withContext SourceResult.Error(SourceException.ParseError(tr("无法打开选择的文件")))
 
                 val jsonStr = inputStream.use { stream ->
                     stream.readImportBytes(2*1024*1024).toString(Charsets.UTF_8)
@@ -154,7 +156,7 @@ object SourceImporter {
             com.example.source.parser.RuleBudget.json(jsonStr)
             if (trimmed.startsWith("[")) {
                 val array = JSONArray(trimmed)
-                require(array.length()<=1000) { "一次最多导入 1000 个书源" }
+                require(array.length()<=1000) { tr("一次最多导入 1000 个书源") }
                 for (i in 0 until array.length()) {
                     val obj = array.optJSONObject(i) ?: continue
                     convertOne(obj)?.let { converted ->
@@ -209,7 +211,7 @@ object SourceImporter {
             val searchObj = obj.optJSONObject("search")
             val htmlSearchObj = obj.optJSONObject("htmlSearch")
             if (searchObj == null && htmlSearchObj == null) {
-                return SourceResult.Error(SourceException.ParseError("缺少 search 或 htmlSearch 节点规则"))
+                return SourceResult.Error(SourceException.ParseError(tr("缺少 search 或 htmlSearch 节点规则")))
             }
 
             val searchUrl = searchObj?.optString("url", "")
@@ -217,7 +219,7 @@ object SourceImporter {
                 ?: htmlSearchObj?.optString("url", "")
                     ?: ""
             if (searchUrl.isBlank()) {
-                return SourceResult.Error(SourceException.ParseError("search/htmlSearch 规则中缺少 url 字段"))
+                return SourceResult.Error(SourceException.ParseError(tr("search/htmlSearch 规则中缺少 url 字段")))
             }
 
             val searchMethod = searchObj?.optString("method", "GET") ?: "GET"

@@ -1,5 +1,7 @@
 package com.example.ui.comic
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -549,7 +551,7 @@ class ComicPageLoader(
         } catch (error: OutOfMemoryError) {
             // Includes decode, preview and geometry fallback allocations. UI must receive
             // a terminal/retryable error even when no enhanced bitmap could be allocated.
-            throw IOException("图片处理内存不足，请重试或关闭画质增强", error)
+            throw IOException(tr("图片处理内存不足，请重试或关闭画质增强"), error)
         } finally {
             if (finished || currentCoroutineContext().isActive) terminalLoads.put(cacheKey, finished)
             availabilityEpoch.update { it + 1 }
@@ -636,7 +638,7 @@ class ComicPageLoader(
             previewCache.put(key, out)
             out
         } catch (error: OutOfMemoryError) {
-            throw IOException("增强预览内存不足，请重试", error)
+            throw IOException(tr("增强预览内存不足，请重试"), error)
         }
     }
 
@@ -1008,7 +1010,7 @@ class ComicPageLoader(
                 clearProcessedCache()
                 (remoteImageLoader ?: coil.Coil.imageLoader(context)).memoryCache?.clear()
                 try { decode(minOf(maxEdge, 1280)) }
-                catch (retry: OutOfMemoryError) { throw IllegalStateException("页面过大，内存不足，请重试", retry) }
+                catch (retry: OutOfMemoryError) { throw IllegalStateException(tr("页面过大，内存不足，请重试"), retry) }
             }
             decoded?.let { capEdge(it, maxEdge) }
         } }
@@ -1113,4 +1115,4 @@ internal suspend fun <T : Any> comicDisplayLoadWithTimeout(
     timeoutMillis: Long = 90_000,
     block: suspend () -> T,
 ): T = withTimeoutOrNull(timeoutMillis) { block() }
-    ?: throw IOException("图片加载或画质增强超时，请重试")
+    ?: throw IOException(tr("图片加载或画质增强超时，请重试"))

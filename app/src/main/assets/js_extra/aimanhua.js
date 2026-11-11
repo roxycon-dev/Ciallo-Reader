@@ -6,7 +6,7 @@
 class AiManhua extends ComicSource {
     name = "爱漫画";
     key = "aimanhua";
-    version = "1.0.4";
+    version = "1.0.5";
     minAppVersion = "1.6.0";
     url = "https://www.alipaypay.com";
     baseUrl = "https://www.alipaypay.com";
@@ -145,6 +145,16 @@ class AiManhua extends ComicSource {
         return url;
     }
 
+    readerImageUrl(raw) {
+        const url = this.abs(raw);
+        // The publisher's WordPress proxy can return 400 for individual pages
+        // even when the original image is available. Its image host serves
+        // these files over HTTP; do not rewrite unrelated hosts or covers.
+        if (!/^https?:\/\/i[0-3]\.wp\.com\/manga\.iqtao\.cn\//i.test(url)) return url;
+        return url.replace(/^https?:\/\/i[0-3]\.wp\.com\/manga\.iqtao\.cn\//i,
+            "http://manga.iqtao.cn/").replace(/\?w=1080$/, "");
+    }
+
     parseMetadata(html, book) {
         const doc = new HtmlDocument(html);
         try {
@@ -166,7 +176,7 @@ class AiManhua extends ComicSource {
     parseImages(html, expected) {
         const doc = new HtmlDocument(html);
         try {
-            const images = doc.querySelectorAll("#comicContain img[data-src]").map(img => this.imageUrl(img.attributes["data-src"]));
+            const images = doc.querySelectorAll("#comicContain img[data-src]").map(img => this.readerImageUrl(img.attributes["data-src"]));
             if (!images.length) throw new Error("爱漫画未提供正文图片");
             if (!Number.isInteger(expected) || expected <= 0 || images.length !== expected) throw new Error("爱漫画章节图片不完整：" + images.length + "/" + expected);
             if (images.some(url => !/^https?:\/\//.test(url))) throw new Error("爱漫画图片地址无效");
@@ -208,9 +218,8 @@ class AiManhua extends ComicSource {
             if (row.locked) throw new Error("该章节需要源站授权");
             return this.parseImages(await this.page(url), row.pages);
         },
-        // Keep online and download requests on the verified JPEG rendition; the
-        // downloader's default WebP Accept negotiates a separate stale CDN cache.
-        onImageLoad: () => ({headers: {"User-Agent": this.headers["User-Agent"], "Accept": "image/jpeg"}}),
+        // Rewrite previously cached proxy URLs as well as newly parsed pages.
+        onImageLoad: (url) => ({url: this.readerImageUrl(url), headers: {"User-Agent": this.headers["User-Agent"], "Accept": "image/jpeg"}}),
         onThumbnailLoad: () => ({headers: {"User-Agent": this.headers["User-Agent"], "Accept": "image/jpeg"}})
     };
 }

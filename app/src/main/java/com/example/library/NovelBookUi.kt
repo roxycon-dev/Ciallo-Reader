@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.i18n.tr
+
 import com.example.ui.wenku.wenkuReveal
 import com.example.ui.wenku.wenkuPagePart
 import com.example.ui.wenku.WenkuTextButton
@@ -151,12 +153,12 @@ fun NovelSearchCard(book: SearchBook, sourceName: String, imageLoader: ImageLoad
                 val facts = listOfNotNull(info?.wordCount, info?.volumeCount?.let { "$it 卷" }, info?.chapterCount?.let { "$it 章" })
                 if (facts.isNotEmpty()) Text(facts.joinToString(" · "), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 val downloadLabel = when (state) {
-                    is DownloadState.Success -> "已在书架 · 离线阅读"
+                    is DownloadState.Success -> tr("已在书架 · 离线阅读")
                     is DownloadState.Downloading -> "整本下载 ${(state.progress * 100).toInt()}%"
-                    is DownloadState.Pending -> "正在准备整本下载"
-                    is DownloadState.Paused -> "整本下载已暂停"
-                    is DownloadState.Error -> if (downloaded) "可读离线版本 · 更新下载失败" else "下载失败 · 点开重试"
-                    else -> if (downloaded) "已在书架 · 离线阅读" else "查看详情 · 整本下载"
+                    is DownloadState.Pending -> tr("正在准备整本下载")
+                    is DownloadState.Paused -> tr("整本下载已暂停")
+                    is DownloadState.Error -> if (downloaded) tr("可读离线版本 · 更新下载失败") else tr("下载失败 · 点开重试")
+                    else -> if (downloaded) tr("已在书架 · 离线阅读") else tr("查看详情 · 整本下载")
                 }
                 Text(downloadLabel, fontSize = 11.sp, color = novelAccentColor(), fontWeight = FontWeight.Medium)
             }
@@ -175,7 +177,7 @@ fun NovelDetailContent(book: SearchBook, sourceName: String, imageLoader: ImageL
             val wide = maxWidth >= 650.dp
             val coverWidth = if (wide) 150.dp else 118.dp
             val coverAction = if (onOpenCover != null && !book.cover.isNullOrBlank()) {
-                Modifier.semantics { contentDescription = "查看封面" }
+                Modifier.semantics { contentDescription = tr("查看封面") }
                     .pullOutClickable(role = Role.Button, onClick = onOpenCover)
             } else {
                 Modifier
@@ -225,9 +227,9 @@ fun NovelDetailContent(book: SearchBook, sourceName: String, imageLoader: ImageL
         }
         if (error != null) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         val facts = listOfNotNull(
-            info?.wordCount?.let { "字数" to it }, info?.chapterCount?.let { "源站目录" to "$it 章" },
-            info?.volumeCount?.let { "收录卷数" to "$it 卷" }, book.size?.let { "下载大小" to "%.1f MB".format(it / 1024.0 / 1024) },
-            info?.publisher?.let { "出版社" to it }, info?.translation?.let { "阅读版本" to it })
+            info?.wordCount?.let { com.example.i18n.tr("字数") to it }, info?.chapterCount?.let { com.example.i18n.tr("源站目录") to "$it 章" },
+            info?.volumeCount?.let { com.example.i18n.tr("收录卷数") to "$it 卷" }, book.size?.let { com.example.i18n.tr("下载大小") to "%.1f MB".format(it / 1024.0 / 1024) },
+            info?.publisher?.let { com.example.i18n.tr("出版社") to it }, info?.translation?.let { com.example.i18n.tr("阅读版本") to it })
         if (facts.isNotEmpty()) GlassCard(Modifier.wenkuPagePart(2)) {
             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 facts.chunked(2).forEach { row -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -241,7 +243,7 @@ fun NovelDetailContent(book: SearchBook, sourceName: String, imageLoader: ImageL
         }
         if (!info?.latestChapter.isNullOrBlank() || !info?.updatedAt.isNullOrBlank()) {
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text("连载进度", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(tr("连载进度"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 info?.latestChapter?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                 info?.updatedAt?.let { Text("源站更新 $it", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
@@ -254,12 +256,12 @@ fun NovelDetailContent(book: SearchBook, sourceName: String, imageLoader: ImageL
         if (!synopsis.isNullOrBlank()) {
             var expanded by remember(book.id, book.sourceId) { mutableStateOf(false) }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                WenkuSectionHeader("01", "SYNOPSIS", "作品简介", Modifier.wenkuPagePart(3))
+                WenkuSectionHeader("01", "SYNOPSIS", com.example.i18n.tr("作品简介"), Modifier.wenkuPagePart(3))
                 Text(synopsis, style = MaterialTheme.typography.bodyMedium, lineHeight = 23.sp,
                     maxLines = if (expanded) Int.MAX_VALUE else 7, overflow = TextOverflow.Ellipsis)
                 if (synopsis.length > 180) {
                     WenkuTextButton(
-                        if (expanded) "收起简介" else "展开完整简介",
+                        if (expanded) tr("收起简介") else tr("展开完整简介"),
                         onClick = { expanded = !expanded },
                         compact = true,
                         wenkuSymbol = if (expanded) WenkuSymbol.Up else WenkuSymbol.Down,
@@ -304,12 +306,12 @@ fun NovelDetailSheet(book: SearchBook, sourceName: String, imageLoader: ImageLoa
             Box(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 12.dp)) {
                 WenkuIconButton(
                     Icons.Default.Close,
-                    "关闭小说详情",
+                    com.example.i18n.tr("关闭小说详情"),
                     onClick = { close {} },
                     modifier = Modifier.align(Alignment.CenterStart),
                 )
                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("小说详情", style = MaterialTheme.typography.titleSmall)
+                    Text(tr("小说详情"), style = MaterialTheme.typography.titleSmall)
                     Text("ARCHIVE / DETAIL", style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -335,7 +337,7 @@ fun NovelDetailSheet(book: SearchBook, sourceName: String, imageLoader: ImageLoa
                             val transfer = state as? DownloadState.Downloading
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    if (transfer == null) "准备整本文件…" else downloadStatusLabel(transfer),
+                                    if (transfer == null) tr("准备整本文件…") else downloadStatusLabel(transfer),
                                     Modifier.weight(1f),
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
@@ -354,11 +356,11 @@ fun NovelDetailSheet(book: SearchBook, sourceName: String, imageLoader: ImageLoa
                             }
                         }
                         is DownloadState.Paused -> WenkuTextButton(
-                            "继续整本下载", onResume, Modifier.fillMaxWidth(),
+                            com.example.i18n.tr("继续整本下载"), onResume, Modifier.fillMaxWidth(),
                             selected = true, wenkuSymbol = WenkuSymbol.Play,
                         )
                         is DownloadState.Success -> WenkuTextButton(
-                            if (hasLocal) "打开书架里的小说" else "整本下载到书架",
+                            if (hasLocal) tr("打开书架里的小说") else tr("整本下载到书架"),
                             if (hasLocal) read else download,
                             Modifier.fillMaxWidth(), selected = true,
                             wenkuSymbol = if (hasLocal) WenkuSymbol.Book else WenkuSymbol.Download,
@@ -368,7 +370,7 @@ fun NovelDetailSheet(book: SearchBook, sourceName: String, imageLoader: ImageLoa
                                 Text(state.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                             }
                             WenkuTextButton(
-                                if (state is DownloadState.Error) "重试整本下载" else "整本下载到书架",
+                                if (state is DownloadState.Error) tr("重试整本下载") else tr("整本下载到书架"),
                                 download,
                                 Modifier.fillMaxWidth(), selected = true, enabled = !loading,
                                 wenkuSymbol = if (state is DownloadState.Error) WenkuSymbol.Refresh else WenkuSymbol.Download,
@@ -376,7 +378,7 @@ fun NovelDetailSheet(book: SearchBook, sourceName: String, imageLoader: ImageLoa
                         }
                     }
                     if (hasLocal && state !is DownloadState.Success) {
-                        WenkuTextButton("阅读已下载版本", read, Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Book)
+                        WenkuTextButton(tr("阅读已下载版本"), read, Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Book)
                     }
                 }
             }
@@ -397,35 +399,35 @@ fun NovelUpdateSheet(update: LibraryViewModel.NovelUpdate, state: DownloadState,
     onRetry: () -> Unit, onDownload: () -> Unit, onPause: () -> Unit, onResume: () -> Unit, onCancel: () -> Unit) {
     PullOutBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("检查小说更新", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(tr("检查小说更新"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(update.local.title, style = MaterialTheme.typography.titleSmall)
             Text(update.sourceName, fontSize = 12.sp, color = novelAccentColor())
             when {
-                update.loading -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("正在获取源站最新信息…") }
-                update.error != null -> { Text(update.error, color = MaterialTheme.colorScheme.error); PullOutOutlinedButton(onClick = onRetry) { Text("重试检查") } }
+                update.loading -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(tr("正在获取源站最新信息…")) }
+                update.error != null -> { Text(update.error, color = MaterialTheme.colorScheme.error); PullOutOutlinedButton(onClick = onRetry) { Text(tr("重试检查")) } }
                 else -> {
-                    Text(when (update.changed) { true -> "源站信息有更新"; false -> "源站信息未变化"; null -> "已获取源站当前信息" }, fontWeight = FontWeight.SemiBold)
+                    Text(when (update.changed) { true -> tr("源站信息有更新"); false -> tr("源站信息未变化"); null -> tr("已获取源站当前信息") }, fontWeight = FontWeight.SemiBold)
                     update.remote?.novelInfo?.let { info ->
                         info.latestChapter?.let { Text("源站最新 · $it", fontSize = 14.sp) }
                         info.updatedAt?.let { Text("更新于 $it", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         info.chapterCount?.let { Text("源站目录 $it 章", fontSize = 12.sp) }
                         info.notice?.let { Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
-                    Text("整本新版验证成功后替换，保留阅读位置、书签和笔记。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(tr("整本新版验证成功后替换，保留阅读位置、书签和笔记。"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     when (state) {
                         is DownloadState.Success -> {
                             if (state.path != update.local.filePath.removePrefix("file://")) {
-                                Text("新版已存入书架", color = novelAccentColor())
-                                PullOutButton(onClick = com.example.ui.components.paperDismiss(onDismiss), colors = novelActionColors(), modifier = Modifier.fillMaxWidth()) { Text("完成，继续阅读") }
-                            } else PullOutButton(onClick = onDownload, colors = novelActionColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = RoundedCornerShape(14.dp)) { Text(if (update.changed == true) "下载整本新版" else "重新下载整本") }
+                                Text(tr("新版已存入书架"), color = novelAccentColor())
+                                PullOutButton(onClick = com.example.ui.components.paperDismiss(onDismiss), colors = novelActionColors(), modifier = Modifier.fillMaxWidth()) { Text(tr("完成，继续阅读")) }
+                            } else PullOutButton(onClick = onDownload, colors = novelActionColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = RoundedCornerShape(14.dp)) { Text(if (update.changed == true) tr("下载整本新版") else tr("重新下载整本")) }
                         }
-                        is DownloadState.Downloading -> { LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth()); Text("正在下载整本新版 ${(state.progress * 100).toInt()}%"); Row { PullOutTextButton(onClick = onPause) { Text("暂停") }; PullOutTextButton(onClick = onCancel) { Text("取消") } } }
-                        is DownloadState.Pending -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("正在准备整本新版…") }
-                        is DownloadState.Paused -> PullOutButton(onClick = onResume, colors = novelActionColors(), modifier = Modifier.fillMaxWidth()) { Text("继续下载新版") }
+                        is DownloadState.Downloading -> { LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth()); Text("正在下载整本新版 ${(state.progress * 100).toInt()}%"); Row { PullOutTextButton(onClick = onPause) { Text(tr("暂停")) }; PullOutTextButton(onClick = onCancel) { Text(tr("取消")) } } }
+                        is DownloadState.Pending -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(tr("正在准备整本新版…")) }
+                        is DownloadState.Paused -> PullOutButton(onClick = onResume, colors = novelActionColors(), modifier = Modifier.fillMaxWidth()) { Text(tr("继续下载新版")) }
                         else -> {
                             if (state is DownloadState.Error) Text(state.message, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                             PullOutButton(onClick = onDownload, colors = novelActionColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = RoundedCornerShape(14.dp)) {
-                                Text(if (update.changed == true) "下载整本新版" else "重新下载整本")
+                                Text(if (update.changed == true) tr("下载整本新版") else tr("重新下载整本"))
                             }
                         }
                     }

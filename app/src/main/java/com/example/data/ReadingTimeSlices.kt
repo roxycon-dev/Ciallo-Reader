@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -8,7 +10,7 @@ internal data class ReadingTimeSlice(val date:String,val start:Long,val end:Long
 internal object ReadingTimeSlices {
     fun split(start:Long,end:Long,seconds:Long):List<ReadingTimeSlice> {
         if(end<=start || seconds<=0) return emptyList()
-        require(end-start<=7L*24*60*60*1000) { "阅读会话时间范围异常" }
+        require(end-start<=7L*24*60*60*1000) { tr("阅读会话时间范围异常") }
         val format=SimpleDateFormat("yyyy-MM-dd",Locale.US)
         val result=mutableListOf<ReadingTimeSlice>()
         var cursor=start

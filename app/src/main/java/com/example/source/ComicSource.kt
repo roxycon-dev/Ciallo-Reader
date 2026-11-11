@@ -1,5 +1,7 @@
 package com.example.source
 
+import com.example.i18n.tr
+
 /**
  * A book source that can browse online comics chapter by chapter.
  */
@@ -9,7 +11,7 @@ interface ComicSource : BookSource {
 
     /** 章节式文字源：返回章节正文纯文本（段落以 \n\n 分隔）。图片源默认不支持。 */
     suspend fun getChapterText(chapterId: String): SourceResult<String> =
-        SourceResult.Error(SourceException.ParseError("该书源不支持文字章节"))
+        SourceResult.Error(SourceException.ParseError(tr("该书源不支持文字章节")))
 
     /**
      * 每个图片 URL 对应的额外请求头（Referer/Cookie/签名等）。

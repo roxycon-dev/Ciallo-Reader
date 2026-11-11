@@ -1,0 +1,12 @@
+{
+  "duration": 41.35,
+  "peak_dbfs": -5.15,
+  "section_rms_dbfs": {
+    "settings": -19.2,
+    "novel_breath": -55.0,
+    "download_pause": -41.3,
+    "download_complete": -15.4,
+    "ending_tail": -36.7
+  },
+  "note": "音频制作电平记录；不代表试听或主观音质结论。"
+}

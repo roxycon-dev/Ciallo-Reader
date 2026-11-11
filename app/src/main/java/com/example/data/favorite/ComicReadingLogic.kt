@@ -1,5 +1,7 @@
 package com.example.data.favorite
 
+import com.example.i18n.tr
+
 import com.example.source.ComicChapter
 import com.example.source.ComicChapterTitle
 
@@ -160,13 +162,13 @@ object ComicReadingLogic {
         val seq = ordered(chapters)
         fun label(index: Int): String = seq.getOrNull(index)?.chapter?.title?.let(ComicChapterTitle::label) ?: "未命名章节"
         return when (target) {
-            ContinueTarget.Start -> "开始阅读"
+            ContinueTarget.Start -> tr("开始阅读")
             is ContinueTarget.Resume -> {
                 val page = (target.pageIndex + 1).coerceAtLeast(1)
                 "继续阅读 · ${label(target.chapterIndex)} · 第${page}页"
             }
             is ContinueTarget.Next -> "继续阅读 · ${label(target.chapterIndex)}"
-            ContinueTarget.UpToDate -> "已读到最新"
+            ContinueTarget.UpToDate -> tr("已读到最新")
         }
     }
 

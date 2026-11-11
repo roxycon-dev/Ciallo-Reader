@@ -249,7 +249,7 @@ data class AniListTitleEntity(
 
 @Database(
     entities = [Book::class, Chapter::class, Bookmark::class, Highlight::class, CategoryEntity::class, ReadingRecord::class, ReadingSession::class, com.example.download.DownloadTaskEntity::class, AniListTitleEntity::class, com.example.data.favorite.FavoriteEntity::class, com.example.data.favorite.ComicProgressEntity::class, com.example.data.favorite.ChapterReadEntity::class, com.example.data.favorite.FavoriteCategoryEntity::class, com.example.god.GodMomentEntity::class, com.example.transfer.TransferIdentityEntity::class, com.example.transfer.TransferReceiptEntity::class],
-    version = 13,
+    version = 14,
     exportSchema = true
 )
 @TypeConverters(com.example.download.DownloadTypeConverters::class)
@@ -264,6 +264,12 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        val MIGRATION_13_14 = object : androidx.room.migration.Migration(13, 14) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE download_tasks ADD COLUMN progress REAL NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE download_tasks SET progress = CASE WHEN status = 'COMPLETED' THEN 1 WHEN totalBytes > 0 THEN MIN(1.0, CAST(downloadedBytes AS REAL) / totalBytes) ELSE 0 END")
+            }
+        }
         val MIGRATION_12_13 = object : androidx.room.migration.Migration(12, 13) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS transfer_identities (localKey TEXT NOT NULL, stableId TEXT NOT NULL, PRIMARY KEY(localKey))")
@@ -526,11 +532,13 @@ abstract class AppDatabase : RoomDatabase() {
                         LegacyDatabaseMigration(3), LegacyDatabaseMigration(4),
                         MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
                         MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
-                        MIGRATION_11_12, MIGRATION_12_13
+                        MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14
                     )
                     
                     .addCallback(object : RoomDatabase.Callback() {
                         override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                            // PRAGMA 是查询语句，Android SQLite 不允许走 execSQL。
+                            db.query("PRAGMA journal_size_limit=4194304").use { it.moveToFirst() }
                             com.example.transfer.ImportJournal.recover(context.applicationContext, db)
                         }
                     })

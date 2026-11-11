@@ -1,22 +1,24 @@
 package com.example.source.parser
 
+import com.example.i18n.tr
+
 /** Regex runs on a deadline-aware CharSequence, including backtracking in java.util.regex. */
 internal object RuleBudget {
-    fun validate(rule:String) { require(rule.length<=4096) { "书源规则过长" }; require(rule.count { it=='@' || it=='&' || it=='|' }<=128) { "书源规则嵌套过多" } }
+    fun validate(rule:String) { require(rule.length<=4096) { tr("书源规则过长") }; require(rule.count { it=='@' || it=='&' || it=='|' }<=128) { tr("书源规则嵌套过多") } }
     fun json(value:String) {
-        require(value.length<=2*1024*1024) { "JSON 超过 2MiB" }
+        require(value.length<=2*1024*1024) { tr("JSON 超过 2MiB") }
         var depth=0; var quoted=false; var escaped=false
         for(ch in value) {
             if(quoted) { if(escaped) escaped=false else if(ch=='\\') escaped=true else if(ch=='"') quoted=false }
             else when(ch) {
                 '"' -> quoted=true
-                '{','[' -> { depth++; require(depth<=64) { "JSON 嵌套过深" } }
+                '{','[' -> { depth++; require(depth<=64) { tr("JSON 嵌套过深") } }
                 '}',']' -> depth--
             }
         }
     }
     fun text(value:String, millis:Long=1000):CharSequence {
-        require(value.length<=2*1024*1024) { "规则输入超过 2MiB" }
+        require(value.length<=2*1024*1024) { tr("规则输入超过 2MiB") }
         return Bounded(value,0,value.length,android.os.SystemClock.elapsedRealtime()+millis)
     }
     private class Bounded(val value:String,val begin:Int,override val length:Int,val deadline:Long):CharSequence {

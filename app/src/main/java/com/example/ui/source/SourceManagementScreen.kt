@@ -2,6 +2,8 @@
 
 package com.example.ui.source
 
+import com.example.i18n.tr
+
 import androidx.compose.runtime.CompositionLocalProvider
 import com.example.ui.wenku.rememberWenkuAccessibility
 import com.example.ui.wenku.WenkuIconContact
@@ -505,7 +507,7 @@ fun SourceManagementScreen(
 
     if (showDebugLog) {
         val clipboard = LocalClipboardManager.current
-        WenkuActionSheet("书源调试日志", onDismiss = { showDebugLog = false }) {
+        WenkuActionSheet(tr("书源调试日志"), onDismiss = { showDebugLog = false }) {
             Text(
                 "查看搜索、目录与正文请求。需要反馈时可以复制日志。",
                 style = MaterialTheme.typography.bodySmall,
@@ -519,7 +521,7 @@ fun SourceManagementScreen(
                 "复制全部",
                 onClick = {
                     clipboard.setText(AnnotatedString(debugLogText))
-                    AppToast.makeText(context, "日志已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                    AppToast.makeText(context, tr("日志已复制到剪贴板"), Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.fillMaxWidth(),
                 wenkuSymbol = WenkuSymbol.Copy
@@ -537,8 +539,8 @@ fun SourceManagementScreen(
     }
 
     if (showImportPicker) {
-        WenkuActionSheet("导入书源", onDismiss = { showImportPicker = false }) {
-            Text("支持「阅读」书源 JSON 文件、粘贴配置和社区合集。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        WenkuActionSheet(tr("导入书源"), onDismiss = { showImportPicker = false }) {
+            Text(tr("支持「阅读」书源 JSON 文件、粘贴配置和社区合集。"), color = MaterialTheme.colorScheme.onSurfaceVariant)
             WenkuTextButton(
                 "从本地文件导入", onClick = paperDismiss { fileLauncher.launch("*/*") },
                 modifier = Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.FolderOpen
@@ -555,11 +557,11 @@ fun SourceManagementScreen(
     }
 
     if (showPasteDialog) {
-        WenkuActionSheet("粘贴 JSON 书源配置", onDismiss = { showPasteDialog = false }, fitKeyboard = true) {
+        WenkuActionSheet(tr("粘贴 JSON 书源配置"), onDismiss = { showPasteDialog = false }, fitKeyboard = true) {
             androidx.compose.material3.OutlinedTextField(
                 value = pasteJsonText,
                 onValueChange = { pasteJsonText = it },
-                label = { Text("JSON 配置") },
+                label = { Text(tr("JSON 配置")) },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp),
                 minLines = 4, maxLines = 6,
                 shape = RoundedCornerShape(SourceAvatarRadius)
@@ -577,7 +579,7 @@ fun SourceManagementScreen(
     }
 
     if (showNetworkDialog) {
-        WenkuActionSheet("网络导入书源", onDismiss = { showNetworkDialog = false }, fitKeyboard = true) {
+        WenkuActionSheet(tr("网络导入书源"), onDismiss = { showNetworkDialog = false }, fitKeyboard = true) {
             Text(
                 "输入「阅读」书源合集的 JSON 地址。导入时会跳过不兼容的书源。",
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -585,13 +587,13 @@ fun SourceManagementScreen(
             androidx.compose.material3.OutlinedTextField(
                 value = networkUrl,
                 onValueChange = { networkUrl = it },
-                label = { Text("书源地址") },
+                label = { Text(tr("书源地址")) },
                 placeholder = { Text("https://…/shuyuan") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(SourceAvatarRadius),
                 singleLine = true
             )
-            Text("快速选择社区源", style = MaterialTheme.typography.labelLarge)
+            Text(tr("快速选择社区源"), style = MaterialTheme.typography.labelLarge)
             SourceImporter.PRESET_SOURCE_URLS.forEach { (url, label) ->
                 WenkuTextButton(
                     label, onClick = { networkUrl = url }, modifier = Modifier.fillMaxWidth(),
@@ -615,18 +617,18 @@ fun SourceManagementScreen(
             loading = loginLoading,
             onLogin = { email, pass, close ->
                 loginLoading = true
-                loginMessage = "登录中…"
+                loginMessage = tr("登录中…")
                 scope.launch {
                     val src = zlibSource
                     if (src == null) {
                         loginLoading = false
-                        loginMessage = "Z-Library 源不可用"
+                        loginMessage = tr("Z-Library 源不可用")
                         return@launch
                     }
                     when (val result = src.login(LoginCredential(username = email, password = pass))) {
                         is SourceResult.Success -> {
                             loginLoading = false
-                            loginMessage = "登录成功"
+                            loginMessage = tr("登录成功")
                             loggedIn = true
                             close()
                         }
@@ -650,7 +652,7 @@ fun SourceManagementScreen(
             onRegister = if (src.id == "js_vomic") {
                 {
                     val result = (src as? com.example.source.js.JsComicSource)?.register()
-                        ?: throw IllegalStateException("源不可用")
+                        ?: throw IllegalStateException(tr("源不可用"))
                     if (result is com.example.source.SourceResult.Error) {
                         throw Exception(result.exception.message ?: "注册失败")
                     }
@@ -718,9 +720,9 @@ private fun SourceQuickTilesRow(
                         }
                         SourceTileStatusText(
                             text = when {
-                                loggedIn -> "已登录"
-                                hasZLibrary -> "未登录"
-                                else -> "未内置"
+                                loggedIn -> tr("已登录")
+                                hasZLibrary -> tr("未登录")
+                                else -> tr("未内置")
                             }
                         )
                     }
@@ -746,7 +748,7 @@ private fun SourceQuickTilesRow(
                     )
                 },
                 name = "调试日志",
-                status = { SourceTileStatusText(text = "查看日志") },
+                status = { SourceTileStatusText(text = tr("查看日志")) },
                 onClick = onOpenDebugLog,
                 modifier = Modifier.weight(1f)
             )
@@ -889,9 +891,9 @@ private fun SourceVeneraTile(
         status = {
             SourceTileStatusText(
                 text = when (phase) {
-                    VENERA_BUSY -> "更新中…"
-                    VENERA_DONE -> "已更新"
-                    else -> "点击更新"
+                    VENERA_BUSY -> tr("更新中…")
+                    VENERA_DONE -> tr("已更新")
+                    else -> tr("点击更新")
                 }
             )
         },
@@ -1142,7 +1144,7 @@ private fun SourceGroupHeader(
             tint = secondaryText(),
             entrance = false,
             modifier = Modifier
-                .semantics { contentDescription = if (expanded) "折叠分组" else "展开分组" }
+                .semantics { contentDescription = if (expanded) tr("折叠分组") else tr("展开分组") }
                 .graphicsLayer { rotationZ = chevron }
         )
     }
@@ -1197,7 +1199,7 @@ private fun SourceExpandRestRow(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = if (showAll) "收起" else "展开其余 $rest 个",
+                text = if (showAll) tr("收起") else com.example.i18n.expandRest(rest),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = accentText()
@@ -1281,7 +1283,7 @@ private fun SourceRow(
                 }
                 if (source.capabilities.requiresLogin) {
                     Spacer(modifier = Modifier.width(6.dp))
-                    SourceMiniLabel(text = "需登录")
+                    SourceMiniLabel(text = tr("需登录"))
                 }
             }
             Spacer(modifier = Modifier.height(2.dp))
@@ -1295,7 +1297,7 @@ private fun SourceRow(
             if (source.isComicSource) {
                 PullOutTextButton(onClick = { showSourceInfo = true }, contentPadding = PaddingValues(0.dp),
                     modifier = Modifier.heightIn(min = 28.dp)) {
-                    Text("漫画源 · 查看资料", style = SourceIdStyle.copy(color = MaterialTheme.colorScheme.primary))
+                    Text(tr("漫画源 · 查看资料"), style = SourceIdStyle.copy(color = MaterialTheme.colorScheme.primary))
                 }
             }
         }
@@ -1307,10 +1309,10 @@ private fun SourceRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             if (onOpenLogin != null) {
-                SourceMiniActionChip(text = if (source.id == "js_mycomic") "验证" else "登录", onClick = onOpenLogin)
+                SourceMiniActionChip(text = if (source.id == "js_mycomic") tr("验证") else tr("登录"), onClick = onOpenLogin)
             }
             if (onOpenNodeManager != null) {
-                SourceMiniActionChip(text = "节点", onClick = onOpenNodeManager)
+                SourceMiniActionChip(text = tr("节点"), onClick = onOpenNodeManager)
             }
             AppSwitch(
                 checked = isEnabled,
@@ -1324,7 +1326,7 @@ private fun SourceRow(
             if (isCustom) {
                 AppIconButton(
                     icon = Icons.Filled.Delete,
-                    contentDescription = "删除书源",
+                    contentDescription = tr("删除书源"),
                     onClick = onDelete,
                     tint = MaterialTheme.colorScheme.error,
                     glyphSize = 22.dp
@@ -1421,7 +1423,7 @@ private fun SourceImportEntryRow(
         WenkuIcon(WenkuSymbol.Add, size = 18.dp, tint = accentText(), entrance = false)
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = "导入 JSON 书源",
+            text = tr("导入 JSON 书源"),
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             color = accentText()

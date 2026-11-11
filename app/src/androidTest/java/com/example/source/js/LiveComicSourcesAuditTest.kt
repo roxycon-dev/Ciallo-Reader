@@ -257,13 +257,11 @@ class LiveComicSourcesAuditTest {
                         row.put("cachedErrorImageWidth", recovered.width).put("cachedErrorImageHeight", recovered.height)
                     }
                     if (download && visibleSamples > 0) {
+                        // Use a new download identity for every audit, including sources
+                        // whose IDs are not URLs, so a prior run cannot satisfy this one.
                         val book = requireNotNull(selectedBook).let {
-                            // A fragment keeps the public comic URL valid while giving this
-                            // owned audit a separate download identity and empty directory.
-                            if (key == "pufei" && InstrumentationRegistry.getArguments().getString("freshDownload") == "true") {
-                                row.put("freshDownload", true)
-                                it.copy(id = it.id + "#audit-" + java.util.UUID.randomUUID())
-                            } else it
+                            row.put("freshDownload", true)
+                            it.copy(id = it.id + "#audit-" + java.util.UUID.randomUUID())
                         }
                         stage("download", 180_000) {
                             val application = context.applicationContext as android.app.Application
@@ -290,12 +288,16 @@ class LiveComicSourcesAuditTest {
                                 ?: error("Completed download was not registered in bookshelf")
                             val localPages = database.bookDao().getChaptersListForBook(localBook.id)
                             assertEquals(pages.size, localPages.size)
-                            localPages.forEach { page ->
+                            localPages.forEachIndexed { index, page ->
                                 val file = File(page.content)
-                                assertTrue("Missing local page", file.isFile && file.length() > 0)
-                                val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                                android.graphics.BitmapFactory.decodeFile(file.absolutePath, bounds)
-                                assertTrue("Invalid downloaded image", bounds.outWidth > 0 && bounds.outHeight > 0)
+                                assertTrue("Missing local page ${index + 1}", file.isFile && file.length() > 0)
+                                // Bounds alone can succeed for damaged image payloads. Actually
+                                // decode every downloaded page, sampling to limit peak memory.
+                                val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = 8 }
+                                val decoded = android.graphics.BitmapFactory.decodeFile(file.absolutePath, options)
+                                assertTrue("Cannot decode downloaded page ${index + 1}",
+                                    decoded != null && decoded.width > 0 && decoded.height > 0)
+                                decoded?.recycle()
                             }
                             // Local references use the offline reader and cannot issue an HTTP request.
                             val offlineLoader = ComicPageLoader(context)
@@ -346,6 +348,10 @@ class LiveComicSourcesAuditTest {
         record(JSONObject().put("summary", true).put("remoteExpected", expected.size)
             .put("installedJs", installed.size).put("attempted", sources.size))
         // Completion of the audit is separate from availability of the individual websites.
-        assertEquals(expected.size + 4, byKey.size + expected.count { it.key !in byKey })
+        assertTrue("No requested sources were available for the audit", sources.isNotEmpty())
+        if (requestedKeys.isNotEmpty()) {
+            assertTrue("Some requested sources were unavailable: ${requestedKeys - sources.map { (it as? JsComicSource)?.sourceKey ?: it.id }.toSet()}",
+                requestedKeys.all { key -> sources.any { ((it as? JsComicSource)?.sourceKey ?: it.id) == key } })
+        }
     }
 }

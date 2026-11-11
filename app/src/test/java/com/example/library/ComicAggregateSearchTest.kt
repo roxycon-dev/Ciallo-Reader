@@ -269,6 +269,20 @@ class ComicAggregateSearchTest {
     }
 
     @Test
+    fun emptyAliasDoesNotHideAnIncompleteOriginalSearch() = runTest {
+        var final: LibraryUiState.AggregateGroup? = null
+        val source = FakeSource("a") {
+            if (it == "original") SourceResult.Error(SourceException.NetworkError("offline"))
+            else SourceResult.Success(emptyList())
+        }
+        runner().search(listOf(source), "original", { listOf(it, "alias") }) { final = it }
+        assertTrue(final!!.books.isEmpty())
+        assertEquals("offline", final!!.error)
+        assertTrue(final!!.failure is SourceException.NetworkError)
+        assertFalse(final!!.loading)
+    }
+
+    @Test
     fun resultGroupsStayInFirstHitOrderAheadOfPendingSources() {
         var state = LibraryUiState.AggregateResults(listOf(group("a"), group("b"), group("c")), true)
         state = state.withComicSearchGroup(group("c", listOf(book("c"))))

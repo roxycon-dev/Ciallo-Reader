@@ -1,5 +1,7 @@
 package com.example.data.favorite
 
+import com.example.i18n.tr
+
 import com.example.source.ComicChapter
 import com.example.source.ComicSource
 import com.example.source.SearchBook
@@ -102,7 +104,7 @@ class FavoriteRepository(
     ): FavoriteMigrationReport = withContext(Dispatchers.IO) {
         require(from.valid && book.sourceId.isNotBlank() && book.id.isNotBlank())
         require(from.raw != favoriteKey(book.sourceId, book.id))
-        require(newChapters.isNotEmpty()) { "新来源暂无可用章节，暂时无法迁移" }
+        require(newChapters.isNotEmpty()) { tr("新来源暂无可用章节，暂时无法迁移") }
         catalogMutex.lock()
         try {
             val catalog = catalogContext?.let(::ChapterCatalog)

@@ -1,5 +1,7 @@
 package com.example.source.keyword
 
+import com.example.i18n.tr
+
 import com.example.data.readImportBytes
 import com.example.source.SharedHttpTransport
 import com.example.source.executeCancellable
@@ -53,12 +55,12 @@ internal class OnlineKeywordLookup(
     private class Unavailable(val reason: String = "资料服务暂不可用") : Exception(reason)
     private fun failureReason(e: Exception): String = when (e) {
         is Unavailable -> e.reason
-        is java.net.UnknownHostException -> "域名解析失败"
-        is java.net.SocketTimeoutException, is java.io.InterruptedIOException -> "网络连接超时"
-        is javax.net.ssl.SSLException -> "安全连接失败"
-        is java.net.ConnectException -> "无法连接资料服务，请检查网络或系统代理"
-        is org.json.JSONException -> "资料服务返回了异常数据"
-        else -> "资料服务连接失败"
+        is java.net.UnknownHostException -> tr("域名解析失败")
+        is java.net.SocketTimeoutException, is java.io.InterruptedIOException -> tr("网络连接超时")
+        is javax.net.ssl.SSLException -> tr("安全连接失败")
+        is java.net.ConnectException -> tr("无法连接资料服务，请检查网络或系统代理")
+        is org.json.JSONException -> tr("资料服务返回了异常数据")
+        else -> tr("资料服务连接失败")
     }
 
     private val bangumiSlots = Semaphore(2)
