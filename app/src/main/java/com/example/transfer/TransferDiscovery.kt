@@ -68,20 +68,20 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
         localPort=port
         val listener=object:NsdManager.RegistrationListener {
             override fun onServiceRegistered(info:NsdServiceInfo) {}
-            override fun onRegistrationFailed(info:NsdServiceInfo,code:Int) { mutableMessage.value="局域网广播失败，可使用附近直连或分享文件" }
+            override fun onRegistrationFailed(info:NsdServiceInfo,code:Int) { mutableMessage.value=tr("局域网广播失败，可使用附近直连或分享文件") }
             override fun onServiceUnregistered(info:NsdServiceInfo) {}
             override fun onUnregistrationFailed(info:NsdServiceInfo,code:Int) {}
         }
         registration=listener
         runCatching { nsd.registerService(NsdServiceInfo().apply { serviceName="Ciallo-${id.take(8)}"; serviceType=SERVICE; setPort(port); setAttribute("id",id); setAttribute("name",name); setAttribute("v","1") },NsdManager.PROTOCOL_DNS_SD,listener) }
             .onFailure { mutableMessage.value="局域网广播不可用：${it.message}" }
-        if(!nearbyReady) {mutableMessage.value="附近连接监听服务未就绪，同 Wi-Fi 互传仍可使用";return}
-        if(!allowed(context)) { mutableMessage.value="授权附近设备后，还可启用离线直连"; return }
+        if(!nearbyReady) {mutableMessage.value=tr("附近连接监听服务未就绪，同 Wi-Fi 互传仍可使用");return}
+        if(!allowed(context)) { mutableMessage.value=tr("授权附近设备后，还可启用离线直连"); return }
         if(portChanged && channel!=null) {
             val ch=channel!!
             p2p?.clearLocalServices(ch,object:WifiP2pManager.ActionListener {
                 override fun onSuccess(){advertiseDirect(ch)}
-                override fun onFailure(reason:Int){mutableMessage.value="附近广播更新失败，请重新开启接收"}
+                override fun onFailure(reason:Int){mutableMessage.value=tr("附近广播更新失败，请重新开启接收")}
             })
         } else startP2p()
     }
@@ -92,7 +92,7 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
             val listener=object:NsdManager.DiscoveryListener {
                 override fun onDiscoveryStarted(type:String) {}
                 override fun onDiscoveryStopped(type:String) {}
-                override fun onStartDiscoveryFailed(type:String,code:Int) { mutableMessage.value="未能开始局域网发现，请重试或使用附近直连"; discovery=null }
+                override fun onStartDiscoveryFailed(type:String,code:Int) { mutableMessage.value=tr("未能开始局域网发现，请重试或使用附近直连"); discovery=null }
                 override fun onStopDiscoveryFailed(type:String,code:Int) {}
                 override fun onServiceLost(info:NsdServiceInfo) {
                     val lost=peerMap.values.filter { "Ciallo-${it.id.take(8)}"==info.serviceName }
@@ -105,7 +105,7 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
                 }
             }
             discovery=listener
-            runCatching { nsd.discoverServices(SERVICE,NsdManager.PROTOCOL_DNS_SD,listener) }.onFailure { discovery=null; mutableMessage.value="局域网发现不可用" }
+            runCatching { nsd.discoverServices(SERVICE,NsdManager.PROTOCOL_DNS_SD,listener) }.onFailure { discovery=null; mutableMessage.value=tr("局域网发现不可用") }
         }
         if(allowed(context)) {
             if(channel==null) startP2p()
@@ -153,7 +153,7 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
     }
     private fun startP2p() {
         if(!nearbyReady)return
-        if(p2p==null || !context.packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT)) {mutableMessage.value="设备不支持附近直连，可使用同 Wi-Fi 互传";return}
+        if(p2p==null || !context.packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT)) {mutableMessage.value=tr("设备不支持附近直连，可使用同 Wi-Fi 互传");return}
         if(!allowed(context))return
         channel?.let {ch ->startDirectServices(ch);connector?.observe();return}
         val ch=p2p.initialize(context,Looper.getMainLooper()) {
@@ -232,8 +232,8 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
     fun connect(peer:TransferPeer) {
         require(allowed(context)){tr("请先授权附近设备")}
         require(peer.nearbyProtocol>=NearbyHandshake.VERSION){tr("该任务或对方使用旧版附近连接。请双方更新至 1.4.5 或更新版本，取消旧任务后重新发现设备")}
-        val address=peer.p2pAddress?:error("未发现对方的附近连接地址，请重新发现")
-        val link=connector?:error("附近连接服务尚未就绪，请重新发现")
+        val address=peer.p2pAddress?:error(tr("未发现对方的附近连接地址，请重新发现"))
+        val link=connector?:error(tr("附近连接服务尚未就绪，请重新发现"))
         link.connect(address)
     }
     fun cancelConnection(){connector?.cancelConnection()}

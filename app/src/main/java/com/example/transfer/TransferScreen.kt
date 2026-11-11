@@ -177,7 +177,7 @@ fun TransferScreen(manager:TransferManager,backup:BackupManager,onEnablePrivacy:
     }
     val save=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(TRANSFER_MIME)) { uri -> if(uri!=null)scope.launch {
         try { localProgress=TransferProgress(TransferPhase.PREPARING); val file=prepare()
-            try { withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } }?:error("无法保存到所选位置") } }
+            try { withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } }?:error(tr("无法保存到所选位置")) } }
             finally { file.delete() }
             Toast.makeText(context,tr("备份已保存"),Toast.LENGTH_SHORT).show()
         }catch(e:Exception){if(e is kotlinx.coroutines.CancellationException)throw e;localError=e.message}finally{localProgress=null}

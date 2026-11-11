@@ -30,7 +30,7 @@ internal object PortableSettings {
                 "float" -> edit.putFloat(key, item.getDouble("value").toFloat().also { require(it.isFinite()) })
                 "string" -> edit.putString(key, item.getString("value"))
                 "set" -> edit.putStringSet(key, item.getJSONArray("value").let { a -> (0 until a.length()).map { a.getString(it) }.toSet() })
-                else -> error("不支持的设置类型")
+                else -> error(tr("不支持的设置类型"))
             }
         }
         check(edit.commit()) { "设置保存失败" }

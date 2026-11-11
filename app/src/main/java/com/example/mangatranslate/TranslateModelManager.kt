@@ -286,7 +286,7 @@ object TranslateModelManager {
     private fun validateUrl(raw: String): String {
         val u = java.net.URI(raw)
         require(u.scheme == "https") { tr("仅允许 https 下载源") }
-        val host = u.host?.lowercase() ?: error("URL 缺少 host")
+        val host = u.host?.lowercase() ?: error(tr("URL 缺少 host"))
         val notAllowed = host == "localhost" ||
             host == "127.0.0.1" || host == "::1" || host == "[::1]" ||
             host.endsWith(".localhost") ||

@@ -343,10 +343,10 @@ class TransferManager private constructor(private val context:Context) {
             val remote=read(input); require(remote.getString("type")=="hello" && remote.getInt("v")==1)
             require(remote.getString("nonce").matches(Regex("[a-f0-9]{48}")))
             if(sending==remote.getBoolean("sending"))throw RejectedException("双方都在发送或都在等待，请让一台设备选择发送")
-            if(endpoint?.routes?.any {it.nearby}==true && endpoint.id!=remote.getString("id"))throw SecurityException("附近握手设备身份不一致")
+            if(endpoint?.routes?.any {it.nearby}==true && endpoint.id!=remote.getString("id"))throw SecurityException(tr("附近握手设备身份不一致"))
             val remotePeer=endpoint?.copy(id=remote.getString("id"),name=remote.getString("name").take(64))?:TransferPeer(remote.getString("id"),remote.getString("name").take(64))
             if(sending && outgoing!!.optString("peerFingerprint").isEmpty() && outgoing!!.optString("peerId")!=remote.getString("id"))
-                throw SecurityException("连接的设备与所选设备不一致，请重新发现")
+                throw SecurityException(tr("连接的设备与所选设备不一致，请重新发现"))
             val fingerprint=TransferTls.peerFingerprint(connection)
             val session=if(sending)outgoing!! else {
                 val sessionId=remote.getString("sessionId"); require(sessionId.matches(Regex("[a-f0-9-]{36}")))
@@ -524,7 +524,7 @@ class TransferManager private constructor(private val context:Context) {
                         target.outputStream().use { output ->
                             com.example.data.ArchiveBudget(MAX_ARCHIVE_BYTES, MAX_ARCHIVE_BYTES, 1).copyEntry(input, output)
                         }
-                    } ?: error("无法打开分享文件")
+                    } ?: error(tr("无法打开分享文件"))
                 }
                 val preview = withContext(Dispatchers.IO) { backup.inspectArchive(target) }
                 importDecision = decision
