@@ -33,7 +33,13 @@
 - `OnboardingScreen` 的页面列表、`LibraryViewModel` 的章节/图片加载错误、`TranslationFailure` 全部改成读取时翻译；引导页 14 条、书库错误 16 条、漫画章节页与发现页维度/范围共 30 余条入表。
 - 单测 JVM 的崩溃改法更精准：从"整体降到 C1"换成 `-XX:CompileCommand=exclude,…SQLiteStatement::executeInsert` + `UseSerialGC` —— 既避开 JBR 的 C2 崩溃，也不会让 Compose 测试因为变慢而超时。
 - 英文第六轮收尾：`PageTurnType` / `TouchAction` / `SwipeAction` 改成读取时翻译；漫画增强引擎的模型下载/校验文案（普通串 + 4 条插值）全部入表或参数化（`modelDownloadFailed` / `modelSizeMb` / `enhanceProgress` / `fullEnhanceProgress`）；再补解析器、书源、导入/备份、站点专属错误约 **350 条**；日历的月名/星期、图表星期名、主题配色名、隐私页、书源 JSON 帮助全部走函数（`monthName` / `weekdayShort` / `weekdayName` / `dayRecordSummary` / `minutesTotal` / `readDateOf` / `durationOf` / `pinFilled`）。
-- 最终口径：`tr()` 调用点 **1300+**、词表 **2900+** 条、`tr()` key 缺失 **0**；未覆盖的中文字面量 1030 → **163**，其中 **50 条是发布记录正文（有意不翻）**，其余是帮助长文与个别诊断串。
+- **排列书架书本转角还原 14dp**：该卡片过去跟随「自定义卡片参数 → 卡片圆角」滑条（默认 16dp、可调到 48dp），
+  现在固定 14dp（与 1.5.x 观感一致）；飞行动画的起点/落点同步用 14dp，动画本身未改动。
+- **设置页语言切换下移**：从「外观与主题」正下方的第 02 分区移到页面最底部（「关于」之后），标题改为「界面语言」。
+- 英文再补齐：版本记录 50 条发布摘要、互传数据类别与阶段（`TransferCategory` / `TransferPhase` 读取时翻译）、
+  附近连接全部提示、漫画预设名与章节状态行、更新弹窗安装提示；关键词补充状态的"进行中 / 失败"判断改成中英双判据
+  （以前英文模式下重试按钮不会出现）。
+- 最终口径：`tr()` 调用点 **1400+**、词表 **2900+** 条、`tr()` key 缺失 **0**；未覆盖的中文字面量 1030 → **98**，其中 **50 条是发布记录正文（有意不翻）**，其余是帮助长文与个别诊断串。
 
 ## 未发布 · 2026-11-11（3D 书架实体化 / 打开动效 / 中英切换）
 
