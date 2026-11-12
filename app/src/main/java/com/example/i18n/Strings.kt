@@ -2964,3 +2964,48 @@ fun scalePresetName(percent: Int): String =
 fun lastPageRead(page: Int, total: Int): String =
     if (AppLocale.language == AppLanguage.ZH) "上次读到第 $page 页 · 共 $total 页"
     else "Last read page $page of $total"
+// ── 统计 / 发现 / 分类窗口（1.6.3） ──────────────────────────────
+fun readDurationOf(period: String): String =
+    if (AppLocale.language == AppLanguage.ZH) "$period" + "阅读时长" else "$period reading time"
+
+fun daysCount(days: Int): String =
+    if (AppLocale.language == AppLanguage.ZH) "$days" + " 天" else if (days == 1) "1 day" else "$days days"
+
+fun streakLine(days: Int): String =
+    if (AppLocale.language == AppLanguage.ZH) "连续阅读 $days" + " 天" else if (days == 1) "1-day streak" else "$days-day streak"
+
+fun periodDaysLine(period: String, days: Int, finished: Int): String =
+    if (AppLocale.language == AppLanguage.ZH) "$period" + "阅读 $days 天 · 读完 $finished 本"
+    else "$period: $days" + if (days == 1) " day" else " days" + " · $finished finished"
+
+fun periodReadOnly(period: String, duration: String): String =
+    if (AppLocale.language == AppLanguage.ZH) "$period" + "只读了 $duration" else "$period: only $duration so far"
+
+fun shareReportTitle(period: String): String =
+    if (AppLocale.language == AppLanguage.ZH) "我的阅读${period}报 · Ciallo Reader" else "My $period" + " reading report · Ciallo Reader"
+
+fun findWhatYouWant(kind: String): String =
+    if (AppLocale.language == AppLanguage.ZH) "找你想看的$kind" else "Find $kind to read"
+
+fun allOf(label: String): String =
+    if (AppLocale.language == AppLanguage.ZH) "全部$label" else "All $label"
+
+fun itemsCount(count: Int): String =
+    if (AppLocale.language == AppLanguage.ZH) " · $count" + "本" else " · $count"
+
+fun applyFilters(count: Int): String =
+    if (AppLocale.language == AppLanguage.ZH) "应用 $count 项" else "Apply $count"fun sourcesOf(active: Int, total: Int): String =
+    if (AppLocale.language == AppLanguage.ZH) "来源 $active / $total" else "Sources $active / $total"
+
+// ── 漫画阅读器（1.6.3） ────────────────────────────────────────
+fun pageOf(page: String): String =
+    if (AppLocale.language == AppLanguage.ZH) "第 $page 页" else "Page $page"
+
+fun loadingPercent(percent: Int): String =
+    if (AppLocale.language == AppLanguage.ZH) "正在加载 · $percent%" else "Loading · $percent%"
+
+fun receivedKb(kb: Long): String =
+    if (AppLocale.language == AppLanguage.ZH) "已接收 $kb KB" else "Received $kb KB"
+
+fun preparingOcr(percent: Int): String =
+    if (AppLocale.language == AppLanguage.ZH) "准备 OCR 模型 · $percent%" else "Preparing OCR model · $percent%"

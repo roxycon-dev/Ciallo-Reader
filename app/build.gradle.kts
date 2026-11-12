@@ -88,8 +88,8 @@ android {
     applicationId = "com.aistudio.novelreader.kxmpzq"
     minSdk = 24
     targetSdk = 35
-    versionCode = 262
-    versionName = "1.6.2"
+    versionCode = 263
+    versionName = "1.6.3"
     externalNativeBuild {
       cmake { arguments += "-DANDROID_STL=c++_static" }
     }
@@ -213,6 +213,8 @@ android {
         // 只把这个方法排除出 C2 编译，比整体降到 C1 更划算：Compose 测试不会因为解释执行变慢而超时。
         it.jvmArgs(
           "-XX:CompileCommand=exclude,android.database.sqlite.SQLiteStatement::executeInsert",
+                    "-XX:CompileCommand=exclude,android.util.LruCache::evictAll",
+                    "-XX:CompileCommand=exclude,android.database.sqlite.SQLiteConnection`$PreparedStatementCache::entryRemoved",
           "-XX:+UseSerialGC",
         )
       }

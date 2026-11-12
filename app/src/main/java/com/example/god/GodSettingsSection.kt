@@ -86,7 +86,7 @@ fun GodSettingsSection(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Text(
-                    "神回排行榜展示风格",
+                    com.example.i18n.tr("神回排行榜展示风格"),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -125,7 +125,7 @@ fun GodSettingsSection(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            "查看神回排行榜 ✦",
+                            com.example.i18n.tr("查看神回排行榜 ✦"),
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = if (dark) GodGold.DarkMid else GodGold.LightEnd,

@@ -111,7 +111,7 @@ internal fun DiscoverCategorySheet(entries: List<DiscoverEntry>, selected: Set<S
         val close = LocalOverlayClose.current
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("找你想看的${partition.label}", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(com.example.i18n.findWhatYouWant(partition.label), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 PullOutIconButton(icon = Icons.Outlined.Close, contentDescription = tr("关闭分类窗口"), onClick = com.example.ui.components.paperDismiss(onDismiss))
             }
             if (facet == "native") {
@@ -130,7 +130,7 @@ internal fun DiscoverCategorySheet(entries: List<DiscoverEntry>, selected: Set<S
                         items(groups) { g -> DiscoverChip(g, nativeGroup == g, solid = false, onClick = { nativeGroup = g }) }
                     } }
                     items(categories.chunked(3)) { row -> FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        row.forEach { c -> DiscoverChip(c.label, false, solid = false, outlined = true, onClick = { val source = nativeSource; close { onNative(source, c.id) } }) }
+                        row.forEach { c -> DiscoverChip(com.example.i18n.tr(c.label), false, solid = false, outlined = true, onClick = { val source = nativeSource; close { onNative(source, c.id) } }) }
                     } }
                     if (categories.isEmpty()) item { Text(tr("这个书源暂未提供独立分类，可使用上方标准分类。"), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(16.dp)) }
                     if (catalog?.dynamicCategories == true) item { PullOutTextButton(onClick = { onLoadCategories(nativeSource) }) { Text(tr("加载全部分类")) } }
@@ -143,13 +143,13 @@ internal fun DiscoverCategorySheet(entries: List<DiscoverEntry>, selected: Set<S
                 LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
                     item { CategorySearchHeader(search, facet, { search = it }, { facet = it; search = "" }) }
                     items(branches) { branch ->
-                        Text(branch.label, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(com.example.i18n.tr(branch.label), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (branch.id in supportedIds) DiscoverChip("全部${branch.label}", branch.id in draft, solid = false, outlined = true, onClick = { toggle(branch.id) })
+                            if (branch.id in supportedIds) DiscoverChip(com.example.i18n.allOf(branch.label), branch.id in draft, solid = false, outlined = true, onClick = { toggle(branch.id) })
                             branch.children.filter { c -> (openTaxonomy || c.id in supportedIds || c.id in draft || c.id in setOf("native_other", "year", "franchise")) &&
                                 (search.isBlank() || branch.label.contains(search, true) || c.label.contains(search, true) || c.aliases.any { it.contains(search, true) }) }.forEach { c ->
-                                val count = counts[c.id]?.let { " · ${it}本" }.orEmpty()
-                                DiscoverChip(c.label + count + if (c.id in updated) tr(" · 今") else "", c.id in draft,
+                                val count = counts[c.id]?.let { com.example.i18n.itemsCount(it) }.orEmpty()
+                                DiscoverChip(com.example.i18n.tr(c.label) + count + if (c.id in updated) tr(" · 今") else "", c.id in draft,
                                     solid = false, outlined = true, onClick = {
                                         if (c.id in setOf("native_other", "year", "franchise")) { facet = "native"; search = "" }
                                         else toggle(c.id)
@@ -161,7 +161,7 @@ internal fun DiscoverCategorySheet(entries: List<DiscoverEntry>, selected: Set<S
             }
             Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 PullOutTextButton(onClick = { draft = emptySet() }) { Text(tr("清除")) }
-                AppActionButton(if (draft.isEmpty()) "查看全部" else "应用 ${draft.size} 项", { val selectedDraft = draft; close { onApply(selectedDraft) } },
+                AppActionButton(if (draft.isEmpty()) com.example.i18n.tr("查看全部") else com.example.i18n.applyFilters(draft.size), { val selectedDraft = draft; close { onApply(selectedDraft) } },
                     modifier = Modifier.weight(1f), fullWidth = true)
             }
         }
@@ -175,7 +175,7 @@ private fun CategorySearchHeader(search: String, facet: String, onSearch: (Strin
         OutlinedTextField(search, onSearch, Modifier.fillMaxWidth(), singleLine = true,
             placeholder = { Text(tr("搜索分类")) }, leadingIcon = { Icon(Icons.Outlined.Search, null) })
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(DiscoverTaxonomy.roots) { root -> DiscoverChip(root.label, facet == root.id, solid = false, onClick = { onFacet(root.id) }) }
+            items(DiscoverTaxonomy.roots) { root -> DiscoverChip(com.example.i18n.tr(root.label), facet == root.id, solid = false, onClick = { onFacet(root.id) }) }
             item { DiscoverChip(tr("书源分类"), facet == "native", solid = false, onClick = { onFacet("native") }) }
         }
         Text(tr("组内多选，跨组组合 · 本数仅统计已加载作品"), style = MaterialTheme.typography.labelSmall,

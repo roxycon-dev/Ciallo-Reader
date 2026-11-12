@@ -3,8 +3,10 @@ package com.example.discover
 import com.example.source.*
 
 /** Storage and source boundaries, independent of the currently visible tab. */
-enum class DiscoverPartition(val label: String, val preferenceSuffix: String) {
+enum class DiscoverPartition(private val rawLabel: String, val preferenceSuffix: String) {
     COMIC("漫画", ""), NOVEL("小说", "_novel");
+
+    val label: String get() = com.example.i18n.tr(rawLabel)
     fun accepts(source: BookSource) = when (this) {
         COMIC -> source.isComicSource
         NOVEL -> source.isNovelSource

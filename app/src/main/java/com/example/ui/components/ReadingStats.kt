@@ -62,14 +62,26 @@ fun readingRecordsToDailyTotals(records: List<ReadingRecord>): Map<String, Long>
 }
 
 fun formatReadDuration(totalSeconds: Long): String {
-    if (totalSeconds <= 0) return "0分钟"
+    val en = com.example.i18n.AppLocale.language == com.example.i18n.AppLanguage.EN
+    if (totalSeconds <= 0) return if (en) "0 min" else "0分钟"
     val h = totalSeconds / 3600
     val m = (totalSeconds % 3600) / 60
-    return if (h > 0) "${h}小时${m}分钟" else "${m}分钟"
+    return when {
+        en && h > 0 -> "${h}h ${m}m"
+        en -> "${m} min"
+        h > 0 -> "${h}小时${m}分钟"
+        else -> "${m}分钟"
+    }
 }
 
 /** 日历格子里的小标签：3h26m / 45m / 12s */
 fun formatShortDuration(totalSeconds: Long): String {
+    val en = com.example.i18n.AppLocale.language == com.example.i18n.AppLanguage.EN
+    if (en) {
+        if (totalSeconds < 60) return "${totalSeconds}s"
+        val mins = totalSeconds / 60
+        return if (mins < 60) "${mins}m" else "${mins / 60}h${mins % 60}m"
+    }
     if (totalSeconds < 60) return "${totalSeconds}秒"
     val m = totalSeconds / 60
     if (m < 60) return "${m}分"

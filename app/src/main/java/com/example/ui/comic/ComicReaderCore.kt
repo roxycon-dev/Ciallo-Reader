@@ -777,7 +777,7 @@ fun ComicReaderCore(
         // Translation progress only follows the visible page, not background prefetch.
         val modelStatus = when (val status = translationModelState) {
             com.example.mangatranslate.TranslateModelManager.DownloadState.Ready -> null
-            is com.example.mangatranslate.TranslateModelManager.DownloadState.Downloading -> "准备 OCR 模型 · ${(status.progress * 100).toInt()}%"
+            is com.example.mangatranslate.TranslateModelManager.DownloadState.Downloading -> com.example.i18n.preparingOcr((status.progress * 100).toInt())
             is com.example.mangatranslate.TranslateModelManager.DownloadState.Failed -> tr("OCR 模型下载失败 · 点按检查翻译设置")
             else -> tr("检查 OCR 模型…")
         }
@@ -1812,7 +1812,7 @@ private fun ComicVerticalItem(
                     Box(Modifier.fillMaxWidth()) {
                     androidx.compose.foundation.Image(
                         bitmap = it,
-                        contentDescription = "第 ${spread.firstRawIndex + 1} 页",
+                        contentDescription = com.example.i18n.pageOf("${spread.firstRawIndex + 1}"),
                         modifier = Modifier.fillMaxWidth(),
                         contentScale = ContentScale.FillWidth
                     )
@@ -2119,7 +2119,7 @@ internal fun SinglePageContent(
                 imageBitmap?.let {
                     androidx.compose.foundation.Image(
                         bitmap = it,
-                        contentDescription = "第 ${slot.rawIndex + 1} 页",
+                        contentDescription = com.example.i18n.pageOf("${slot.rawIndex + 1}"),
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.FillBounds
                     )
@@ -2246,7 +2246,7 @@ internal fun DoubleSpreadContent(
                 if (ready != null && sz != Size.Zero) {
                     androidx.compose.foundation.Image(
                         bitmap = ready.bitmap.asImageBitmap(),
-                        contentDescription = "第 ${slot.rawIndex + 1} 页",
+                        contentDescription = com.example.i18n.pageOf("${slot.rawIndex + 1}"),
                         modifier = Modifier
                             .requiredWidth(with(density) { sz.width.toDp() })
                             .requiredHeight(with(density) { sz.height.toDp() }),
@@ -2292,7 +2292,7 @@ internal fun ComicRefinementFeedback(refining: Boolean, error: Throwable?, modif
     Column(modifier.background(ReadingPalette.ScrimStrong).padding(DesignTokens.SpaceSm), horizontalAlignment = Alignment.CenterHorizontally) {
         if (error == null) {
             val modelStatus = when (mode) { ComicEnhanceMode.MANGAJANAI -> MangaJaNai.status.collectAsStateWithLifecycle().value; ComicEnhanceMode.MANGAJANAI_FULL -> MangaJaNaiFull.status.collectAsStateWithLifecycle().value; else -> "" }
-            Text(modelStatus.ifBlank { "高清图加载中…" }, color = Color.White, fontSize = DesignTokens.TypeCaption)
+            Text(modelStatus.ifBlank { com.example.i18n.tr("高清图加载中…") }, color = Color.White, fontSize = DesignTokens.TypeCaption)
         }
         else PullOutTextButton(onClick = onRetry) { Text(tr("高清图加载失败 · 重试"), color = Color.White) }
     }
@@ -2385,8 +2385,8 @@ internal fun ComicLoadingFeedback(ref: ComicPageRef?, onRetry: (() -> Unit)? = n
         if (fraction != null && fraction < 1f) LinearProgressIndicator(progress = { fraction }, modifier = Modifier.width(144.dp))
         val label = when {
             fraction == 1f -> tr("正在展开页面…")
-            fraction != null -> "正在加载 · ${(fraction * 100).toInt()}%"
-            (transfer?.bytes ?: 0) > 0 -> "已接收 ${transfer!!.bytes / 1024} KB"
+            fraction != null -> com.example.i18n.loadingPercent((fraction * 100).toInt())
+            (transfer?.bytes ?: 0) > 0 -> com.example.i18n.receivedKb(transfer!!.bytes / 1024)
             elapsed >= 5 -> tr("连接较慢，正在加载…")
             else -> tr("正在加载页面…")
         }
@@ -2400,7 +2400,7 @@ internal fun ComicLoadingFeedback(ref: ComicPageRef?, onRetry: (() -> Unit)? = n
 /** 增强处理耗时提示文案（null = 未开启增强，不显示） */
 internal fun enhanceHintFor(config: ComicReaderConfig, longEdge: Int): String? {
     if (config.enhanceMode == ComicEnhanceMode.OFF || config.enhanceStrength <= 0) return null
-    if (config.enhanceMode.isJaNai) return "MangaJaNai 处理中"
+    if (config.enhanceMode.isJaNai) return com.example.i18n.tr("MangaJaNai 处理中")
     val sec = ComicImagePipeline.enhanceEstimateSec(config.enhanceMode, config.enhanceStrength, longEdge)
     return "画质增强处理中 · 约 ${if (sec == sec.toLong().toDouble()) sec.toInt().toString() else sec}s"
 }

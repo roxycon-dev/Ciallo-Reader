@@ -175,7 +175,7 @@ fun WeeklyReadingChart(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom
             ) {
-                dayNames.forEachIndexed { index, dayName ->
+                dayNamesShown.forEachIndexed { index, dayName ->
                     val mins = minutesPerDay.getOrElse(index) { 0 }
                     val isToday = index == todayIndex
                     val isSelected = index == selectedDayIndex
@@ -320,7 +320,7 @@ fun WeeklyReadingChart(
             // Detail Popover Card for Selected Day
             val selMins = minutesPerDay.getOrElse(selectedDayIndex) { 0 }
             val selRecords = dayRecords.getOrElse(selectedDayIndex) { emptyList() }
-            val selDayName = dayNames.getOrElse(selectedDayIndex) { "" }
+            val selDayName = dayNamesShown.getOrElse(selectedDayIndex) { "" }
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),

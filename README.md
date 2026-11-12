@@ -11,7 +11,7 @@
 
 [🌐 产品主页](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.6.2 更新说明](docs/release-1.6.2-2026-11-12.md) ·
+[1.6.3 更新说明](docs/release-1.6.3-2026-11-12.md) ·
 [查看截图](#界面预览) ·
 [全部功能](#功能亮点) ·
 [提交问题或建议](https://github.com/roxycon-dev/Ciallo-Reader/issues)
@@ -28,6 +28,8 @@ Ciallo Reader 是一款 **Android 小说阅读器、漫画阅读器和 EPUB 电�
 **English:** Ciallo Reader is an Android ebook, novel, and manga reader for local files and configurable online sources. Search, download, organize your library, and read offline.
 
 **算法与适配验证（待发布）**：继续减少动效重复计算，修复长章折叠重分页的换行丢失与暂时跳位、漫画区域清晰度缓存及资源释放。保留现有视觉与画质分档。145 项 JVM 对照与回归、19 项 Android 模拟器回归通过；整款软件降至原占用 10–20% 尚未证实。详见[本轮验证记录](docs/performance-stability-2026-10-26.md)。
+
+**1.6.3 / 263 · 英文补齐与仓库清理**：统计页的阅读时长与「N 天/连续天数」、神回设置与三种排行榜风格、发现页的分类窗口（125 个题材词）与「漫画/小说」分区、结果行「来源 N / M」、书源管理、书架搜索的「全部/书名/作者」、漫画阅读器状态文案，在英文模式下全部翻译；阅读时长格式随语言切换（`3 分钟` → `3 min`）。删掉误传进仓库的 13 MB 生成页 `promo/output/` 与 `promo/experience/archive-v*` 旧实验目录。详见 [1.6.3 更新说明](docs/release-1.6.3-2026-11-12.md)。
 
 **1.6.2 / 262 · 3D 书架与中英文**：打开一本书的动画过去跨两个渲染器（书架画布转正 → 覆盖层放大贴图），中间必然有速度断点；现在整本书由 `ShelfVolumeArtist` 一个渲染器、一条 `ShelfOpenTimeline` 画到底，首帧与书架静止帧逐像素相同，归位是同一条路径的反向。修掉「退出阅读器后某本书变黑封面」（封面预热窗口按实际绘制槽位取，兜底色改纸色）。按需求去掉 3D 书脊上的书名，只保留编号与柱面明暗。中英文切换补齐：`tr()` 调用点 1300+、词表 2900+ 条、缺失 key 0，并修正英文模式下作品状态掉成「状态未知」的问题。详见 [1.6.2 更新说明](docs/release-1.6.2-2026-11-12.md)。
 **1.5.4 / 246**：现有抽纸变形、液态按钮、水滴选择、液态滑条及挤压开关保留在「高／极致」；「均衡／流畅／极简」使用普通过渡和基础控件。切换画质保留当前数值与选项。成人源仍默认启用，原更新安装流程保留，并包含启动异常保护与本地诊断导出。详见 [1.5.4 更新说明](docs/release-1.5.4-2026-10-26.md)。
