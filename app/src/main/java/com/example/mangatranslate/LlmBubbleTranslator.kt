@@ -262,7 +262,7 @@ class LlmBubbleTranslator(private val context: Context, private val clientOverri
         val host = (u.host ?: "").lowercase()
         require(host.isNotEmpty()) { tr("API 地址缺少主机名") }
         require(host != "localhost" && host != "127.0.0.1" && host != "::1" && host != "[::1]") {
-            "请填局域网 IP 而非 localhost（如 http://192.168.x.x:1234）"
+            com.example.i18n.tr("请填局域网 IP 而非 localhost（如 http://192.168.x.x:1234）")
         }
         return url
     }

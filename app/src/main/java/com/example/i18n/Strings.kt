@@ -2943,3 +2943,24 @@ fun archiveMissingBook(title: String): String =
 /** 图表里的「12分」/「12m」。 */
 fun minutesShort(minutes: Int): String =
     if (AppLocale.language == AppLanguage.ZH) "${minutes}分" else "${minutes}m"
+
+// ── 互传 / 关键词状态 / 漫画预设 / 章节状态（收尾） ───────────────
+fun peerWantsToSend(peer: String): String =
+    if (AppLocale.language == AppLanguage.ZH) "${peer} 想发送数据" else "$peer wants to send data"
+
+/** 关键词补充状态里的"正在…"：中英都要认，否则英文模式下重试按钮不会出现。 */
+fun isBusyStatus(status: String): Boolean =
+    status.startsWith("正在") || status.startsWith("Filling") || status.startsWith("Looking") ||
+        status.startsWith("Translating") || status.startsWith("Checking") || status.startsWith("Saving")
+
+fun isFailureStatus(status: String): Boolean =
+    status.contains("失败") || status.contains("超时") || status.startsWith("未找到更多") ||
+        status.contains("failed", true) || status.contains("timed out", true) ||
+        status.startsWith("No further", true)
+
+fun scalePresetName(percent: Int): String =
+    if (AppLocale.language == AppLanguage.ZH) "缩放 $percent%" else "Zoom $percent%"
+
+fun lastPageRead(page: Int, total: Int): String =
+    if (AppLocale.language == AppLanguage.ZH) "上次读到第 $page 页 · 共 $total 页"
+    else "Last read page $page of $total"

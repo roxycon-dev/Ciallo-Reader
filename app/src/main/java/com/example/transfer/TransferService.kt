@@ -1,4 +1,6 @@
-package com.example.transfer
+package com.example.transfer
+import com.example.i18n.tr
+
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -27,7 +29,7 @@ class TransferService:Service() {
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             val cancel=PendingIntent.getService(this,1,Intent(this,TransferService::class.java).setAction("cancel"),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             return NotificationCompat.Builder(this,"device_transfer").setSmallIcon(android.R.drawable.stat_sys_upload)
-                .setContentTitle(state.phase.label).setContentText(state.message.ifBlank { "数据正在设备之间安全传输" })
+                .setContentTitle(state.phase.label).setContentText(state.message.ifBlank { com.example.i18n.tr("数据正在设备之间安全传输") })
                 .setContentIntent(open).setOnlyAlertOnce(true).setOngoing(state.busy)
                 .setProgress(100,(state.progress.fraction*100).toInt(),state.progress.totalBytes==0L)
                 .apply { if(state.phase!=TransferPhase.IMPORTING)addAction(android.R.drawable.ic_menu_close_clear_cancel,"取消",cancel) }.build()

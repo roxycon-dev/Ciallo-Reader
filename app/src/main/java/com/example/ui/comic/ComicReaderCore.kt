@@ -208,7 +208,7 @@ fun ComicReaderCore(
     onJumpToChapter: ((Int) -> Unit)? = null,
     onPrevChapter: (() -> Unit)? = null,
     onNextChapter: (() -> Unit)? = null,
-    chapterNavLabel: String = "章节",
+    chapterNavLabel: String = com.example.i18n.tr("章节"),
     onPageChanged: (rawPage: Int, isFinished: Boolean) -> Unit = { _, _ -> },
     remoteImageLoader: ImageLoader? = null,
     /** 工具栏神回入口；未提供时不显示。 */
@@ -801,7 +801,7 @@ fun ComicReaderCore(
                     .background(Color(0xB3141416))
                     .padding(horizontal = DesignTokens.SpaceComfortable, vertical = 7.dp)
             ) {
-                Text(translationProgress[currentTranslationBusy] ?: "正在翻译…", color = Color(0xE6FFFFFF), fontSize = DesignTokens.TypeCaption)
+                Text(translationProgress[currentTranslationBusy] ?: com.example.i18n.tr("正在翻译…"), color = Color(0xE6FFFFFF), fontSize = DesignTokens.TypeCaption)
             }
         }
         val currentFailure = currentTranslationKeys.firstOrNull { it in translationFailures }?.let { translationFailureDetails[it] }
