@@ -1,4 +1,6 @@
-package com.example.ui.comic
+package com.example.ui.comic
+import com.example.i18n.tr
+
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -105,7 +107,7 @@ class ComicSettingsStore(context: Context) {
     fun createPreset(name: String, emoji: String, config: ComicReaderConfig): ComicPreset {
         val preset = ComicPreset(
             id = "preset_" + UUID.randomUUID().toString().take(12),
-            name = name.trim().ifBlank { "我的预设" }, emoji = emoji, config = config.normalized(), builtIn = false
+            name = name.trim().ifBlank { com.example.i18n.tr("我的预设") }, emoji = emoji, config = config.normalized(), builtIn = false
         )
         savePresets(loadPresets() + preset)
         return preset
@@ -147,7 +149,7 @@ class ComicSettingsStore(context: Context) {
     fun saveCustomFitPreset(name: String, base: ComicFit, scalePct: Int): ComicCustomFitPreset {
         val preset = ComicCustomFitPreset(
             id = "cfit_" + UUID.randomUUID().toString().take(10),
-            name = name.trim().ifBlank { "缩放 %d%%".format(scalePct) },
+            name = name.trim().ifBlank { com.example.i18n.scalePresetName(scalePct) },
             base = base.takeUnless { it == ComicFit.CUSTOM } ?: ComicFit.FIT_PAGE, scalePct = scalePct.coerceIn(50, 250),
         )
         saveCustomFitPresets(loadCustomFitPresets() + preset)

@@ -73,7 +73,7 @@ internal fun AppUpdateDialogHost() {
             installer.launch(platform.installationIntent(manager.apkFile))
             manager.installing()
         }.onFailure {
-            manager.installationFailed("无法打开系统安装页面。可以导出安装包，用文件管理器安装，或使用浏览器下载。")
+            manager.installationFailed(com.example.i18n.tr("无法打开系统安装页面。可以导出安装包，用文件管理器安装，或使用浏览器下载。"))
         }
     }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {

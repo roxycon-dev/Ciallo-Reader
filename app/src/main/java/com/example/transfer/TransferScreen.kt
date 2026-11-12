@@ -119,7 +119,7 @@ fun TransferHost(backup:BackupManager,onEnablePrivacy:suspend(String)->Boolean={
         val prompt = state
         var opening by remember(prompt.peer?.id, prompt.verificationCode) { mutableStateOf(false) }
         TransferSheet(
-            title = "${prompt.peer?.name ?: "附近设备"} 想发送数据",
+            title = com.example.i18n.peerWantsToSend(prompt.peer?.name ?: "附近设备"),
             onDismiss = {
                 if (!opening && manager.state.value.matchesPrompt(prompt)) manager.confirm(false)
             }

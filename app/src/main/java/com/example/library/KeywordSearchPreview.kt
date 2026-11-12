@@ -95,7 +95,7 @@ internal fun KeywordSearchPreview(
                         transitionSpec = { fadeIn(tween(if (reduce) 0 else 160, delayMillis = if (reduce) 0 else 50)) togetherWith fadeOut(tween(if (reduce) 0 else 80)) },
                         label = "keywordStatus") { currentStatus ->
                         Text(currentStatus, style = MaterialTheme.typography.labelSmall,
-                            color = if (currentStatus.startsWith("正在")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                            color = if (com.example.i18n.isBusyStatus(currentStatus)) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 com.example.ui.components.AnimatedChevron(expanded, collapsedRotation = -90f, expandedRotation = 0f, contentDescription = if (expanded) tr("收起搜索用词") else tr("查看搜索用词"),
@@ -145,8 +145,8 @@ internal fun KeywordSearchPreview(
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            if (onRetry != null && !status.startsWith("正在") &&
-                (status.contains("失败") || status.contains("超时") || status.startsWith("未找到更多"))) {
+            if (onRetry != null && !com.example.i18n.isBusyStatus(status) &&
+                (com.example.i18n.isFailureStatus(status))) {
                 PullOutTextButton(onClick = onRetry, contentPadding = PaddingValues(horizontal = DesignTokens.SpaceXs)) {
                     Text(tr("重新查词"), style = MaterialTheme.typography.labelMedium)
                 }

@@ -327,50 +327,6 @@ fun SettingsTabScreen(
                     }
                 }
 
-                item(key = "language_section", span = { GridItemSpan(maxLineSpan) }) {
-                    // 语言：默认中文，可切英文。用的是设置页既有的分段选择器（LiquidSegmentedSelector），
-                    // 与屏幕方向、渲染画质完全同一套手感，没有另造控件。
-                    WenkuSectionHeader("02", "LANGUAGE", str.t("语言"))
-                }
-                item(key = "language_card", span = { GridItemSpan(maxLineSpan) }) {
-                    GlassCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Text(
-                                text = str.t("界面语言"),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
-                            )
-                            Text(
-                                text = str.t("切换后立即生效，无需重启。"),
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            SegmentedPillSelector(
-                                options = listOf(0 to str.t("中文"), 1 to "English"),
-                                selected = if (com.example.i18n.AppLocale.language ==
-                                    com.example.i18n.AppLanguage.EN
-                                ) 1 else 0,
-                                onSelect = { index ->
-                                    val language = if (index == 1) {
-                                        com.example.i18n.AppLanguage.EN
-                                    } else {
-                                        com.example.i18n.AppLanguage.ZH
-                                    }
-                                    com.example.i18n.AppLocale.language = language
-                                    prefs.appLanguage = language.tag
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-                }
-
                 item(key = "discover_settings") {
                     SettingsSection(str.t("书库与发现")) {
                         SettingsNavigationCard(
@@ -1094,6 +1050,52 @@ fun SettingsTabScreen(
                         }
                     }
                 }
+
+                item(key = "language_section", span = { GridItemSpan(maxLineSpan) }) {
+                    // 语言：默认中文，可切英文。用的是设置页既有的分段选择器（LiquidSegmentedSelector），
+                    // 与屏幕方向、渲染画质完全同一套手感，没有另造控件。
+                    SettingsSectionHeader(str.t("界面语言"))
+                }
+                item(key = "language_card", span = { GridItemSpan(maxLineSpan) }) {
+                    GlassCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = str.t("界面语言"),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
+                            Text(
+                                text = str.t("切换后立即生效，无需重启。"),
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            SegmentedPillSelector(
+                                options = listOf(0 to str.t("中文"), 1 to "English"),
+                                selected = if (com.example.i18n.AppLocale.language ==
+                                    com.example.i18n.AppLanguage.EN
+                                ) 1 else 0,
+                                onSelect = { index ->
+                                    val language = if (index == 1) {
+                                        com.example.i18n.AppLanguage.EN
+                                    } else {
+                                        com.example.i18n.AppLanguage.ZH
+                                    }
+                                    com.example.i18n.AppLocale.language = language
+                                    prefs.appLanguage = language.tag
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+
+
             }
             }
         }

@@ -310,7 +310,7 @@ internal object PortableArchive {
             require(references.all { it in bookIds }) { tr("数据包含缺失的关联书籍") }
             val categories=manifest?.getJSONArray("categories")?.let { a -> (0 until a.length()).map { TransferCategory.valueOf(a.getString(it)) }.toSet() } ?: TransferCategory.entries.toSet()
             if(manifest!=null) require(counts==manifest.getJSONObject("counts").let { obj -> obj.keys().asSequence().associateWith { obj.getInt(it) } }) { tr("数据数量与清单不符") }
-            val warnings=manifest?.optJSONArray("warnings")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: listOf("旧版 ZIP：缺少完整性清单，将按兼容方式导入")
+            val warnings=manifest?.optJSONArray("warnings")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: listOf(com.example.i18n.tr("旧版 ZIP：缺少完整性校验信息清单，将按兼容方式导入"))
             return Extracted(stage,ArchivePreview(manifest?.getString("packageId") ?: fileHash(archive),if(manifest==null)1 else 2,counts,expanded,categories,warnings,protected,protectedFavorites),settings)
         } catch(e: Exception) { stage.deleteRecursively(); throw e }
     }

@@ -213,7 +213,10 @@ fun HomeScreen(
 ) {
     val str = com.example.i18n.LocalStrings.current
     // 卡片实际圆角：飞行层的起飞形状要和它完全一致，否则第一帧会"圆角变尖角"。
-    val shelfCardRadius = com.example.ui.components.LocalCardTweaks.current.cornerRadiusDp.dp
+    // 排列书架上的书本转角固定 14dp（与 1.5.x 的观感一致），不再跟随「自定义卡片参数」的圆角滑条：
+    // 那个滑条一调大，书架上的书就会变得过于圆润。飞行动画的起点/落点也用同一个值，
+    // 保证首帧与卡片严丝合缝。
+    val shelfCardRadius = 14.dp
     val sharedTransitionScope = com.example.LocalSharedTransitionScope.current
     val reduceMotion = LocalReduceMotion.current
     val shelfMotion = com.example.ui.shelf.rememberShelfMotionState()
@@ -1479,7 +1482,7 @@ fun HomeScreen(
                                             val isThemeDark = com.example.ui.theme.LocalAppDarkTheme.current
                                             // 设置 →「自定义卡片参数」实时生效：圆角/不透明度/主题色叠加/压力形变。
                                             val cardTweaks = com.example.ui.components.LocalCardTweaks.current
-                                            val cardShape = androidx.compose.foundation.shape.RoundedCornerShape(cardTweaks.cornerRadiusDp.dp)
+                                            val cardShape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
                                             val coverGradColors = if (isThemeDark) {
                                                 listOf(
                                                     com.example.ui.wenku.WenkuTokens.RaisedDark.copy(alpha = cardTweaks.cardAlpha),

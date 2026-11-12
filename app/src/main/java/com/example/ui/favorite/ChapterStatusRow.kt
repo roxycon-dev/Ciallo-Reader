@@ -184,9 +184,9 @@ fun ChapterStatusRow(
                             ChapterVisual.UNREAD -> tr("未读")
                         }
                     )
-                    if (state.downloaded) append("，已下载")
-                    if (state.isNew) append("，新章节")
-                    if (bookmarked) append("，已加书签")
+                    if (state.downloaded) append(com.example.i18n.tr("，已下载"))
+                    if (state.isNew) append(com.example.i18n.tr("，新章节"))
+                    if (bookmarked) append(com.example.i18n.tr("，已加书签"))
                 }
             }
             .pullOutCombinedClickable(onClick = onClick, onLongClick = onLongClick)
@@ -277,7 +277,7 @@ fun ChapterStatusRow(
                 state.visual == ChapterVisual.READING && state.pageCount > 0 -> {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "上次读到第 ${state.pageIndex + 1} 页 · 共 ${state.pageCount} 页",
+                        text = com.example.i18n.lastPageRead(state.pageIndex + 1, state.pageCount),
                         fontSize = 11.sp,
                         color = MintPrimary.copy(alpha = 0.85f),
                     )

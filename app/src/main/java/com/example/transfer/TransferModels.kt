@@ -7,9 +7,11 @@ import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
 
-enum class TransferCategory(val label: String) {
+enum class TransferCategory(private val rawLabel: String) {
     BOOKS("书籍与离线原文件"), FAVORITES("收藏与分类"), ANNOTATIONS("书签、标注与神回"),
-    HISTORY("阅读进度与记录"), SETTINGS("阅读设置与预设"), RESOURCES("自定义背景与字体"), SOURCES("书源")
+    HISTORY("阅读进度与记录"), SETTINGS("阅读设置与预设"), RESOURCES("自定义背景与字体"), SOURCES("书源");
+
+    val label: String get() = com.example.i18n.tr(rawLabel)
 }
 enum class ImportMode { MERGE, REPLACE }
 data class ExportSelection(
@@ -28,11 +30,13 @@ data class TransferProgress(val phase: TransferPhase, val completedBytes: Long =
     val fraction: Float get() = if (totalBytes > 0) (completedBytes.toDouble() / totalBytes).toFloat().coerceIn(0f, 1f) else 0f
     val remainingSeconds: Long? get() = if (bytesPerSecond > 0) ((totalBytes - completedBytes).coerceAtLeast(0) / bytesPerSecond) else null
 }
-enum class TransferPhase(val label: String) {
+enum class TransferPhase(private val rawLabel: String) {
     IDLE("准备互传"), PREPARING("正在准备数据"), DISCOVERING("正在发现设备"), CONNECTING("正在连接"),
     AWAITING_CONFIRMATION("等待确认"), TRANSFERRING("正在传输"), WAITING_TO_RESUME("等待继续传输"),
     VERIFYING("正在校验"), RECEIVED("数据已收到"), IMPORTING("正在导入"), COMPLETED("已完成"),
-    CANCELLED("已取消"), FAILED("传输未完成")
+    CANCELLED("已取消"), FAILED("传输未完成");
+
+    val label: String get() = com.example.i18n.tr(rawLabel)
 }
 enum class TransferError { PERMISSION, WIFI_DISABLED, UNSUPPORTED, BUSY, CONNECTION, REJECTED, SPACE, CORRUPT, VERSION, IMPORT, UNKNOWN }
 data class TransferRoute(val host:String,val port:Int,val networkHandle:Long?=null,val localAddress:String?=null,val nearby:Boolean=false)

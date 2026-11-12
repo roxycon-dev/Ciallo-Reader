@@ -131,7 +131,7 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
                     val network=if(Build.VERSION.SDK_INT>=33)info.network?.networkHandle else null
                     val routes=addresses.mapNotNull { it.hostAddress?.let {host -> TransferRoute(host,info.port,network)} }
                     if(discovery!=null && peerId!=null && routes.isNotEmpty() && info.port in 1..65535)
-                        put(TransferPeer(peerId,(attr("name")?:"Android 设备").take(64),routes.first().host,info.port,protocol=attr("v")?.toIntOrNull()?:0,routes=routes))
+                        put(TransferPeer(peerId,(attr("name")?:com.example.i18n.tr("Android 设备")).take(64),routes.first().host,info.port,protocol=attr("v")?.toIntOrNull()?:0,routes=routes))
                 }finally{next()}
             }
         })}catch(_:Exception){next()}
@@ -159,7 +159,7 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
         val ch=p2p.initialize(context,Looper.getMainLooper()) {
             connector?.stop();connector=null;channel=null
             receiver?.let {runCatching {context.unregisterReceiver(it)}};receiver=null
-            onP2pError("附近连接服务已断开，请重新发现设备")
+            onP2pError(com.example.i18n.tr("附近连接服务已断开，请重新发现设备"))
         }
         channel=ch
         val platform=object:NearbyPlatform {
@@ -212,7 +212,7 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
                         connector?.refresh()
                     }
                     WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION -> if(intent.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE,-1)!=WifiP2pManager.WIFI_P2P_STATE_ENABLED)
-                        onP2pError("Wi-Fi Direct 已关闭，附近网络未建立")
+                        onP2pError(com.example.i18n.tr("Wi-Fi Direct 已关闭，附近网络未建立"))
                 }
             }
         }
@@ -222,7 +222,7 @@ internal class TransferDiscovery(private val context: Context,private val id:Str
             addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
         },ContextCompat.RECEIVER_EXPORTED)
         p2p.setDnsSdResponseListeners(ch,{_,_,_->},{_,record,device ->
-            if(record["app"]=="ciallo" && record["id"]!=null)put(TransferPeer(record.getValue("id"),(record["name"]?:"Android 设备").take(64),
+            if(record["app"]=="ciallo" && record["id"]!=null)put(TransferPeer(record.getValue("id"),(record["name"]?:com.example.i18n.tr("Android 设备")).take(64),
                 port=record["port"]?.toIntOrNull()?:PORT,p2pAddress=device.deviceAddress,protocol=record["v"]?.toIntOrNull()?:0,
                 directPort=record["port"]?.toIntOrNull(),nearbyProtocol=record["pv"]?.toIntOrNull()?:0))
         })
