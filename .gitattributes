@@ -6,3 +6,10 @@
 app/src/main/cpp/vendor/ncnn/** whitespace=-blank-at-eof
 # Package assets verbatim from Git, including upstream scripts and dictionaries.
 app/src/main/assets/** -text
+
+# GitHub 语言统计：落地页、宣传页与测试夹具不是产品代码，不计入语言占比。
+docs/promo-site/** linguist-documentation
+promo/** linguist-documentation
+app/src/test/resources/** linguist-vendored
+app/src/androidTest/assets/** linguist-vendored
+*.html linguist-documentation
