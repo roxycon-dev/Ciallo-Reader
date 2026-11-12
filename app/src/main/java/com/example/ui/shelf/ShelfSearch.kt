@@ -191,8 +191,10 @@ private fun Modifier.shelfSearchBottomInsets(): Modifier {
     }
 }
 
-internal enum class ShelfSearchField(val title: String) {
+internal enum class ShelfSearchField(private val rawTitle: String) {
     Any("全部"), Title("书名"), Author("作者");
+
+    val title: String get() = com.example.i18n.tr(rawTitle)
 
     fun matches(query: String, title: String, author: String): Boolean =
         (this != Author && title.contains(query, ignoreCase = true)) ||

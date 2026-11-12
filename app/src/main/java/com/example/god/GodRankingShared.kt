@@ -239,7 +239,7 @@ private fun Modifier.clickableItem(onClick: () -> Unit): Modifier =
 @Composable
 fun GodEmptyState(
     modifier: Modifier = Modifier,
-    message: String = "还没有神回，读完一话向后滑试试",
+    message: String = com.example.i18n.tr("还没有神回，读完一话向后滑试试"),
     reduceMotion: Boolean = false,
 ) {
     val infinite = androidx.compose.animation.core.rememberInfiniteTransition(label = "emptyFloat")

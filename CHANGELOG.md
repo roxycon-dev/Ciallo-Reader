@@ -33,6 +33,15 @@
 - `OnboardingScreen` 的页面列表、`LibraryViewModel` 的章节/图片加载错误、`TranslationFailure` 全部改成读取时翻译；引导页 14 条、书库错误 16 条、漫画章节页与发现页维度/范围共 30 余条入表。
 - 单测 JVM 的崩溃改法更精准：从"整体降到 C1"换成 `-XX:CompileCommand=exclude,…SQLiteStatement::executeInsert` + `UseSerialGC` —— 既避开 JBR 的 C2 崩溃，也不会让 Compose 测试因为变慢而超时。
 - 英文第六轮收尾：`PageTurnType` / `TouchAction` / `SwipeAction` 改成读取时翻译；漫画增强引擎的模型下载/校验文案（普通串 + 4 条插值）全部入表或参数化（`modelDownloadFailed` / `modelSizeMb` / `enhanceProgress` / `fullEnhanceProgress`）；再补解析器、书源、导入/备份、站点专属错误约 **350 条**；日历的月名/星期、图表星期名、主题配色名、隐私页、书源 JSON 帮助全部走函数（`monthName` / `weekdayShort` / `weekdayName` / `dayRecordSummary` / `minutesTotal` / `readDateOf` / `durationOf` / `pinFilled`）。
+## 1.6.3 · 2026-11-12（263）
+
+- 英文界面补齐：统计页阅读时长（`3 分钟` → `3 min`，`1小时20分钟` → `1h 20m`）、本周/周期阅读天数与连续天数的「N 天」、吉祥物文案、本周点亮星期、神回空态、周图表星期名；神回设置区与三种排行榜风格/说明、排序方式、内容类型。
+- 发现页：分区「漫画/小说」、分类入口与分类窗口（含 125 个题材词、分组标题、「全部…」「· N 本」「应用 N 项」）、结果行「来源 N / M」、维度与排序标签全部改成读取时翻译。
+- 书源管理：标题、导入菜单与说明、登录/注册失败提示、分组名、调试日志与 Venera 源条目。
+- 书架搜索：点开后的「全部 / 书名 / 作者」分段标签。
+- 漫画阅读器：页码描述、加载/接收/OCR 进度、高清图加载中、MangaJaNai 处理中。
+- 更新目录：补上 1.6.3 / 1.6.2 / 1.6.1 / 1.6.0 / 1.5.5 / 1.5.4 条目，当前版本那一行显示「当前版本」而不是重复版本号（`DiscoverUiTest` 因此恢复通过）。
+- 仓库清理：删除 `promo/output/`（含 13 MB 生成页）与 `promo/experience/archive-v1/3/4/5/6/7`、`archive-audio-v8`；保留 `docs/promo-site/`、`promo/styleframes/`、`promo/experience/` 与测试 HTML 夹具。
 - **排列书架书本转角还原 14dp**：该卡片过去跟随「自定义卡片参数 → 卡片圆角」滑条（默认 16dp、可调到 48dp），
   现在固定 14dp（与 1.5.x 观感一致）；飞行动画的起点/落点同步用 14dp，动画本身未改动。
 - **设置页语言切换下移**：从「外观与主题」正下方的第 02 分区移到页面最底部（「关于」之后），标题改为「界面语言」。

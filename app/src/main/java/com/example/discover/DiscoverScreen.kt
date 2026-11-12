@@ -250,13 +250,13 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                         val unknownStatus = state.entries.any { serialLabel(it.book.discoverStatus) == com.example.i18n.AppLocale.t("状态未知") }
                         Box(Modifier.wenkuTabTitle(2, strength = .55f)) {
                         DiscoverFilters(
-                            tabs = listOf(com.example.i18n.AppLocale.t("推荐") to native) + availableDimensions.map { it.label to (!native && dimension == it) },
+                            tabs = listOf(com.example.i18n.AppLocale.t("推荐") to native) + availableDimensions.map { com.example.i18n.tr(it.label) to (!native && dimension == it) },
                             onTab = { index -> if (index == 0) { light(); nativeFeed = store.string("native_feed_$sourceId", "native"); nativeCategory = null } else switch(availableDimensions[index - 1]) },
                             source = if (sourceId == "aggregate") com.example.i18n.AppLocale.t("聚合书源") else sources.firstOrNull { it.id == sourceId }?.name ?: com.example.i18n.AppLocale.t("选择书源"),
                             onSource = { showSources = true }, selected = selected, onCategory = { expanded = true },
                             onRemove = { store.put("categories", selected - it) }, onClear = { store.put("categories", emptySet()) },
                             refreshing = state.loading, onRefresh = { light(); model.refresh() },
-                            sorts = if (feeds.isNotEmpty()) feeds.map { it.label to (nativeFeed == it.id || (nativeFeed == "native" && it == feeds.first())) } else ranges.map { com.example.discover.discoverRangeLabel(it) to (range == it) },
+                            sorts = if (feeds.isNotEmpty()) feeds.map { com.example.i18n.tr(it.label) to (nativeFeed == it.id || (nativeFeed == "native" && it == feeds.first())) } else ranges.map { com.example.discover.discoverRangeLabel(it) to (range == it) },
                             onSort = { index -> light(); if (feeds.isNotEmpty()) { nativeFeed = feeds[index].id; nativeCategory = null; statusFilter = com.example.i18n.AppLocale.t("全部") } else { range = ranges[index]; statusFilter = com.example.i18n.AppLocale.t("全部") } },
                             statuses = if (statusKnown && statusScope.showStatusChoices) listOf(com.example.i18n.AppLocale.t("全部"), com.example.i18n.AppLocale.t("连载"), com.example.i18n.AppLocale.t("完结")) + (if (state.entries.any { serialLabel(it.book.discoverStatus) == com.example.i18n.AppLocale.t("停更") }) listOf(com.example.i18n.AppLocale.t("停更")) else emptyList()) + (if (unknownStatus) listOf(com.example.i18n.AppLocale.t("状态未知")) else emptyList()) else emptyList(),
                             status = effectiveStatus, statusHint = statusScope.hint, onStatus = { light(); statusFilter = it })
@@ -325,7 +325,7 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                                 val participantCount = rows.flatMap { it.variants }.map { it.book.sourceId }.distinct().size
                                 val action: @Composable () -> Unit = {
                                     WenkuTextButton(
-                                        "来源 $participantCount / ${activeSources.size}",
+                                        com.example.i18n.sourcesOf(participantCount, activeSources.size),
                                         { noticesExpanded = true },
                                         compact = true,
                                         wenkuSymbol = if (state.loading) WenkuSymbol.Sync else WenkuSymbol.Info,

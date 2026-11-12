@@ -29,10 +29,14 @@ import com.example.ui.wenku.WenkuTextButton
 
 internal data class ReleaseSummary(val version: String, val date: String, val summary: String)
 internal val releaseHistory = listOf(
+    ReleaseSummary("1.6.3", "11-12", tr("英文界面补齐 · 分类与统计文案 · 仓库清理")),
+    ReleaseSummary("1.6.2", "11-12", tr("3D 书架单时间轴 · 黑封面修复 · 可覆盖安装的正式签名")),
     ReleaseSummary("1.6.1", "11-10", tr("平板排版 · 旋转重排 · 启动检查更新 · 镜像下载")),
     ReleaseSummary("1.6.0", "11-10", tr("Wenku8 UI · 平板布局 · 漫画预加载数量 · Roxy 动画")),
     ReleaseSummary("1.5.16", "11-07", tr("EPUB 连续插图修复 · 保留插图原始尺寸")),
     ReleaseSummary("1.5.15", "11-06", tr("Alice's Library · 自动备份")),
+    ReleaseSummary("1.5.5", "10-26", tr("恢复原正式版包名与固定签名 · 覆盖升级修正")),
+    ReleaseSummary("1.5.4", "10-26", tr("动效分档 · 启动异常保护与诊断导出")),
     ReleaseSummary("1.5.2", "10-26", tr("动效计算与缓冲复用 · 折叠分页保持 · 成人源固定启用")),
     ReleaseSummary("1.5.1", "10-23", tr("平板性能优化 · 滚动与章节复用 · 缓存预算")),
     ReleaseSummary("1.5.0", "10-21", tr("移除内置阅读指南 · 书架多选不再触发抽纸")),
@@ -114,7 +118,11 @@ internal fun ReleaseHistoryDialog(onDismiss: () -> Unit) {
                 items(releaseHistory, key = { it.version }) { release ->
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(release.version, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (release.version == BuildConfig.VERSION_NAME) tr("当前版本") else release.version,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (release.version == BuildConfig.VERSION_NAME) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            )
                             Text(release.date, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Text(release.summary, style = MaterialTheme.typography.bodySmall)

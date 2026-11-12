@@ -18,10 +18,11 @@ import kotlin.math.roundToInt
  */
 
 /** 内容类型（本期只做 COMIC，NOVEL 为扩展口）。 */
-enum class GodContentType(val code: String, val label: String) {
+enum class GodContentType(val code: String, private val rawLabel: String) {
     COMIC("comic", "漫画"),
-    NOVEL("novel", "小说"),
-    ;
+    NOVEL("novel", "小说");
+
+    val label: String get() = com.example.i18n.tr(rawLabel)
 
     companion object {
         fun of(code: String?): GodContentType =
@@ -30,11 +31,14 @@ enum class GodContentType(val code: String, val label: String) {
 }
 
 /** 神回排行榜展示风格（设置项三选一）。 */
-enum class GodRankingStyle(val code: String, val label: String, val desc: String) {
+enum class GodRankingStyle(val code: String, private val rawLabel: String, private val rawDesc: String) {
     PODIUM("podium", "领奖台", "前三名登台，其余卡牌流"),
     VINYL_SHELF("vinyl", "唱片架", "黑胶 Cover Flow 翻阅"),
     POLAROID_WALL("polaroid", "照片墙", "拍立得挂在麻绳上"),
     ;
+
+    val label: String get() = com.example.i18n.tr(rawLabel)
+    val desc: String get() = com.example.i18n.tr(rawDesc)
 
     companion object {
         fun of(code: String?): GodRankingStyle =
@@ -43,10 +47,12 @@ enum class GodRankingStyle(val code: String, val label: String, val desc: String
 }
 
 /** 排行榜排序方式。 */
-enum class GodSort(val code: String, val label: String) {
+enum class GodSort(val code: String, private val rawLabel: String) {
     RATING("rating", "评分"),
     RECENT("recent", "最近添加"),
-    BOOK("book", "书籍"),
+    BOOK("book", "书籍");
+
+    val label: String get() = com.example.i18n.tr(rawLabel)
 }
 
 /* ══════════════ 封面来源 ══════════════ */

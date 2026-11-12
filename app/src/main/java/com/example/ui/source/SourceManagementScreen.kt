@@ -359,11 +359,11 @@ fun SourceManagementScreen(
             val novels = builtinSources.filter { it.isNovelSource }
             val comics = builtinSources.filter { it.isComicSource }
             val others = builtinSources.filter { !it.isNovelSource && !it.isComicSource }
-            if (novels.isNotEmpty()) add(SourceGroup("小说", SourceGroupKind.NOVEL, novels))
-            if (comics.isNotEmpty()) add(SourceGroup("漫画", SourceGroupKind.COMIC, comics))
-            if (others.isNotEmpty()) add(SourceGroup("其他", SourceGroupKind.OTHER, others))
+            if (novels.isNotEmpty()) add(SourceGroup(com.example.i18n.tr("小说"), SourceGroupKind.NOVEL, novels))
+            if (comics.isNotEmpty()) add(SourceGroup(com.example.i18n.tr("漫画"), SourceGroupKind.COMIC, comics))
+            if (others.isNotEmpty()) add(SourceGroup(com.example.i18n.tr("其他"), SourceGroupKind.OTHER, others))
             if (customSources.isNotEmpty()) {
-                add(SourceGroup("自定义", SourceGroupKind.CUSTOM, customSources))
+                add(SourceGroup(com.example.i18n.tr("自定义"), SourceGroupKind.CUSTOM, customSources))
             }
         }
     }
@@ -519,7 +519,7 @@ fun SourceManagementScreen(
         val clipboard = LocalClipboardManager.current
         WenkuActionSheet(tr("书源调试日志"), onDismiss = { showDebugLog = false }) {
             Text(
-                "查看搜索、目录与正文请求。需要反馈时可以复制日志。",
+                com.example.i18n.tr("查看搜索、目录与正文请求。需要反馈时可以复制日志。"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -528,7 +528,7 @@ fun SourceManagementScreen(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).verticalScroll(rememberScrollState())
             )
             WenkuTextButton(
-                "复制全部",
+                com.example.i18n.tr("复制全部"),
                 onClick = {
                     clipboard.setText(AnnotatedString(debugLogText))
                     AppToast.makeText(context, tr("日志已复制到剪贴板"), Toast.LENGTH_SHORT).show()
@@ -537,10 +537,10 @@ fun SourceManagementScreen(
                 wenkuSymbol = WenkuSymbol.Copy
             )
             WenkuTextButton(
-                "清空",
+                com.example.i18n.tr("清空"),
                 onClick = {
                     com.example.source.SourceLog.clear()
-                    debugLogText = "（已清空）"
+                    debugLogText = com.example.i18n.tr("（已清空）")
                 },
                 modifier = Modifier.fillMaxWidth(),
                 wenkuSymbol = WenkuSymbol.Delete
@@ -552,15 +552,15 @@ fun SourceManagementScreen(
         WenkuActionSheet(tr("导入书源"), onDismiss = { showImportPicker = false }) {
             Text(tr("支持「阅读」书源 JSON 文件、粘贴配置和社区合集。"), color = MaterialTheme.colorScheme.onSurfaceVariant)
             WenkuTextButton(
-                "从本地文件导入", onClick = paperDismiss { fileLauncher.launch("*/*") },
+                com.example.i18n.tr("从本地文件导入"), onClick = paperDismiss { fileLauncher.launch("*/*") },
                 modifier = Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.FolderOpen
             )
             WenkuTextButton(
-                "粘贴 JSON 配置", onClick = paperDismiss { showPasteDialog = true },
+                com.example.i18n.tr("粘贴 JSON 配置"), onClick = paperDismiss { showPasteDialog = true },
                 modifier = Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Document
             )
             WenkuTextButton(
-                "网络导入书源", onClick = paperDismiss { showNetworkDialog = true },
+                com.example.i18n.tr("网络导入书源"), onClick = paperDismiss { showNetworkDialog = true },
                 modifier = Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Link
             )
         }
@@ -577,7 +577,7 @@ fun SourceManagementScreen(
                 shape = RoundedCornerShape(SourceAvatarRadius)
             )
             WenkuTextButton(
-                "确定导入",
+                com.example.i18n.tr("确定导入"),
                 onClick = paperDismiss {
                     viewModel.importSourceFromJsonString(pasteJsonText)
                     pasteJsonText = ""
@@ -591,7 +591,7 @@ fun SourceManagementScreen(
     if (showNetworkDialog) {
         WenkuActionSheet(tr("网络导入书源"), onDismiss = { showNetworkDialog = false }, fitKeyboard = true) {
             Text(
-                "输入「阅读」书源合集的 JSON 地址。导入时会跳过不兼容的书源。",
+                com.example.i18n.tr("输入「阅读」书源合集的 JSON 地址。导入时会跳过不兼容的书源。"),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             androidx.compose.material3.OutlinedTextField(
@@ -611,7 +611,7 @@ fun SourceManagementScreen(
                 )
             }
             WenkuTextButton(
-                "开始导入",
+                com.example.i18n.tr("开始导入"),
                 onClick = paperDismiss {
                     viewModel.importSourceFromUrl(networkUrl.trim())
                     networkUrl = ""
@@ -644,7 +644,7 @@ fun SourceManagementScreen(
                         }
                         is SourceResult.Error -> {
                             loginLoading = false
-                            loginMessage = result.exception.message ?: "登录失败，请检查账号密码"
+                            loginMessage = result.exception.message ?: com.example.i18n.tr("登录失败，请检查账号密码")
                         }
                     }
                 }
@@ -664,7 +664,7 @@ fun SourceManagementScreen(
                     val result = (src as? com.example.source.js.JsComicSource)?.register()
                         ?: throw IllegalStateException(tr("源不可用"))
                     if (result is com.example.source.SourceResult.Error) {
-                        throw Exception(result.exception.message ?: "注册失败")
+                        throw Exception(result.exception.message ?: com.example.i18n.tr("注册失败"))
                     }
                 }
             } else null
@@ -679,7 +679,7 @@ private fun SourceCollapsingTopBar(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    com.example.ui.glasskit.GlassManagementTopBar("书源管理", "LIBRARY / SOURCES", scrollBehavior, onBack, modifier)
+    com.example.ui.glasskit.GlassManagementTopBar(com.example.i18n.tr("书源管理"), "LIBRARY / SOURCES", scrollBehavior, onBack, modifier)
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -757,7 +757,7 @@ private fun SourceQuickTilesRow(
                         tint = MaterialTheme.colorScheme.primary, entrance = false,
                     )
                 },
-                name = "调试日志",
+                name = com.example.i18n.tr("调试日志"),
                 status = { SourceTileStatusText(text = tr("查看日志")) },
                 onClick = onOpenDebugLog,
                 modifier = Modifier.weight(1f)
@@ -896,7 +896,7 @@ private fun SourceVeneraTile(
                 }
             }
         },
-        name = "Venera 源",
+        name = com.example.i18n.tr("Venera 源"),
         enabled = phase != VENERA_BUSY,
         status = {
             SourceTileStatusText(

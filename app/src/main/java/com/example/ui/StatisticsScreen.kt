@@ -407,7 +407,7 @@ private fun PeriodOverviewCard(
     val shareLabel = when (period) { 0 -> com.example.i18n.AppLocale.t("周"); 1 -> com.example.i18n.AppLocale.t("月"); else -> com.example.i18n.AppLocale.t("年") }
     val shareReport: () -> Unit = {
         val shareText = buildString {
-            appendLine("📚 我的阅读${shareLabel}报 · Ciallo Reader")
+            appendLine("📚 " + com.example.i18n.shareReportTitle(shareLabel))
             appendLine("────────────────────")
             if (periodTotal > 0) {
                 appendLine("⏱ ${periodName}阅读 ${formatReadDuration(periodTotal)}（日均 ${if (avgDaily in 1..59) com.example.i18n.AppLocale.t("不足1分钟") else formatShortDuration(avgDaily)}）")
@@ -415,8 +415,8 @@ private fun PeriodOverviewCard(
                 appendLine("⏱ ${periodName}暂无阅读记录，从一页开始 ✨")
             }
             appendLine("🎯 每日目标 ${dailyGoalMinutes} 分钟 · 完成 ${(animatedGoal * 100).toInt()}%")
-            if (streak > 0) appendLine("🔥 连续阅读 $streak 天")
-            if (daysRead > 0) appendLine("📖 ${periodName}阅读 $daysRead 天 · 读完 $finishedCount 本")
+            if (streak > 0) appendLine("🔥 " + com.example.i18n.streakLine(streak))
+            if (daysRead > 0) appendLine("📖 " + com.example.i18n.periodDaysLine(periodName, daysRead, finishedCount))
             appendLine("━━━━━━━━━━━━━━━━")
             appendLine("Ciallo Reader · Roxy 陪伴 ✨")
         }
@@ -448,7 +448,7 @@ private fun PeriodOverviewCard(
             Spacer(Modifier.height(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("${periodName}阅读时长", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(com.example.i18n.readDurationOf(periodName), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = formatReadDuration(animatedPeriodTotal.toLong()),
@@ -521,7 +521,7 @@ private fun PeriodOverviewCard(
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(com.example.i18n.AppLocale.t("每日目标"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("${dailyGoalMinutes} 分钟", style = MaterialTheme.typography.titleSmall, color = MintPrimary)
+                        Text(com.example.i18n.minutesValue("$dailyGoalMinutes"), style = MaterialTheme.typography.titleSmall, color = MintPrimary)
                     }
                     WenkuIconButton(
                         Icons.Filled.RemoveCircleOutline, com.example.i18n.AppLocale.t("减少目标15分钟"),
@@ -544,13 +544,13 @@ private fun PeriodOverviewCard(
                 MiniStatCard(
                     icon = { Icon(Icons.Filled.Book, contentDescription = null, tint = MintSecondary) },
                     label = if (period == 0) com.example.i18n.AppLocale.t("本周阅读天数") else com.example.i18n.AppLocale.t("周期阅读天数"),
-                    value = "$daysRead 天",
+                    value = com.example.i18n.daysCount(daysRead),
                     modifier = Modifier.weight(1f)
                 )
                 MiniStatCard(
                     icon = { Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = MintGold) },
                     label = com.example.i18n.AppLocale.t("当前连续"),
-                    value = "$streak 天",
+                    value = com.example.i18n.daysCount(streak),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -611,13 +611,13 @@ private fun PeriodOverviewCard(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                "${periodName}只读了 ${formatShortDuration(periodTotal)}",
+                                com.example.i18n.periodReadOnly(periodName, formatShortDuration(periodTotal)),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MintPrimary
                             )
                             Text(
-                                "Roxy 捧着魔法书等你翻开第一页～",
+                                tr("Roxy 捧着魔法书等你翻开第一页～"),
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
