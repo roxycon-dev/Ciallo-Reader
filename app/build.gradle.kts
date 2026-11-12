@@ -214,7 +214,7 @@ android {
         it.jvmArgs(
           "-XX:CompileCommand=exclude,android.database.sqlite.SQLiteStatement::executeInsert",
                     "-XX:CompileCommand=exclude,android.util.LruCache::evictAll",
-                    "-XX:CompileCommand=exclude,android.database.sqlite.SQLiteConnection`$PreparedStatementCache::entryRemoved",
+                    "-XX:CompileCommand=exclude,android.database.sqlite.SQLiteConnection${'$'}PreparedStatementCache::entryRemoved",
           "-XX:+UseSerialGC",
         )
       }
