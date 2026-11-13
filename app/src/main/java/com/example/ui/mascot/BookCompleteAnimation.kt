@@ -1,5 +1,7 @@
 package com.example.ui.mascot
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -153,7 +155,7 @@ fun BookCompleteAnimation(onComplete: () -> Unit) {
             ) {
                 Image(
                     painter = painterResource(id = currentDrawableRes),
-                    contentDescription = "Roxy 庆祝",
+                    contentDescription = tr("Roxy 庆祝"),
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -161,7 +163,7 @@ fun BookCompleteAnimation(onComplete: () -> Unit) {
             Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = "🎉 恭喜读完这本书！",
+                text = tr("🎉 恭喜读完这本书！"),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFFF0B95E),
@@ -171,7 +173,7 @@ fun BookCompleteAnimation(onComplete: () -> Unit) {
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "Roxy 为你欢呼 ～✨",
+                text = tr("Roxy 为你欢呼 ～✨"),
                 fontSize = 13.sp,
                 color = Color.White.copy(alpha = 0.85f),
                 textAlign = TextAlign.Center

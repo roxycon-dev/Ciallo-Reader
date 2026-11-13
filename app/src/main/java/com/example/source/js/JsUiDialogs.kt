@@ -1,5 +1,7 @@
 package com.example.source.js
 
+import com.example.i18n.tr
+
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
@@ -57,7 +59,7 @@ suspend fun awaitJsInputDialog(
     imageBase64: String? = null
 ): String = withContext(Dispatchers.Main) {
     val activity = JsActivityTracker.currentActivity()
-        ?: throw IllegalStateException("无可用界面（请回到 App 后重试）")
+        ?: throw IllegalStateException(tr("无可用界面（请回到 App 后重试）"))
     suspendCancellableCoroutine { cont ->
         val density = activity.resources.displayMetrics.density
         val pad = (24 * density).toInt()
@@ -108,7 +110,7 @@ suspend fun awaitJsInputDialog(
 suspend fun awaitWebsiteVerification(url: String, userAgent: String): Boolean = withContext(Dispatchers.Main) {
     require(android.net.Uri.parse(url).host in setOf("mycomic.com", "nhentai.net", "www.bilimanga.net"))
     val activity = JsActivityTracker.currentActivity()
-        ?: throw IllegalStateException("请回到应用后打开站点验证")
+        ?: throw IllegalStateException(tr("请回到应用后打开站点验证"))
     suspendCancellableCoroutine { continuation ->
         val main = Handler(Looper.getMainLooper())
         val cookies = CookieManager.getInstance().apply { setAcceptCookie(true) }

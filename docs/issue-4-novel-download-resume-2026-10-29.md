@@ -32,4 +32,13 @@
 - 16 KiB ZIP 对齐检查通过，权限集合与 1.5.9 一致；未进行真机覆盖安装。
 - 发布附件提供 SHA-256、混淆映射、公开证书及原始测试和构建记录。
 
+### 早期本地构建记录（1.5.5 / 247）
+
+`:app:assembleRelease` 构建成功，包含正式版 Lint 检查、R8 混淆与资源精简。首次构建进程在内存压力较高时被主动重启，后续复用已完成的编译结果完成构建。
+
+- APK：`app/build/outputs/apk/release/app-release.apk`，29,235,200 字节，沿用 1.5.5 / 247。
+- APK SHA-256：`8faddeb5b3d19fa26cbb05d4f3828f976f63333e38fc4d480034836c5845e17b`。
+- `apksigner verify` 通过，证书 SHA-256 与仓库固定的 `signing/release-cert.sha256` 一致。
+- 未推送代码、发布 GitHub Release 或关闭 issue。
+
 本次未进行真机 Wi-Fi / 移动网络切换验证，也未测量源站接口吞吐量。消除重复章节请求可减少中断后的额外耗时；首次下载仍受逐章接口响应及请求节流影响。

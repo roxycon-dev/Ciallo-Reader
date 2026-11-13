@@ -1,5 +1,7 @@
 package com.example.download
 
+import com.example.i18n.tr
+
 import com.example.source.SourceResult
 import com.example.source.impl.XbookcnSource
 import kotlinx.coroutines.currentCoroutineContext
@@ -39,12 +41,12 @@ internal object XbookcnEpub {
         progress: suspend (Int, Int) -> Unit
     ) {
         val url = downloadUrl.toHttpUrl()
-        require(url.fragment == XbookcnSource.EPUB_MARKER) { "书阁下载标识无效" }
+        require(url.fragment == XbookcnSource.EPUB_MARKER) { tr("书阁下载标识无效") }
         val bookId = url.pathSegments.getOrNull(1) ?: error("书阁下载地址无效")
         XbookcnSource.requireBookId(bookId)
         val book = value(source.getDetail(bookId))
         val toc = value(source.getChapters(bookId))
-        require(toc.isNotEmpty()) { "书阁目录为空，未生成电子书" }
+        require(toc.isNotEmpty()) { tr("书阁目录为空，未生成电子书") }
         val records = JSONArray()
         var complete = false
         try {

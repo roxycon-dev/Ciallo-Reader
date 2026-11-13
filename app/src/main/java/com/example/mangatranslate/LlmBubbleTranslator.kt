@@ -1,5 +1,7 @@
 package com.example.mangatranslate
 
+import com.example.i18n.tr
+
 import android.content.Context
 import com.example.source.executeCancellable
 import com.example.data.readImportBytes
@@ -168,7 +170,7 @@ class LlmBubbleTranslator(private val context: Context, private val clientOverri
     internal fun batches(items: List<Item>): List<List<Item>> {
         val chunks = mutableListOf<MutableList<Item>>()
         for (item in items) {
-            require(item.text.length <= 6000) { "单个对白过长" }
+            require(item.text.length <= 6000) { tr("单个对白过长") }
             if (chunks.isEmpty() || chunks.last().size >= 20 || chunks.last().sumOf { it.text.length } + item.text.length > 6000)
                 chunks.add(mutableListOf())
             chunks.last().add(item)
@@ -226,7 +228,7 @@ class LlmBubbleTranslator(private val context: Context, private val clientOverri
 
     internal fun compatibleEndpoint(apiUrl: String): String {
         val base = apiUrl.trim().trimEnd('/').toHttpUrlOrNull()
-            ?: throw IllegalArgumentException("API 地址须以 http(s):// 开头")
+            ?: throw IllegalArgumentException(tr("API 地址须以 http(s):// 开头"))
         if (base.encodedPath.endsWith("/chat/completions")) return base.toString()
         return base.newBuilder().addPathSegments("chat/completions").build().toString()
     }
@@ -242,7 +244,7 @@ class LlmBubbleTranslator(private val context: Context, private val clientOverri
             )
         ).put("generationConfig", JSONObject().put("temperature", 0.2))
         val base = cfg.apiUrl.trim().trimEnd('/').toHttpUrlOrNull()
-            ?: throw IllegalArgumentException("API 地址须以 http(s):// 开头")
+            ?: throw IllegalArgumentException(tr("API 地址须以 http(s):// 开头"))
         val endpoint = base.newBuilder()
             .apply { if (base.encodedPath == "/") addPathSegment("v1beta") }
             .addPathSegment("models").addPathSegment("${cfg.modelName}:generateContent")
@@ -256,9 +258,9 @@ class LlmBubbleTranslator(private val context: Context, private val clientOverri
      */
     private fun sanitizeEndpoint(url: String, gemini: Boolean): String {
         val u = java.net.URI(url)
-        require(u.scheme == "https" || u.scheme == "http") { "API 地址须以 http(s):// 开头" }
+        require(u.scheme == "https" || u.scheme == "http") { tr("API 地址须以 http(s):// 开头") }
         val host = (u.host ?: "").lowercase()
-        require(host.isNotEmpty()) { "API 地址缺少主机名" }
+        require(host.isNotEmpty()) { tr("API 地址缺少主机名") }
         require(host != "localhost" && host != "127.0.0.1" && host != "::1" && host != "[::1]") {
             "请填局域网 IP 而非 localhost（如 http://192.168.x.x:1234）"
         }

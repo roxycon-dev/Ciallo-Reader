@@ -1,5 +1,7 @@
 package com.example.source.impl
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.net.Uri
 import android.util.Log
@@ -104,7 +106,7 @@ class MangaDexSource(
                 response = apiGet("$OFFICIAL_API/chapter?limit=$limit&offset=$offset&order%5BpublishAt%5D=desc" +
                     "&translatedLanguage%5B%5D=zh&translatedLanguage%5B%5D=zh-hk&translatedLanguage%5B%5D=en" +
                     "&publishAtSince=${URLEncoder.encode(since, "UTF-8")}$ratings")
-                    ?: return@withContext SourceResult.Error(SourceException.NetworkError("MangaDex 更新接口不可达"))
+                    ?: return@withContext SourceResult.Error(SourceException.NetworkError(tr("MangaDex 更新接口不可达")))
                 val chapters = response.optJSONArray("data") ?: org.json.JSONArray()
                 for (i in 0 until chapters.length()) {
                     val chapter = chapters.optJSONObject(i) ?: continue
@@ -118,13 +120,13 @@ class MangaDexSource(
                 }
                 collection = if (updates.isEmpty()) org.json.JSONArray() else apiGet("$OFFICIAL_API/manga?limit=$limit$includes$ratings&" +
                     updates.keys.joinToString("&") { "ids%5B%5D=$it" })?.optJSONArray("data")
-                    ?: return@withContext SourceResult.Error(SourceException.NetworkError("MangaDex 作品信息加载失败"))
+                    ?: return@withContext SourceResult.Error(SourceException.NetworkError(tr("MangaDex 作品信息加载失败")))
             } else {
                 val order = if (query.range == "新作") "createdAt" else "followedCount"
                 val status = if (query.range == "完结") "&status%5B%5D=completed" else ""
                 val tagsFilter = if (tagBrowse) "&includedTagsMode=OR" + tagIds.joinToString("") { "&includedTags%5B%5D=$it" } else ""
                 response = apiGet("$OFFICIAL_API/manga?limit=$limit&offset=$offset&order%5B$order%5D=desc$includes$ratings$status$tagsFilter")
-                    ?: return@withContext SourceResult.Error(SourceException.NetworkError("MangaDex 榜单接口不可达"))
+                    ?: return@withContext SourceResult.Error(SourceException.NetworkError(tr("MangaDex 榜单接口不可达")))
                 collection = response.optJSONArray("data") ?: org.json.JSONArray()
             }
             val entries = (0 until collection.length()).mapNotNull { i ->
@@ -144,7 +146,7 @@ class MangaDexSource(
                     fileName?.let { "https://uploads.mangadex.org/covers/$uuid/$it.512.jpg" }, format = "漫画", comicId = "mdapi:$uuid",
                     comicInfo = info.copy(tags = tags)), updatedAt = updates[uuid]?.first, latestChapter = updates[uuid]?.second,
                     rank = if (!tagBrowse && query.dimension == DiscoverDimension.RANKING) offset + i + 1 else null,
-                    native = tagBrowse, origin = if (tagBrowse) "分类推荐" else null,
+                    native = tagBrowse, origin = if (tagBrowse) tr("分类推荐") else null,
                     nativeOrder = if (query.dimension == DiscoverDimension.UPDATES && !tagBrowse) updates.keys.indexOf(uuid) + offset + 1 else offset + i + 1)
             }
             SourceResult.Success(DiscoverPage(entries, offset + response.optInt("limit", limit) < response.optInt("total"), native = tagBrowse,
@@ -549,10 +551,10 @@ class MangaDexSource(
                     val json = apiGet(
                         "$OFFICIAL_API/manga/$uuid?includes%5B%5D=cover_art&includes%5B%5D=author&includes%5B%5D=artist"
                     ) ?: return@withContext SourceResult.Error(
-                        SourceException.NetworkError("MangaDex 官方 API 不可达")
+                        SourceException.NetworkError(tr("MangaDex 官方 API 不可达"))
                     )
                     val item = json.optJSONObject("data")
-                        ?: return@withContext SourceResult.Error(SourceException.ParseError("作品不存在"))
+                        ?: return@withContext SourceResult.Error(SourceException.ParseError(tr("作品不存在")))
                     val attrs = item.optJSONObject("attributes")
                     val titleObj = attrs?.optJSONObject("title")
                     val title = titleObj?.let { t ->
@@ -644,7 +646,7 @@ class MangaDexSource(
                                 "&contentRating%5B%5D=safe&contentRating%5B%5D=suggestive" +
                                 "&contentRating%5B%5D=erotica"
                         ) ?: return@withContext SourceResult.Error(
-                            SourceException.NetworkError("MangaDex 官方 API 不可达")
+                            SourceException.NetworkError(tr("MangaDex 官方 API 不可达"))
                         )
                         val data = feed.optJSONArray("data") ?: break
                         for (i in 0 until data.length()) {
@@ -799,7 +801,7 @@ class MangaDexSource(
                     Log.i(TAG, "mirror fallback for $chapterUuid ch$chapterNum -> ${fallback.size}")
                     return@withContext if (fallback.isEmpty()) {
                         SourceResult.Error(
-                            SourceException.ParseError("该章节官方图片不可用，镜像站也未找到同作品、同章节的图片")
+                            SourceException.ParseError(tr("该章节官方图片不可用，镜像站也未找到同作品、同章节的图片"))
                         )
                     } else {
                         SourceResult.Success(fallback)
@@ -807,7 +809,7 @@ class MangaDexSource(
                 }
                 val path = chapterId.trim('/')
                 if (!path.startsWith("read/")) {
-                    return@withContext SourceResult.Error(SourceException.ParseError("章节标识无效"))
+                    return@withContext SourceResult.Error(SourceException.ParseError(tr("章节标识无效")))
                 }
                 val doc = Jsoup.parse(getHtml("$BASE/$path", referer = true))
                 val images = doc.select("img[src]").mapNotNull { img ->
@@ -816,7 +818,7 @@ class MangaDexSource(
                 }
                 Log.i(TAG, "chapter images $chapterId -> ${images.size}")
                 if (images.isEmpty()) {
-                    SourceResult.Error(SourceException.ParseError("该章节没有可读取的图片"))
+                    SourceResult.Error(SourceException.ParseError(tr("该章节没有可读取的图片")))
                 } else {
                     SourceResult.Success(images)
                 }
@@ -833,7 +835,7 @@ class MangaDexSource(
         }
 
     override suspend fun getDownloadInfo(bookId: String): SourceResult<DownloadInfo> =
-        SourceResult.Error(SourceException.ParseError("漫画源按章节在线阅读/下载，不支持单文件下载"))
+        SourceResult.Error(SourceException.ParseError(tr("漫画源按章节在线阅读/下载，不支持单文件下载")))
 
     override suspend fun getChapterImageHeaders(
         chapterId: String,
@@ -906,22 +908,22 @@ class MangaDexSource(
     }
 
     private fun languageLabel(code: String): String = when (code.uppercase()) {
-        "ZH", "ZH-HK", "ZH-CN", "ZH-TW" -> "中文"
-        "EN" -> "英文"
-        "JA" -> "日文"
-        "KO" -> "韩文"
-        "ES" -> "西班牙语"
-        "PT-BR", "PT" -> "葡萄牙语"
-        "FR" -> "法语"
-        "DE" -> "德语"
-        "RU" -> "俄语"
-        "IT" -> "意大利语"
-        "AR" -> "阿拉伯语"
-        "CA" -> "加泰罗尼亚语"
-        "TR" -> "土耳其语"
-        "TH" -> "泰语"
-        "VI" -> "越南语"
-        "ID" -> "印尼语"
+        "ZH", "ZH-HK", "ZH-CN", "ZH-TW" -> tr("中文")
+        "EN" -> tr("英文")
+        "JA" -> tr("日文")
+        "KO" -> tr("韩文")
+        "ES" -> tr("西班牙语")
+        "PT-BR", "PT" -> tr("葡萄牙语")
+        "FR" -> tr("法语")
+        "DE" -> tr("德语")
+        "RU" -> tr("俄语")
+        "IT" -> tr("意大利语")
+        "AR" -> tr("阿拉伯语")
+        "CA" -> tr("加泰罗尼亚语")
+        "TR" -> tr("土耳其语")
+        "TH" -> tr("泰语")
+        "VI" -> tr("越南语")
+        "ID" -> tr("印尼语")
         else -> code.uppercase()
     }
 

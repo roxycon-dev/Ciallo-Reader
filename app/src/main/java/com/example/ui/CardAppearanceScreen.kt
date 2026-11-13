@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.i18n.tr
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
@@ -59,9 +61,9 @@ internal fun CardAppearanceScreen(
                             ) {
                                 WenkuIcon(WenkuSymbol.Layers, size = 24.dp, tint = colors.primary, entrance = false)
                                 Column {
-                                    Text("实时预览", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                                    Text(tr("实时预览"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                                     Text(
-                                        if (pressPreview) "按住卡片边缘，查看倾斜与压力反馈" else "圆角、色调与不透明度即时更新",
+                                        if (pressPreview) tr("按住卡片边缘，查看倾斜与压力反馈") else tr("圆角、色调与不透明度即时更新"),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = colors.onSurfaceVariant
                                     )
@@ -79,31 +81,31 @@ internal fun CardAppearanceScreen(
                 ) {
                     item(key = "finish") {
                         WenkuContentPanel(Modifier.fillMaxWidth().wenkuPagePart(2)) {
-                            Text("表面与色调", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(tr("表面与色调"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.height(12.dp))
                             CardTweakSlider(
-                                label = "壁纸玻璃模糊（自定义壁纸＋高或极致画质）",
+                                label = tr("壁纸玻璃模糊（自定义壁纸＋高或极致画质）"),
                                 valueText = "${tw.blurRadiusDp.toInt()}dp",
                                 position = (tw.blurRadiusDp - 8f) / 32f,
                                 startText = "8",
                                 endText = "40",
                             ) { v -> updateCardTweaks { it.copy(blurRadiusDp = 8f + v * 32f) } }
                             CardTweakSlider(
-                                label = "卡片圆角",
+                                label = tr("卡片圆角"),
                                 valueText = "${tw.cornerRadiusDp.toInt()}dp",
                                 position = (tw.cornerRadiusDp - 2f) / 46f,
                                 startText = "2",
                                 endText = "48",
                             ) { v -> updateCardTweaks { it.copy(cornerRadiusDp = 2f + v * 46f) } }
                             CardTweakSlider(
-                                label = "主题色叠加浓度",
+                                label = tr("主题色叠加浓度"),
                                 valueText = "${(tw.tintMix * 100).toInt()}%",
                                 position = tw.tintMix / 0.3f,
                                 startText = "0%",
                                 endText = "30%",
                             ) { v -> updateCardTweaks { it.copy(tintMix = v * 0.3f) } }
                             CardTweakSlider(
-                                label = "卡片不透明度",
+                                label = tr("卡片不透明度"),
                                 valueText = "${(tw.cardAlpha * 100).toInt()}%",
                                 position = (tw.cardAlpha - 0.4f) / 0.6f,
                                 startText = "40%",
@@ -113,31 +115,31 @@ internal fun CardAppearanceScreen(
                     }
                     item(key = "contact") {
                         WenkuContentPanel(Modifier.fillMaxWidth().wenkuPagePart(3)) {
-                            Text("倾斜与按压", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(tr("倾斜与按压"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.height(12.dp))
                             CardTweakSlider(
-                                label = "3D 倾斜最大角度",
+                                label = tr("3D 倾斜最大角度"),
                                 valueText = "%.1f°".format(tw.tiltMaxDeg),
                                 position = kotlin.math.sqrt(tw.tiltMaxDeg / 15f),
                                 startText = "0°",
                                 endText = "15°",
                             ) { v -> updateCardTweaks { it.copy(tiltMaxDeg = v * v * 15f) } }
                             CardTweakSlider(
-                                label = "立体透视强度（越大越立体）",
+                                label = tr("立体透视强度（越大越立体）"),
                                 valueText = "${((12f - tw.cameraDistMult) / 9f * 100).toInt()}%",
                                 position = (12f - tw.cameraDistMult) / 9f,
                                 startText = "平面",
                                 endText = "立体",
                             ) { v -> updateCardTweaks { it.copy(cameraDistMult = 12f - v * 9f) } }
                             CardTweakSlider(
-                                label = "压力形变强度",
+                                label = tr("压力形变强度"),
                                 valueText = "${(tw.pressStrength * 100).toInt()}%",
                                 position = tw.pressStrength / 2f,
                                 startText = "0%",
                                 endText = "200%",
                             ) { v -> updateCardTweaks { it.copy(pressStrength = v * 2f) } }
                             CardTweakSlider(
-                                label = "压力形变半径",
+                                label = tr("压力形变半径"),
                                 valueText = "×%.1f".format(tw.pressRadius),
                                 position = (tw.pressRadius - 0.5f) / 2.0f,
                                 startText = "0.5×",

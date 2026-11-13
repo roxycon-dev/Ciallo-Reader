@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.i18n.tr
+
 import com.example.ui.wenku.wenkuPagePart
 import com.example.ui.wenku.wenkuTabTitle
 import com.example.ui.wenku.WenkuSectionHeader
@@ -50,7 +52,6 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -210,6 +211,9 @@ fun HomeScreen(
     onMarkFinished: (Book) -> Unit = {},
     search: ShelfSearchState = rememberShelfSearchState(),
 ) {
+    val str = com.example.i18n.LocalStrings.current
+    // 卡片实际圆角：飞行层的起飞形状要和它完全一致，否则第一帧会"圆角变尖角"。
+    val shelfCardRadius = com.example.ui.components.LocalCardTweaks.current.cornerRadiusDp.dp
     val sharedTransitionScope = com.example.LocalSharedTransitionScope.current
     val reduceMotion = LocalReduceMotion.current
     val shelfMotion = com.example.ui.shelf.rememberShelfMotionState()
@@ -225,8 +229,10 @@ fun HomeScreen(
         result
     }
 
-    var use3dShelf by rememberSaveable { mutableStateOf(true) }
-    var use3dFavorites by rememberSaveable { mutableStateOf(true) }
+    val shelfContext = LocalContext.current
+    val shelfPrefs = remember(shelfContext) { com.example.data.PreferencesManager(shelfContext) }
+    var use3dShelf by remember(shelfPrefs) { mutableStateOf(shelfPrefs.shelfUses3dView) }
+    var use3dFavorites by remember(shelfPrefs) { mutableStateOf(shelfPrefs.favoritesUse3dView) }
     val searchFocusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
@@ -294,14 +300,12 @@ fun HomeScreen(
         favoriteRefreshing = false
     }
     // 首次进入多选的一次性提示：最多展示 3 次（次数持久化，之后不再打扰）
-    val hintContext = androidx.compose.ui.platform.LocalContext.current
-    val hintPrefs = remember(hintContext) { com.example.data.PreferencesManager(hintContext) }
-    var dragHintShown by remember { mutableIntStateOf(hintPrefs.shelfDragHintShown) }
+    var dragHintShown by remember { mutableIntStateOf(shelfPrefs.shelfDragHintShown) }
     LaunchedEffect(shelfSelection.phase) {
         if (shelfSelection.phase == com.example.ui.shelf.ShelfPhase.SELECTING && dragHintShown < 3) {
             showDragHint = true
             dragHintShown += 1
-            hintPrefs.shelfDragHintShown = dragHintShown
+            shelfPrefs.shelfDragHintShown = dragHintShown
         }
     }
 
@@ -405,7 +409,7 @@ fun HomeScreen(
             com.example.data.Book(
                 id = -(kotlin.math.abs(item.key.hashCode()) + 1),
                 title = fav.title,
-                author = fav.author.ifBlank { "未知作者" },
+                author = fav.author.ifBlank { str.t("未知作者") },
                 filePath = "",
                 coverUri = cover,
                 contentType = "COMIC",
@@ -419,24 +423,24 @@ fun HomeScreen(
 
     categoryToDelete?.let { cat ->
         val isDefault = cat.name == com.example.data.DEFAULT_CATEGORY
-        WenkuActionSheet(if (isDefault) "无法删除" else "删除分类", onDismiss = { categoryToDelete = null }) {
-            Text(if (isDefault) "默认分类不可删除。"
+        WenkuActionSheet(if (isDefault) str.t("无法删除") else str.t("删除分类"), onDismiss = { categoryToDelete = null }) {
+            Text(if (isDefault) str.t("默认分类不可删除。")
                 else "「${cat.name}」中的书籍将移到「默认」分类。")
             if (isDefault) {
-                WenkuTextButton("知道了", paperDismiss {}, Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Check)
+                WenkuTextButton(str.t("知道了"), paperDismiss {}, Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Check)
             } else {
                 WenkuTextButton(
-                    "删除",
+                    str.t("删除"),
                     onClick = paperDismiss {
                         onDeleteCategory?.invoke(cat) { deleted ->
                             if (deleted && selectedCategory == cat.name) onShelfCategoryChange(com.example.data.DEFAULT_CATEGORY)
-                            if (!deleted) AppToast.makeText(context, "无法删除分类", Toast.LENGTH_SHORT).show()
+                            if (!deleted) AppToast.makeText(context, str.t("无法删除分类"), Toast.LENGTH_SHORT).show()
                         }
                     },
                     modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.error,
                     wenkuSymbol = WenkuSymbol.Delete,
                 )
-                WenkuTextButton("取消", paperDismiss {}, Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Close)
+                WenkuTextButton(str.t("取消"), paperDismiss {}, Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Close)
             }
         }
     }
@@ -449,7 +453,7 @@ fun HomeScreen(
         com.example.ui.shelf.CategoryPickerSheet(
             categories = if (forFavorites) listOf(com.example.data.favorite.FAV_DEFAULT_CATEGORY) + favCustomCategories
                 else categories.map { it.name },
-            title = "移动到分类",
+            title = str.t("移动到分类"),
             onPick = { name ->
                 if (forFavorites) {
                     val keys = pickedKeys.filter { com.example.ui.shelf.isFavShelfKey(it) }
@@ -483,16 +487,16 @@ fun HomeScreen(
     // 「更多」菜单：我的书架 → 标记为已读完；我喜欢的 → 检查更新
     if (showMoreSheet) {
         com.example.ui.shelf.MoreActionSheet(
-            actions = listOf("标记为已读完" to WenkuSymbol.Check, "取消全选" to WenkuSymbol.CloseCircle),
+            actions = listOf(str.t("标记为已读完") to WenkuSymbol.Check, str.t("取消全选") to WenkuSymbol.CloseCircle),
             onDismiss = { showMoreSheet = false },
             onPick = { label ->
                 when (label) {
-                    "标记为已读完" -> {
+                    str.t("标记为已读完") -> {
                         sortedBooks.filter { it.id.toString() in shelfSelection.selected }
                             .forEach { onMarkFinished(it) }
                         shelfSelection.exitSelection()
                     }
-                    "取消全选" -> shelfSelection.exitSelection()
+                    str.t("取消全选") -> shelfSelection.exitSelection()
                 }
                 showMoreSheet = false
             },
@@ -503,8 +507,8 @@ fun HomeScreen(
     if (showAddCategoryDialog) {
         val dropKeys = newShelfCategoryDropKeys
         CategoryNameSheet(
-            title = "新建书架分类",
-            description = "用于「我的书架」里的本地书籍。",
+            title = str.t("新建书架分类"),
+            description = tr("用于「我的书架」里的本地书籍。"),
             name = newCategoryText,
             onNameChange = { newCategoryText = it },
             onDismiss = {
@@ -514,7 +518,7 @@ fun HomeScreen(
             onConfirm = { name ->
                 if (dropKeys.isNotEmpty()) pendingCategoryMove = PendingCategoryMove(name, dropKeys, forFavorites = false)
                 onAddCategory(name)
-                AppToast.makeText(context, "已创建分类「$name」", android.widget.Toast.LENGTH_SHORT).show()
+                AppToast.makeText(context, com.example.i18n.categoryCreated(name), android.widget.Toast.LENGTH_SHORT).show()
                 newCategoryText = ""
                 showAddCategoryDialog = false
             },
@@ -525,8 +529,8 @@ fun HomeScreen(
 
     if (showAddFavoriteCategoryDialog) {
         CategoryNameSheet(
-            title = "新建收藏分类",
-            description = "只用于「我喜欢的」，不会出现在书架的分类里。",
+            title = str.t("新建收藏分类"),
+            description = tr("只用于「我喜欢的」，不会出现在书架的分类里。"),
             name = newFavoriteCategoryText,
             onNameChange = { newFavoriteCategoryText = it },
             onDismiss = { showAddFavoriteCategoryDialog = false },
@@ -540,11 +544,11 @@ fun HomeScreen(
 
     favCategorySheetFor?.let { name ->
         com.example.ui.shelf.MoreActionSheet(
-            actions = listOf("重命名分类" to WenkuSymbol.Edit, "删除分类" to WenkuSymbol.Delete),
+            actions = listOf(str.t("重命名分类") to WenkuSymbol.Edit, str.t("删除分类") to WenkuSymbol.Delete),
             onPick = { action ->
                 when (action) {
-                    "重命名分类" -> favCategoryRenameFor = name
-                    "删除分类" -> favCategoryDeleteFor = name
+                    str.t("重命名分类") -> favCategoryRenameFor = name
+                    str.t("删除分类") -> favCategoryDeleteFor = name
                 }
             },
             onDismiss = { favCategorySheetFor = null },
@@ -554,9 +558,9 @@ fun HomeScreen(
     favCategoryRenameFor?.let { original ->
         var text by remember(original) { mutableStateOf(original) }
         CategoryNameSheet(
-            title = "重命名分类", description = "「我喜欢的」中的收藏会保留。",
+            title = str.t("重命名分类"), description = tr("「我喜欢的」中的收藏会保留。"),
             name = text, onNameChange = { text = it },
-            confirmLabel = "保存",
+            confirmLabel = str.t("保存"),
             onDismiss = { favCategoryRenameFor = null },
             onConfirm = { name ->
                 onRenameFavoriteCategory(original, name)
@@ -566,10 +570,10 @@ fun HomeScreen(
     }
 
     favCategoryDeleteFor?.let { name ->
-        WenkuActionSheet("删除收藏分类", onDismiss = { favCategoryDeleteFor = null }) {
+        WenkuActionSheet(str.t("删除收藏分类"), onDismiss = { favCategoryDeleteFor = null }) {
             Text("「$name」中的收藏会移到「默认」分类。")
             WenkuTextButton(
-                "删除",
+                str.t("删除"),
                 onClick = paperDismiss {
                     onDeleteFavoriteCategory(name)
                     if (favoriteCategory == name) favoriteCategory = com.example.ui.favorite.ALL_FAV_CATEGORY
@@ -577,7 +581,7 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.error,
                 wenkuSymbol = WenkuSymbol.Delete,
             )
-            WenkuTextButton("取消", paperDismiss {}, Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Close)
+            WenkuTextButton(str.t("取消"), paperDismiss {}, Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Close)
         }
     }
 
@@ -706,7 +710,7 @@ fun HomeScreen(
             onDropToFavorite = { keys ->
                 val list = sortedBooks.filter { it.id.toString() in keys }
                 val (ok, skipped) = onFavoriteSelectedBooks?.invoke(list) ?: (0 to 0)
-                val msg = if (skipped > 0) "已喜欢 $ok 本，$skipped 本无来源已跳过" else "已加入我喜欢的 $ok 本"
+                val msg = if (skipped > 0) com.example.i18n.favouritesAddedPartial(ok, skipped) else com.example.i18n.favouritesAdded(ok)
                 onShowUndo?.invoke(msg) { }
             },
             onDropToFavoriteCategory = { keys, name ->
@@ -780,7 +784,7 @@ fun HomeScreen(
                                         bookKey = key,
                                         bounds = cover,
                                         image = com.example.ui.wenku.WenkuCoverSnapshots.get(key),
-                                        radius = 14.dp
+                                        radius = shelfCardRadius
                                     )
                                 }
                             }
@@ -830,7 +834,7 @@ fun HomeScreen(
                         CollapsingTabScreenHeader(
                             fractionSource = { if (!search.mounted && homeHeaderCollapsedSource()) 1f else 0f },
                             focusDriven = true,
-                            title = "书架",
+                            title = tr("书架"),
                             subtitle = "BOOKSHELF & READING",
                             titleColor = glassTitleColor(),
                             titleOpacity = { 1f - WenkuMotion.ease.transform(search.motion.value) },
@@ -843,9 +847,9 @@ fun HomeScreen(
                                     value = search.query,
                                     onValueChange = { search.query = it },
                                     hint = when (search.field) {
-                                        ShelfSearchField.Any -> "输入书名或作者"
-                                        ShelfSearchField.Title -> "输入书名"
-                                        ShelfSearchField.Author -> "输入作者"
+                                        ShelfSearchField.Any -> str.t("输入书名或作者")
+                                        ShelfSearchField.Title -> str.t("输入书名")
+                                        ShelfSearchField.Author -> str.t("输入作者")
                                     },
                                     focusRequester = searchFocusRequester,
                                     onOpen = search::open,
@@ -907,9 +911,9 @@ fun HomeScreen(
                             ) {
                                 com.example.ui.components.MascotEmptyState(
                                     mascotResId = com.example.ui.mascot.MascotSpriteSheet.sadDrawable,
-                                    title = "「书架空空如也」",
-                                    description = "您的书架还没有任何书哦！Roxy 觉得有点寂寞。您可以点击下方按钮导入本地电子书，或者直接去在线书库挑选精彩的小说！",
-                                    actionLabel = "立即前往在线书库",
+                                    title = str.t("「书架空空如也」"),
+                                    description = tr("您的书架还没有任何书哦！Roxy 觉得有点寂寞。您可以点击下方按钮导入本地电子书，或者直接去在线书库挑选精彩的小说！"),
+                                    actionLabel = str.t("立即前往在线书库"),
                                     onActionClick = onNavigateToShelf,
                                     testTagPrefix = "books_empty_state"
                                 )
@@ -920,7 +924,7 @@ fun HomeScreen(
                                     onClick = { onImportClick(com.example.data.DEFAULT_CATEGORY) },
                                     modifier = Modifier.wenkuTabTitle(2, strength = .7f).testTag("empty_bookshelf_import_button")
                                 ) {
-                                    Text("或者 导入本地 TXT / EPUB / Comic 文件", color = MintPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text(str.t("或者 导入本地 TXT / EPUB / Comic 文件"), color = MintPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         } else {
@@ -930,7 +934,7 @@ fun HomeScreen(
                             // 不再只有 3/4 两档——宽屏拉伸大卡片的问题源头
                             val cols = ((screenWidthDp + 24) / 150).coerceIn(3, 6)
 
-                            // 第七轮第 6.3 条：Hero"正在阅读"卡片同样是内容泄漏面——
+                            // 第七轮第 6.3 条：Herostr.t("正在阅读")卡片同样是内容泄漏面——
                             // 其书籍所在分类处于锁定态时整卡隐藏（PIN 解锁后恢复）
                             val heroCategoryLocked = remember(
                                 currentlyReading.category, privacyModeEnabled,
@@ -974,10 +978,12 @@ fun HomeScreen(
                                     .fillMaxSize()
                                     .padding(horizontal = shelfSidePadding)
                                     .onGloballyPositioned { booksGridRoot = it.positionInRoot() },
+                                // 3D 书架自带标题条：不给底部留白的话，它会正好压在悬浮 Tab 栏下面。
+                                contentPadding = PaddingValues(bottom = LocalAppBottomInset.current + 8.dp),
                                 verticalArrangement = Arrangement.spacedBy(20.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                if (!heroCategoryLocked && books.isNotEmpty() && !use3dShelf) item(span = { GridItemSpan(maxLineSpan) }, key = "hero_section") {
+                                if (!heroCategoryLocked && books.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }, key = "hero_section") {
                                     // 2. HERO: RECENTLY READ BIG BOOK CARD (pre-calculated and remembered at top)
 
                                     val heroCoverData = remember(currentlyReading.coverUri, currentlyReading.isCoverValid) {
@@ -1007,7 +1013,7 @@ fun HomeScreen(
 
                                     Column {
                                         Text(
-                                            text = "正在阅读",
+                                            text = str.t("正在阅读"),
                                             fontSize = 20.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = adaptiveTitleColor(),
@@ -1118,7 +1124,7 @@ fun HomeScreen(
                                                     )
                                                     Spacer(modifier = Modifier.height(4.dp))
                                                     Text(
-                                                        text = "著  ${currentlyReading.author}",
+                                                        text = str.byAuthor(currentlyReading.author),
                                                         fontSize = 13.sp,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
@@ -1145,7 +1151,7 @@ fun HomeScreen(
                                                         )
                                                         Spacer(modifier = Modifier.width(10.dp))
                                                         Text(
-                                                            text = "已读 $progressPercent%",
+                                                            text = str.readPercent(progressPercent),
                                                             fontSize = 12.sp,
                                                             fontWeight = FontWeight.Bold,
                                                             color = MintGold
@@ -1155,7 +1161,7 @@ fun HomeScreen(
                                                     Spacer(modifier = Modifier.height(16.dp))
 
                                                     com.example.ui.wenku.WenkuPillButton(
-                                                        text = "继续阅读",
+                                                        text = str.t("继续阅读"),
                                                         onClick = { onBookClick(currentlyReading) },
                                                         primary = true,
                                                         modifier = Modifier.align(Alignment.End)
@@ -1170,10 +1176,13 @@ fun HomeScreen(
                                     // 3. MAIN SECTION: MY BOOKSHELF
                                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         ShelfRegionHeading(
-                                            "01", "PERSONAL COLLECTION", "我的书架",
-                                            "${sortedBooks.size} 本",
+                                            "01", "PERSONAL COLLECTION", str.t("我的书架"),
+                                            str.books(sortedBooks.size),
                                         ) {
-                                            ShelfViewControl(use3dShelf) { use3dShelf = !use3dShelf }
+                                            ShelfViewControl(use3dShelf) {
+                                                use3dShelf = !use3dShelf
+                                                shelfPrefs.shelfUses3dView = use3dShelf
+                                            }
                                         }
                                         FlowRow(
                                             modifier = Modifier.fillMaxWidth().wenkuPagePart(2),
@@ -1182,7 +1191,7 @@ fun HomeScreen(
                                         ) {
                                             HomeActionChip(
                                                 icon = Icons.Filled.Sort,
-                                                label = when (sortBy) { 0 -> "默认排序"; 1 -> "按字母"; else -> "最近阅读" },
+                                                label = when (sortBy) { 0 -> str.t("默认排序"); 1 -> str.t("按字母"); else -> str.t("最近阅读") },
                                                 emphasized = sortBy > 0,
                                                 wenkuSymbol = com.example.ui.wenku.WenkuSymbol.Filter
                                             ) {
@@ -1204,13 +1213,13 @@ fun HomeScreen(
                                             }
                                             HomeActionChip(
                                                 icon = Icons.Filled.Add,
-                                                label = "导入新书",
+                                                label = str.t("导入新书"),
                                                 emphasized = true,
                                                 wenkuSymbol = com.example.ui.wenku.WenkuSymbol.ImportFile
                                             ) { onImportClick(selectedCategory) }
                                             HomeActionChip(
                                                 icon = Icons.Filled.Category,
-                                                label = "新建分类",
+                                                label = str.t("新建分类"),
                                                 emphasized = false,
                                                 wenkuSymbol = com.example.ui.wenku.WenkuSymbol.FolderAdd
                                             ) { showAddCategoryDialog = true }
@@ -1280,7 +1289,8 @@ fun HomeScreen(
                                         ArchiveShelf(
                                             books = sortedBooks,
                                             onBookClick = onBookClick,
-                                            modifier = Modifier.fillMaxWidth().wenkuReveal(0)
+                                            modifier = Modifier.fillMaxWidth().wenkuReveal(0),
+                                            scopeKey = "shelf:$selectedCategory"
                                         )
                                     }
                                 }
@@ -1316,13 +1326,13 @@ fun HomeScreen(
                                                     Spacer(modifier = Modifier.width(12.dp))
                                                     Column(Modifier.weight(1f)) {
                                                         Text(
-                                                            text = "分类『$selectedCategory』已锁定",
+                                                            text = com.example.i18n.categoryLocked(selectedCategory),
                                                             fontSize = 14.sp,
                                                             fontWeight = FontWeight.SemiBold,
                                                             color = adaptiveTitleColor()
                                                         )
                                                         Text(
-                                                            text = "验证隐私密码后即可查看其中的书籍",
+                                                            text = tr("验证隐私密码后即可查看其中的书籍"),
                                                             fontSize = 11.sp,
                                                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
                                                         )
@@ -1340,7 +1350,7 @@ fun HomeScreen(
                                                             .padding(horizontal = 14.dp, vertical = 8.dp)
                                                     ) {
                                                         Text(
-                                                            "验证密码查看",
+                                                            str.t("验证密码查看"),
                                                             fontSize = 12.sp,
                                                             fontWeight = FontWeight.SemiBold,
                                                             color = MintPrimary
@@ -1351,9 +1361,9 @@ fun HomeScreen(
                                         } else {
                                             com.example.ui.components.MascotEmptyState(
                                                 mascotResId = com.example.ui.mascot.MascotSpriteSheet.sadDrawable,
-                                                title = "「分类下没有图书」",
-                                                description = "在分类『$selectedCategory』下还没有任何图书哦。您可以点击下方按钮导入新书到该分类！",
-                                                actionLabel = "在此分类下导入新书",
+                                                title = str.t("「分类下没有图书」"),
+                                                description = com.example.i18n.categoryEmpty(selectedCategory),
+                                                actionLabel = str.t("在此分类下导入新书"),
                                                 onActionClick = { onImportClick(selectedCategory) },
                                                 testTagPrefix = "category_empty_state"
                                             )
@@ -1577,7 +1587,7 @@ fun HomeScreen(
                                                         )
 
                                                         Text(
-                                                            text = if (book.isComic) "漫画" else "TXT",
+                                                            text = if (book.isComic) tr("漫画") else "TXT",
                                                             fontSize = 9.sp,
                                                             fontWeight = FontWeight.Bold,
                                                             color = if (book.isComic) Color(0xFFFF6B6B) else MintGold.copy(alpha = 0.8f)
@@ -1615,7 +1625,7 @@ fun HomeScreen(
                                                             modifier = Modifier
                                                                 .size(12.dp)
                                                                 .semantics {
-                                                                    contentDescription = "已加入我喜欢的"
+                                                                    contentDescription = str.t("已加入我喜欢的")
                                                                 },
                                                             glow = 0f,
                                                         )
@@ -1659,7 +1669,7 @@ fun HomeScreen(
                                                 modifier = Modifier.fillMaxWidth()
                                             )
 
-                                            // 读完标记：金色 ✓ + "已读完"
+                                            // 读完标记：金色 ✓ + str.t("已读完")
                                             if (book.isFinished) {
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 Row(
@@ -1675,7 +1685,7 @@ fun HomeScreen(
                                                     )
                                                     Spacer(modifier = Modifier.width(3.dp))
                                                     Text(
-                                                        "已读完",
+                                                        str.t("已读完"),
                                                         fontSize = 9.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         color = MintGold
@@ -1722,11 +1732,14 @@ fun HomeScreen(
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
                                     ShelfRegionHeading(
-                                        "02", "FAVOURITE COLLECTION", "我喜欢的",
-                                        if (favoritesLocked) "已锁定" else "${favSorted.size} 本",
+                                        "02", "FAVOURITE COLLECTION", str.t("我喜欢的"),
+                                        if (favoritesLocked) str.t("已锁定") else str.books(favSorted.size),
                                     ) {
                                         if (!favoritesLocked && favoriteItems.isNotEmpty()) {
-                                            ShelfViewControl(use3dFavorites) { use3dFavorites = !use3dFavorites }
+                                            ShelfViewControl(use3dFavorites) {
+                                                use3dFavorites = !use3dFavorites
+                                                shelfPrefs.favoritesUse3dView = use3dFavorites
+                                            }
                                         }
                                     }
                                     FlowRow(
@@ -1738,13 +1751,13 @@ fun HomeScreen(
                                             // 锁定态：整个板块只有一把锁，点它验证密码
                                             HomeActionChip(
                                                 icon = Icons.Filled.Lock,
-                                                label = "已锁定",
+                                                label = str.t("已锁定"),
                                                 emphasized = true,
                                             ) { favoritesPinFor = true }
                                         } else {
                                             HomeActionChip(
                                                 icon = Icons.Filled.Refresh,
-                                                label = if (favoriteRefreshing) "检查中…" else "检查更新",
+                                                label = if (favoriteRefreshing) str.t("检查中…") else str.t("检查更新"),
                                                 emphasized = favoriteRefreshing,
                                             ) {
                                                 if (favoriteRefreshing) return@HomeActionChip
@@ -1757,7 +1770,7 @@ fun HomeScreen(
                                             }
                                             HomeActionChip(
                                                 icon = Icons.Filled.Category,
-                                                label = "新建分类",
+                                                label = str.t("新建分类"),
                                                 emphasized = false,
                                                 wenkuSymbol = WenkuSymbol.FolderAdd,
                                             ) { showAddFavoriteCategoryDialog = true }
@@ -1832,13 +1845,13 @@ fun HomeScreen(
                                             Spacer(modifier = Modifier.width(10.dp))
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = "「我喜欢的」已锁定",
+                                                    text = str.t("「我喜欢的」已锁定"),
                                                     fontSize = 14.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     color = MaterialTheme.colorScheme.onSurface,
                                                 )
                                                 Text(
-                                                    text = "点击验证密码后查看",
+                                                    text = str.t("点击验证密码后查看"),
                                                     fontSize = 11.sp,
                                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
                                                 )
@@ -1850,9 +1863,9 @@ fun HomeScreen(
                                 item(span = { GridItemSpan(maxLineSpan) }, key = "fav_empty_state", contentType = "fullspan") {
                                     com.example.ui.components.MascotEmptyState(
                                         mascotResId = com.example.ui.mascot.MascotSpriteSheet.idleDrawable,
-                                        title = "「还没有喜欢的漫画」",
-                                        description = "在漫画页点一下 ♡，喜欢的漫画都在这里 —— 不下载、不占空间，随时在线接着看。",
-                                        actionLabel = "去书库逛逛",
+                                        title = str.t("「还没有喜欢的漫画」"),
+                                        description = tr("在漫画页点一下 ♡，喜欢的漫画都在这里 —— 不下载、不占空间，随时在线接着看。"),
+                                        actionLabel = str.t("去书库逛逛"),
                                         onActionClick = onNavigateToShelf,
                                         testTagPrefix = "favorites_empty_state",
                                     )
@@ -1862,7 +1875,8 @@ fun HomeScreen(
                                     ArchiveShelf(
                                         books = favShelfBooks,
                                         onBookClick = { picked -> favById[picked.id]?.let(onOpenFavorite) },
-                                        modifier = Modifier.fillMaxWidth().wenkuReveal(0)
+                                        modifier = Modifier.fillMaxWidth().wenkuReveal(0),
+                                        scopeKey = "favorites"
                                     )
                                 }
                             } else {
@@ -1908,7 +1922,7 @@ fun HomeScreen(
                                     // 改用全 App 统一的下发值
                                     Column(modifier = Modifier.padding(bottom = LocalAppBottomInset.current)) {
                                         Text(
-                                            text = "阅读统计",
+                                            text = str.t("阅读统计"),
                                             fontSize = 20.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = adaptiveTitleColor(),
@@ -1932,7 +1946,7 @@ fun HomeScreen(
                                                     TodayReadTimeText(todayReadSecondsFlow)
                                                     Spacer(modifier = Modifier.height(2.dp))
                                                     Text(
-                                                        text = "保持阅读，遇见更好的自己。",
+                                                        text = str.t("保持阅读，遇见更好的自己。"),
                                                         fontSize = 11.sp,
                                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                                     )
@@ -1953,7 +1967,7 @@ fun HomeScreen(
                                                         )
                                                         Spacer(modifier = Modifier.width(4.dp))
                                                         Text(
-                                                            text = "连续 ${streakDays} 天",
+                                                            text = str.streak(streakDays),
                                                             fontSize = 11.sp,
                                                             fontWeight = FontWeight.Bold,
                                                             color = MintGold
@@ -1986,7 +2000,7 @@ fun HomeScreen(
                                 // 「删除下载」，且选项数 5↔4 跳变导致整条栏位置大变样。
                                 val favActions = listOf(
                                     com.example.ui.shelf.ShelfAction(
-                                        label = "打开",
+                                        label = str.t("打开"),
                                         icon = androidx.compose.material.icons.Icons.Filled.MenuBook,
                                         enabled = selectedFavs.size == 1,
                                         onClick = {
@@ -1998,13 +2012,13 @@ fun HomeScreen(
                                     // （用户：没有分享移动等等）。移动 = 归到收藏分类，
                                     // 分享收藏的作品详情链接，与书架的文件分享独立。
                                     com.example.ui.shelf.ShelfAction(
-                                        label = "移动",
+                                        label = str.t("移动"),
                                         icon = androidx.compose.material.icons.Icons.Filled.Folder,
                                         enabled = true,
                                         onClick = { bulkCategoryTarget = 1 },
                                     ),
                                     com.example.ui.shelf.ShelfAction(
-                                        label = if (preparingShare) "准备中…" else "分享",
+                                        label = if (preparingShare) str.t("准备中…") else str.t("分享"),
                                         icon = androidx.compose.material.icons.Icons.Filled.Share,
                                         enabled = selectedFavs.isNotEmpty() && !preparingShare,
                                         onClick = {
@@ -2013,7 +2027,7 @@ fun HomeScreen(
                                         },
                                     ),
                                     com.example.ui.shelf.ShelfAction(
-                                        label = "取消喜欢",
+                                        label = str.t("取消喜欢"),
                                         icon = androidx.compose.material.icons.Icons.Filled.Favorite,
                                         enabled = true,
                                         destructive = true,
@@ -2034,7 +2048,7 @@ fun HomeScreen(
                                     // 两边都是 4 项 ⇒ 数量恒定，切换时不会因数量变化而整体偏移。
                                     actions = if (favScope) favActions else listOf(
                                         com.example.ui.shelf.ShelfAction(
-                                            label = "移动",
+                                            label = str.t("移动"),
                                             icon = androidx.compose.material.icons.Icons.Filled.Folder,
                                             enabled = selectedBooks.isNotEmpty(),
                                             onClick = { bulkCategoryTarget = 0 },
@@ -2043,13 +2057,13 @@ fun HomeScreen(
                                         // 书架多选栏不再提供加入/取消「我喜欢的」（用户判定为无用）。
                                         // 需要收藏请走单本书内的 ♡。
                                         com.example.ui.shelf.ShelfAction(
-                                            label = if (preparingShare) "准备中…" else "分享",
+                                            label = if (preparingShare) str.t("准备中…") else str.t("分享"),
                                             icon = androidx.compose.material.icons.Icons.Filled.Share,
                                             enabled = selectedBooks.isNotEmpty() && !preparingShare,
                                             onClick = { prepareShare { com.example.library.BookShareHelper.shareBooks(context, selectedBooks) } },
                                         ),
                                         com.example.ui.shelf.ShelfAction(
-                                            label = "删除下载",
+                                            label = str.t("删除下载"),
                                             icon = androidx.compose.material.icons.Icons.Filled.Delete,
                                             enabled = selectedBooks.isNotEmpty(),
                                             destructive = true,
@@ -2061,7 +2075,7 @@ fun HomeScreen(
                                             },
                                         ),
                                         com.example.ui.shelf.ShelfAction(
-                                            label = "更多",
+                                            label = str.t("更多"),
                                             icon = androidx.compose.material.icons.Icons.Filled.MoreVert,
                                             enabled = selectedBooks.isNotEmpty(),
                                             onClick = { showMoreSheet = true },
@@ -2249,7 +2263,7 @@ private fun TodayReadTimeText(todaySecondsFlow: kotlinx.coroutines.flow.StateFlo
 
     Text(
         // reading_statistics_shared_charts.dart:299-315 counts the number up over 340ms (settle).
-        text = "今日已阅读 " + com.example.ui.wenku.WenkuCountUp(
+        text = tr("今日已阅读 ") + com.example.ui.wenku.WenkuCountUp(
             value = minutes.toFloat(),
             format = { v -> v.toInt().toString() }
         ) + " 分钟",
@@ -2268,9 +2282,10 @@ private fun CategoryNameSheet(
     name: String,
     onNameChange: (String) -> Unit,
     onDismiss: () -> Unit,
-    confirmLabel: String = "新建",
+    confirmLabel: String? = null,
     onConfirm: (String) -> Unit,
 ) {
+    val str = com.example.i18n.LocalStrings.current
     WenkuActionSheet(title, onDismiss, fitKeyboard = true) {
         val keyboard = LocalSoftwareKeyboardController.current
         val close = paperDismiss { onConfirm(name.trim()) }
@@ -2283,14 +2298,14 @@ private fun CategoryNameSheet(
         Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedTextField(
             value = name, onValueChange = onNameChange, modifier = Modifier.fillMaxWidth(),
-            label = { Text("名称") }, singleLine = true, shape = RoundedCornerShape(16.dp),
+            label = { Text(str.t("名称")) }, singleLine = true, shape = RoundedCornerShape(16.dp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { submit() }),
         )
-        WenkuTextButton(confirmLabel, onClick = submit,
+        WenkuTextButton(confirmLabel ?: com.example.i18n.AppLocale.t("新建"), onClick = submit,
             modifier = Modifier.fillMaxWidth(), enabled = name.isNotBlank(),
             selected = true, wenkuSymbol = WenkuSymbol.Check)
-        WenkuTextButton("取消", paperDismiss {}, Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Close)
+        WenkuTextButton(str.t("取消"), paperDismiss {}, Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Close)
     }
 }
 
@@ -2328,8 +2343,9 @@ private fun ShelfRegionHeading(
 
 @Composable
 private fun ShelfViewControl(use3d: Boolean, onClick: () -> Unit) {
+    val str = com.example.i18n.LocalStrings.current
     WenkuTextButton(
-        if (use3d) "切换列表" else "切换 3D",
+        if (use3d) str.t("切换列表") else str.t("切换 3D"),
         onClick = onClick,
         compact = true,
         wenkuSymbol = if (use3d) WenkuSymbol.Grid else WenkuSymbol.Shelf,
@@ -2369,6 +2385,7 @@ private fun HomeCategoryChip(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
+    val str = com.example.i18n.LocalStrings.current
     val baseColor = if (selected) MintPrimary else MaterialTheme.colorScheme.onSurface
     val bgAlpha by animateFloatAsState(
         targetValue = if (selected) 0.16f else 0.06f,
@@ -2402,7 +2419,7 @@ private fun HomeCategoryChip(
             Spacer(modifier = Modifier.width(5.dp))
             Icon(
                 Icons.Filled.Lock,
-                contentDescription = "已加密",
+                contentDescription = str.t("已加密"),
                 tint = if (selected) MintPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
                 modifier = Modifier.size(12.dp)
             )
@@ -2424,26 +2441,27 @@ private fun CategoryActionSheet(
     onGoToSettings: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val str = com.example.i18n.LocalStrings.current
     val isDefault = category.name == com.example.data.DEFAULT_CATEGORY
     val colors = MaterialTheme.colorScheme
     WenkuActionSheet(category.name, onDismiss) {
         if (privacyModeEnabled) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("密码保护", style = MaterialTheme.typography.titleSmall)
-                    Text("验证密码后显示书籍 · 无痕阅读", style = MaterialTheme.typography.bodySmall,
+                    Text(str.t("密码保护"), style = MaterialTheme.typography.titleSmall)
+                    Text(str.t("验证密码后显示书籍 · 无痕阅读"), style = MaterialTheme.typography.bodySmall,
                         color = colors.onSurfaceVariant)
                 }
                 com.example.ui.components.AppSwitch(checked = category.isProtected, onCheckedChange = onToggleProtected)
             }
         } else {
-            Text("开启隐私模式后可为分类设置密码。", style = MaterialTheme.typography.bodySmall,
+            Text(str.t("开启隐私模式后可为分类设置密码。"), style = MaterialTheme.typography.bodySmall,
                 color = colors.onSurfaceVariant)
-            WenkuTextButton("设置密码保护", onClick = paperDismiss(onGoToSettings),
+            WenkuTextButton(str.t("设置密码保护"), onClick = paperDismiss(onGoToSettings),
                 modifier = Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Shield)
         }
         WenkuTextButton(
-            if (isDefault) "默认分类不可删除" else "删除分类",
+            if (isDefault) str.t("默认分类不可删除") else str.t("删除分类"),
             onClick = paperDismiss(onDeleteRequest),
             modifier = Modifier.fillMaxWidth(), enabled = !isDefault,
             color = colors.error, wenkuSymbol = WenkuSymbol.Delete,

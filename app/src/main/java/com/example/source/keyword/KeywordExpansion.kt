@@ -1,5 +1,7 @@
 package com.example.source.keyword
 
+import com.example.i18n.tr
+
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -62,8 +64,8 @@ internal class KeywordExpansion(
             emit(KeywordUpdate(batch, status, origins.filterKeys { it in seen }, providers.values.toList()))
         }
         publish(if (supplement) 4 else KeywordVariants.LIMIT,
-            if (supplement) "正在在线补充名称" else if (cached) "已使用缓存" else "已使用本地名称",
-            if (cached) "本地 / 缓存" else "本地")
+            if (supplement) tr("正在在线补充名称") else if (cached) tr("已使用缓存") else tr("已使用本地名称"),
+            if (cached) tr("本地 / 缓存") else tr("本地"))
 
         if (supplement) {
             timedOut = withTimeoutOrNull(onlineWindowMs) {
@@ -93,7 +95,7 @@ internal class KeywordExpansion(
                         val merged = KeywordConcepts.merge(concepts[i] + result.concepts)
                         // Fresh metadata receives its reserved slots before surplus local aliases.
                         concepts[i] = merged
-                        publish(if (concepts.all(KeywordConcepts::complete)) KeywordVariants.LIMIT else 4, "正在在线补充名称", if (result.cached) "缓存" else "在线",
+                        publish(if (concepts.all(KeywordConcepts::complete)) KeywordVariants.LIMIT else 4, "正在在线补充名称", if (result.cached) tr("缓存") else tr("在线"),
                             if (parts.size == 1) result.concepts.flatMap { it.names } else emptyList())
                         onlineAdded = onlineAdded || (!result.cached && seen.size > before)
                     }
@@ -108,16 +110,16 @@ internal class KeywordExpansion(
             .any { origins[KeywordKeys.query(it.text)] == "在线" }
         val state = when {
             supplement && !onlineAllowed() -> onlineDisabledReason()
-            timedOut -> if (onlineAdded && persisted) "已补充并缓存，部分在线查询超时" else "在线补充超时，使用已有关键词"
-            failed -> if (onlineAdded) if (persisted) "已补充并缓存，部分在线查询失败" else "已补充部分名称，部分在线查询失败" else "在线查询失败，使用已有关键词"
-            onlineAdded -> if (persisted) "已在线补充并缓存" else "已在线补充"
-            ambiguous -> "名称存在歧义，未自动扩展不确定名称"
-            cached -> "已使用缓存"
+            timedOut -> if (onlineAdded && persisted) tr("已补充并缓存，部分在线查询超时") else tr("在线补充超时，使用已有关键词")
+            failed -> if (onlineAdded) if (persisted) tr("已补充并缓存，部分在线查询失败") else tr("已补充部分名称，部分在线查询失败") else tr("在线查询失败，使用已有关键词")
+            onlineAdded -> if (persisted) tr("已在线补充并缓存") else tr("已在线补充")
+            ambiguous -> tr("名称存在歧义，未自动扩展不确定名称")
+            cached -> tr("已使用缓存")
             !onlineAllowed() && missing.isNotEmpty() -> onlineDisabledReason()
-            localFailed && seen.size == 1 -> "本地资料暂不可用，未找到扩展名称，本次仅使用原词"
-            supplement -> "未找到更多可靠名称，使用已有关键词"
-            seen.size == 1 -> "未找到扩展名称，仅使用原词"
-            else -> "已使用本地名称"
+            localFailed && seen.size == 1 -> tr("本地资料暂不可用，未找到扩展名称，本次仅使用原词")
+            supplement -> tr("未找到更多可靠名称，使用已有关键词")
+            seen.size == 1 -> tr("未找到扩展名称，仅使用原词")
+            else -> tr("已使用本地名称")
         }
         publish(KeywordVariants.LIMIT, state, "本地 / 缓存")
     }

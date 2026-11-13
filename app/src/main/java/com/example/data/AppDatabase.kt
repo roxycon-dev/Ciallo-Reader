@@ -537,6 +537,7 @@ abstract class AppDatabase : RoomDatabase() {
                     
                     .addCallback(object : RoomDatabase.Callback() {
                         override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                            // PRAGMA 是查询语句，Android SQLite 不允许走 execSQL。
                             db.query("PRAGMA journal_size_limit=4194304").use { it.moveToFirst() }
                             com.example.transfer.ImportJournal.recover(context.applicationContext, db)
                         }

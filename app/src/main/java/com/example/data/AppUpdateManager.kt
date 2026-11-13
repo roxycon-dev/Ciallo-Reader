@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import android.content.Context
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -62,7 +64,7 @@ internal class AppUpdateManager(
             catch (_: Exception) { store.clear(); null }
         }
         if (pending != null) mutableState.value = AppUpdateState(pending.release, AppUpdateStage.READY,
-            message = "安装包已下载，可继续安装")
+            message = tr("安装包已下载，可继续安装"))
     }
 
     fun offer(release: UpdateRelease) = scope.launch {
@@ -121,12 +123,12 @@ internal class AppUpdateManager(
                 mutableState.update { it.copy(stage = AppUpdateStage.READY, autoInstall = true) }
             } catch (cancelled: CancellationException) {
                 mutableState.update { it.copy(stage = if (committed) AppUpdateStage.READY else AppUpdateStage.AVAILABLE,
-                    message = if (committed) "安装包已下载，可继续安装" else "下载已取消", autoInstall = false) }
+                    message = if (committed) tr("安装包已下载，可继续安装") else tr("下载已取消"), autoInstall = false) }
                 throw cancelled
             } catch (e: Exception) {
                 if (!currentCoroutineContext().isActive) {
                     mutableState.update { it.copy(stage = if (committed) AppUpdateStage.READY else AppUpdateStage.AVAILABLE,
-                        message = if (committed) "安装包已下载，可继续安装" else "下载已取消", autoInstall = false) }
+                        message = if (committed) tr("安装包已下载，可继续安装") else tr("下载已取消"), autoInstall = false) }
                     currentCoroutineContext().ensureActive()
                 } else mutableState.update { it.copy(stage = AppUpdateStage.FAILED,
                     message = e.message?.take(250) ?: "更新下载失败，请重试或使用浏览器下载", autoInstall = false) }
@@ -150,7 +152,7 @@ internal class AppUpdateManager(
         if (state.value.stage != AppUpdateStage.INSTALLING || state.value.release?.tag != original.release?.tag) return@launch
         if (installed) mutableState.value = AppUpdateState()
         else mutableState.update { it.copy(stage = AppUpdateStage.READY, visible = true,
-            message = "安装包已保留。如果尚未完成安装，可以重试或导出安装包", autoInstall = false) }
+            message = tr("安装包已保留。如果尚未完成安装，可以重试或导出安装包"), autoInstall = false) }
     }
 
     fun installationFailed(message: String) {

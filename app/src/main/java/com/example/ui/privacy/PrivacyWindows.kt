@@ -1,5 +1,7 @@
 package com.example.ui.privacy
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -86,7 +88,7 @@ fun PrivacyPinOverlay(
                     if (pin != firstPin) {
                         firstPin = null
                         stage = if (oldPin == null) PinEntryMode.SETUP else PinEntryMode.CHANGE_NEW
-                        reset(if (oldPin == null) "两次输入不一致，请重新设置" else "两次输入不一致，请重新输入新密码")
+                        reset(if (oldPin == null) tr("两次输入不一致，请重新设置") else tr("两次输入不一致，请重新输入新密码"))
                         return
                     }
                     busy = true
@@ -102,7 +104,7 @@ fun PrivacyPinOverlay(
                             accepted()
                         } else {
                             stage = if (previous == null) PinEntryMode.SETUP else PinEntryMode.CHANGE_NEW
-                            reset("密码保存失败，请重试")
+                            reset(com.example.i18n.tr("密码保存失败，请重试"))
                             busy = false
                         }
                     }
@@ -113,7 +115,7 @@ fun PrivacyPinOverlay(
                     scope.launch {
                         when {
                             !pinResult { onPinVerified(pin) } -> {
-                                reset("密码错误，请重试")
+                                reset(com.example.i18n.tr("密码错误，请重试"))
                                 busy = false
                             }
                             changing -> {
@@ -162,17 +164,17 @@ fun PrivacyPinOverlay(
                         ) { current ->
                             Column {
                                 val title = when (current) {
-                                    PinEntryMode.SETUP -> "设置隐私密码"
-                                    PinEntryMode.CONFIRM -> "再次输入以确认"
-                                    PinEntryMode.VERIFY -> "输入隐私密码"
-                                    PinEntryMode.CHANGE_OLD -> "输入当前密码"
-                                    PinEntryMode.CHANGE_NEW -> "输入新密码"
+                                    PinEntryMode.SETUP -> tr("设置隐私密码")
+                                    PinEntryMode.CONFIRM -> tr("再次输入以确认")
+                                    PinEntryMode.VERIFY -> tr("输入隐私密码")
+                                    PinEntryMode.CHANGE_OLD -> tr("输入当前密码")
+                                    PinEntryMode.CHANGE_NEW -> tr("输入新密码")
                                 }
                                 Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                                Text("6 位数字密码", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                                Text(tr("6 位数字密码"), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
                             }
                         }
-                        AppIconButton(Icons.Filled.Close, "关闭面板", onClick = close, enabled = !busy)
+                        AppIconButton(Icons.Filled.Close, tr("关闭面板"), onClick = close, enabled = !busy)
                     }
                     Spacer(Modifier.height(spacing))
                     PinDots(entered.length, error != null, Modifier.wenkuPagePart(1))
@@ -182,8 +184,8 @@ fun PrivacyPinOverlay(
                         val status = when {
                             error != null -> error.orEmpty()
                             !busy -> ""
-                            stage == PinEntryMode.CONFIRM -> "正在保存…"
-                            else -> "正在验证…"
+                            stage == PinEntryMode.CONFIRM -> tr("正在保存…")
+                            else -> tr("正在验证…")
                         }
                         Text(status, color = if (error == null) colors.onSurfaceVariant else colors.error,
                             style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
@@ -242,7 +244,7 @@ private fun PinDots(filled: Int, error: Boolean, modifier: Modifier = Modifier) 
     }
     Row(
         modifier.graphicsLayer { translationX = offset.value }.semantics {
-            stateDescription = "已输入 $filled 位，共 6 位"
+            stateDescription = com.example.i18n.pinFilled(filled)
         },
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -266,7 +268,7 @@ private fun PinKey(digit: String?, modifier: Modifier, enabled: Boolean, onClick
     var activation by remember { mutableIntStateOf(0) }
     WenkuGlassSurface(
         modifier = modifier.semantics(mergeDescendants = true) {
-            if (digit == null) contentDescription = "删除一位"
+            if (digit == null) contentDescription = tr("删除一位")
             if (!enabled) {
                 role = Role.Button
                 disabled()
@@ -309,24 +311,24 @@ fun PrivacyManageOverlay(
     requestDismiss: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
-    WenkuActionSheet("隐私模式", onDismiss, fitKeyboard = true, requestDismiss = requestDismiss) {
-        Text("密码保护与无痕阅读", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+    WenkuActionSheet(tr("隐私模式"), onDismiss, fitKeyboard = true, requestDismiss = requestDismiss) {
+        Text(tr("密码保护与无痕阅读"), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
         WenkuContentPanel(Modifier.fillMaxWidth()) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                PrivacySwitchRow("无痕浏览", "所有阅读不计入统计，阅读进度继续保存",
+                PrivacySwitchRow(com.example.i18n.tr("无痕浏览"), com.example.i18n.tr("所有阅读不计入统计，阅读进度继续保存"),
                     WenkuSymbol.EyeOff, incognitoBrowsingEnabled, onToggleIncognito)
-                PrivacySwitchRow("「我喜欢的」需要密码", "验证密码后显示收藏",
+                PrivacySwitchRow(com.example.i18n.tr("「我喜欢的」需要密码"), com.example.i18n.tr("验证密码后显示收藏"),
                     WenkuSymbol.Bookmarked, favoritesProtected, onToggleFavoritesProtected)
             }
         }
         if (categories.isNotEmpty()) {
-            Text("书架分类", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
+            Text(tr("书架分类"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(top = 4.dp))
             WenkuContentPanel(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     categories.forEach { category ->
                         key(category.id) {
-                            PrivacySwitchRow(category.name, if (category.isProtected) "验证密码后显示 · 无痕阅读" else null,
+                            PrivacySwitchRow(category.name, if (category.isProtected) tr("验证密码后显示 · 无痕阅读") else null,
                                 if (category.isProtected) WenkuSymbol.Shield else WenkuSymbol.Folder,
                                 category.isProtected, { onToggleProtected(category, it) })
                         }
@@ -334,11 +336,11 @@ fun PrivacyManageOverlay(
                 }
             }
         }
-        WenkuTextButton("修改密码", onChangePin, Modifier.fillMaxWidth(), enabled = privacyModeEnabled,
+        WenkuTextButton(tr("修改密码"), onChangePin, Modifier.fillMaxWidth(), enabled = privacyModeEnabled,
             wenkuSymbol = WenkuSymbol.Edit)
-        WenkuTextButton("关闭隐私模式", onDisablePrivacy, Modifier.fillMaxWidth(), enabled = privacyModeEnabled,
+        WenkuTextButton(tr("关闭隐私模式"), onDisablePrivacy, Modifier.fillMaxWidth(), enabled = privacyModeEnabled,
             color = colors.error, wenkuSymbol = WenkuSymbol.Shield)
-        WenkuTextButton("完成", paperDismiss {}, Modifier.fillMaxWidth(), selected = true,
+        WenkuTextButton(tr("完成"), paperDismiss {}, Modifier.fillMaxWidth(), selected = true,
             wenkuSymbol = WenkuSymbol.Check)
     }
 }

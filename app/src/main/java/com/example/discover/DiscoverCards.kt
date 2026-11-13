@@ -1,5 +1,7 @@
 package com.example.discover
 
+import com.example.i18n.tr
+
 import com.example.ui.components.pullOutCombinedClickable
 import com.example.ui.components.pullOutClickable
 import androidx.compose.animation.core.*
@@ -57,7 +59,7 @@ internal fun DiscoverCard(work: DiscoverWork, dimension: DiscoverDimension, layo
     val scale by animateFloatAsState(if (menuActive) .97f else 1f, tween(if (reduce) 0 else 120), label = "discoverPress")
     val primary = MaterialTheme.colorScheme.primary
     val sourceCount = work.variants.map { it.book.sourceId }.distinct().size
-    val source = if (sourceCount > 1) "$sourceCount 个源可读" else sourceLabel(work.book.sourceId)
+    val source = if (sourceCount > 1) com.example.i18n.sourcesReadable(sourceCount) else sourceLabel(work.book.sourceId)
     val medal = rank?.takeIf { it in 1..3 }?.let { DiscoverMedals[it - 1] }
     val shape = RoundedCornerShape(if (layout == DiscoverLayout.LARGE) 24.dp else if (layout == DiscoverLayout.GRID) 16.dp else 20.dp)
     Box(Modifier.fillMaxWidth().wenkuReveal(entryIndex).graphicsLayer { scaleX = scale; scaleY = scale }
@@ -220,9 +222,9 @@ private fun Cover(
         }
         if ((updatedAt ?: 0) >= (DiscoverEngine.rangeStart("今日", System.currentTimeMillis()) ?: Long.MAX_VALUE))
             Box(Modifier.align(Alignment.TopStart).padding(4.dp).size(16.dp).background(MaterialTheme.colorScheme.primary, CircleShape), contentAlignment = Alignment.Center) {
-                Text("今", fontSize = 10.sp, color = contrastInk(MaterialTheme.colorScheme.primary), fontWeight = FontWeight.Medium)
+                Text(tr("今"), fontSize = 10.sp, color = contrastInk(MaterialTheme.colorScheme.primary), fontWeight = FontWeight.Medium)
             }
-        if (unread) SourceBadge("● 未读", Modifier.align(Alignment.BottomEnd).padding(4.dp))
+        if (unread) SourceBadge(tr("● 未读"), Modifier.align(Alignment.BottomEnd).padding(4.dp))
         if (rank != null && medal != null) Box(Modifier.align(Alignment.TopStart).size(28.dp).background(Brush.linearGradient(listOf(medal, medal.copy(alpha = .64f))), CircleShape), contentAlignment = Alignment.Center) {
             Text(rank.toString(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = contrastInk(medal))
         }
@@ -238,7 +240,7 @@ private fun FollowButton(followed: Boolean, compact: Boolean, modifier: Modifier
     // Foundation expands the small visual icon's touch target without stretching the title row.
     Box(modifier.size(if (compact) 48.dp else 28.dp).pullOutClickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick), contentAlignment = Alignment.Center) {
         com.example.ui.components.AnimatedStateIcon(if (followed) Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder,
-            if (followed) "取消喜欢" else "加入我喜欢的", Modifier.size(20.dp),
+            if (followed) tr("取消喜欢") else tr("加入我喜欢的"), Modifier.size(20.dp),
             tint = if (followed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -310,7 +312,7 @@ private fun Trend(work: DiscoverWork, dimension: DiscoverDimension, reverse: Boo
         else -> "${if (value > 0) "▲" else "▼"}${String.format(java.util.Locale.CHINA, "%.1f", kotlin.math.abs(value))}%" }
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (value != null && value >= 100 && dimension != DiscoverDimension.RANKING)
-            Icon(Icons.Outlined.LocalFireDepartment, "飙升", Modifier.size(12.dp), tint = if (reverse) DiscoverFall else DiscoverRise)
+            Icon(Icons.Outlined.LocalFireDepartment, tr("飙升"), Modifier.size(12.dp), tint = if (reverse) DiscoverFall else DiscoverRise)
         Text(label, if (label == "NEW") Modifier.background(discoverTint(), CircleShape).padding(horizontal = 4.dp, vertical = 2.dp) else Modifier,
             fontSize = if (label == "NEW") 10.sp else 11.sp, fontFamily = FontFamily.Monospace,
             color = if (label == "NEW") discoverAccentText() else if (value == null || value == 0.0) idleColor ?: discoverInk().copy(alpha = .64f)

@@ -1,5 +1,7 @@
 package com.example.mangatranslate
 
+import com.example.i18n.tr
+
 import android.graphics.Bitmap
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -9,7 +11,7 @@ internal object PageMemoryBudget {
     fun check(bitmap:Bitmap) {
         val pixels=bitmap.width.toLong()*bitmap.height
         val allowed=minOf(32L*1024*1024,Runtime.getRuntime().maxMemory()/8)
-        require(pixels<=allowed/4) { "页面过大，请降低图片清晰度后翻译" }
+        require(pixels<=allowed/4) { tr("页面过大，请降低图片清晰度后翻译") }
     }
     fun fingerprint(bitmap:Bitmap):String {
         check(bitmap)

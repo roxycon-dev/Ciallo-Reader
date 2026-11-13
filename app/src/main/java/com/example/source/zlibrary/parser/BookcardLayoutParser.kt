@@ -1,5 +1,7 @@
 package com.example.source.zlibrary.parser
 
+import com.example.i18n.tr
+
 import com.example.source.SearchBook
 import com.example.source.zlibrary.ParsedBookDetail
 import org.jsoup.nodes.Document
@@ -97,9 +99,9 @@ class BookcardLayoutParser : ZLibraryLayoutParser {
 
         val dlAnchor = doc.firstRealDownloadLink()
             ?: doc.selectFirst("a.dlButton[href*=/dl/]")
-            ?: throw com.example.source.SourceException.ParseError("未找到下载链接")
+            ?: throw com.example.source.SourceException.ParseError(tr("未找到下载链接"))
         var dlUrl = dlAnchor.attr("href")
-        if (dlUrl.isBlank()) throw com.example.source.SourceException.ParseError("解析下载链接为空")
+        if (dlUrl.isBlank()) throw com.example.source.SourceException.ParseError(tr("解析下载链接为空"))
         if (!dlUrl.startsWith("http")) dlUrl = formatUrl(baseUrl, dlUrl)
 
         // 新版格式在按钮附近：.book-property__extension 或 z-bookcard extension 属性；

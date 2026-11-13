@@ -2,6 +2,8 @@
 
 package com.example.ui.pageturn
 
+import com.example.i18n.tr
+
 import com.example.ui.reader.TouchZone
 import com.example.ui.reader.TouchAction
 import com.example.ui.reader.SwipeAction
@@ -387,10 +389,10 @@ fun PageCurlReaderContainer(
                             Spacer(Modifier.height(6.dp))
                             Text(
                                 text = when {
-                                    charged && isCurrentBookmarked -> "松开即可取消书签"
-                                    charged -> "松开即可保存书签"
-                                    isCurrentBookmarked -> "下拉取消书签"
-                                    else -> "下拉添加书签"
+                                    charged && isCurrentBookmarked -> tr("松开即可取消书签")
+                                    charged -> tr("松开即可保存书签")
+                                    isCurrentBookmarked -> tr("下拉取消书签")
+                                    else -> tr("下拉添加书签")
                                 },
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,

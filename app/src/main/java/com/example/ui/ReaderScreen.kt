@@ -2,6 +2,8 @@
 
 package com.example.ui
 
+import com.example.i18n.tr
+
 
 import com.example.ui.components.PullOutButton
 import com.example.ui.components.GlassCard
@@ -112,7 +114,6 @@ import androidx.compose.foundation.layout.*
 
 import androidx.compose.foundation.lazy.LazyColumn
 
-import androidx.compose.ui.draw.alpha
 
 import androidx.compose.ui.draw.clip
 
@@ -456,11 +457,11 @@ fun ReaderScreen(
                         input?.use { inp -> file.outputStream().use { out -> inp.copyTo(out) } }
                         prefs.customFontPath = file.absolutePath
                         withContext(Dispatchers.Main) {
-                            AppToast.makeText(context, "自定义字体已导入", Toast.LENGTH_SHORT).show()
+                            AppToast.makeText(context, tr("自定义字体已导入"), Toast.LENGTH_SHORT).show()
                         }
                     } catch (_: Exception) {
                         withContext(Dispatchers.Main) {
-                            AppToast.makeText(context, "字体导入失败", Toast.LENGTH_SHORT).show()
+                            AppToast.makeText(context, tr("字体导入失败"), Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -514,11 +515,11 @@ fun ReaderScreen(
 
                 prefs.customSplashPosterUri = localUriStr
 
-                AppToast.makeText(context, "开屏海报已更新", Toast.LENGTH_SHORT).show()
+                AppToast.makeText(context, tr("开屏海报已更新"), Toast.LENGTH_SHORT).show()
 
             } catch (e: Exception) {
 
-                AppToast.makeText(context, "图片设置失败", Toast.LENGTH_SHORT).show()
+                AppToast.makeText(context, tr("图片设置失败"), Toast.LENGTH_SHORT).show()
 
             }
 
@@ -923,7 +924,7 @@ fun ReaderScreen(
 
             onDeleteBookmark(existingBookmark.id)
 
-            AppToast.makeText(context, "已取消书签", Toast.LENGTH_SHORT).show()
+            AppToast.makeText(context, tr("已取消书签"), Toast.LENGTH_SHORT).show()
 
         } else {
 
@@ -1125,154 +1126,27 @@ fun ReaderScreen(
 
 
 
-    // 共享封面转场：封面先随共享元素缩放进场，随后正文从右侧轻轻滑入叠在封面上，
-
-    // 封面再缓慢淡成水印，避免“加载完正文瞬间盖掉封面”的生硬感。
-
+    val reduceMotion = com.example.ui.feedback.LocalReduceMotion.current
     var transitionStarted by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-
-        kotlinx.coroutines.delay(140)
-
+    LaunchedEffect(reduceMotion) {
+        if (!reduceMotion) kotlinx.coroutines.delay(140)
         transitionStarted = true
-
     }
 
     val contentAlpha by androidx.compose.animation.core.animateFloatAsState(
-
-        targetValue = if (transitionStarted) 1f else 0f,
-
+        targetValue = if (transitionStarted || reduceMotion) 1f else 0f,
         animationSpec = tween(420, easing = com.example.ui.theme.IosMotion.EaseOut),
-
         label = "readerContentAlpha"
-
-    )
-
-    val coverAlpha by androidx.compose.animation.core.animateFloatAsState(
-
-        targetValue = if (transitionStarted) 0.06f else 1f,
-
-        // 2026-09-21：原来 900ms —— 打开书籍后封面要近 1 秒才淡干净，等待感很重，
-        // 且与内容(420ms)、背景(380ms)的节奏完全打架。缩到 480ms：
-        // 内容先到位，封面稍后收尾，形成层次又不拖沓。
-        animationSpec = tween(480, easing = com.example.ui.theme.IosMotion.EaseOut),
-
-        label = "readerCoverAlpha"
-
     )
 
     val readerSettingsBackdrop = com.kashif_e.backdrop.backdrops.rememberLayerBackdrop()
-
-    val bgAlpha by androidx.compose.animation.core.animateFloatAsState(
-
-        targetValue = if (transitionStarted) 1f else 0f,
-
-        animationSpec = tween(380, easing = com.example.ui.theme.IosMotion.EaseOut),
-
-        label = "readerBgAlpha"
-
-    )
-
-
-
-    // R15：返回时让封面纸飞回书架原位（840ms 反向），再交给路由 pop。
-    fun exitReader() {
-        book?.id?.let { com.example.ui.wenku.WenkuFlightBridge.reverse(it.toString()) }
-        onBack()
-    }
-
     Box(Modifier.fillMaxSize()) {
     Box(
-
         modifier = Modifier
-
             .fillMaxSize()
-
             .then(if (showSettingsSheet && com.example.ui.components.LocalRenderQuality.current.realtimeGlass) Modifier.layerBackdrop(readerSettingsBackdrop) else Modifier)
-            .background(bgColor.copy(alpha = bgAlpha))
-
+            .background(bgColor)
     ) {
-
-        // R14：这里不再需要共享元素作用域——封面飞行由根部覆盖层完成；
-        // 而且阅读器路由刻意把 LocalNavAnimatedVisibilityScope 置空（MainActivity），
-        // 旧的 `sharedTransitionScope != null && animatedVisibilityScope != null` 门槛
-        // 会让整块封面根本不组合、arrive() 永远等不到落点。
-        if (book != null) {
-
-                val imageRequest = if (!book.coverUri.isNullOrEmpty() && book.isCoverValid) {
-
-                    if (book.coverUri!!.startsWith("content://")) android.net.Uri.parse(book.coverUri)
-
-                    else java.io.File(book.coverUri!!)
-
-                } else null
-
-                // R14：封面飞行目标端。飞行期间这张整屏封面先让出像素（alpha 0），
-                // 由根部的 WenkuFlightOverlay 画那张纸；桥一清空就恢复原本的 alpha 曲线。
-                var flightArrived by remember(book.id) { mutableStateOf(false) }
-                val flightActive = com.example.ui.wenku.WenkuFlightBridge.isActiveFor(book.id.toString())
-
-                if (imageRequest != null) {
-
-                    coil.compose.AsyncImage(
-
-                        model = imageRequest,
-
-                        contentDescription = "Shared Cover",
-
-                        modifier = Modifier
-
-                            .fillMaxSize()
-
-                            .onGloballyPositioned { coordinates ->
-                                // 落点只登记一次：这是整屏封面，飞行终点就是整块窗口。
-                                //
-                                // ⚠️ 不能用 coordinates.positionInRoot()：阅读器是 paperComposable
-                                // 的滑入页，布局阶段它还停在 x=1080（右侧屏幕外），拿到的落点会把
-                                // 纸直接飞出屏幕（R14 实测：dst=1080..2160）。这里要的是「屏幕矩形」，
-                                // 与入场位移无关。
-                                if (!flightArrived) {
-                                    flightArrived = true
-                                    com.example.ui.wenku.WenkuFlightBridge.arrive(
-                                        bookKey = book.id.toString(),
-                                        bounds = androidx.compose.ui.geometry.Rect(
-                                            0f,
-                                            0f,
-                                            coordinates.size.width.toFloat(),
-                                            coordinates.size.height.toFloat()
-                                        ),
-                                        radius = 0.dp
-                                    )
-                                }
-                            }
-
-                            .clip(
-
-                                RoundedCornerShape(
-
-                                    topStart = DesignTokens.SpaceXs,
-
-                                    bottomStart = DesignTokens.SpaceXs,
-
-                                    topEnd = DesignTokens.SpaceMd,
-
-                                    bottomEnd = DesignTokens.SpaceMd
-
-                                )
-
-                            )
-
-                            .alpha(if (flightActive) 0f else coverAlpha),
-
-                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
-
-                    )
-
-                }
-
-        }
-
         BoxWithConstraints(
 
             modifier = Modifier
@@ -1283,9 +1157,9 @@ fun ReaderScreen(
 
                 .graphicsLayer {
 
-                    alpha = contentAlpha
+                    alpha = if (reduceMotion) 1f else contentAlpha
 
-                    translationX = (1f - contentAlpha) * transitionSlidePx
+                    translationX = if (reduceMotion) 0f else (1f - contentAlpha) * transitionSlidePx
 
                 }
 
@@ -1835,7 +1709,7 @@ fun ReaderScreen(
                         showTtsBar = true; isAutoScrolling = false
                         if (!isTtsPlaying) currentChapter?.let { ttsManager.startReading(NovelInlineImages.stripTokens(it.content), speed = prefs.ttsSpeed, pitch = prefs.ttsPitch) }
                     }
-                    TouchAction.EXIT -> exitReader()
+                    TouchAction.EXIT -> onBack()
                     TouchAction.NONE -> Unit
                 }
             }
@@ -1848,7 +1722,7 @@ fun ReaderScreen(
                 ) {
                     Text("章节加载失败：$readerLoadError", color = textColor)
                     Spacer(Modifier.height(DesignTokens.SpaceLg))
-                    PullOutButton(onClick = onRetryLoad) { Text("重试加载") }
+                    PullOutButton(onClick = onRetryLoad) { Text(com.example.i18n.AppLocale.t("重试加载")) }
                 }
             } else if (readerLoading || chapters.isEmpty() ||
                 (book?.isComic == false && currentChapterIndex !in loadedChapterIndices) ||
@@ -1871,7 +1745,7 @@ fun ReaderScreen(
 
                     Text(
 
-                        text = "该文件格式暂不支持阅读（KFX / DJVU / DOC / RTF / CHM 等）\n请导入 EPUB、PDF、TXT 或漫画格式",
+                        text = tr("该文件格式暂不支持阅读（KFX / DJVU / DOC / RTF / CHM 等）\n请导入 EPUB、PDF、TXT 或漫画格式"),
 
                         color = textColor.copy(alpha = 0.75f),
 
@@ -1885,7 +1759,7 @@ fun ReaderScreen(
 
             } else if (currentChapter?.content.isNullOrBlank()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("本章暂无正文", color = textColor.copy(alpha = 0.75f))
+                    Text(com.example.i18n.AppLocale.t("本章暂无正文"), color = textColor.copy(alpha = 0.75f))
                 }
             } else {
 
@@ -2111,7 +1985,7 @@ fun ReaderScreen(
 
                                                     Text(
 
-                                                        text = "↓ 已到本章开头 · 继续下拉返回上一章",
+                                                        text = com.example.i18n.AppLocale.t("↓ 已到本章开头 · 继续下拉返回上一章"),
 
                                                         fontSize = DesignTokens.TypeCaption,
 
@@ -2376,7 +2250,7 @@ fun ReaderScreen(
 
                                                     pageIndex = 0,
 
-                                                    pageText = "已经是最后一页了",
+                                                    pageText = com.example.i18n.AppLocale.t("已经是最后一页了"),
 
                                                     chapterTitle = null,
 
@@ -2495,7 +2369,7 @@ fun ReaderScreen(
 
                                                     pageIndex = 0,
 
-                                                    pageText = "已经是第一页了",
+                                                    pageText = com.example.i18n.AppLocale.t("已经是第一页了"),
 
                                                     chapterTitle = null,
 
@@ -2733,13 +2607,13 @@ fun ReaderScreen(
 
                                                     text = when {
 
-                                                        pullProgress >= 1f && isNext -> "松开切换下一章"
+                                                        pullProgress >= 1f && isNext -> com.example.i18n.AppLocale.t("松开切换下一章")
 
-                                                        pullProgress >= 1f -> "松开返回上一章"
+                                                        pullProgress >= 1f -> com.example.i18n.AppLocale.t("松开返回上一章")
 
-                                                        isNext -> "继续上滑进入下一章"
+                                                        isNext -> com.example.i18n.AppLocale.t("继续上滑进入下一章")
 
-                                                        else -> "继续下拉返回上一章"
+                                                        else -> com.example.i18n.AppLocale.t("继续下拉返回上一章")
 
                                                     },
 
@@ -2893,11 +2767,11 @@ fun ReaderScreen(
 
                                     ) {
 
-                                        Text("朗读播放器", fontWeight = FontWeight.Bold, fontSize = DesignTokens.TypeBodySmall)
+                                        Text(com.example.i18n.AppLocale.t("朗读播放器"), fontWeight = FontWeight.Bold, fontSize = DesignTokens.TypeBodySmall)
 
                                         AppIconButton(
                                             icon = Icons.Filled.Close,
-                                            contentDescription = "关闭",
+                                            contentDescription = com.example.i18n.AppLocale.t("关闭"),
                                             onClick = { showTtsBar = false }
                                         )
 
@@ -2917,7 +2791,7 @@ fun ReaderScreen(
 
                                         AppIconButton(
                                             icon = Icons.Filled.SkipPrevious,
-                                            contentDescription = "上一段",
+                                            contentDescription = com.example.i18n.AppLocale.t("上一段"),
                                             onClick = { ttsManager.previousParagraph() }
                                         )
 
@@ -2957,7 +2831,7 @@ fun ReaderScreen(
 
                                                 if (isTtsPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
 
-                                                contentDescription = "播放暂停",
+                                                contentDescription = com.example.i18n.AppLocale.t("播放暂停"),
 
                                                 tint = Color.White
 
@@ -2969,7 +2843,7 @@ fun ReaderScreen(
 
                                         AppIconButton(
                                             icon = Icons.Filled.SkipNext,
-                                            contentDescription = "下一段",
+                                            contentDescription = com.example.i18n.AppLocale.t("下一段"),
                                             onClick = { ttsManager.nextParagraph() }
                                         )
 
@@ -3010,7 +2884,7 @@ fun ReaderScreen(
                                 ) {
                                     Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, tint = Color.White)
                                     Spacer(modifier = Modifier.width(DesignTokens.SpaceCompact))
-                                    Text("返回上次处", color = Color.White, fontSize = DesignTokens.TypeCaption, fontWeight = FontWeight.Bold)
+                                    Text(com.example.i18n.AppLocale.t("返回上次处"), color = Color.White, fontSize = DesignTokens.TypeCaption, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -3063,7 +2937,7 @@ fun ReaderScreen(
 
                     Spacer(modifier = Modifier.width(DesignTokens.SpaceCompact))
 
-                    Text("自动滚屏中 · 点击停止", color = Color.White, fontSize = DesignTokens.TypeCaption, fontWeight = FontWeight.Medium)
+                    Text(tr("自动滚屏中 · 点击停止"), color = Color.White, fontSize = DesignTokens.TypeCaption, fontWeight = FontWeight.Medium)
 
                 }
 
@@ -3073,7 +2947,7 @@ fun ReaderScreen(
 
 
 
-        // 滚动模式：滚过 20% 时显示"回到顶部"按钮
+        // 滚动模式：滚过 20% 时显示com.example.i18n.AppLocale.t("回到顶部")按钮
 
         val scrollTopVisible by rememberReaderScrollTopVisible(scrollState, isScrollMode && !isAutoScrolling)
 
@@ -3108,7 +2982,7 @@ fun ReaderScreen(
 
                         Icons.Filled.KeyboardArrowUp,
 
-                        contentDescription = "回到顶部",
+                        contentDescription = com.example.i18n.AppLocale.t("回到顶部"),
 
                         tint = MintPrimary,
 
@@ -3211,8 +3085,8 @@ fun ReaderScreen(
 
                                             AppIconButton(
                                                 icon = Icons.AutoMirrored.Filled.ArrowBack,
-                                                contentDescription = "返回",
-                                                onClick = { exitReader() },
+                                                contentDescription = com.example.i18n.AppLocale.t("返回"),
+                                                onClick = onBack,
                                                 tint = barContentColor,
                                                 glyphSize = 22.dp
                                             )
@@ -3259,7 +3133,7 @@ fun ReaderScreen(
 
                                             AppIconButton(
                                                 icon = if (currentBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
-                                                contentDescription = "书签",
+                                                contentDescription = com.example.i18n.AppLocale.t("书签"),
                                                 onClick = { toggleBookmark() },
                                                 active = currentBookmarked,
                                                 tint = if (currentBookmarked) MintGold else barContentColor,
@@ -3268,7 +3142,7 @@ fun ReaderScreen(
 
                                             AppIconButton(
                                                 icon = if (isTtsPlaying) Icons.AutoMirrored.Filled.VolumeUp else Icons.Filled.Headphones,
-                                                contentDescription = "听书",
+                                                contentDescription = com.example.i18n.AppLocale.t("听书"),
                                                 tint = if (isTtsPlaying) MintGold else barContentColor,
                                                 glyphSize = DesignTokens.SpaceXl,
                                                 active = isTtsPlaying,
@@ -3282,14 +3156,14 @@ fun ReaderScreen(
                                                                 speed = prefs.ttsSpeed,
                                                                 pitch = prefs.ttsPitch
                                                             )
-                                                            AppToast.makeText(context, "已开启语音听书", Toast.LENGTH_SHORT).show()
+                                                            AppToast.makeText(context, com.example.i18n.AppLocale.t("已开启语音听书"), Toast.LENGTH_SHORT).show()
                                                         }
                                                     }
                                                 }
                                             )
                                             AppIconButton(
                                                 icon = Icons.Filled.Menu,
-                                                contentDescription = "目录",
+                                                contentDescription = com.example.i18n.AppLocale.t("目录"),
                                                 onClick = { showTocSheet = true },
                                                 tint = barContentColor,
                                                 glyphSize = DesignTokens.SpaceXl
@@ -3302,7 +3176,7 @@ fun ReaderScreen(
                                             Box {
                                                 AppIconButton(
                                                     icon = Icons.Filled.MoreVert,
-                                                    contentDescription = "更多",
+                                                    contentDescription = com.example.i18n.AppLocale.t("更多"),
                                                     onClick = {
                                                         moreAnchor = moreCoordinates?.takeIf { it.isAttached }?.boundsInWindow()
                                                         showReaderMoreMenu = true
@@ -3318,21 +3192,21 @@ fun ReaderScreen(
                                                     borderless = true,
                                                 ) {
                                                     PullOutDropdownMenuItem(
-                                                        text = { Text("全文搜索") },
+                                                        text = { Text(com.example.i18n.AppLocale.t("全文搜索")) },
                                                         leadingIcon = { Icon(Icons.Filled.Search, null, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
                                                         onClick = com.example.ui.components.paperOpen { isAutoScrolling = false; showSearchDialog = true }
                                                     )
                                                     PullOutDropdownMenuItem(
-                                                        text = { Text("书签列表") },
+                                                        text = { Text(com.example.i18n.AppLocale.t("书签列表")) },
                                                         leadingIcon = { Icon(Icons.Filled.Bookmarks, null, tint = MintPrimary, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
                                                         onClick = com.example.ui.components.paperOpen { showReaderMoreMenu = false; showAnnotationsSheet = true }
                                                     )
                                                     PullOutDropdownMenuItem(
-                                                        text = { Text(if (isAutoScrolling) "停止自动滚屏" else "自动滚屏") },
+                                                        text = { Text(if (isAutoScrolling) com.example.i18n.AppLocale.t("停止自动滚屏") else com.example.i18n.AppLocale.t("自动滚屏")) },
                                                         leadingIcon = { Icon(Icons.Filled.UnfoldMore, null, tint = if (isAutoScrolling) MintGold else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
                                                         onClick = com.example.ui.components.paperDismiss {
                                                             if (!isScrollMode) {
-                                                                AppToast.makeText(context, "自动滚屏需切换到滚动模式", Toast.LENGTH_SHORT).show()
+                                                                AppToast.makeText(context, tr("自动滚屏需切换到滚动模式"), Toast.LENGTH_SHORT).show()
                                                             } else {
                                                                 isAutoScrolling = !isAutoScrolling
                                                                 if (isAutoScrolling && isTtsPlaying) ttsManager.pause()
@@ -3340,7 +3214,7 @@ fun ReaderScreen(
                                                         }
                                                     )
                                                     PullOutDropdownMenuItem(
-                                                        text = { Text("排版设置") },
+                                                        text = { Text(com.example.i18n.AppLocale.t("排版设置")) },
                                                         leadingIcon = { Icon(Icons.Filled.Settings, null, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
                                                         onClick = com.example.ui.components.paperOpen { showReaderMoreMenu = false; showSettingsSheet = true }
                                                     )
@@ -3387,7 +3261,7 @@ fun ReaderScreen(
                         ) {
                             AppIconButton(
                                 icon = Icons.Filled.SkipPrevious,
-                                contentDescription = "上一章",
+                                contentDescription = com.example.i18n.AppLocale.t("上一章"),
                                 tint = barContentColor,
                                 enabled = currentChapterIndex > 0,
                                 onClick = {
@@ -3400,7 +3274,7 @@ fun ReaderScreen(
                             WenkuReaderProgressSlider(
                                 modifier = Modifier.weight(1f),
                                 value = position,
-                                label = "本章进度",
+                                label = com.example.i18n.AppLocale.t("本章进度"),
                                 tint = barContentColor,
                                 enabled = pagedProgress || isScrollMode,
                                 onValueChange = { dragPos = it },
@@ -3423,7 +3297,7 @@ fun ReaderScreen(
                             )
                             AppIconButton(
                                 icon = Icons.Filled.SkipNext,
-                                contentDescription = "下一章",
+                                contentDescription = com.example.i18n.AppLocale.t("下一章"),
                                 tint = barContentColor,
                                 enabled = currentChapterIndex < chapters.lastIndex,
                                 onClick = {
@@ -3456,11 +3330,11 @@ fun ReaderScreen(
                                 modifier = Modifier.weight(1f).padding(end = DesignTokens.SpaceSm)
                             )
                             if (isTtsPlaying) {
-                                Text("朗读中", color = MintGold, fontSize = DesignTokens.TypeCaption)
+                                Text(com.example.i18n.AppLocale.t("朗读中"), color = MintGold, fontSize = DesignTokens.TypeCaption)
                             }
                             AppIconButton(
                                 icon = if (isTtsPlaying) Icons.AutoMirrored.Filled.VolumeUp else Icons.Filled.Headphones,
-                                contentDescription = "听书模式",
+                                contentDescription = com.example.i18n.AppLocale.t("听书模式"),
                                 tint = if (isTtsPlaying) MintGold else barContentColor,
                                 active = isTtsPlaying,
                                 onClick = {
@@ -3535,7 +3409,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                     Text("目录 (${chapters.size}章)", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     if (onCheckNovelUpdate != null) PullOutTextButton(onClick = com.example.ui.components.paperDismiss { onCheckNovelUpdate() }) {
                         Icon(Icons.Filled.Refresh, null, Modifier.size(DesignTokens.SpaceLg))
-                        Spacer(Modifier.width(5.dp)); Text("检查更新")
+                        Spacer(Modifier.width(5.dp)); Text(tr("检查更新"))
                     }
                 }
 
@@ -3549,7 +3423,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                     onValueChange = { tocFilter = it },
 
-                    placeholder = { Text("搜索章节...") },
+                    placeholder = { Text(com.example.i18n.AppLocale.t("搜索章节...")) },
 
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
 
@@ -3664,7 +3538,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                         modifier = Modifier.clip(CircleShape).background(accentColor.copy(alpha = 0.10f)).padding(9.dp).size(22.dp)
                     )
                     Spacer(modifier = Modifier.width(DesignTokens.SpaceTight))
-                    Text("阅读排版", fontSize = DesignTokens.TypeDisplay, fontWeight = FontWeight.SemiBold, color = textColor,
+                    Text(tr("阅读排版"), fontSize = DesignTokens.TypeDisplay, fontWeight = FontWeight.SemiBold, color = textColor,
                         modifier = Modifier.weight(1f))
                     PullOutTextButton(onClick = {
                         fontSize = 18f
@@ -3675,20 +3549,20 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                         prefs.lineHeight = lineHeight
                         prefs.marginHorizontal = marginHorizontal
                         prefs.readerBrightness = readerBrightness
-                        AppToast.makeText(context, "排版参数已重置", Toast.LENGTH_SHORT).show()
+                        AppToast.makeText(context, tr("排版参数已重置"), Toast.LENGTH_SHORT).show()
                     }) {
-                        Text("重置", fontWeight = FontWeight.SemiBold, color = accentColor)
+                        Text(tr("重置"), fontWeight = FontWeight.SemiBold, color = accentColor)
                     }
                     PullOutIconButton(
                         icon = Icons.Filled.Close,
-                        contentDescription = "关闭阅读排版",
+                        contentDescription = com.example.i18n.AppLocale.t("关闭阅读排版"),
                         tint = textColor.copy(alpha = 0.65f),
                         onClick = closePanel
                     )
                 }
 
                 PullOutFilledTonalButton(onClick = com.example.ui.components.paperDismiss { showBars = false; isAutoScrolling = false; showTouchEditor = true }, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Filled.TouchApp, null); Spacer(Modifier.width(8.dp)); Text("自定义触控功能分区")
+                    Icon(Icons.Filled.TouchApp, null); Spacer(Modifier.width(8.dp)); Text(com.example.i18n.AppLocale.t("自定义触控功能分区"))
                 }
                 /* ── 分组：显示（亮度 + 首行缩进）── */
                 Text(
@@ -3715,7 +3589,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                 modifier = Modifier.size(DesignTokens.SpaceLg)
                             )
                             Spacer(modifier = Modifier.width(DesignTokens.SpaceSm))
-                            Text("亮度", fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
+                            Text(tr("亮度"), fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
                             Spacer(modifier = Modifier.weight(1f))
                             Text("${(readerBrightness * 100).toInt()}%", fontSize = DesignTokens.TypeLabel, fontWeight = FontWeight.SemiBold, color = accentColor,
                                 modifier = Modifier.clip(RoundedCornerShape(DesignTokens.RadiusXs)).background(accentColor.copy(alpha = 0.08f)).padding(horizontal = DesignTokens.SpaceSm, vertical = DesignTokens.SpaceXs))
@@ -3735,7 +3609,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("首行缩进", fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
+                                Text(tr("首行缩进"), fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
                                 Text(
                                     "段落首行自动空两格",
                                     fontSize = DesignTokens.TypeCaptionSmall,
@@ -3770,7 +3644,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                     Column(modifier = Modifier.padding(horizontal = DesignTokens.SpaceComfortable, vertical = DesignTokens.SpaceTight)) {
                         // 字号：A− / 当前 / A+ 紧凑步进器
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text("字号", fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
+                            Text(tr("字号"), fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
                             Spacer(modifier = Modifier.weight(1f))
                             Surface(
                                 shape = RoundedCornerShape(DesignTokens.RadiusInner),
@@ -3819,9 +3693,9 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                         // 字体：当前字体一行 + 展开列表（示例文字直接用对应字体渲染）
                         var fontPanelOpen by remember { mutableStateOf(false) }
                         val currentFontName = when (fontFamilyIndex) {
-                            1 -> "衬线体"; 2 -> "黑体"; 3 -> "等宽体"
-                            4 -> if (customTypeface != null) "自定义字体" else "自定义字体（未导入）"
-                            else -> "默认字体"
+                            1 -> tr("衬线体"); 2 -> tr("黑体"); 3 -> tr("等宽体")
+                            4 -> if (customTypeface != null) tr("自定义字体") else tr("自定义字体（未导入）")
+                            else -> tr("默认字体")
                         }
                         Row(
                             modifier = Modifier
@@ -3830,7 +3704,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                 .pullOutClickable { fontPanelOpen = !fontPanelOpen },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("字体", fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
+                            Text(tr("字体"), fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
                             Spacer(modifier = Modifier.width(DesignTokens.SpaceTight))
                             Text(
                                 currentFontName,
@@ -3843,7 +3717,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                             )
                             com.example.ui.components.AnimatedStateIcon(
                                 if (fontPanelOpen) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                                contentDescription = if (fontPanelOpen) "收起字体列表" else "展开字体列表",
+                                contentDescription = if (fontPanelOpen) tr("收起字体列表") else tr("展开字体列表"),
                                 tint = textColor.copy(alpha = 0.65f).copy(alpha = 0.6f),
                                 modifier = Modifier.size(DesignTokens.SpaceXl)
                             )
@@ -3865,8 +3739,8 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                 }
                                 val customLoaded = prefs.customFontPath.isNotEmpty() && customTypeface != null
                                 ReaderFontOptionRow(
-                                    name = "自定义字体",
-                                    sample = if (customLoaded) "已导入字体效果预览 Aa" else "选择 TTF 文件后可在此预览",
+                                    name = com.example.i18n.AppLocale.t("自定义字体"),
+                                    sample = if (customLoaded) tr("已导入字体效果预览 Aa") else tr("选择 TTF 文件后可在此预览"),
                                     family = customTypeface?.let { FontFamily(it) } ?: AppFonts.Default,
                                     selected = fontFamilyIndex == 4 && customLoaded,
                                     onClick = {
@@ -3883,7 +3757,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                                             modifier = Modifier.height(30.dp)
                                         ) {
                                             Text(
-                                                if (customLoaded) "换字体" else "+导入",
+                                                if (customLoaded) tr("换字体") else tr("+导入"),
                                                 fontSize = DesignTokens.TypeCaption,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = accentColor
@@ -3900,7 +3774,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                         // 行间距 / 页边距：紧凑滑杆行
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text("行间距", fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
+                            Text(tr("行间距"), fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
                             Spacer(modifier = Modifier.weight(1f))
                             Text("${lineHeight.toInt()} sp", fontSize = DesignTokens.TypeLabel, fontWeight = FontWeight.SemiBold, color = accentColor,
                                 modifier = Modifier.clip(RoundedCornerShape(DesignTokens.RadiusXs)).background(accentColor.copy(alpha = 0.08f)).padding(horizontal = DesignTokens.SpaceSm, vertical = DesignTokens.SpaceXs))
@@ -3916,7 +3790,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                             )
                         )
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text("页边距", fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
+                            Text(tr("页边距"), fontSize = DesignTokens.TypeBodySmall, fontWeight = FontWeight.Medium)
                             Spacer(modifier = Modifier.weight(1f))
                             Text("${marginHorizontal} dp", fontSize = DesignTokens.TypeLabel, fontWeight = FontWeight.SemiBold, color = accentColor,
                                 modifier = Modifier.clip(RoundedCornerShape(DesignTokens.RadiusXs)).background(accentColor.copy(alpha = 0.08f)).padding(horizontal = DesignTokens.SpaceSm, vertical = DesignTokens.SpaceXs))
@@ -4054,11 +3928,11 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
             ) {
                 val close = paperDismiss { }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("查找", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    AppIconButton(Icons.Filled.Close, "关闭查找", onClick = close)
+                    Text(tr("查找"), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    AppIconButton(Icons.Filled.Close, tr("关闭查找"), onClick = close)
                 }
                 SegmentedPillSelector(
-                    options = listOf(0 to "章内查找", 1 to "整书查找"),
+                    options = listOf(0 to tr("章内查找"), 1 to tr("整书查找")),
                     selected = searchScope,
                     onSelect = {
                         focusManager.clearFocus()
@@ -4075,14 +3949,14 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                             onSearch(it)
                         }
                     },
-                    hint = "输入关键词...",
+                    hint = com.example.i18n.AppLocale.t("输入关键词..."),
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(DesignTokens.SpaceMd))
                 when {
                     query.isBlank() -> Unit
                     searching -> CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
-                    matches.isEmpty() -> Text("未找到匹配", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    matches.isEmpty() -> Text(tr("未找到匹配"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     else -> key(searchScope) {
                         LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
                             itemsIndexed(matches, key = { index, _ -> index }) { _, item ->
@@ -4147,7 +4021,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                 if (bookmarks.isEmpty()) {
 
-                    Text("无书签", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(tr("无书签"), color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                 } else {
 
@@ -4195,7 +4069,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                                 AppIconButton(
                                     icon = Icons.Filled.Delete,
-                                    contentDescription = "删除",
+                                    contentDescription = com.example.i18n.AppLocale.t("删除"),
                                     tint = MaterialTheme.colorScheme.error,
                                     onClick = { onDeleteBookmark(bm.id) }
                                 )
@@ -4297,7 +4171,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                         Text(
 
-                            text = "定时休息提醒",
+                            text = com.example.i18n.AppLocale.t("定时休息提醒"),
 
                             fontWeight = FontWeight.Bold,
 
@@ -4311,7 +4185,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                         Text(
 
-                            text = "已持续阅读 ${prefs.restReminderMinutes} 分钟，建议远眺片刻！",
+                            text = com.example.i18n.restReminder(prefs.restReminderMinutes),
 
                             fontSize = DesignTokens.TypeLabel,
 
@@ -4327,7 +4201,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
                 AppActionButton(
 
-                    text = "好的",
+                    text = com.example.i18n.AppLocale.t("好的"),
 
                     onClick = { showRestDialog = false },
 
@@ -4849,7 +4723,7 @@ private fun ReaderThemePreviewCard(
             if (selected) {
                 Icon(
                     Icons.Filled.CheckCircle,
-                    contentDescription = "已选择",
+                    contentDescription = com.example.i18n.AppLocale.t("已选择"),
                     tint = MintPrimary,
                     modifier = Modifier
                         .size(DesignTokens.SpaceComfortable)

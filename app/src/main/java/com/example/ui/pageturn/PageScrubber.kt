@@ -1,5 +1,7 @@
 package com.example.ui.pageturn
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.SoundPool
@@ -513,7 +515,7 @@ fun PageScrubberOverlay(
                         )
                     }
                     Text(
-                        text = "左右滑动选页 · 点击进入",
+                        text = tr("左右滑动选页 · 点击进入"),
                         color = Color(0xB3FFFFFF),
                         fontSize = 11.sp
                     )
@@ -551,7 +553,7 @@ fun PageScrubberOverlay(
                     .graphicsLayer { alpha = enter.value.coerceIn(0f, 1f) }
             ) {
                 Text(
-                    text = "取消",
+                    text = tr("取消"),
                     fontSize = 14.sp,
                     modifier = Modifier.padding(horizontal = 30.dp, vertical = 9.dp)
                 )

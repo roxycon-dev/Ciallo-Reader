@@ -1,5 +1,7 @@
 package com.example.ui.wenku
 
+import com.example.i18n.tr
+
 import com.example.ui.components.RenderQuality
 import com.example.ui.components.LocalRenderQuality
 import com.kashif_e.backdrop.effects.lens
@@ -451,7 +453,7 @@ fun BoxScope.WenkuExpandableSearch(
     if (!mounted) {
         WenkuIconButton(
             icon = Icons.Outlined.Search,
-            contentDescription = "搜索书架",
+            contentDescription = tr("搜索书架"),
             onClick = onOpen,
             modifier = Modifier.align(Alignment.CenterEnd).size(46.dp).graphicsLayer {
                 scaleX = 1f - (5f / 24f) * compactFraction
@@ -557,7 +559,7 @@ fun WenkuSearchField(
             if (value.isNotEmpty()) {
                 WenkuIconButton(
                     icon = Icons.Filled.Close,
-                    contentDescription = "清空搜索",
+                    contentDescription = tr("清空搜索"),
                     onClick = { onValueChange("") },
                     wenkuSymbol = WenkuSymbol.CloseCircle,
                     modifier = Modifier.size(40.dp),
@@ -567,7 +569,7 @@ fun WenkuSearchField(
             if (onClose != null) {
                 WenkuIconButton(
                     icon = Icons.Filled.Close,
-                    contentDescription = "收起搜索",
+                    contentDescription = tr("收起搜索"),
                     onClick = onClose,
                     modifier = Modifier.size(40.dp),
                     enabled = enabled

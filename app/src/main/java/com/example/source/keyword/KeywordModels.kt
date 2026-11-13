@@ -1,5 +1,7 @@
 package com.example.source.keyword
 
+import com.example.i18n.tr
+
 import com.example.source.anilist.TitleNormalizer
 import java.util.Locale
 
@@ -24,11 +26,11 @@ internal data class KeywordProviderState(val provider: String, val outcome: Stri
     val detail: String = "") {
     val displayName: String get() = when (provider) {
         "wikidata" -> "Wikidata"
-        "bangumi:subjects" -> "Bangumi 作品"
-        "bangumi:characters" -> "Bangumi 角色"
-        "bangumi:persons" -> "Bangumi 人物"
+        "bangumi:subjects" -> tr("Bangumi 作品")
+        "bangumi:characters" -> tr("Bangumi 角色")
+        "bangumi:persons" -> tr("Bangumi 人物")
         "anilist" -> "AniList"
-        else -> "名称查询"
+        else -> tr("名称查询")
     }
 }
 internal data class OnlineKeywordResult(

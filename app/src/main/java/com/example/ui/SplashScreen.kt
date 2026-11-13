@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.i18n.tr
+
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
@@ -158,7 +160,7 @@ fun SplashScreen(
             if (customBitmap != null) {
                 Image(
                     bitmap = customBitmap!!,
-                    contentDescription = "开屏海报",
+                    contentDescription = tr("开屏海报"),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
@@ -216,7 +218,7 @@ fun SplashScreen(
                 }
 
                 Text(
-                    text = "点击跳过",
+                    text = tr("点击跳过"),
                     fontSize = 12.sp,
                     color = Color.White.copy(alpha = 0.5f),
                     modifier = Modifier

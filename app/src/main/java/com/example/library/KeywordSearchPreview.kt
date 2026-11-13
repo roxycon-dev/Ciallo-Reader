@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.i18n.tr
+
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.pullOutClickable
 import androidx.compose.foundation.clickable
@@ -76,16 +78,16 @@ internal fun KeywordSearchPreview(
     GlassKitCard(modifier = modifier.fillMaxWidth().animateContentSize(tween(if (reduce) 0 else 220, easing = AppMotion.easeOutCubic)).testTag("keyword_search_preview")) {
         Column(Modifier.padding(DesignTokens.SpaceMd), verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
             Row(Modifier.fillMaxWidth().heightIn(min = DesignTokens.SpaceXxl * 2)
-                .semantics { stateDescription = if (expanded) "已展开" else "已收起" }
-                .pullOutClickable(role = Role.Button, onClickLabel = if (expanded) "收起搜索用词" else "查看搜索用词") { expanded = !expanded },
+                .semantics { stateDescription = if (expanded) tr("已展开") else tr("已收起") }
+                .pullOutClickable(role = Role.Button, onClickLabel = if (expanded) tr("收起搜索用词") else tr("查看搜索用词")) { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
-                Icon(Icons.Default.Translate, "多语言关键词", tint = MaterialTheme.colorScheme.primary,
+                Icon(Icons.Default.Translate, tr("多语言关键词"), tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(DesignTokens.SpaceXxl))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
-                        Text("搜索用词", style = MaterialTheme.typography.labelLarge)
+                        Text(tr("搜索用词"), style = MaterialTheme.typography.labelLarge)
                         Text("${words.size} 个", style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary)
                     }
@@ -96,7 +98,7 @@ internal fun KeywordSearchPreview(
                             color = if (currentStatus.startsWith("正在")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                com.example.ui.components.AnimatedChevron(expanded, collapsedRotation = -90f, expandedRotation = 0f, contentDescription = if (expanded) "收起搜索用词" else "查看搜索用词",
+                com.example.ui.components.AnimatedChevron(expanded, collapsedRotation = -90f, expandedRotation = 0f, contentDescription = if (expanded) tr("收起搜索用词") else tr("查看搜索用词"),
                     modifier = Modifier, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (!expanded) {
@@ -108,7 +110,7 @@ internal fun KeywordSearchPreview(
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.widthIn(max = DesignTokens.SpaceXxl * 9)
                                 .background(MaterialTheme.colorScheme.secondaryContainer, DesignTokens.shape(DesignTokens.RadiusXs))
-                                .pullOutClickable(onClickLabel = "查看完整搜索用词") { expanded = true }
+                                .pullOutClickable(onClickLabel = tr("查看完整搜索用词")) { expanded = true }
                                 .padding(horizontal = DesignTokens.SpaceSm, vertical = DesignTokens.SpaceXs))
                     }
                 }
@@ -122,21 +124,21 @@ internal fun KeywordSearchPreview(
                             .background(MaterialTheme.colorScheme.surfaceContainer, DesignTokens.shape(DesignTokens.RadiusSm))
                             .padding(DesignTokens.SpaceSm)) {
                             Text(word, style = MaterialTheme.typography.bodyMedium)
-                            Text("${origins[key] ?: "扩展名称"} · " + if (count == 0) "等待提交" else "已提交 $count 个书源",
+                            Text("${origins[key] ?: "扩展名称"} · " + if (count == 0) tr("等待提交") else com.example.i18n.sourcesSubmitted(count),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    Text("已提交表示交给书源处理，结果由书源返回。长按名称可复制。",
+                    Text(tr("已提交表示交给书源处理，结果由书源返回。长按名称可复制。"),
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if (expanded && providers.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(DesignTokens.SpaceXs)) {
                 providers.forEach { state ->
                     val outcome = when (state.outcome) {
-                        "found" -> "已找到名称"
-                        "empty" -> "未收录匹配名称"
-                        "ambiguous" -> "存在同名，未自动采用"
+                        "found" -> tr("已找到名称")
+                        "empty" -> tr("未收录匹配名称")
+                        "ambiguous" -> tr("存在同名，未自动采用")
                         else -> state.detail.ifBlank { "查询失败，请稍后重试" }
                     }
                     Text("${state.displayName} · $outcome", style = MaterialTheme.typography.labelSmall,
@@ -146,7 +148,7 @@ internal fun KeywordSearchPreview(
             if (onRetry != null && !status.startsWith("正在") &&
                 (status.contains("失败") || status.contains("超时") || status.startsWith("未找到更多"))) {
                 PullOutTextButton(onClick = onRetry, contentPadding = PaddingValues(horizontal = DesignTokens.SpaceXs)) {
-                    Text("重新查词", style = MaterialTheme.typography.labelMedium)
+                    Text(tr("重新查词"), style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
@@ -162,15 +164,15 @@ internal fun KeywordSearchOptions(
     Column {
         ListItem(modifier = Modifier.testTag("multilingual_option"),
             colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-            headlineContent = { Text("多语言搜索", style = MaterialTheme.typography.bodyMedium) },
-            supportingContent = { Text(if (enabled) "开启：扩展常用词、作品、角色和作者别名" else "关闭：仅使用输入的原始关键词") },
-            leadingContent = { Icon(Icons.Default.Translate, "多语言搜索",
+            headlineContent = { Text(tr("多语言搜索"), style = MaterialTheme.typography.bodyMedium) },
+            supportingContent = { Text(if (enabled) tr("开启：扩展常用词、作品、角色和作者别名") else tr("关闭：仅使用输入的原始关键词")) },
+            leadingContent = { Icon(Icons.Default.Translate, tr("多语言搜索"),
                 tint = if (enabled) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant) },
             trailingContent = { AppSwitch(checked = enabled, onCheckedChange = onEnabledChange) })
         if (enabled) ListItem(modifier = Modifier.testTag("online_keyword_option"),
             colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-            headlineContent = { Text("缺词时在线补充", style = MaterialTheme.typography.bodyMedium) },
-            supportingContent = { Text("优先查本地资料；在线查询名称后缓存，无痕时暂停") },
+            headlineContent = { Text(tr("缺词时在线补充"), style = MaterialTheme.typography.bodyMedium) },
+            supportingContent = { Text(tr("优先查本地资料；在线查询名称后缓存，无痕时暂停")) },
             leadingContent = { Spacer(Modifier.size(DesignTokens.SpaceXxl)) },
             trailingContent = { AppSwitch(checked = online, onCheckedChange = onOnlineChange) })
     }

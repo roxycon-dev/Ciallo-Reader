@@ -101,6 +101,19 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("preload_wifi_only", false)
         set(value) = prefs.edit().putBoolean("preload_wifi_only", value).apply()
 
+    var shelfUses3dView: Boolean
+        get() = prefs.getBoolean(SHELF_USES_3D_VIEW, true)
+        set(value) = prefs.edit().putBoolean(SHELF_USES_3D_VIEW, value).apply()
+
+    var favoritesUse3dView: Boolean
+        get() = prefs.getBoolean(FAVORITES_USE_3D_VIEW, true)
+        set(value) = prefs.edit().putBoolean(FAVORITES_USE_3D_VIEW, value).apply()
+
+    /** 界面语言：`zh`（默认）/ `en`。只影响文案，不动数据（分类名、书源 id 等）。 */
+    var appLanguage: String
+        get() = prefs.getString(APP_LANGUAGE, "zh") ?: "zh"
+        set(value) = prefs.edit().putString(APP_LANGUAGE, value).apply()
+
     /** 书架多选/拖拽的「再次长按可拖动」提示已展示次数（最多 3 次，之后不再打扰）。 */
     var shelfDragHintShown: Int
         get() = prefs.getInt("shelf_drag_hint_shown", 0)
@@ -109,6 +122,12 @@ class PreferencesManager(context: Context) {
     var keepScreenOn: Boolean
         get() = prefs.getBoolean("keep_screen_on", true)
         set(value) = prefs.edit().putBoolean("keep_screen_on", value).apply()
+
+    companion object {
+        internal const val SHELF_USES_3D_VIEW = "shelf_uses_3d_view"
+        internal const val FAVORITES_USE_3D_VIEW = "favorites_use_3d_view"
+        internal const val APP_LANGUAGE = "app_language"
+    }
 
     /**
      * 触控反馈（触觉）总开关。此前 LocalHapticsEnabled 在 MainActivity 里被硬编码为 true，

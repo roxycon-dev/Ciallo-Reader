@@ -1,0 +1,13 @@
+[
+  {
+    "file": "kinetic-import.webp",
+    "source": "04_shelf.mp4",
+    "second": 1.6,
+    "crop_ltrb": [
+      0,
+      500,
+      1224,
+      840
+    ]
+  }
+]

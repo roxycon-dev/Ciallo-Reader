@@ -6,6 +6,8 @@
 
 package com.example.library
 
+import com.example.i18n.tr
+
 import com.example.ui.wenku.rememberWenkuAccessibility
 import com.example.ui.wenku.WenkuMotion
 import com.example.ui.wenku.WenkuSectionHeader
@@ -278,10 +280,10 @@ fun LibraryScreen(
         try {
             when (val result = viewModel.novelDetail(book)) {
                 is com.example.source.SourceResult.Success -> novelDetailBook = result.data
-                is com.example.source.SourceResult.Error -> novelDetailError = result.exception.message ?: "详情暂时无法加载"
+                is com.example.source.SourceResult.Error -> novelDetailError = result.exception.message ?: com.example.i18n.AppLocale.t("详情暂时无法加载")
             }
         } catch (e: kotlinx.coroutines.CancellationException) { throw e }
-        catch (e: Exception) { novelDetailError = e.message ?: "详情暂时无法加载" }
+        catch (e: Exception) { novelDetailError = e.message ?: com.example.i18n.AppLocale.t("详情暂时无法加载") }
         finally { novelDetailLoading = false }
     }
 
@@ -322,7 +324,7 @@ fun LibraryScreen(
             viewModel.checkSourceLoginStatus()
             if (!viewModel.isCurrentSourceLoggedIn.value) {
                 showLoginDialog = true
-                loginMessage = "检测到未登录，登录后可正常下载（搜索无需登录）"
+                loginMessage = tr("检测到未登录，登录后可正常下载（搜索无需登录）")
             }
         }
     }
@@ -334,7 +336,7 @@ fun LibraryScreen(
             kotlinx.coroutines.delay(15000)
             val st = viewModel.downloadStates.value[com.example.download.DownloadManager.taskId(book.sourceId, book.id)]
             if (st == null || st is DownloadState.Idle) {
-                nativeStatus = "未能获取下载链接（可能需要登录），可稍后重试"
+                nativeStatus = tr("未能获取下载链接（可能需要登录），可稍后重试")
             }
         }
     }
@@ -531,9 +533,9 @@ fun LibraryScreen(
             onRegister = if (src.id == "js_vomic") {
                 {
                     val result = (src as? com.example.source.js.JsComicSource)?.register()
-                        ?: throw IllegalStateException("源不可用")
+                        ?: throw IllegalStateException(com.example.i18n.AppLocale.t("源不可用"))
                     if (result is com.example.source.SourceResult.Error) {
-                        throw Exception(result.exception.message ?: "注册失败")
+                        throw Exception(result.exception.message ?: com.example.i18n.tr("注册失败"))
                     }
                 }
             } else null
@@ -593,14 +595,14 @@ fun LibraryScreen(
         fractionSource = headerFractionSource,
         focusDriven = searchFieldFocused,
         modifier = Modifier.statusBarsPadding(),
-        title = "书库",
+        title = com.example.i18n.AppLocale.t("书库"),
         subtitle = "LIBRARY & SEARCH",
         titleColor = glassTitleColor(),
         leading = {
             onBack?.let { back ->
                 PullOutIconButton(
                     icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回上一层",
+                    contentDescription = com.example.i18n.AppLocale.t("返回上一层"),
                     onClick = back,
                     glyphSize = 22.dp
                 )
@@ -642,8 +644,8 @@ fun LibraryScreen(
                         },
                         sourceSheetOpen = showSourceSheet,
                         sourceLabel = if (aggregateMode)
-                            if (aggregateKind == "novel") "全部小说" else "全部漫画"
-                        else currentSource?.name ?: "书源",
+                            if (aggregateKind == "novel") com.example.i18n.AppLocale.t("全部小说") else com.example.i18n.AppLocale.t("全部漫画")
+                        else currentSource?.name ?: com.example.i18n.AppLocale.t("书源"),
                         searchFocused = searchFieldFocused,
                         modifier = Modifier.fillMaxWidth().wenkuPagePart(1)
                     )
@@ -667,7 +669,7 @@ fun LibraryScreen(
                                 )
                                 if (currentSource?.capabilities?.downloadRequiresLogin == true && !isCurrentSourceLoggedIn) {
                                     PullOutTextButton(onClick = onOpenSourceManagement) {
-                                        Text("去管理/登录")
+                                        Text(com.example.i18n.AppLocale.t("去管理/登录"))
                                     }
                                 }
                             }
@@ -687,10 +689,10 @@ fun LibraryScreen(
                             Spacer(Modifier.width(DesignTokens.SpaceTight))
                             Column(Modifier.weight(1f)) {
                                 Text("下载任务 · ${visibleDownloads.size + comicDownloading.size} 项", fontWeight = FontWeight.SemiBold)
-                                Text(visibleDownloads.firstOrNull()?.let { downloadStatusLabel(it) } ?: "漫画正在下载",
+                                Text(visibleDownloads.firstOrNull()?.let { downloadStatusLabel(it) } ?: com.example.i18n.AppLocale.t("漫画正在下载"),
                                     style = MaterialTheme.typography.bodySmall)
                             }
-                            Text("查看进度", style = MaterialTheme.typography.labelLarge)
+                            Text(com.example.i18n.AppLocale.t("查看进度"), style = MaterialTheme.typography.labelLarge)
                         }
                     }
                 }
@@ -873,9 +875,9 @@ fun LibraryScreen(
                             ) {
                                 com.example.ui.components.MascotEmptyState(
                                     mascotResId = com.example.ui.mascot.MascotSpriteSheet.sadDrawable,
-                                    title = "未找到结果",
-                                    description = "所有${if (aggregateKind == "novel") "小说源" else "漫画源"}都没有匹配“$searchQuery”的内容",
-                                    actionLabel = "管理与导入书源",
+                                    title = com.example.i18n.AppLocale.t("未找到结果"),
+                                    description = "所有${if (aggregateKind == "novel") com.example.i18n.AppLocale.t("小说源") else com.example.i18n.AppLocale.t("漫画源")}都没有匹配“$searchQuery”的内容",
+                                    actionLabel = com.example.i18n.AppLocale.t("管理与导入书源"),
                                     onActionClick = onOpenSourceManagement,
                                     testTagPrefix = "aggregate_empty_state"
                                 )
@@ -904,7 +906,7 @@ fun LibraryScreen(
                                 hoveredElevation = 0.dp
                             )
                         ) {
-                            Icon(Icons.Filled.ArrowUpward, contentDescription = "回到顶部")
+                            Icon(Icons.Filled.ArrowUpward, contentDescription = com.example.i18n.AppLocale.t("回到顶部"))
                         }
                     }
                     }
@@ -944,14 +946,14 @@ fun LibraryScreen(
                             } else if (uiState is LibraryUiState.Error) {
                                 val error = (uiState as LibraryUiState.Error).error
                                 val (title, desc, action) = when (error) {
-                                    is LibraryError.NetworkUnavailable -> Triple("无网络连接", "请检查网络设置后重试", "重试")
+                                    is LibraryError.NetworkUnavailable -> Triple(com.example.i18n.AppLocale.t("无网络连接"), com.example.i18n.AppLocale.t("请检查网络设置后重试"), com.example.i18n.AppLocale.t("重试"))
                                     // v1.0.1：网络失败展示真实原因（HTTP 状态码 / DNS / TLS / 超时），便于排查
-                                    is LibraryError.NetworkDetail -> Triple("请求失败", error.message, "重试")
-                                    is LibraryError.SourceUnavailable -> Triple("服务无响应", "当前书源站点暂无响应，请稍后重试或切换书源", "重试")
-                                    is LibraryError.AuthenticationRequired -> Triple("需要登录", "当前书源需要账号身份验证", "去登录")
-                                    is LibraryError.CloudflareBlocked -> Triple("安全验证拦截", "目标站点已启用安全防护，请稍后重试", "重试")
-                                    is LibraryError.ParseFailed -> Triple("数据解析失败", "返回数据格式异常，无法解析内容", "重试")
-                                    else -> Triple("请求超时", error.message ?: "网络请求超时，请重试", "重试")
+                                    is LibraryError.NetworkDetail -> Triple(com.example.i18n.AppLocale.t("请求失败"), error.message, com.example.i18n.AppLocale.t("重试"))
+                                    is LibraryError.SourceUnavailable -> Triple(com.example.i18n.AppLocale.t("服务无响应"), com.example.i18n.AppLocale.t("当前书源站点暂无响应，请稍后重试或切换书源"), com.example.i18n.AppLocale.t("重试"))
+                                    is LibraryError.AuthenticationRequired -> Triple(com.example.i18n.AppLocale.t("需要登录"), com.example.i18n.AppLocale.t("当前书源需要账号身份验证"), com.example.i18n.AppLocale.t("去登录"))
+                                    is LibraryError.CloudflareBlocked -> Triple(com.example.i18n.AppLocale.t("安全验证拦截"), com.example.i18n.AppLocale.t("目标站点已启用安全防护，请稍后重试"), com.example.i18n.AppLocale.t("重试"))
+                                    is LibraryError.ParseFailed -> Triple(com.example.i18n.AppLocale.t("数据解析失败"), com.example.i18n.AppLocale.t("返回数据格式异常，无法解析内容"), com.example.i18n.AppLocale.t("重试"))
+                                    else -> Triple(com.example.i18n.AppLocale.t("请求超时"), error.message ?: com.example.i18n.AppLocale.t("网络请求超时，请重试"), com.example.i18n.AppLocale.t("重试"))
                                 }
                                 LibrarySearchNotice(
                                     title, desc, action, "search_error_state",
@@ -963,13 +965,13 @@ fun LibraryScreen(
                                 )
                             } else {
                                 LibrarySearchNotice(
-                                    title = if (searchQuery.isBlank()) "检索图书" else "未找到结果",
+                                    title = if (searchQuery.isBlank()) com.example.i18n.AppLocale.t("检索图书") else com.example.i18n.AppLocale.t("未找到结果"),
                                     description = if (searchQuery.isBlank()) {
-                                        "在上方输入书名、作者或关键词"
+                                        com.example.i18n.AppLocale.t("在上方输入书名、作者或关键词")
                                     } else {
                                         "未找到与“$searchQuery”匹配的内容，请尝试更换关键词或书源"
                                     },
-                                    action = "管理与导入书源",
+                                    action = com.example.i18n.AppLocale.t("管理与导入书源"),
                                     tag = "search_empty_state",
                                     symbol = WenkuSymbol.Folder,
                                     onAction = onOpenSourceManagement,
@@ -1044,22 +1046,22 @@ fun LibraryScreen(
                             val src = currentSource
                             if (src == null) {
                                 loginLoading = false
-                                loginMessage = "当前书源不可用"
+                                loginMessage = com.example.i18n.AppLocale.t("当前书源不可用")
                                 return@LibraryLoginDialog
                             }
                             loginLoading = true
-                            loginMessage = "登录中…"
+                            loginMessage = com.example.i18n.AppLocale.t("登录中…")
                             scope.launch {
                                 when (val result = src.login(LoginCredential(username = email, password = pass))) {
                                     is SourceResult.Success -> {
                                         loginLoading = false
-                                        loginMessage = "登录成功"
+                                        loginMessage = com.example.i18n.AppLocale.t("登录成功")
                                         close()
                                         viewModel.checkSourceLoginStatus()
                                     }
                                     is SourceResult.Error -> {
                                         loginLoading = false
-                                        loginMessage = result.exception.message ?: "登录失败，请检查账号密码"
+                                        loginMessage = result.exception.message ?: com.example.i18n.AppLocale.t("登录失败，请检查账号密码")
                                     }
                                 }
                             }
@@ -1280,7 +1282,7 @@ private fun UnifiedSearchField(
                 onSourceClick,
                 modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp).widthIn(max = 140.dp)
                     .align(Alignment.CenterVertically)
-                    .semantics { contentDescription = "选择书源" },
+                    .semantics { contentDescription = com.example.i18n.AppLocale.t("选择书源") },
                 selected = sourceSheetOpen,
                 compact = true,
                 wenkuSymbol = if (sourceSheetOpen) WenkuSymbol.Up else WenkuSymbol.Down,
@@ -1319,7 +1321,7 @@ private fun UnifiedSearchField(
                         if (query.isEmpty()) {
                             // 占位字号与输入一致（15sp，避免首键入瞬间跳变）；单行防大字体溢出
                             Text(
-                                text = "搜索书名或作者",
+                                text = com.example.i18n.AppLocale.t("搜索书名或作者"),
                                 fontSize = 15.sp,
                                 color = placeholderColor,
                                 maxLines = 1,
@@ -1333,7 +1335,7 @@ private fun UnifiedSearchField(
             if (query.isNotBlank()) {
                 PullOutIconButton(
                     icon = Icons.Default.Close,
-                    contentDescription = "清空",
+                    contentDescription = com.example.i18n.AppLocale.t("清空"),
                     onClick = { onQueryChange("") },
                     modifier = Modifier.size(36.dp),
                     tint = sourceTint.copy(alpha = 0.55f),
@@ -1344,7 +1346,7 @@ private fun UnifiedSearchField(
             }
             PullOutIconButton(
                 icon = Icons.Default.Search,
-                contentDescription = "搜索",
+                contentDescription = com.example.i18n.AppLocale.t("搜索"),
                 onClick = {
                     focusManager.clearFocus()
                     onSearch()
@@ -1445,7 +1447,7 @@ private fun SearchHistoryPanel(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "搜索历史",
+                    text = com.example.i18n.AppLocale.t("搜索历史"),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -1467,7 +1469,7 @@ private fun SearchHistoryPanel(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "清空",
+                        text = com.example.i18n.AppLocale.t("清空"),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = error
@@ -1495,14 +1497,14 @@ private fun SearchHistoryPanel(
             onDismissRequest = { confirmClear = false },
             title = {
                 Text(
-                    text = "清空搜索历史？",
+                    text = com.example.i18n.AppLocale.t("清空搜索历史？"),
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
             },
             text = {
                 Text(
-                    text = "将删除全部 ${history.size} 条历史搜索词，此操作不可撤销。",
+                    text = com.example.i18n.clearSearchHistory(history.size),
                     fontSize = 13.sp
                 )
             },
@@ -1512,12 +1514,12 @@ private fun SearchHistoryPanel(
                     editing = false
                     onClearAll()
                 }) {
-                    Text(text = "清空", color = error)
+                    Text(text = com.example.i18n.AppLocale.t("清空"), color = error)
                 }
             },
             dismissButton = {
                 PullOutTextButton(onClick = { confirmClear = false }) {
-                    Text(text = "取消")
+                    Text(text = com.example.i18n.AppLocale.t("取消"))
                 }
             }
         )
@@ -1561,7 +1563,7 @@ private fun HistoryChips(
         overflow = FlowRowOverflow.expandOrCollapseIndicator(
             expandIndicator = {
                 HistoryChip(
-                    text = "更多 ⌄",
+                    text = tr("更多 ⌄"),
                     index = 0,
                     muted = true,
                     editing = false,
@@ -1573,7 +1575,7 @@ private fun HistoryChips(
             },
             collapseIndicator = {
                 HistoryChip(
-                    text = "收起 ⌃",
+                    text = tr("收起 ⌃"),
                     index = 0,
                     muted = true,
                     editing = false,
@@ -1689,7 +1691,7 @@ private fun HistoryChip(
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "删除",
+                    contentDescription = com.example.i18n.AppLocale.t("删除"),
                     tint = onSurfaceVariant,
                     modifier = Modifier.size(10.dp)
                 )
@@ -1722,16 +1724,16 @@ internal fun SourcePickerSheet(
                 Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("选择书源", Modifier.weight(1f), fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                Text(com.example.i18n.AppLocale.t("选择书源"), Modifier.weight(1f), fontWeight = FontWeight.Bold, fontSize = 20.sp)
                 WenkuTextButton(
-                    text = "管理书源",
+                    text = com.example.i18n.AppLocale.t("管理书源"),
                     onClick = com.example.ui.components.paperOpen(onManageSources),
                     wenkuSymbol = WenkuSymbol.Settings,
                     compact = true
                 )
                 PullOutIconButton(
                     icon = Icons.Default.Close,
-                    contentDescription = "关闭书源选择",
+                    contentDescription = com.example.i18n.AppLocale.t("关闭书源选择"),
                     onClick = { close {} }
                 )
             }
@@ -1745,21 +1747,21 @@ internal fun SourcePickerSheet(
             ) {
                 item {
                     // 分区标题（12px 灰色 + 0.04em 字距）—— 层次只靠 间距 / 分组标题 / 细分割线
-                    SourceSectionLabel("聚合搜索")
+                    SourceSectionLabel(com.example.i18n.AppLocale.t("聚合搜索"))
                 }
                 item {
                     // v1.0.1：聚合搜索按类别分区——聚合漫画 / 聚合小说 互斥选择
                     AggregateOptionItem(
-                        title = "聚合漫画（全部）",
-                        subtitle = "同时搜索所有已启用的漫画源",
+                        title = com.example.i18n.AppLocale.t("聚合漫画（全部）"),
+                        subtitle = com.example.i18n.AppLocale.t("同时搜索所有已启用的漫画源"),
                         selected = aggregateMode && aggregateKind == "comic",
                         onClick = { close { onSelectAggregate("comic") } }
                     )
                 }
                 item {
                     AggregateOptionItem(
-                        title = "聚合小说（全部）",
-                        subtitle = "同时搜索所有已启用的小说源（网文/电子书）",
+                        title = com.example.i18n.AppLocale.t("聚合小说（全部）"),
+                        subtitle = com.example.i18n.AppLocale.t("同时搜索所有已启用的小说源（网文/电子书）"),
                         selected = aggregateMode && aggregateKind == "novel",
                         onClick = { close { onSelectAggregate("novel") } }
                     )
@@ -1782,7 +1784,7 @@ internal fun SourcePickerSheet(
                 }
                 // v1.0.1：书源按类型分区展示——漫画源 / 小说源
                 if (comicSources.isNotEmpty()) {
-                    item { SourceSectionLabel("漫画源") }
+                    item { SourceSectionLabel(com.example.i18n.AppLocale.t("漫画源")) }
                     columnItems(comicSources, key = { it.id }) { source ->
                         SourceOptionItem(
                             source = source,
@@ -1792,7 +1794,7 @@ internal fun SourcePickerSheet(
                     }
                 }
                 if (novelSources.isNotEmpty()) {
-                    item { SourceSectionLabel("小说源") }
+                    item { SourceSectionLabel(com.example.i18n.AppLocale.t("小说源")) }
                     columnItems(novelSources, key = { it.id }) { source ->
                         SourceOptionItem(
                             source = source,
@@ -1876,7 +1878,7 @@ private fun AggregateOptionItem(
             if (selected) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "当前选择",
+                    contentDescription = com.example.i18n.AppLocale.t("当前选择"),
                     tint = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier
                         .size(22.dp)
@@ -1963,7 +1965,7 @@ private fun SourceOptionItem(
             if (selected) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "当前使用",
+                    contentDescription = com.example.i18n.AppLocale.t("当前使用"),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
                         .size(22.dp)
@@ -2024,7 +2026,7 @@ fun LibraryWelcomeScreen(
         Spacer(modifier = Modifier.height(16.dp))
         
         Text(
-            text = "欢迎使用书库",
+            text = com.example.i18n.AppLocale.t("欢迎使用书库"),
             style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.Center
@@ -2033,7 +2035,7 @@ fun LibraryWelcomeScreen(
         Spacer(modifier = Modifier.height(8.dp))
         
         Text(
-            text = "在这里，您可以轻松导入本地电子书，或开启云端在线书源自由搜索。",
+            text = tr("在这里，您可以轻松导入本地电子书，或开启云端在线书源自由搜索。"),
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -2061,14 +2063,14 @@ fun LibraryWelcomeScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Folder,
-                        contentDescription = "本地图书",
+                        contentDescription = com.example.i18n.AppLocale.t("本地图书"),
                         tint = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("本地阅读", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                    Text("直接导入手机中的 EPUB / TXT 电子书开始阅读", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(com.example.i18n.AppLocale.t("本地阅读"), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                    Text(tr("直接导入手机中的 EPUB / TXT 电子书开始阅读"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -2095,15 +2097,15 @@ fun LibraryWelcomeScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Search,
-                        contentDescription = "在线搜索",
+                        contentDescription = com.example.i18n.AppLocale.t("在线搜索"),
                         tint = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("在线搜索", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                    Text(com.example.i18n.AppLocale.t("在线搜索"), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
                     Text(
-                        if (hasOnlineSource) "开启云端搜索，检索图书资源" else "连接 Z-Library 云端书源检索图书",
+                        if (hasOnlineSource) tr("开启云端搜索，检索图书资源") else tr("连接 Z-Library 云端书源检索图书"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -2133,14 +2135,14 @@ fun LibraryWelcomeScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Tune,
-                        contentDescription = "高级设置",
+                        contentDescription = com.example.i18n.AppLocale.t("高级设置"),
                         tint = MaterialTheme.colorScheme.onTertiaryContainer
                     )
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("高级设置", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                    Text("管理书源或导入自定义 JSON 配置", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(com.example.i18n.AppLocale.t("高级设置"), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                    Text(tr("管理书源或导入自定义 JSON 配置"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -2185,7 +2187,7 @@ fun SearchResultFavoriteButton(
         ),
         label = "searchFavPress",
     )
-    val label = if (favorite) "取消喜欢" else "加入我喜欢的"
+    val label = if (favorite) com.example.i18n.AppLocale.t("取消喜欢") else com.example.i18n.AppLocale.t("加入我喜欢的")
     val tint = if (favorite) MintPrimary else Color.White
     Box(
         modifier = modifier
@@ -2206,7 +2208,7 @@ fun SearchResultFavoriteButton(
     ) {
         com.example.ui.components.AnimatedStateIcon(
             imageVector = if (favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-            contentDescription = if (favorite) "取消喜欢" else "加入我喜欢的",
+            contentDescription = label,
             tint = tint,
             modifier = Modifier.size(17.dp),
         )
@@ -2331,7 +2333,7 @@ fun LibraryBookCard(
                     when (state) {
                         is DownloadState.Idle -> {
                             AppActionButton(
-                                text = if (comicMode) "阅读" else "下载",
+                                text = if (comicMode) com.example.i18n.AppLocale.t("阅读") else com.example.i18n.AppLocale.t("下载"),
                                 onClick = onStartDownload,
                                 variant = AppButtonVariant.Primary,
                                 buttonSize = AppButtonSize.Small,
@@ -2345,7 +2347,7 @@ fun LibraryBookCard(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 AppActionButton(
-                                    text = "重试",
+                                    text = com.example.i18n.AppLocale.t("重试"),
                                     onClick = onStartDownload,
                                     variant = AppButtonVariant.Primary,
                                     buttonSize = AppButtonSize.Small,
@@ -2360,7 +2362,7 @@ fun LibraryBookCard(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.ErrorOutline,
-                                        contentDescription = "错误",
+                                        contentDescription = com.example.i18n.AppLocale.t("错误"),
                                         tint = MaterialTheme.colorScheme.error,
                                         modifier = Modifier.size(14.dp)
                                     )
@@ -2388,7 +2390,7 @@ fun LibraryBookCard(
                                     color = MaterialTheme.colorScheme.secondary
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("正在准备...", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
+                                Text(com.example.i18n.AppLocale.t("正在准备..."), fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 AppIconButton(onClick = onCancelDownload, modifier = Modifier.size(24.dp)) {
                                     com.example.ui.wenku.WenkuIcon(
@@ -2422,7 +2424,7 @@ fun LibraryBookCard(
                                         }
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = if (isPaused) "已暂停" else {
+                                            text = if (isPaused) com.example.i18n.AppLocale.t("已暂停") else {
                                                 val p = (state as? DownloadState.Downloading)?.progress ?: 0f
                                                 "下载中: ${(p * 100).toInt()}%"
                                             },
@@ -2469,13 +2471,13 @@ fun LibraryBookCard(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = "已完成",
+                                    contentDescription = com.example.i18n.AppLocale.t("已完成"),
                                     tint = MaterialTheme.colorScheme.secondary,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "已存入书架",
+                                    text = com.example.i18n.AppLocale.t("已存入书架"),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.secondary
@@ -2509,7 +2511,7 @@ private fun BookCoverPlaceholder(book: SearchBook) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = book.title.trim().firstOrNull()?.uppercase() ?: "书",
+                text = book.title.trim().firstOrNull()?.uppercase() ?: com.example.i18n.tr("书"),
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -2590,7 +2592,7 @@ private fun StaggeredComicCard(
         listOfNotNull(
             book.comicId?.takeIf { it.isNotBlank() }?.let { "#$it" },
             book.format?.takeIf { it.isNotBlank() && !it.equals("epub", true) }?.uppercase()
-        ).firstOrNull() ?: if (novel) "小说" else "漫画"
+        ).firstOrNull() ?: if (novel) com.example.i18n.AppLocale.t("小说") else com.example.i18n.AppLocale.t("漫画")
     }
     Column(
         modifier = modifier
@@ -2788,7 +2790,7 @@ private fun AggregateSourceHeader(
                 Spacer(modifier = Modifier.width(6.dp))
                 Icon(
                     Icons.Filled.UnfoldMore,
-                    contentDescription = "打开源组跳转面板",
+                    contentDescription = com.example.i18n.AppLocale.t("打开源组跳转面板"),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
                     modifier = Modifier.size(14.dp)
                 )
@@ -2837,7 +2839,7 @@ private fun AggregateExpandButton(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "展开全部 $hiddenCount 条",
+            text = com.example.i18n.expandAll(hiddenCount),
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             color = MintPrimary
@@ -2923,7 +2925,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize
                     Icon(Icons.Filled.UnfoldMore, contentDescription = null, tint = MintPrimary, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "跳转到源组",
+                        com.example.i18n.AppLocale.t("跳转到源组"),
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp,
                         color = MaterialTheme.colorScheme.onSurface
@@ -2931,7 +2933,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize
                     Spacer(Modifier.weight(1f))
                     PullOutIconButton(
                         icon = Icons.Default.Close,
-                        contentDescription = "关闭",
+                        contentDescription = com.example.i18n.AppLocale.t("关闭"),
                         onClick = com.example.ui.components.paperDismiss(onDismiss),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         glyphSize = 20.dp
@@ -2952,7 +2954,7 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize
                             Icon(Icons.Filled.ArrowUpward, contentDescription = null, tint = MintPrimary, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(12.dp))
                             Text(
-                                "回到搜索顶部",
+                                com.example.i18n.AppLocale.t("回到搜索顶部"),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -3003,14 +3005,14 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxSize
                                 }
                                 else -> Icon(
                                     Icons.Default.ErrorOutline,
-                                    contentDescription = "无结果",
+                                    contentDescription = com.example.i18n.AppLocale.t("无结果"),
                                     tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                                     modifier = Modifier.size(15.dp)
                                 )
                             }
                             Spacer(Modifier.width(10.dp))
                             if (idx == activeGroupIdx) {
-                                Icon(Icons.Filled.CheckCircle, "当前位置", tint = MintPrimary, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Filled.CheckCircle, com.example.i18n.AppLocale.t("当前位置"), tint = MintPrimary, modifier = Modifier.size(18.dp))
                             } else {
                                 Spacer(Modifier.width(18.dp))
                             }
@@ -3030,11 +3032,11 @@ private fun AggregateSourceError(
 ) {
     val timedOut = error?.contains("timeout", ignoreCase = true) == true ||
         error?.contains("timed out", ignoreCase = true) == true ||
-        error?.contains("超时") == true
+        error?.contains(com.example.i18n.AppLocale.t("超时")) == true
     // 源正常返回空列表（error=null）才是真正的「无结果」；任何真实错误都翻译成可行动的提示
     val message = when {
-        error.isNullOrBlank() -> "无结果"
-        timedOut -> "链接超时"
+        error.isNullOrBlank() -> com.example.i18n.AppLocale.t("无结果")
+        timedOut -> com.example.i18n.AppLocale.t("链接超时")
         else -> com.example.source.js.friendlyJsSourceError(error)
     }
     Card(

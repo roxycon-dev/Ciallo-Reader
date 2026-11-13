@@ -1,5 +1,7 @@
 package com.example.transfer
 
+import com.example.i18n.tr
+
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import java.security.KeyPairGenerator
@@ -49,9 +51,9 @@ internal object TransferTls {
         val pairingTrust=object : X509TrustManager {
             override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
             private fun validate(chain: Array<out X509Certificate>?) {
-                require(chain?.size==1) { "无效设备证书" }
+                require(chain?.size==1) { tr("无效设备证书") }
                 val cert=chain!![0]; cert.checkValidity(); cert.verify(cert.publicKey)
-                require(cert.publicKey.encoded.size>=128) { "设备证书强度不足" }
+                require(cert.publicKey.encoded.size>=128) { tr("设备证书强度不足") }
             }
             override fun checkClientTrusted(chain: Array<out X509Certificate>?,authType:String?) = validate(chain)
             override fun checkServerTrusted(chain: Array<out X509Certificate>?,authType:String?) = validate(chain)

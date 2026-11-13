@@ -1,5 +1,7 @@
 package com.example.ui.help
 
+import com.example.i18n.tr
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,14 +28,14 @@ fun JsonSourceGuideCard(modifier: Modifier = Modifier) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "什么是 JSON 书源？",
+                text = tr("什么是 JSON 书源？"),
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
                 color = MintPrimary
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "JSON 书源是一种不需要修改 APP 代码即可扩展站点检索的配置文件，兼容「开源阅读 Legado」社区规则。您只需用选择器描述搜索、目录和图片规则：",
+                text = tr("JSON 书源是一种不需要修改 APP 代码即可扩展站点检索的配置文件，兼容「开源阅读 Legado」社区规则。您只需用选择器描述搜索、目录和图片规则："),
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 18.sp
@@ -43,7 +45,7 @@ fun JsonSourceGuideCard(modifier: Modifier = Modifier) {
 
             // JSON Code block
             Text(
-                text = "漫画/图集站 JSON 模板（可直接复制修改）：",
+                text = tr("漫画/图集站 JSON 模板（可直接复制修改）："),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurface
@@ -96,19 +98,19 @@ fun JsonSourceGuideCard(modifier: Modifier = Modifier) {
                     .background(MintPrimary.copy(alpha = 0.1f))
                     .padding(8.dp)
             ) {
-                Text("字段名称", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1.2f), color = MintPrimary)
-                Text("对应描述与作用说明", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(2.8f), color = MintPrimary)
+                Text(tr("字段名称"), fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1.2f), color = MintPrimary)
+                Text(tr("对应描述与作用说明"), fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(2.8f), color = MintPrimary)
             }
             HorizontalDivider(color = MintPrimary.copy(alpha = 0.3f))
 
             val fields = listOf(
-                "id" to "唯一英文字符标识，保证书源独立性",
-                "name" to "在书源列表中显示的友好名称",
-                "baseUrl" to "站点主站域名，用于拼合相对路径",
-                "htmlSearch.url" to "搜索地址，{keyword} 替换关键词，{page} 替换页码",
-                "htmlSearch.listSelector" to "结果列表项规则（支持 Legado 语法与 @css:）",
-                "htmlChapters.url" to "目录页地址，{id} 为搜索结果详情链接",
-                "htmlContent.imageSelector" to "章节图片规则，支持 @src / @data-src / JSONPath"
+                "id" to com.example.i18n.tr("唯一英文字符标识，保证书源独立性"),
+                "name" to com.example.i18n.tr("在书源列表中显示的友好名称"),
+                "baseUrl" to com.example.i18n.tr("站点主站域名，用于拼合相对路径"),
+                "htmlSearch.url" to com.example.i18n.tr("搜索地址，{keyword} 替换关键词，{page} 替换页码"),
+                "htmlSearch.listSelector" to com.example.i18n.tr("结果列表项规则（支持 Legado 语法与 @css:）"),
+                "htmlChapters.url" to com.example.i18n.tr("目录页地址，{id} 为搜索结果详情链接"),
+                "htmlContent.imageSelector" to com.example.i18n.tr("章节图片规则，支持 @src / @data-src / JSONPath")
             )
 
             fields.forEach { (field, desc) ->

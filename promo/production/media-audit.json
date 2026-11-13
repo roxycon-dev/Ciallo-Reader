@@ -1,0 +1,280 @@
+[
+  {
+    "file": "01_home.mp4",
+    "bytes": 10364204,
+    "duration_seconds": 11.241292,
+    "video": {
+      "codec_name": "h264",
+      "width": 1224,
+      "height": 2700,
+      "r_frame_rate": "90000/1",
+      "avg_frame_rate": "2673000/50419",
+      "nb_frames": "594",
+      "pix_fmt": "yuv420p"
+    },
+    "audio": {
+      "codec_name": "aac",
+      "sample_rate": "48000",
+      "channels": 1,
+      "channel_layout": null
+    },
+    "blackdetect": "",
+    "contact_sheets": [
+      "production\\contact-sheets\\01_home_00-07s.jpg",
+      "production\\contact-sheets\\01_home_08-10s.jpg"
+    ]
+  },
+  {
+    "file": "02_search.mp4",
+    "bytes": 10172822,
+    "duration_seconds": 11.741292,
+    "video": {
+      "codec_name": "h264",
+      "width": 1224,
+      "height": 2700,
+      "r_frame_rate": "90000/1",
+      "avg_frame_rate": "3240000/62039",
+      "nb_frames": "612",
+      "pix_fmt": "yuv420p"
+    },
+    "audio": {
+      "codec_name": "aac",
+      "sample_rate": "48000",
+      "channels": 1,
+      "channel_layout": null
+    },
+    "blackdetect": "",
+    "contact_sheets": [
+      "production\\contact-sheets\\02_search_00-07s.jpg",
+      "production\\contact-sheets\\02_search_08-11s.jpg"
+    ]
+  },
+  {
+    "file": "03_detail_download.mp4",
+    "bytes": 9434368,
+    "duration_seconds": 21.233333,
+    "video": {
+      "codec_name": "h264",
+      "width": 1224,
+      "height": 2700,
+      "r_frame_rate": "30/1",
+      "avg_frame_rate": "30/1",
+      "nb_frames": "637",
+      "pix_fmt": "yuv420p"
+    },
+    "audio": {
+      "codec_name": "aac",
+      "sample_rate": "44100",
+      "channels": 2,
+      "channel_layout": null
+    },
+    "blackdetect": "",
+    "contact_sheets": [
+      "production\\contact-sheets\\03_detail_download_00-07s.jpg",
+      "production\\contact-sheets\\03_detail_download_08-15s.jpg",
+      "production\\contact-sheets\\03_detail_download_16-20s.jpg"
+    ]
+  },
+  {
+    "file": "04_shelf.mp4",
+    "bytes": 6649074,
+    "duration_seconds": 5.701292,
+    "video": {
+      "codec_name": "h264",
+      "width": 1224,
+      "height": 2700,
+      "r_frame_rate": "60/1",
+      "avg_frame_rate": "29970000/509011",
+      "nb_frames": "333",
+      "pix_fmt": "yuv420p"
+    },
+    "audio": {
+      "codec_name": "aac",
+      "sample_rate": "48000",
+      "channels": 1,
+      "channel_layout": null
+    },
+    "blackdetect": "",
+    "contact_sheets": [
+      "production\\contact-sheets\\04_shelf_00-05s.jpg"
+    ]
+  },
+  {
+    "file": "05_comic_open.mp4",
+    "bytes": 6499693,
+    "duration_seconds": 8.521292,
+    "video": {
+      "codec_name": "h264",
+      "width": 1224,
+      "height": 2700,
+      "r_frame_rate": "90000/1",
+      "avg_frame_rate": "3532500/95287",
+      "nb_frames": "314",
+      "pix_fmt": "yuv420p"
+    },
+    "audio": {
+      "codec_name": "aac",
+      "sample_rate": "48000",
+      "channels": 1,
+      "channel_layout": null
+    },
+    "blackdetect": "",
+    "contact_sheets": [
+      "production\\contact-sheets\\05_comic_open_00-07s.jpg"
+    ]
+  },
+  {
+    "file": "06_comic_read.mp4",
+    "bytes": 10256636,
+    "duration_seconds": 12.261292,
+    "video": {
+      "codec_name": "h264",
+      "width": 1224,
+      "height": 2700,
+      "r_frame_rate": "90000/1",
+      "avg_frame_rate": "46440000/1099739",
+      "nb_frames": "516",
+      "pix_fmt": "yuv420p"
+    },
+    "audio": {
+      "codec_name": "aac",
+      "sample_rate": "48000",
+      "channels": 1,
+      "channel_layout": null
+    },
+    "blackdetect": "",
+    "contact_sheets": [
+      "production\\contact-sheets\\06_comic_read_00-07s.jpg",
+      "production\\contact-sheets\\06_comic_read_08-11s.jpg"
+    ]
+  },
+  {
+    "file": "07_comic_glass.mp4",
+    "bytes": 9295199,
+    "duration_seconds": 19.333333,
+    "video": {
+      "codec_name": "h264",
+      "width": 1224,
+      "height": 2700,
+      "r_frame_rate": "30/1",
+      "avg_frame_rate": "30/1",
+      "nb_frames": "580",
+      "pix_fmt": "yuv420p"
+    },
+    "audio": {
+      "codec_name": "aac",
+      "sample_rate": "44100",
+      "channels": 2,
+      "channel_layout": null
+    },
+    "blackdetect": "",
+    "contact_sheets": [
+      "production\\contact-sheets\\07_comic_glass_00-07s.jpg",
+      "production\\contact-sheets\\07_comic_glass_08-15s.jpg",
+      "production\\contact-sheets\\07_comic_glass_16-18s.jpg"
+    ]
+  },
+  {
+    "file": "08_novel_turn.mp4",
+    "bytes": 9362818,
+    "duration_seconds": 13.1119,
+    "video": {
+      "codec_name": "h264",
+      "width": 1224,
+      "height": 2700,
+      "r_frame_rate": "90000/1",
+      "avg_frame_rate": "5600000/131119",
+      "nb_frames": "560",
+      "pix_fmt": "yuv420p"
+    },
+    "audio": {
+      "codec_name": "aac",
+      "sample_rate": "48000",
+      "channels": 1,
+      "channel_layout": null
+    },
+    "blackdetect": "",
+    "contact_sheets": [
+      "production\\contact-sheets\\08_novel_turn_00-07s.jpg",
+      "production\\contact-sheets\\08_novel_turn_08-12s.jpg"
+    ]
+  },
+  {
+    "file": "09_novel_settings.mp4",
+    "bytes": 11988884,
+    "duration_seconds": 27.361292,
+    "video": {
+      "codec_name": "h264",
+      "width": 1224,
+      "height": 2700,
+      "r_frame_rate": "90000/1",
+      "avg_frame_rate": "1645000/45537",
+      "nb_frames": "987",
+      "pix_fmt": "yuv420p"
+    },
+    "audio": {
+      "codec_name": "aac",
+      "sample_rate": "48000",
+      "channels": 1,
+      "channel_layout": null
+    },
+    "blackdetect": "",
+    "contact_sheets": [
+      "production\\contact-sheets\\09_novel_settings_00-07s.jpg",
+      "production\\contact-sheets\\09_novel_settings_08-15s.jpg",
+      "production\\contact-sheets\\09_novel_settings_16-23s.jpg",
+      "production\\contact-sheets\\09_novel_settings_24-26s.jpg"
+    ]
+  },
+  {
+    "file": "10_roxy.mp4",
+    "bytes": 2062559,
+    "duration_seconds": 7.533333,
+    "video": {
+      "codec_name": "h264",
+      "width": 1224,
+      "height": 2700,
+      "r_frame_rate": "30/1",
+      "avg_frame_rate": "30/1",
+      "nb_frames": "226",
+      "pix_fmt": "yuv420p"
+    },
+    "audio": {
+      "codec_name": "aac",
+      "sample_rate": "44100",
+      "channels": 2,
+      "channel_layout": null
+    },
+    "blackdetect": "",
+    "contact_sheets": [
+      "production\\contact-sheets\\10_roxy_00-07s.jpg"
+    ]
+  },
+  {
+    "file": "11_glass_ui.mp4",
+    "bytes": 24485454,
+    "duration_seconds": 25.701292,
+    "video": {
+      "codec_name": "h264",
+      "width": 1224,
+      "height": 2700,
+      "r_frame_rate": "90000/1",
+      "avg_frame_rate": "30240000/577609",
+      "nb_frames": "1344",
+      "pix_fmt": "yuv420p"
+    },
+    "audio": {
+      "codec_name": "aac",
+      "sample_rate": "48000",
+      "channels": 1,
+      "channel_layout": null
+    },
+    "blackdetect": "",
+    "contact_sheets": [
+      "production\\contact-sheets\\11_glass_ui_00-07s.jpg",
+      "production\\contact-sheets\\11_glass_ui_08-15s.jpg",
+      "production\\contact-sheets\\11_glass_ui_16-23s.jpg",
+      "production\\contact-sheets\\11_glass_ui_24-25s.jpg"
+    ]
+  }
+]

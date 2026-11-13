@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -47,7 +49,7 @@ object EpubParser {
             val unzipped = unzipEpub(context, uri, tempDir)
             if (!unzipped) {
                 tempDir.deleteRecursively()
-                return@withContext Result.failure(Exception("无法解压 EPUB 文件"))
+                return@withContext Result.failure(Exception(tr("无法解压 EPUB 文件")))
             }
 
             val encryption=File(tempDir,"META-INF/encryption.xml")
@@ -61,13 +63,13 @@ object EpubParser {
             val containerFile = File(tempDir, "META-INF/container.xml")
             if (!containerFile.exists()) {
                 tempDir.deleteRecursively()
-                return@withContext Result.failure(Exception("EPUB 缺少 META-INF/container.xml"))
+                return@withContext Result.failure(Exception(tr("EPUB 缺少 META-INF/container.xml")))
             }
 
             val opfRelativePath = parseContainerXml(containerFile)
             if (opfRelativePath.isNullOrBlank()) {
                 tempDir.deleteRecursively()
-                return@withContext Result.failure(Exception("无法解析 EPUB container.xml 中的 OPF 路径"))
+                return@withContext Result.failure(Exception(tr("无法解析 EPUB container.xml 中的 OPF 路径")))
             }
 
             val opfFile = ArchiveBudget.destination(tempDir, decodeUrl(opfRelativePath))
@@ -105,7 +107,7 @@ object EpubParser {
             for (idref in opfData.spineItemRefs) {
                 val href = opfData.manifestItems[idref] ?: continue
                 val xhtmlFile = File(opfDir, decodeUrl(href)).canonicalFile
-                require(xhtmlFile.canonicalPath.startsWith(tempDir.canonicalPath.trimEnd(File.separatorChar) + File.separator)) { "EPUB正文路径越界" }
+                require(xhtmlFile.canonicalPath.startsWith(tempDir.canonicalPath.trimEnd(File.separatorChar) + File.separator)) { tr("EPUB正文路径越界") }
                 if (!xhtmlFile.exists()) {
                     error("EPUB 缺少正文文件：$href")
                 }
@@ -134,7 +136,7 @@ object EpubParser {
                 tempDir.deleteRecursively()
                 File(context.filesDir, "epub_images/$bookId").deleteRecursively()
                 if (targetBookId == null) bookDao.deleteBook(initialBook.copy(id = bookId))
-                return@withContext Result.failure(Exception("EPUB 文件中未找到有效的正文内容"))
+                return@withContext Result.failure(Exception(tr("EPUB 文件中未找到有效的正文内容")))
             }
 
             // 6. Handle Cover Image if available
@@ -142,8 +144,8 @@ object EpubParser {
             Log.d(TAG, "[COVER] 开始解析: $fileName")
             Log.d(TAG, "[COVER] container.xml 定位到 OPF 路径: ${opfFile.absolutePath}")
             Log.d(TAG, "[COVER] 检测到 EPUB 版本: ${opfData.epubVersion}")
-            Log.d(TAG, "[COVER] EPUB3 properties=cover-image 匹配结果: ${if (!opfData.epub3CoverHref.isNullOrBlank()) "找到" else "未找到"}, item id=${opfData.epub3CoverId ?: ""}, href=${opfData.epub3CoverHref ?: ""}")
-            Log.d(TAG, "[COVER] EPUB2 meta name=cover 匹配结果: ${if (!opfData.epub2CoverId.isNullOrBlank()) "找到" else "未找到"}, content(id)=${opfData.epub2CoverId ?: ""}")
+            Log.d(TAG, "[COVER] EPUB3 properties=cover-image 匹配结果: ${if (!opfData.epub3CoverHref.isNullOrBlank()) "找到" else tr("未找到")}, item id=${opfData.epub3CoverId ?: ""}, href=${opfData.epub3CoverHref ?: ""}")
+            Log.d(TAG, "[COVER] EPUB2 meta name=cover 匹配结果: ${if (!opfData.epub2CoverId.isNullOrBlank()) "找到" else tr("未找到")}, content(id)=${opfData.epub2CoverId ?: ""}")
             Log.d(TAG, "[COVER] manifest 中按 id 查找 href 结果: ${opfData.epub2CoverHref ?: ""}")
             val fullParsedPath = if (!opfData.coverHref.isNullOrBlank()) File(opfDir, decodeUrl(opfData.coverHref)).absolutePath else ""
             Log.d(TAG, "[COVER] href 相对 OPF 目录解析后的完整路径: $fullParsedPath")
@@ -153,7 +155,7 @@ object EpubParser {
 
             // Layer 1: Spec-based extraction
             val (specCoverFile, matchedEntryName) = findMatchingCoverFile(opfDir, tempDir, opfData.coverHref)
-            Log.d(TAG, "[COVER] zip 内查找该路径结果: ${if (specCoverFile != null) "找到" else "未找到"}, 实际匹配的 entry 名: ${matchedEntryName ?: ""}")
+            Log.d(TAG, "[COVER] zip 内查找该路径结果: ${if (specCoverFile != null) tr("找到") else tr("未找到")}, 实际匹配的 entry 名: ${matchedEntryName ?: ""}")
 
             if (specCoverFile != null && specCoverFile.exists() && specCoverFile.isFile) {
                 // Verify decoding
@@ -888,7 +890,7 @@ object EpubParser {
         paint.color = android.graphics.Color.WHITE
         paint.textSize = 44f
         paint.textAlign = android.graphics.Paint.Align.CENTER
-        canvas.drawText(if (isEpub3) "EPUB3 示例图书" else "EPUB2 示例图书", 300f, 360f, paint)
+        canvas.drawText(if (isEpub3) tr("EPUB3 示例图书") else tr("EPUB2 示例图书"), 300f, 360f, paint)
 
         paint.textSize = 30f
         paint.color = android.graphics.Color.parseColor("#FDE68A")

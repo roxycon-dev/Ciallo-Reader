@@ -1,3 +1,0 @@
-shaderFrames=160
-failures=0
-maxGeometryMs=2.199485

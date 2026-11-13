@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.i18n.tr
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
@@ -36,13 +38,21 @@ import com.example.ui.wenku.rememberWenkuAccessibility
 import com.example.ui.wenku.wenkuColors
 import com.example.ui.wenku.wenkuPagePart
 
+/**
+ * 引导页数据。展示文案在**读取时**翻译：这个 list 是顶层 `val`，类加载期就构造好了，
+ * 在构造参数里调 `tr()` 会把语言永久冻住。
+ */
 private data class OnboardingPage(
-    val title: String,
-    val description: String,
+    private val rawTitle: String,
+    private val rawDescription: String,
     val imageRes: Int,
-    val label: String,
+    private val rawLabel: String,
     val code: String,
-)
+) {
+    val title: String get() = com.example.i18n.tr(rawTitle)
+    val description: String get() = com.example.i18n.tr(rawDescription)
+    val label: String get() = com.example.i18n.tr(rawLabel)
+}
 
 private val onboardingPages = listOf(
     OnboardingPage(
@@ -137,7 +147,7 @@ fun OnboardingScreen(onFinished: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Row(
-                    modifier = Modifier.semantics { contentDescription = "第 ${page + 1} 步，共 ${onboardingPages.size} 步" },
+                    modifier = Modifier.semantics { contentDescription = com.example.i18n.stepCounter(page + 1, onboardingPages.size) },
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
                     onboardingPages.indices.forEach { index ->
@@ -154,7 +164,7 @@ fun OnboardingScreen(onFinished: () -> Unit) {
                 }
                 val last = page == onboardingPages.lastIndex
                 WenkuTextButton(
-                    if (last) "立即开启阅读之旅" else "下一步",
+                    if (last) tr("立即开启阅读之旅") else tr("下一步"),
                     onClick = { if (!finishing) { if (last) finish() else page++ } },
                     modifier = Modifier.fillMaxWidth().testTag("onboarding_action_button"),
                     selected = true,

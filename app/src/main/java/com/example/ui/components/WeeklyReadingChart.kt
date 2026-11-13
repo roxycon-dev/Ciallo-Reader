@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import com.example.i18n.tr
+
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -77,6 +79,7 @@ fun WeeklyReadingChart(
     modifier: Modifier = Modifier
 ) {
     val dayNames = listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
+    val dayNamesShown = dayNames.map { com.example.i18n.weekdayName(it) }
     var selectedDayIndex by remember { mutableIntStateOf(todayIndex.coerceIn(0, 6)) }
     
     val totalMinutes = remember(minutesPerDay) { minutesPerDay.sum() }
@@ -135,13 +138,13 @@ fun WeeklyReadingChart(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "本周阅读趋势",
+                            text = tr("本周阅读趋势"),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "周一 至 周日",
+                            text = tr("周一 至 周日"),
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -153,7 +156,7 @@ fun WeeklyReadingChart(
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                 ) {
                     Text(
-                        text = "本周共 ${totalMinutes} 分钟",
+                        text = com.example.i18n.weekMinutes(totalMinutes),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = MintPrimary,
@@ -220,7 +223,7 @@ fun WeeklyReadingChart(
                             contentAlignment = Alignment.BottomCenter
                         ) {
                             Text(
-                                text = if (mins > 0) "${mins}分" else "-",
+                                text = if (mins > 0) com.example.i18n.minutesShort(mins) else "-",
                                 fontSize = 10.sp,
                                 fontWeight = when {
                                     index == peakDayIdx && mins > 0 -> FontWeight.Bold
@@ -340,18 +343,18 @@ fun WeeklyReadingChart(
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = "${selDayName}阅读记录：",
+                            text = com.example.i18n.dayReadLog(selDayName),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = if (selMins > 0 && selRecords.isNotEmpty()) {
-                                "共 ${selRecords.size} 本 · 详情见下方封面"
+                                com.example.i18n.dayRecordSummary(selRecords.size)
                             } else if (selMins > 0) {
-                                "自选阅读"
+                                com.example.i18n.tr("自选阅读")
                             } else {
-                                "无阅读记录"
+                                com.example.i18n.tr("无阅读记录")
                             },
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
@@ -360,7 +363,7 @@ fun WeeklyReadingChart(
                     }
 
                     Text(
-                        text = if (selMins > 0) "共 ${selMins} 分钟" else "0 分钟",
+                        text = if (selMins > 0) com.example.i18n.minutesTotal(selMins) else tr("0 分钟"),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -547,7 +550,7 @@ private fun DayCoverCard(
         anchorInWindow = menuAnchor
     ) {
         com.example.ui.components.PullOutDropdownMenuItem(
-            text = { Text("前往阅读") },
+            text = { Text(tr("前往阅读")) },
             leadingIcon = { com.example.ui.wenku.WenkuIcon(com.example.ui.wenku.WenkuSymbol.Book, entrance = false) },
             enabled = book != null || recordBook != null,
             onClick = com.example.ui.components.paperOpen {
@@ -556,12 +559,12 @@ private fun DayCoverCard(
             }
         )
         com.example.ui.components.PullOutDropdownMenuItem(
-            text = { Text("阅读详情") },
+            text = { Text(tr("阅读详情")) },
             leadingIcon = { com.example.ui.wenku.WenkuIcon(com.example.ui.wenku.WenkuSymbol.Info, entrance = false) },
             onClick = com.example.ui.components.paperOpen { showDetail = true }
         )
         com.example.ui.components.PullOutDropdownMenuItem(
-            text = { Text("删除阅读历史", color = MaterialTheme.colorScheme.error) },
+            text = { Text(tr("删除阅读历史"), color = MaterialTheme.colorScheme.error) },
             leadingIcon = { com.example.ui.wenku.WenkuIcon(com.example.ui.wenku.WenkuSymbol.Delete,
                 tint = MaterialTheme.colorScheme.error, entrance = false) },
             onClick = com.example.ui.components.paperDismiss { onDeleteRecord(record) }
@@ -581,13 +584,13 @@ private fun DayCoverCard(
             },
             text = {
                 Column {
-                    Text("阅读日期：${record.dateStr}")
+                    Text(com.example.i18n.readDateOf(record.dateStr))
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("时长：${formatShortDuration(record.durationSeconds)}")
+                    Text(com.example.i18n.durationOf(formatShortDuration(record.durationSeconds)))
                     if (book == null && recordBook == null) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "该书已不在书库中",
+                            text = tr("该书已不在书库中"),
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -596,7 +599,7 @@ private fun DayCoverCard(
             },
             confirmButton = {
                 val closeOverlay = com.example.ui.components.LocalOverlayClose.current
-                PullOutTextButton(onClick = { closeOverlay { showDetail = false } }) { Text("关闭") }
+                PullOutTextButton(onClick = { closeOverlay { showDetail = false } }) { Text(tr("关闭")) }
             }
         )
     }

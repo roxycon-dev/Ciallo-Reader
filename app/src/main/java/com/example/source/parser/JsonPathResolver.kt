@@ -1,5 +1,7 @@
 package com.example.source.parser
 
+import com.example.i18n.tr
+
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -14,7 +16,7 @@ object JsonPathResolver {
         val root = parseRoot(jsonStr) ?: return emptyList()
         val targets = resolveAll(listOf(root), parseSegments(path))
         if (required && (targets.isEmpty() || targets.any { it !is JSONArray && it !is JSONObject }))
-            throw com.example.source.SourceException.ParseError("源站未返回规则所需的搜索列表，请检查或更新书源规则")
+            throw com.example.source.SourceException.ParseError(tr("源站未返回规则所需的搜索列表，请检查或更新书源规则"))
         val resultList = mutableListOf<JSONObject>()
 
         for (target in targets) {
@@ -33,7 +35,7 @@ object JsonPathResolver {
             }
         }
         if (required && resultList.isEmpty() && targets.any { it is JSONArray && it.length() > 0 })
-            throw com.example.source.SourceException.ParseError("源站搜索列表条目格式异常，请更新书源规则")
+            throw com.example.source.SourceException.ParseError(tr("源站搜索列表条目格式异常，请更新书源规则"))
         return resultList
     }
 
@@ -124,7 +126,7 @@ object JsonPathResolver {
         var current = inputs
         for (segment in segments) {
             current = resolveSegmentAll(current, segment)
-            require(current.size<=10_000) { "JSONPath 结果过多" }
+            require(current.size<=10_000) { tr("JSONPath 结果过多") }
             if (current.isEmpty()) return emptyList()
         }
         return current
@@ -138,15 +140,15 @@ object JsonPathResolver {
             val pending=java.util.ArrayDeque<Pair<Any,Int>>()
             inputs.forEach { pending.addLast(it to 0) }
             while(pending.isNotEmpty()) {
-                require(out.size<10_000) { "JSONPath 遍历节点过多" }
+                require(out.size<10_000) { tr("JSONPath 遍历节点过多") }
                 val (value,depth)=pending.removeFirst()
-                require(depth<=64) { "JSONPath 嵌套过深" }
+                require(depth<=64) { tr("JSONPath 嵌套过深") }
                 out.add(value)
                 when(value) {
                     is JSONObject -> value.keys().forEach { key -> value.opt(key)?.takeIf { it!=JSONObject.NULL }?.let { pending.addLast(it to depth+1) } }
                     is JSONArray -> for(i in 0 until value.length()) value.opt(i)?.takeIf { it!=JSONObject.NULL }?.let { pending.addLast(it to depth+1) }
                 }
-                require(pending.size<=10_000) { "JSONPath 遍历节点过多" }
+                require(pending.size<=10_000) { tr("JSONPath 遍历节点过多") }
             }
             return out
         }

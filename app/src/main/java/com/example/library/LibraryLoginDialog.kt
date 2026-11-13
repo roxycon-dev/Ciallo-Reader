@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.i18n.tr
+
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -29,7 +31,7 @@ fun LibraryLoginDialog(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    WenkuActionSheet("登录 Z-Library", onDismiss, dismissEnabled = !loading, fitKeyboard = true) {
+    WenkuActionSheet(tr("登录 Z-Library"), onDismiss, dismissEnabled = !loading, fitKeyboard = true) {
         val keyboard = LocalSoftwareKeyboardController.current
         val closeAfterSuccess = paperDismiss {}
         val canSubmit = !loading && email.isNotBlank() && password.isNotBlank()
@@ -45,7 +47,7 @@ fun LibraryLoginDialog(
         }
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         WenkuTextButton(
-            if (loading) "登录中" else "确认登录",
+            if (loading) tr("登录中") else tr("确认登录"),
             submit,
             Modifier.fillMaxWidth(),
             selected = true,
@@ -53,11 +55,11 @@ fun LibraryLoginDialog(
             wenkuSymbol = WenkuSymbol.Check,
         )
         WenkuTextButton(
-            "没有账号？去注册",
+            com.example.i18n.tr("没有账号？去注册"),
             onClick = {
                 val url = "https://${ZLibraryNodeConfig.domain}/registration"
                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }.onFailure {
-                    AppToast.makeText(context, "无法打开注册页面", Toast.LENGTH_SHORT).show()
+                    AppToast.makeText(context, tr("无法打开注册页面"), Toast.LENGTH_SHORT).show()
                 }
             },
             modifier = Modifier.fillMaxWidth(),

@@ -27,6 +27,7 @@ class ComicFeatureDeviceTest {
         val store = ComicSettingsStore(compose.activity)
         store.saveBookConfig("feature-device", config)
         store.saveBookState("feature-device", ComicBookState())
+        store.saveChapterResume("feature-device", "feature-device-0", ComicChapterResume())
         val pages = List(6) { index ->
             val file = File(compose.activity.cacheDir, "feature-device-$index.png")
             val image = Bitmap.createBitmap(600, 900, Bitmap.Config.ARGB_8888)

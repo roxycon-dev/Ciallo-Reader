@@ -1,5 +1,7 @@
 package com.example.transfer
 
+import com.example.i18n.tr
+
 import kotlinx.coroutines.*
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -25,7 +27,7 @@ internal class NearbyConnector(private val scope:CoroutineScope,private val plat
     private val wake=kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
     fun observe() {
         if(job?.isActive==true)return
-        job=scope.launch {try {watch()}catch(e:CancellationException){throw e}catch(e:Exception){onError(e.message?:"附近连接状态读取失败")}}
+        job=scope.launch {try {watch()}catch(e:CancellationException){throw e}catch(e:Exception){onError(e.message?:com.example.i18n.tr("附近连接状态读取失败"))}}
     }
     fun refresh() {wake.trySend(Unit)}
     fun connect(address:String) {
@@ -35,7 +37,7 @@ internal class NearbyConnector(private val scope:CoroutineScope,private val plat
         connecting=true
         job=scope.launch {
             try {
-                onStage("正在建立附近网络")
+                onStage(tr("正在建立附近网络"))
                 withTimeout(negotiationMillis) {
                     val existing=readGroup()
                     if(existing!=null && existing.members.any {it.equals(address,true)}) {
@@ -54,9 +56,9 @@ internal class NearbyConnector(private val scope:CoroutineScope,private val plat
                 if(epoch==token)connecting=false
                 watch()
             } catch(e:TimeoutCancellationException) {
-                platform.cancelPending();onError("附近网络未建立，系统连接请求已超时。可重新连接")
+                platform.cancelPending();onError(com.example.i18n.tr("附近网络未建立，系统连接请求已超时。可重新连接"))
             } catch(e:CancellationException){throw e}
-            catch(e:Exception){platform.cancelPending();onError(e.message?:"附近连接未能建立")}
+            catch(e:Exception){platform.cancelPending();onError(e.message?:com.example.i18n.tr("附近连接未能建立"))}
             finally {if(epoch==token)connecting=false}
         }
     }
@@ -76,11 +78,11 @@ internal class NearbyConnector(private val scope:CoroutineScope,private val plat
                 if(readGroup()!=null){action {platform.removeGroup(it)};waitForRemoval()}
                 if(token==epoch)watch()
             } catch(e:CancellationException){throw e}
-            catch(e:Exception){onError(e.message?:"附近网络清理失败")}
+            catch(e:Exception){onError(e.message?:com.example.i18n.tr("附近网络清理失败"))}
         }
     }
     private suspend fun waitForRemoval() {
-        check(withTimeoutOrNull(5_000){while(readGroup()!=null)pause();true}==true){"旧的附近网络尚未断开，请稍后重新连接"}
+        check(withTimeoutOrNull(5_000){while(readGroup()!=null)pause();true}==true){com.example.i18n.tr("旧的附近网络尚未断开，请稍后重新连接")}
     }
     private suspend fun readGroup():NearbyGroup?=withTimeoutOrNull(1_500) {
         suspendCancellableCoroutine {c ->platform.group {if(c.isActive)c.resume(it)}}

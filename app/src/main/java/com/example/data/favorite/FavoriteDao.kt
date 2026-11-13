@@ -1,5 +1,7 @@
 package com.example.data.favorite
 
+import com.example.i18n.tr
+
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -204,7 +206,7 @@ interface FavoriteDao {
         latestId: String?,
     ): FavoriteMigrationReport {
         val oldFavorite = favorite(from.sourceId, from.comicId)
-            ?: throw IllegalStateException("旧收藏已移除，请重新选择")
+            ?: throw IllegalStateException(tr("旧收藏已移除，请重新选择"))
         val targetStates = chapterStatesSync(replacement.sourceId, replacement.comicId).associateBy { it.chapterId }
         val oldStates = chapterStatesSync(from.sourceId, from.comicId)
             .filter { it.status != ChapterReadState.UNREAD.code || it.bookmarked }

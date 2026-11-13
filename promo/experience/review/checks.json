@@ -1,0 +1,22 @@
+{
+  "status": "passed",
+  "viewports": [
+    "1440x1000",
+    "390x844"
+  ],
+  "checks": [
+    "full page asset load",
+    "real frame tabs",
+    "keyboard tabs",
+    "Roxy response",
+    "audio playback and pause",
+    "autoplay advances",
+    "guided interface changes",
+    "manual interruption",
+    "mobile horizontal overflow",
+    "reduced motion view",
+    "direct file open"
+  ],
+  "errors": [],
+  "failures": []
+}

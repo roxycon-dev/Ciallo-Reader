@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,7 +22,7 @@ class BackupManager(
 ) {
 
     suspend fun authorizeProtectedExport(pin: String, selection: com.example.transfer.ExportSelection): com.example.transfer.ExportSelection = withContext(Dispatchers.Default) {
-        require(PrivacyManager(context).verifyPin(pin)) { "隐私 PIN 不正确或暂时处于冷却期" }
+        require(PrivacyManager(context).verifyPin(pin)) { tr("隐私 PIN 不正确或暂时处于冷却期") }
         selection.copy(protectedAuthorized = true)
     }
 
@@ -39,7 +41,7 @@ class BackupManager(
     suspend fun importArchive(archive: File, mode: com.example.transfer.ImportMode = com.example.transfer.ImportMode.MERGE,
         progress: (com.example.transfer.TransferProgress) -> Unit = {}): com.example.transfer.ImportResult = withContext(Dispatchers.IO) {
         val preview=inspectArchive(archive)
-        require(!preview.containsProtected || PrivacyManager(context).isEnabled()) { "请先在接收设备设置隐私 PIN" }
+        require(!preview.containsProtected || PrivacyManager(context).isEnabled()) { tr("请先在接收设备设置隐私 PIN") }
         com.example.download.DownloadManager.withControlLock {
             com.example.library.ComicDownloadManager.withControlLock {
                 if(mode == com.example.transfer.ImportMode.REPLACE) {
@@ -92,7 +94,7 @@ class BackupManager(
     suspend fun exportBackupJson(): String = withContext(Dispatchers.IO) {
         val archive = exportBackupArchive(File(context.cacheDir, "backup_${java.util.UUID.randomUUID()}.zip"))
         val encoded = try {
-            require(archive.length() <= 16L * 1024 * 1024) { "备份超过 JSON 容量，请使用 ZIP 备份接口" }
+            require(archive.length() <= 16L * 1024 * 1024) { tr("备份超过 JSON 容量，请使用 ZIP 备份接口") }
             android.util.Base64.encodeToString(archive.readBytes(), android.util.Base64.NO_WRAP)
         } finally { archive.delete() }
         val payload = BackupPayload(

@@ -1,5 +1,7 @@
 package com.example.source.impl
 
+import com.example.i18n.tr
+
 import android.content.Context
 import com.example.source.AuthenticationState
 import com.example.source.BookSource
@@ -36,7 +38,7 @@ class MockBookSource(context: Context) : BookSource {
         SearchBook(
             id = "mock/three-body",
             sourceId = id,
-            title = "三体 (The Three-Body Problem)",
+            title = tr("三体 (The Three-Body Problem)"),
             author = "刘慈欣",
             cover = null,
             format = "epub",

@@ -1,5 +1,7 @@
 package com.example.ui.favorite
 
+import com.example.i18n.tr
+
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutBottomSheet
 import com.example.ui.components.pullOutClickable
@@ -135,14 +137,14 @@ fun SourceMigrateSheet(
                 .padding(bottom = 24.dp)
         ) {
             Text(
-                text = "换个书源继续看",
+                text = tr("换个书源继续看"),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "《$title》\n选择来源后，收藏、阅读进度与已读状态会按章节顺序迁移过去。",
+                text = com.example.i18n.migrateIntro(title),
                 fontSize = 13.sp,
                 lineHeight = 19.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -164,7 +166,7 @@ fun SourceMigrateSheet(
                 }
                 candidates.isEmpty() -> {
                     Text(
-                        text = "其它书源里没找到同名作品，可先在书库搜索确认。",
+                        text = tr("其它书源里没找到同名作品，可先在书库搜索确认。"),
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 20.dp),
@@ -185,7 +187,7 @@ fun SourceMigrateSheet(
 
             Spacer(modifier = Modifier.height(8.dp))
             PullOutTextButton(onClick = com.example.ui.components.paperDismiss(onDismiss), modifier = Modifier.align(Alignment.End)) {
-                Text("取消")
+                Text(tr("取消"))
             }
         }
     }
@@ -229,7 +231,7 @@ private fun SourceCandidateRow(
             Spacer(modifier = Modifier.width(8.dp))
             Icon(
                 Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = "迁移到该来源",
+                contentDescription = tr("迁移到该来源"),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp),
             )

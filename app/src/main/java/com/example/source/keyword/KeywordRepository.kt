@@ -1,5 +1,7 @@
 package com.example.source.keyword
 
+import com.example.i18n.tr
+
 import android.content.Context
 import com.example.data.AniListDao
 import com.example.data.AppDatabase
@@ -52,10 +54,10 @@ internal class KeywordRepository(
         !prefs.incognitoBrowsingEnabled
 
     private fun onlineDisabledReason(): String = when {
-        !prefs.multiLanguageSearch -> "多语言搜索已关闭，仅使用原词"
-        !prefs.multiLanguageOnlineLookup -> "在线补充已关闭，使用本地关键词"
-        prefs.incognitoBrowsingEnabled -> "无痕浏览中，在线补充暂停，使用本地关键词"
-        else -> "使用已有关键词"
+        !prefs.multiLanguageSearch -> tr("多语言搜索已关闭，仅使用原词")
+        !prefs.multiLanguageOnlineLookup -> tr("在线补充已关闭，使用本地关键词")
+        prefs.incognitoBrowsingEnabled -> tr("无痕浏览中，在线补充暂停，使用本地关键词")
+        else -> tr("使用已有关键词")
     }
 
     private suspend fun local(input: String): List<KeywordConcept> {

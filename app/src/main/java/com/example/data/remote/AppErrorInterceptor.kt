@@ -1,5 +1,7 @@
 package com.example.data.remote
 
+import com.example.i18n.tr
+
 import android.content.Context
 import okhttp3.Interceptor
 import okhttp3.Response
@@ -24,10 +26,10 @@ class NetworkErrorMessage(
 
     constructor(cause: Throwable, url: String? = null) : this(
         message = when (cause) {
-            is SocketTimeoutException -> "连接超时，请检查网络后重试"
-            is UnknownHostException -> "无法解析服务器地址，请检查网络或书源"
-            is ConnectException -> "无法连接到服务器"
-            is SSLException -> "安全连接失败，服务器证书可能不受信任"
+            is SocketTimeoutException -> tr("连接超时，请检查网络后重试")
+            is UnknownHostException -> tr("无法解析服务器地址，请检查网络或书源")
+            is ConnectException -> tr("无法连接到服务器")
+            is SSLException -> tr("安全连接失败，服务器证书可能不受信任")
             else -> cause.message?.takeIf { it.isNotBlank() } ?: "网络请求失败"
         },
         url = url
@@ -51,8 +53,8 @@ class NetworkErrorMessage(
             val serverMessage = message?.trim()?.takeIf { it.isNotEmpty() }
             val base = when (code) {
                 401, 403 -> "服务器拒绝访问（$code），可能需要重新登录或书源已失效"
-                404 -> "服务器上没有这个内容（404）"
-                429 -> "请求过于频繁，服务器暂时拒绝了请求（429）"
+                404 -> tr("服务器上没有这个内容（404）")
+                429 -> tr("请求过于频繁，服务器暂时拒绝了请求（429）")
                 in 500..599 -> "服务器出错了（$code），通常是源站繁忙，稍后再试"
                 else -> serverMessage ?: "服务器返回错误（$code）"
             }
@@ -92,7 +94,7 @@ object ServerMessageExtractor {
         val fallback = when (code) {
             in 500..599 -> "服务器出错了（$code），通常是源站繁忙，稍后再试"
             401, 403 -> "服务器拒绝访问（$code），可能需要重新登录或书源已失效"
-            404 -> "服务器上没有这个内容（404）"
+            404 -> tr("服务器上没有这个内容（404）")
             else -> "服务器返回错误（$code）"
         }
         return if (serverMessage != null) "$fallback（$serverMessage）" else fallback

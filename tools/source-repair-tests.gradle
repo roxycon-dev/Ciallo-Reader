@@ -1,0 +1,15 @@
+gradle.projectsEvaluated {
+    def app = rootProject.project(':app')
+    def selected = ['com/example/discover/DiscoverUiTest.kt', 'com/example/source/js/JsHtmlStoreTest.kt',
+        'com/example/source/js/JsAccessErrorTest.kt', 'com/example/source/impl/FanqieGatewayTest.kt',
+        'com/example/source/impl/GuestNovelTransportTest.kt']
+    app.tasks.named('compileDebugUnitTestKotlin').configure {
+        setSource(selected.collect { new File(app.projectDir, 'src/test/java/' + it) })
+    }
+    app.tasks.matching { it.name in ['kspDebugUnitTestKotlin', 'compileDebugUnitTestJavaWithJavac'] }.configureEach { enabled = false }
+    app.tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+        forkEvery = 0
+        maxParallelForks = 1
+        jvmArgs('--add-exports=java.base/sun.nio.ch=ALL-UNNAMED', '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED')
+    }
+}

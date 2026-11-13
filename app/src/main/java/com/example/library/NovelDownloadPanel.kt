@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -35,20 +37,20 @@ import com.example.ui.wenku.*
 import java.util.Locale
 
 internal fun downloadBytes(bytes: Long): String = when {
-    bytes < 0 -> "未知大小"
+    bytes < 0 -> tr("未知大小")
     bytes < 1024 -> "$bytes B"
     bytes < 1024 * 1024 -> String.format(Locale.ROOT, "%.1f KB", bytes / 1024.0)
     else -> String.format(Locale.ROOT, "%.1f MB", bytes / (1024.0 * 1024))
 }
 
 internal fun downloadStatusLabel(state: DownloadState): String = when (state) {
-    DownloadState.Pending -> "准备下载 · 获取文件与可用线路"
-    is DownloadState.Downloading -> if (state.progress >= 1f) "校验文件并存入书架…"
-        else if (state.totalBytes > 0 || state.progress > 0) "下载中 · ${(state.progress * 100).toInt()}%" else "下载中 · 总大小未知"
-    is DownloadState.Paused -> "已暂停"
-    is DownloadState.Success -> "已完成 · 已存入书架"
-    is DownloadState.Error -> "下载失败"
-    DownloadState.Idle -> "等待下载"
+    DownloadState.Pending -> tr("准备下载 · 获取文件与可用线路")
+    is DownloadState.Downloading -> if (state.progress >= 1f) tr("校验文件并存入书架…")
+        else if (state.totalBytes > 0 || state.progress > 0) "下载中 · ${(state.progress * 100).toInt()}%" else tr("下载中 · 总大小未知")
+    is DownloadState.Paused -> tr("已暂停")
+    is DownloadState.Success -> tr("已完成 · 已存入书架")
+    is DownloadState.Error -> tr("下载失败")
+    DownloadState.Idle -> tr("等待下载")
 }
 
 @Composable
@@ -112,16 +114,16 @@ internal fun NovelDownloadPanel(
             Column(Modifier.fillMaxWidth().wenkuPagePart(1)) {
                 if (showHeader) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("下载任务", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                        AppIconButton(Icons.Default.Close, "收起", onClick = onDismiss)
+                        Text(tr("下载任务"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                        AppIconButton(Icons.Default.Close, tr("收起"), onClick = onDismiss)
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("离线任务", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
+                    Text(tr("离线任务"), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold)
                     Text("$count 项", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 }
-                Text("任务在后台继续，完成后可在书架阅读。", style = MaterialTheme.typography.bodySmall,
+                Text(tr("任务在后台继续，完成后可在书架阅读。"), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
             }
         }
@@ -162,7 +164,7 @@ internal fun NovelDownloadPanel(
                 task.book.title, "${task.chapter.title} · ${sourceNames[task.book.sourceId] ?: task.book.sourceId}", state,
                 { onComicPause(id) }, { onComicResume(id) }, { deletion = task.book.title to { onComicDelete(id) } },
                 { onComicResume(id) }, modifier = Modifier.wenkuPagePart(pending.size + tasks.size + index + 2),
-                completionLabel = "已完成 · 漫画章节可离线阅读",
+                completionLabel = tr("已完成 · 漫画章节可离线阅读"),
             )
         }
         if (count == 0) {
@@ -171,8 +173,8 @@ internal fun NovelDownloadPanel(
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         WenkuIcon(WenkuSymbol.CloudDownload, size = 24.dp, tint = MaterialTheme.colorScheme.primary, entrance = false)
                         Column {
-                            Text("暂无下载任务", style = MaterialTheme.typography.titleSmall)
-                            Text("从书库或漫画章节开始下载。", style = MaterialTheme.typography.bodySmall,
+                            Text(tr("暂无下载任务"), style = MaterialTheme.typography.titleSmall)
+                            Text(tr("从书库或漫画章节开始下载。"), style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -182,14 +184,14 @@ internal fun NovelDownloadPanel(
     }
     }
     deletion?.let { (title, remove) ->
-        WenkuActionSheet("删除下载记录？", onDismiss = { deletion = null }) {
+        WenkuActionSheet(tr("删除下载记录？"), onDismiss = { deletion = null }) {
             Text("“$title”的下载记录将被移除。未完成的任务会停止，已存入书架的书籍保留。")
             WenkuTextButton(
                 "删除", onClick = paperDismiss(remove), modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.error, wenkuSymbol = WenkuSymbol.Delete,
             )
             WenkuTextButton(
-                "保留", onClick = paperDismiss {}, modifier = Modifier.fillMaxWidth(),
+                com.example.i18n.tr("保留"), onClick = paperDismiss {}, modifier = Modifier.fillMaxWidth(),
                 wenkuSymbol = WenkuSymbol.Close,
             )
         }
@@ -221,7 +223,7 @@ private fun DownloadTaskRow(
                     color = if (state is DownloadState.Error) colors.error else colors.primary)
                 when (state) {
                     is DownloadState.Downloading -> if (state.downloadedBytes > 0) {
-                        val total = if (state.totalBytes > 0) downloadBytes(state.totalBytes) else "未知大小"
+                        val total = if (state.totalBytes > 0) downloadBytes(state.totalBytes) else tr("未知大小")
                         Text("${downloadBytes(state.downloadedBytes)} / $total", style = MaterialTheme.typography.labelSmall)
                     }
                     is DownloadState.Error -> Text(com.example.download.DownloadWorker.failureMessage(state.message), style = MaterialTheme.typography.labelSmall, color = colors.error)
@@ -238,16 +240,16 @@ private fun DownloadTaskRow(
                         wenkuSymbol = WenkuSymbol.Pause, glyphSize = 16.dp,
                     )
                 }
-                is DownloadState.Paused -> AppIconButton(Icons.Default.PlayArrow, "继续", onClick = onResume,
+                is DownloadState.Paused -> AppIconButton(Icons.Default.PlayArrow, tr("继续"), onClick = onResume,
                     wenkuSymbol = WenkuSymbol.Play)
-                is DownloadState.Error -> AppIconButton(Icons.Default.Refresh, "重新获取并重试", onClick = onRetry,
+                is DownloadState.Error -> AppIconButton(Icons.Default.Refresh, tr("重新获取并重试"), onClick = onRetry,
                     wenkuSymbol = WenkuSymbol.Refresh)
                 is DownloadState.Success -> Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                     WenkuIcon(WenkuSymbol.Check, size = 20.dp, tint = colors.primary)
                 }
                 DownloadState.Idle -> Unit
             }
-            AppIconButton(Icons.Default.Delete, "删除记录", onClick = onDelete, wenkuSymbol = WenkuSymbol.Delete)
+            AppIconButton(Icons.Default.Delete, tr("删除记录"), onClick = onDelete, wenkuSymbol = WenkuSymbol.Delete)
         }
     }
 }

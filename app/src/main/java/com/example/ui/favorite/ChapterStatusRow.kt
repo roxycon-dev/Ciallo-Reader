@@ -1,5 +1,7 @@
 package com.example.ui.favorite
 
+import com.example.i18n.tr
+
 import com.example.ui.components.pullOutCombinedClickable
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -177,9 +179,9 @@ fun ChapterStatusRow(
                     append("，")
                     append(
                         when (state.visual) {
-                            ChapterVisual.READ -> "已读"
-                            ChapterVisual.READING -> "阅读中"
-                            ChapterVisual.UNREAD -> "未读"
+                            ChapterVisual.READ -> tr("已读")
+                            ChapterVisual.READING -> tr("阅读中")
+                            ChapterVisual.UNREAD -> tr("未读")
                         }
                     )
                     if (state.downloaded) append("，已下载")
@@ -267,7 +269,7 @@ fun ChapterStatusRow(
                             .background(Color(0xFFFF4D4F), RoundedCornerShape(4.dp))
                             .padding(horizontal = 4.dp, vertical = 1.dp),
                     ) {
-                        Text("新", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(tr("新"), fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             }
@@ -292,7 +294,7 @@ fun ChapterStatusRow(
                 }
                 state.visual == ChapterVisual.READ -> {
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text("已读", fontSize = 11.sp, color = readGray)
+                    Text(tr("已读"), fontSize = 11.sp, color = readGray)
                 }
             }
         }
@@ -315,7 +317,7 @@ fun ChapterStatusRow(
             if (state.downloaded) {
                 Icon(
                     Icons.Filled.DownloadDone,
-                    contentDescription = "已下载",
+                    contentDescription = tr("已下载"),
                     tint = MintPrimary,
                     modifier = Modifier.size(18.dp),
                 )
@@ -331,7 +333,7 @@ fun ChapterStatusRow(
                 ) {
                     Icon(
                         Icons.Filled.Download,
-                        contentDescription = "下载本章",
+                        contentDescription = tr("下载本章"),
                         tint = MintPrimary,
                         modifier = Modifier.size(17.dp),
                     )
@@ -341,7 +343,7 @@ fun ChapterStatusRow(
             if (state.visual == ChapterVisual.READ) {
                 Icon(
                     Icons.Filled.Check,
-                    contentDescription = "已读",
+                    contentDescription = tr("已读"),
                     tint = readGray,
                     modifier = Modifier.size(18.dp),
                 )
@@ -366,7 +368,7 @@ fun ChapterStatusRow(
                 .graphicsLayer { translationX = dragAnim.value }
                 .padding(start = 16.dp)
                 .size(width = 26.dp, height = 46.dp),
-            contentDescription = if (bookmarked) "已加书签" else null,
+            contentDescription = if (bookmarked) tr("已加书签") else null,
         )
     }
     } // Box（丝带宿主）闭合

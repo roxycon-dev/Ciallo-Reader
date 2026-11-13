@@ -1,5 +1,7 @@
 package com.example.ui.source
 
+import com.example.i18n.tr
+
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -123,13 +125,13 @@ fun ZLibraryNodeManagementScreen(
                             (html.contains("三体") || books.any { it.title.contains("三体") })
                         when {
                             books.isNotEmpty() && relevant -> "可用（搜索到 ${books.size} 本）"
-                            books.isNotEmpty() -> "不可用（结果与关键词无关，疑似主页充数）"
+                            books.isNotEmpty() -> tr("不可用（结果与关键词无关，疑似主页充数）")
                             html.contains("/book/") ||
                             html.contains("z-bookcard") ||
                             html.contains("resItemBox") ||
-                            html.contains("book-item") -> "可用（页面可打开）"
-                            html.contains("Z-Library", ignoreCase = true) -> "可用（站点可达）"
-                            else -> "不可用（无搜索结果）"
+                            html.contains("book-item") -> tr("可用（页面可打开）")
+                            html.contains("Z-Library", ignoreCase = true) -> tr("可用（站点可达）")
+                            else -> tr("不可用（无搜索结果）")
                         }
                     }
                     // 仅"不可用 / 需验证"才尝试 WebView（挑战/JS 渲染场景），
@@ -143,8 +145,8 @@ fun ZLibraryNodeManagementScreen(
                         )
                         when {
                             web.books.isNotEmpty() -> "可用（搜索到 ${web.books.size} 本）"
-                            web.pageHasZlibMarkers -> "可用（页面可打开）"
-                            web.stillChallenged -> "需验证（无法自动搜索）"
+                            web.pageHasZlibMarkers -> tr("可用（页面可打开）")
+                            web.stillChallenged -> tr("需验证（无法自动搜索）")
                             else -> httpResult
                         }
                     } else {
@@ -176,7 +178,7 @@ fun ZLibraryNodeManagementScreen(
     fun selectNode(node: String) {
         ZLibraryNodeManager.selectNode(context, node)
         selectedNode = node
-        AppToast.makeText(context, "已切换到 $node", Toast.LENGTH_SHORT).show()
+        AppToast.makeText(context, com.example.i18n.switchedTo(node), Toast.LENGTH_SHORT).show()
     }
 
     val defaultNode = ZLibraryNodeManager.DEFAULT_NODE
@@ -220,7 +222,7 @@ fun ZLibraryNodeManagementScreen(
                                     style = MaterialTheme.typography.titleSmall
                                 )
                                 WenkuTextButton(
-                                    text = if (scraping) "扒取中…" else "扒取节点",
+                                    text = if (scraping) tr("扒取中…") else tr("扒取节点"),
                                     onClick = {
                                         scope.launch {
                                             scraping = true
@@ -230,7 +232,7 @@ fun ZLibraryNodeManagementScreen(
                                                 foundNodes = nodes
                                                 showReplaceDialog = true
                                             } else {
-                                                AppToast.makeText(context, "扒取失败，请检查网络后重试", Toast.LENGTH_LONG).show()
+                                                AppToast.makeText(context, tr("扒取失败，请检查网络后重试"), Toast.LENGTH_LONG).show()
                                             }
                                         }
                                     },
@@ -264,10 +266,10 @@ fun ZLibraryNodeManagementScreen(
                     val isDefault = node == defaultNode
                     val verifiedLive = node in ZLibraryNodeManager.VERIFIED_LIVE_NODES
                     val label = when {
-                        isDefault -> "默认节点"
-                        verifiedLive -> "已验证可用"
-                        node == "z-lib.sk" -> "硬挑战·留池"
-                        else -> "导航站节点"
+                        isDefault -> tr("默认节点")
+                        verifiedLive -> tr("已验证可用")
+                        node == "z-lib.sk" -> tr("硬挑战·留池")
+                        else -> tr("导航站节点")
                     }
                     NodeCard(
                         node = node,
@@ -302,7 +304,7 @@ fun ZLibraryNodeManagementScreen(
                 itemsIndexed(customNodeList, key = { _, node -> node }) { index, node ->
                     NodeCard(
                         node = node,
-                        label = "自定义节点",
+                        label = tr("自定义节点"),
                         isSelected = selectedNode == node,
                         status = statuses[node] ?: "未测试",
                         isTesting = testingNode == node,
@@ -328,20 +330,20 @@ fun ZLibraryNodeManagementScreen(
                         OutlinedTextField(
                             value = customInput,
                             onValueChange = { customInput = it },
-                            placeholder = { Text("自定义节点域名") },
+                            placeholder = { Text(tr("自定义节点域名")) },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp)
                         )
                         WenkuTextButton(
-                            text = "添加",
+                            text = tr("添加"),
                             onClick = {
                                 if (ZLibraryNodeManager.addCustomNode(context, customInput)) {
                                     customNodes = ZLibraryNodeManager.getCustomNodes(context)
                                     customInput = ""
-                                    AppToast.makeText(context, "已添加自定义节点", Toast.LENGTH_SHORT).show()
+                                    AppToast.makeText(context, tr("已添加自定义节点"), Toast.LENGTH_SHORT).show()
                                 } else {
-                                    AppToast.makeText(context, "请输入有效的域名", Toast.LENGTH_SHORT).show()
+                                    AppToast.makeText(context, tr("请输入有效的域名"), Toast.LENGTH_SHORT).show()
                                 }
                             },
                             compact = true,
@@ -356,7 +358,7 @@ fun ZLibraryNodeManagementScreen(
 
     if (showReplaceDialog) {
         WenkuActionSheet("找到 ${foundNodes.size} 个节点", onDismiss = { showReplaceDialog = false }) {
-            Text("是否合并以下节点？内置已验证节点会保留。")
+            Text(tr("是否合并以下节点？内置已验证节点会保留。"))
             foundNodes.forEach { node ->
                 Text(node, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace)
             }
@@ -365,13 +367,13 @@ fun ZLibraryNodeManagementScreen(
                 onClick = paperDismiss {
                     ZLibraryNodeManager.saveScrapedNodes(context, foundNodes)
                     scrapedNodes = ZLibraryNodeManager.getScrapedNodes(context)
-                    AppToast.makeText(context, "已合并节点", Toast.LENGTH_SHORT).show()
+                    AppToast.makeText(context, tr("已合并节点"), Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.fillMaxWidth(),
                 selected = true,
                 wenkuSymbol = WenkuSymbol.Check
             )
-            WenkuTextButton("取消", onClick = paperDismiss {}, modifier = Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Close)
+            WenkuTextButton(tr("取消"), onClick = paperDismiss {}, modifier = Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Close)
         }
     }
 }
@@ -437,14 +439,14 @@ private fun NodeCard(
             Spacer(modifier = Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 WenkuTextButton(
-                    text = "检测",
+                    text = tr("检测"),
                     onClick = onTest,
                     enabled = !isTesting,
                     compact = true,
                     wenkuSymbol = WenkuSymbol.Search
                 )
                 WenkuTextButton(
-                    text = if (isSelected) "使用中" else "使用",
+                    text = if (isSelected) tr("使用中") else tr("使用"),
                     onClick = onSelect,
                     selected = isSelected,
                     compact = true,
@@ -454,7 +456,7 @@ private fun NodeCard(
                     Spacer(modifier = Modifier.weight(1f))
                     AppIconButton(
                         icon = Icons.Default.Delete,
-                        contentDescription = "删除节点",
+                        contentDescription = tr("删除节点"),
                         onClick = onDelete,
                         tint = MaterialTheme.colorScheme.error,
                         glyphSize = 22.dp

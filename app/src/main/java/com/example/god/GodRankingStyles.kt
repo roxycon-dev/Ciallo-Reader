@@ -1,5 +1,7 @@
 package com.example.god
 
+import com.example.i18n.tr
+
 import com.example.ui.components.pullOutCombinedClickable
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutAlertDialog
@@ -163,16 +165,16 @@ fun GodRankingBody(
         interactions.deleteFor?.let { target ->
             PullOutAlertDialog(
                 onDismissRequest = { interactions.deleteFor = null },
-                title = { Text("确定移除这个神回吗？") },
-                text = { Text("随笔和评分将一并删除", fontSize = 14.sp) },
+                title = { Text(tr("确定移除这个神回吗？")) },
+                text = { Text(tr("随笔和评分将一并删除"), fontSize = 14.sp) },
                 confirmButton = {
                     PullOutTextButton(onClick = {
                         interactions.deleteFor = null
                         onDelete(target)
-                    }) { Text("移除", color = MaterialTheme.colorScheme.error) }
+                    }) { Text(tr("移除"), color = MaterialTheme.colorScheme.error) }
                 },
                 dismissButton = {
-                    PullOutTextButton(onClick = { interactions.deleteFor = null }) { Text("取消") }
+                    PullOutTextButton(onClick = { interactions.deleteFor = null }) { Text(tr("取消")) }
                 },
                 shape = RoundedCornerShape(24.dp),
             )
@@ -273,8 +275,8 @@ fun GodItemCard(
                     }
                     interactions.menuFor = moment
                 },
-                onClickLabel = "打开书籍详情",
-                onLongClickLabel = "编辑或删除神回",
+                onClickLabel = tr("打开书籍详情"),
+                onLongClickLabel = tr("编辑或删除神回"),
             ),
     ) {
         content(Modifier.fillMaxSize())

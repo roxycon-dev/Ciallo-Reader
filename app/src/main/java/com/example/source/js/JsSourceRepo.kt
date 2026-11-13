@@ -1,5 +1,7 @@
 package com.example.source.js
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
@@ -46,8 +48,8 @@ object JsSourceRepo {
         require(scripts.length()<=500)
         for(i in 0 until scripts.length()) {
             val item=scripts.getJSONObject(i)
-            require(parseIndex(JSONArray().put(item).toString()).size==1) { "书源定义无效" }
-            require(item.getString("script").toByteArray().size<=512*1024 && validScript(item.getString("script"))) { "书源脚本无效" }
+            require(parseIndex(JSONArray().put(item).toString()).size==1) { tr("书源定义无效") }
+            require(item.getString("script").toByteArray().size<=512*1024 && validScript(item.getString("script"))) { tr("书源脚本无效") }
         }
     }
 
@@ -373,7 +375,7 @@ object JsSourceRepo {
     private fun parseIndex(json: String): List<SourceMeta> {
         com.example.source.parser.RuleBudget.json(json)
         val arr = JSONArray(json)
-        require(arr.length()<=500) { "书源仓库条目过多" }
+        require(arr.length()<=500) { tr("书源仓库条目过多") }
         val seen = HashSet<String>()
         return (0 until arr.length()).mapNotNull { i ->
             val obj = arr.optJSONObject(i) ?: return@mapNotNull null
@@ -829,7 +831,6 @@ function __cialloChapterJson(doc, html) {
         if (!originReady && this.loadSetting('refreshDomainsOnStart')) await this.refreshDomains(false)
         """.trimIndent()
     )
-
     private fun patchScript(key: String, script: String): String = patchDiscoverSource(key, when (key) {
         // 漫蛙吧 API 域名迁移（mwuu.cc 301 → manwaxu.cc），2026-09-26 实测
         "manwaba" -> script.replace("https://mwuu.cc", "https://manwaxu.cc")

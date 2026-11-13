@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.i18n.tr
+
 import com.example.ui.components.pullOutClickable
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutDialog
@@ -78,7 +80,7 @@ object TranslationCacheIndex {
             val label = when {
                 src.isNotBlank() && dst.isNotBlank() -> "$src → $dst"
                 src.isNotBlank() -> src
-                else -> "空译文"
+                else -> tr("空译文")
             }.replace("\n", " ")
             label to "$regions 个气泡区域"
         }.getOrDefault(("未知页面" to ""))
@@ -90,7 +92,7 @@ object TranslationCacheIndex {
             val dir = TranslationCache.dir(context)
             val files = dir.listFiles()?.filter { it.isFile && it.name.endsWith(".json") } ?: return@withContext emptyList()
             files.map { f ->
-                var label = "未知页面"
+                var label = tr("未知页面")
                 var regions = 0
                 runCatching {
                     val o = JSONObject(f.readText(Charsets.UTF_8))
@@ -103,7 +105,7 @@ object TranslationCacheIndex {
                         label = when {
                             src.isNotBlank() && dst.isNotBlank() -> "$src → $dst"
                             src.isNotBlank() -> src
-                            else -> "空译文"
+                            else -> tr("空译文")
                         }
                     }
                 }
@@ -153,10 +155,10 @@ fun TranslationCacheDetailDialog(
                     Icon(Icons.Filled.Description, contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("译文缓存明细", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(tr("译文缓存明细"), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Spacer(Modifier.weight(1f))
                     Text(
-                        if (scanning) "扫描中…" else "${entries.size} 页 · 共 ${formatCacheSize(totalSize)}",
+                        if (scanning) tr("扫描中…") else "${entries.size} 页 · 共 ${formatCacheSize(totalSize)}",
                         fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -166,7 +168,7 @@ fun TranslationCacheDetailDialog(
 
                 if (!scanning && entries.isEmpty()) {
                     Box(Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
-                        Text("暂无已翻译页面", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                        Text(tr("暂无已翻译页面"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                     }
                 } else {
                     LazyColumn(
@@ -238,7 +240,7 @@ fun TranslationCacheDetailDialog(
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Icon(
-                                    Icons.Filled.Delete, contentDescription = "删除",
+                                    Icons.Filled.Delete, contentDescription = tr("删除"),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                     modifier = Modifier
                                         .size(18.dp)
@@ -266,11 +268,11 @@ fun TranslationCacheDetailDialog(
                             }
                         },
                         enabled = entries.isNotEmpty() && !scanning,
-                    ) { Text("全部清理", color = MaterialTheme.colorScheme.error) }
+                    ) { Text(tr("全部清理"), color = MaterialTheme.colorScheme.error) }
                     Spacer(Modifier.weight(1f))
                     PullOutTextButton(
                         onClick = com.example.ui.components.paperDismiss(onDismiss),
-                    ) { Text("关闭") }
+                    ) { Text(tr("关闭")) }
                     PullOutTextButton(
                         onClick = {
                             scope.launch {

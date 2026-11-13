@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
@@ -15,7 +17,7 @@ internal class ArchiveBudget(
     private var entries = 0
 
     fun copyEntry(input: InputStream, output: OutputStream? = null) {
-        require(++entries <= maxEntries) { "压缩包条目过多" }
+        require(++entries <= maxEntries) { tr("压缩包条目过多") }
         val buffer = ByteArray(64 * 1024)
         var size = 0L
         while (true) {
@@ -23,7 +25,7 @@ internal class ArchiveBudget(
             if (read < 0) break
             size += read
             total += read
-            require(size <= maxEntryBytes && total <= maxTotalBytes) { "压缩包解压体积超过安全上限" }
+            require(size <= maxEntryBytes && total <= maxTotalBytes) { tr("压缩包解压体积超过安全上限") }
             output?.write(buffer, 0, read)
         }
     }
@@ -61,7 +63,7 @@ internal fun splitChapterText(text: String, limit: Int = MAX_CHAPTER_LENGTH): Li
             if (text[end - 1].isHighSurrogate() && text[end].isLowSurrogate()) end--
             val tokenStart = text.lastIndexOf("[IMG:", end - 1)
             if (tokenStart >= start && text.indexOf(']', tokenStart).let { it >= end }) {
-                require(tokenStart > start) { "内嵌图片引用超过章节长度上限" }
+                require(tokenStart > start) { tr("内嵌图片引用超过章节长度上限") }
                 end = tokenStart
             }
         }

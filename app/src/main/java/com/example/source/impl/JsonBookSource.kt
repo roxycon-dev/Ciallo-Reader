@@ -1,5 +1,7 @@
 package com.example.source.impl
 
+import com.example.i18n.tr
+
 import com.example.data.readImportBytes
 import com.example.source.*
 import com.example.source.parser.JsonPathResolver
@@ -56,7 +58,7 @@ class JsonBookSource(
             val request=chain.request()
             com.example.source.SourceNetworkPolicy.check(request.url,configuredHost)
             if (!request.url.isHttps && request.headers.names().any { it.equals("Authorization", true) || it.equals("Cookie", true) })
-                throw IOException("非 HTTPS 书源不能发送登录凭据")
+                throw IOException(tr("非 HTTPS 书源不能发送登录凭据"))
             chain.proceed(request)
         }.build()
 
@@ -175,7 +177,7 @@ class JsonBookSource(
                 val books = jsonItems.mapNotNull { jsonObj ->
                     parseSearchBook(jsonObj, config.search.fields)
                 }
-                if (jsonItems.isNotEmpty() && books.isEmpty()) throw SourceException.ParseError("源站条目无法匹配书名或编号，请检查书源字段规则")
+                if (jsonItems.isNotEmpty() && books.isEmpty()) throw SourceException.ParseError(tr("源站条目无法匹配书名或编号，请检查书源字段规则"))
 
                 SourceResult.Success(books)
             } catch (e: SourceException) {
@@ -194,7 +196,7 @@ class JsonBookSource(
     override suspend fun getChapters(bookId: String): SourceResult<List<ComicChapter>> {
         val rule = config.htmlChapters
         if (rule == null) {
-            return SourceResult.Error(SourceException.ParseError("该书源未配置漫画目录规则"))
+            return SourceResult.Error(SourceException.ParseError(tr("该书源未配置漫画目录规则")))
         }
         return withContext(Dispatchers.IO) {
             try {
@@ -247,7 +249,7 @@ class JsonBookSource(
     override suspend fun getChapterImages(chapterId: String): SourceResult<List<String>> {
         val rule = config.htmlContent
         if (rule == null) {
-            return SourceResult.Error(SourceException.ParseError("该书源未配置漫画图片规则"))
+            return SourceResult.Error(SourceException.ParseError(tr("该书源未配置漫画图片规则")))
         }
         return withContext(Dispatchers.IO) {
             try {
@@ -268,7 +270,7 @@ class JsonBookSource(
                 }
                 if (images.isEmpty()) {
                     SourceLog.log(name, "正文无图片 ← $chapterId（可能是文本源或规则失效）")
-                    SourceResult.Error(SourceException.ParseError("该章节没有可读取的图片（若为文本书源，请前往详情页下载原文件）"))
+                    SourceResult.Error(SourceException.ParseError(tr("该章节没有可读取的图片（若为文本书源，请前往详情页下载原文件）")))
                 } else {
                     SourceLog.log(name, "正文图片 ${images.size} 张 ← $chapterId")
                     SourceResult.Success(images)
@@ -288,7 +290,7 @@ class JsonBookSource(
     /** 章节式文本源：抓取章节页并按 Legado 正文规则提取纯文本（段落 \n\n 分隔）。 */
     override suspend fun getChapterText(chapterId: String): SourceResult<String> {
         val rule = config.htmlContent
-            ?: return SourceResult.Error(SourceException.ParseError("该书源未配置正文规则"))
+            ?: return SourceResult.Error(SourceException.ParseError(tr("该书源未配置正文规则")))
         return withContext(Dispatchers.IO) {
             try {
                 val url = resolveUrl(rule.url.replace("{chapterUrl}", chapterId))
@@ -305,7 +307,7 @@ class JsonBookSource(
                     .joinToString("\n\n")
                 if (text.isBlank()) {
                     SourceLog.log(name, "正文无文字 ← $chapterId（规则可能失效）")
-                    SourceResult.Error(SourceException.ParseError("本章内容为空（正文规则可能失效）"))
+                    SourceResult.Error(SourceException.ParseError(tr("本章内容为空（正文规则可能失效）")))
                 } else {
                     SourceLog.log(name, "正文 ${text.length} 字 ← $chapterId")
                     SourceResult.Success(text)
@@ -323,7 +325,7 @@ class JsonBookSource(
     }
 
     private suspend fun searchHtml(keyword: String, overrideRule: HtmlSearchRule? = null, page: Int = 1): SourceResult<List<SearchBook>> {
-        val rule = overrideRule ?: config.htmlSearch ?: return SourceResult.Error(SourceException.ParseError("缺少 htmlSearch 规则"))
+        val rule = overrideRule ?: config.htmlSearch ?: return SourceResult.Error(SourceException.ParseError(tr("缺少 htmlSearch 规则")))
         val encoded = URLEncoder.encode(keyword, "UTF-8")
         val keywordB64 = android.util.Base64.encodeToString(
             keyword.toByteArray(Charsets.UTF_8),
@@ -366,7 +368,7 @@ class JsonBookSource(
                     author = selectValue(el, rule.authorSelector) ?: "未知作者",
                     cover = coverRaw?.let { resolveUrl(it) },
                     description = selectValue(el, rule.introSelector),
-                    format = if (isComicLike) "漫画" else config.download.defaultFormat.ifBlank { "" }
+                    format = if (isComicLike) tr("漫画") else config.download.defaultFormat.ifBlank { "" }
                 )
             )
         }
@@ -390,7 +392,7 @@ class JsonBookSource(
                     author = resolveJsonTemplate(item, rule.authorSelector) ?: "未知作者",
                     cover = coverRaw?.let { resolveUrl(it) },
                     description = resolveJsonTemplate(item, rule.introSelector),
-                    format = if (isComicLike) "漫画" else config.download.defaultFormat.ifBlank { "" }
+                    format = if (isComicLike) tr("漫画") else config.download.defaultFormat.ifBlank { "" }
                 )
             )
         }

@@ -1,0 +1,294 @@
+=== LibraryScreen.kt 98
+详情暂时无法加载
+检测到未登录，登录后可正常下载（搜索无需登录）
+未能获取下载链接（可能需要登录），可稍后重试
+源不可用
+注册失败
+书库
+返回上一层
+下载任务，${activeCount} 项进行中
+下载任务
+全部小说
+全部漫画
+书源
+去管理/登录
+下载任务 · ${visibleDownloads.size + comicDownloading.size} 项
+漫画正在下载
+查看进度
+未找到结果
+所有${if (aggregateKind == 
+小说源
+漫画源
+管理与导入书源
+回到顶部
+无网络连接
+请检查网络设置后重试
+重试
+请求失败
+服务无响应
+当前书源站点暂无响应，请稍后重试或切换书源
+需要登录
+当前书源需要账号身份验证
+去登录
+安全验证拦截
+目标站点已启用安全防护，请稍后重试
+数据解析失败
+返回数据格式异常，无法解析内容
+请求超时
+网络请求超时，请重试
+检索图书
+在上方输入书名、作者或关键词
+未找到与“$searchQuery”匹配的内容，请尝试更换关键词或书源
+当前书源不可用
+登录中…
+登录成功
+登录失败，请检查账号密码
+选择书源
+搜索书名或作者
+清空
+搜索
+搜索历史
+清空搜索历史？
+将删除全部 ${history.size} 条历史搜索词，此操作不可撤销。
+取消
+更多 ⌄
+收起 ⌃
+删除
+管理书源
+关闭书源选择
+聚合搜索
+聚合漫画（全部）
+同时搜索所有已启用的漫画源
+聚合小说（全部）
+同时搜索所有已启用的小说源（网文/电子书）
+当前选择
+当前使用
+欢迎使用书库
+在这里，您可以轻松导入本地电子书，或开启云端在线书源自由搜索。
+本地图书
+本地阅读
+直接导入手机中的 EPUB / TXT 电子书开始阅读
+在线搜索
+开启云端搜索，检索图书资源
+连接 Z-Library 云端书源检索图书
+高级设置
+管理书源或导入自定义 JSON 配置
+取消喜欢
+加入我喜欢的
+格式：${book.displayFormat()}${if (extras.isNotEmpty()) 
+阅读
+下载
+错误
+下载失败: ${state.message}
+正在准备...
+已暂停
+下载中: ${(p * 100).toInt()}%
+已完成
+已存入书架
+书
+小说
+漫画
+打开源组跳转面板
+展开全部 $hiddenCount 条
+跳转到源组
+关闭
+回到搜索顶部
+无结果
+当前位置
+超时
+链接超时
+=== DiscoverScreen.kt 42
+下载任务
+全部
+最新
+发现
+发现设置
+连载
+完结
+状态未知
+推荐
+聚合书源
+选择书源
+停更
+来源 $participantCount / ${activeSources.size}
+浏览结果
+连接中断，已保留上次内容
+${state.errors.size} 个书源暂时连接不上
+重试
+查看详情
+已加载作品暂无匹配
+换个分类，遇见新故事
+这个书源暂时没有数据
+还有更多原站内容，可以继续查找
+试试其他分类，或清除筛选继续浏览
+下拉刷新，或换个书源继续发现
+继续查找
+清除筛选
+原站推荐
+已看完当前书源的可用内容 · 换个维度继续发现
+${work.variants.size} 个源可读 · 选择阅读书源
+取消喜欢
+加入我喜欢的
+不感兴趣
+分享
+連載
+连载中
+連載中
+完結
+已完结
+已完結
+休刊
+暂停更新
+未提供
+=== StatisticsScreen.kt 47
+阅读统计
+「暂无阅读统计记录」
+您最近还没有在本软件中阅读过小说哦。Roxy 已经乖乖为您备好了专属书签，快去读一章，开启您的阅读旅程并点亮统计图表吧！
+立即前往书架阅读
+本周阅读明细
+本周
+本月
+今年
+上周
+上月
+去年
+周
+月
+年
+📚 我的阅读${shareLabel}报 · Ciallo Reader
+⏱ ${periodName}阅读 ${formatReadDuration(periodTotal)}（日均 ${if (avgDaily in 1..59) 
+⏱ ${periodName}暂无阅读记录，从一页开始 ✨
+🎯 每日目标 ${dailyGoalMinutes} 分钟 · 完成 ${(animatedGoal * 100).toInt()}%
+🔥 连续阅读 $streak 天
+📖 ${periodName}阅读 $daysRead 天 · 读完 $finishedCount 本
+Ciallo Reader · Roxy 陪伴 ✨
+分享阅读报告
+阅读总览
+分享${periodName}阅读报告
+${periodName}阅读时长
+不足1分钟
+首次记录
+日均 $avgDailyText · 较$prevName $prevText
+每日目标
+${dailyGoalMinutes} 分钟
+减少目标15分钟
+增加目标15分钟
+本周阅读天数
+周期阅读天数
+$daysRead 天
+当前连续
+$streak 天
+本周点亮
+${books.size} 本藏书 · ${finishedCount} 本读完
+${periodName}只读了 ${formatShortDuration(periodTotal)}
+Roxy 捧着魔法书等你翻开第一页～
+$date 阅读明细
+共 ${formatReadDuration(totalSeconds)}
+这一天没有阅读记录
+删除
+阅读时段
+${formatSessionTime(session)} 起
+=== ReaderScreen.kt 103
+自定义字体已导入
+字体导入失败
+开屏海报已更新
+图片设置失败
+已取消书签
+章节加载失败：$readerLoadError
+重试加载
+本章暂无正文
+↓ 已到本章开头 · 继续下拉返回上一章
+—— 本章完 · 继续上滑进入下一章 ——
+—— 全书完 ——
+已经是最后一页了
+已经是第一页了
+松开切换下一章
+松开返回上一章
+继续上滑进入下一章
+继续下拉返回上一章
+第 ${currentChapterIndex + 1}/${chapters.size} 章
+第 ${activeSubPageIndex + 1}/${pagesList.size} 页 · 第 ${currentChapterIndex + 1}/${chapters.size} 章
+朗读播放器
+关闭
+上一段
+播放暂停
+下一段
+返回上次处
+自动滚屏中 · 点击停止
+回到顶部
+返回
+${currentChapterIndex + 1}/${chapters.size} 章
+书签
+听书
+已开启语音听书
+目录
+更多
+全文搜索
+书签列表
+停止自动滚屏
+自动滚屏
+自动滚屏需切换到滚动模式
+排版设置
+上一章
+本章进度
+第 ${Math.round(it * lastPage) + 1} 页
+下一章
+跳转 → 本章第 ${Math.round(preview * lastPage) + 1}/$pageCount 页
+跳转 → 本章 ${(preview * 100).toInt()}%
+第 ${currentChapterIndex + 1} / ${chapters.size} 章 · ${currentChapter?.title.orEmpty()}
+朗读中
+听书模式
+开启语音听书：${chapter.title}
+目录 (${chapters.size}章)
+检查更新
+搜索章节...
+阅读排版
+排版参数已重置
+重置
+关闭阅读排版
+自定义触控功能分区
+显 示
+亮度
+首行缩进
+段落首行自动空两格
+文 字
+字号
+衬线体
+黑体
+等宽体
+自定义字体
+自定义字体（未导入）
+默认字体
+字体
+收起字体列表
+展开字体列表
+永字八法，安静阅读 Aa 123
+已导入字体效果预览 Aa
+选择 TTF 文件后可在此预览
+换字体
++导入
+行间距
+页边距
+阅读主题
+白底
+羊皮
+夜间
+护眼
+纯黑
+翻 页
+翻页
+卷页
+渐变
+查找
+关闭查找
+章内查找
+整书查找
+输入关键词...
+未找到匹配
+书签记录 (${bookmarks.size})
+无书签
+删除
+定时休息提醒
+已持续阅读 ${prefs.restReminderMinutes} 分钟，建议远眺片刻！
+好的
+已选择

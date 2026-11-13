@@ -1,5 +1,7 @@
 package com.example.god
 
+import com.example.i18n.tr
+
 
 import com.example.ui.components.pullOutClickable
 import androidx.compose.animation.core.animateFloatAsState
@@ -67,7 +69,7 @@ fun GodSettingsSection(
 
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
-            text = "神回",
+            text = tr("神回"),
             fontWeight = FontWeight.SemiBold,
             fontSize = 13.sp,
             letterSpacing = 0.1.sp,
@@ -106,8 +108,8 @@ fun GodSettingsSection(
 
                 if (hasGyro) {
                     GodSettingSwitchRow(
-                        title = "排行榜陀螺仪视差",
-                        desc = "倾斜手机时封面与光环反向位移，形成景深",
+                        title = tr("排行榜陀螺仪视差"),
+                        desc = tr("倾斜手机时封面与光环反向位移，形成景深"),
                         checked = gyro,
                         onCheckedChange = { scope.launch { store.setGyroParallaxEnabled(it) } },
                     )

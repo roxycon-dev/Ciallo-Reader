@@ -1,0 +1,23 @@
+{
+  "status": "passed",
+  "network": "offline",
+  "display": {
+    "loaded": true,
+    "embedded": true
+  },
+  "audio": {
+    "playing": true,
+    "embedded": true
+  },
+  "fonts": [
+    {
+      "family": "CialloSans",
+      "status": "loaded"
+    },
+    {
+      "family": "CialloSerif",
+      "status": "loaded"
+    }
+  ],
+  "errors": []
+}

@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
@@ -149,10 +151,10 @@ class BookRepository(
                     "fb2" -> Fb2Parser.importFb2(context, effectiveUri, book.title, bookDao, targetBookId = book.id)
                     "docx" -> DocxParser.importDocx(context, effectiveUri, book.title, bookDao, targetBookId = book.id)
                     else -> MobiParser.importMobi(context, effectiveUri, book.title, bookDao, targetBookId = book.id)
-                }.getOrNull() ?: throw IllegalStateException("重解析失败")
+                }.getOrNull() ?: throw IllegalStateException(tr("重解析失败"))
                 // 硬门槛：必须真的提取到内嵌图片，否则回滚（纯文字书不值得改变分章）
                 if (bookDao.searchChapters(book.id, "[IMG:").isEmpty()) {
-                    throw IllegalStateException("未提取到内嵌图片")
+                    throw IllegalStateException(tr("未提取到内嵌图片"))
                 }
                 val newMetadata = bookDao.getChaptersMetadataList(book.id)
                 require(oldMetadata.map { it.title } == newMetadata.map { it.title }) {
@@ -278,7 +280,7 @@ class BookRepository(
             input.use { ins -> dest.outputStream().use { out ->
                 ArchiveBudget(256L * 1024 * 1024, 256L * 1024 * 1024, 1).copyEntry(ins, out)
             } }
-            require(dest.length() > 0) { "文件为空" }
+            require(dest.length() > 0) { tr("文件为空") }
             Uri.fromFile(dest)
         } catch (e: Exception) {
             dest.delete()
@@ -333,7 +335,7 @@ class BookRepository(
 
     /** Opt-in whole-book refresh. Parse first and commit replacement with annotations atomically. */
     suspend fun importDownloadedNovel(uri: Uri, snapshot: com.example.source.SearchBook, replace: Boolean): Result<Book> = withContext(Dispatchers.IO) {
-        require(com.example.source.WholeBookNovelSources.contains(snapshot.sourceId)) { "该书源不使用小说更新流程" }
+        require(com.example.source.WholeBookNovelSources.contains(snapshot.sourceId)) { tr("该书源不使用小说更新流程") }
         require(uri.scheme == "file")
         importMutex.lock()
         try {
@@ -342,7 +344,7 @@ class BookRepository(
                 val old = bookDao.getBookBySourceResource(snapshot.sourceId, snapshot.id)
                 if (old != null && (!replace || old.filePath == uri.toString())) return@withTransaction old
                 val parsed = importBookUnchecked(uri, "${snapshot.title}.${snapshot.format}").getOrThrow()
-                require(!parsed.isComic) { "下载内容不是文字小说" }
+                require(!parsed.isComic) { tr("下载内容不是文字小说") }
                 val linked = parsed.copy(sourceId = snapshot.sourceId, comicId = snapshot.id,
                     author = snapshot.author.ifBlank { parsed.author }, coverUri = parsed.coverUri ?: snapshot.cover)
                 if (old == null) {
@@ -351,10 +353,10 @@ class BookRepository(
                 }
                 val before = bookDao.getChaptersMetadataList(old.id)
                 val after = bookDao.getChaptersListForBook(parsed.id)
-                require(after.isNotEmpty()) { "新版没有可读正文，保留旧书" }
+                require(after.isNotEmpty()) { tr("新版没有可读正文，保留旧书") }
                 val oldTitles = before.map { ChapterMerger.cleanSplitTitle(it.title) }.toSet()
                 val newTitles = after.map { ChapterMerger.cleanSplitTitle(it.title) }.toSet()
-                require(newTitles.containsAll(oldTitles)) { "新版缺少原有章节，已保留旧书；请等待源站补齐下载包" }
+                require(newTitles.containsAll(oldTitles)) { tr("新版缺少原有章节，已保留旧书；请等待源站补齐下载包") }
                 fun mapped(index: Int): Int {
                     val title = before.getOrNull(index)?.title ?: return index.coerceIn(0, after.lastIndex)
                     val occurrence = before.take(index).count { it.title == title }
@@ -427,7 +429,7 @@ class BookRepository(
             val chapterPattern = Pattern.compile("^第[0-9一二三四五六七八九十百千万]+[章回卷节\\s].*")
             val batch = mutableListOf<Chapter>()
             var chapterCount = 0
-            var currentTitle = if (hasChapters) "前言" else "第 1 部分"
+            var currentTitle = if (hasChapters) tr("前言") else tr("第 1 部分")
             val content = StringBuilder()
             suspend fun emit(title: String, text: String) {
                 splitChapterText(text).forEachIndexed { index, part ->
@@ -462,7 +464,7 @@ class BookRepository(
             }
             if (content.isNotEmpty()) emit(currentTitle, content.toString())
             if (batch.isNotEmpty()) bookDao.insertChapters(batch)
-            require(chapterCount > 0) { "文件中没有可阅读的正文" }
+            require(chapterCount > 0) { tr("文件中没有可阅读的正文") }
             val book = initialBook.copy(id = bookId, totalChapters = chapterCount)
             bookDao.updateBook(book)
             Result.success(book)
@@ -581,7 +583,7 @@ class BookRepository(
             // ?????????????
             runCatching {
                 AppDatabase.getDatabase(context).openHelper.writableDatabase
-                    .execSQL("PRAGMA wal_checkpoint(TRUNCATE)")
+                    .query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
             }
         } catch (t: Throwable) {
             if (t is kotlinx.coroutines.CancellationException) throw t

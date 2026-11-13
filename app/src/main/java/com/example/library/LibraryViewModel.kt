@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.i18n.tr
+
 import android.app.Application
 import android.graphics.BitmapFactory
 import android.util.Log
@@ -337,7 +339,7 @@ class LibraryViewModel private constructor(
             page = previous.page,
             requested = chapter,
             loading = source != null,
-            error = if (source == null) "当前书源不可用" else null
+            error = if (source == null) tr("当前书源不可用") else null
         )
         _onlineNovelChapter.value = pending
         if (source == null) return
@@ -366,7 +368,7 @@ class LibraryViewModel private constructor(
                     is SourceResult.Error -> {
                         _onlineNovelChapter.value = pending.copy(
                             loading = false,
-                            error = result.exception.message ?: "章节加载失败"
+                            error = result.exception.message ?: com.example.i18n.tr("章节加载失败")
                         )
                     }
                 }
@@ -374,7 +376,7 @@ class LibraryViewModel private constructor(
                 throw e
             } catch (e: Exception) {
                 if (request == novelRequestSeq) {
-                    _onlineNovelChapter.value = pending.copy(loading = false, error = e.message ?: "章节加载失败")
+                    _onlineNovelChapter.value = pending.copy(loading = false, error = e.message ?: com.example.i18n.tr("章节加载失败"))
                 }
             }
         }
@@ -409,7 +411,7 @@ class LibraryViewModel private constructor(
     }
 
     fun setAggregateKind(kind: String) {
-        require(kind == "comic" || kind == "novel") { "未知的聚合搜索类型" }
+        require(kind == "comic" || kind == "novel") { tr("未知的聚合搜索类型") }
         if (_aggregateKind.value == kind) return
         searchRequestSeq++
         resetSearchResults()
@@ -472,8 +474,8 @@ class LibraryViewModel private constructor(
 
     private fun startKeywordPreview(keyword: String) {
         _searchKeywords.value = listOf(keyword)
-        _keywordStatus.value = if (prefs.multiLanguageSearch) "正在查找本地名称" else ""
-        _keywordOrigins.value = mapOf(KeywordKeys.query(keyword) to "原词")
+        _keywordStatus.value = if (prefs.multiLanguageSearch) tr("正在查找本地名称") else ""
+        _keywordOrigins.value = mapOf(KeywordKeys.query(keyword) to com.example.i18n.tr("原词"))
         _keywordDispatches.value = emptyMap()
         _keywordProviders.value = emptyList()
     }
@@ -527,7 +529,7 @@ class LibraryViewModel private constructor(
         }
         startKeywordPreview(keyword)
         if (sources.isEmpty())
-            _keywordStatus.value = "没有可用的搜索书源"
+            _keywordStatus.value = com.example.i18n.tr("没有可用的搜索书源")
         if (sources.isEmpty()) {
             _uiState.value = LibraryUiState.Error(LibraryError.SourceUnavailable)
             return
@@ -550,7 +552,7 @@ class LibraryViewModel private constructor(
         val requestSeq = ++chaptersRequestSeq
         val source = sourceManager.availableSources.value.firstOrNull { it.id == book.sourceId } as? ComicSource
         if (source == null) {
-            _comicChaptersError.value = "该漫画的书源已停用或不支持漫画"
+            _comicChaptersError.value = com.example.i18n.tr("该漫画的书源已停用或不支持漫画")
             _comicChaptersLoading.value = false
             return
         }
@@ -565,10 +567,10 @@ class LibraryViewModel private constructor(
                     is SourceResult.Success -> {
                         _comicChapters.value = result.data
                         database.favoriteDao().updateSourceHealth(book.sourceId, book.id, true)
-                        if (result.data.isEmpty()) _comicChaptersError.value = "暂无可用章节"
+                        if (result.data.isEmpty()) _comicChaptersError.value = com.example.i18n.tr("暂无可用章节")
                     }
                     is SourceResult.Error -> {
-                        _comicChaptersError.value = result.exception.message ?: "章节加载失败"
+                        _comicChaptersError.value = result.exception.message ?: com.example.i18n.tr("章节加载失败")
                     }
                 }
                 // Enrich every comic source's search snapshot. JS reuses the loadInfo request above.
@@ -590,7 +592,7 @@ class LibraryViewModel private constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                if (requestSeq == chaptersRequestSeq) _comicChaptersError.value = e.message ?: "章节加载失败"
+                if (requestSeq == chaptersRequestSeq) _comicChaptersError.value = e.message ?: com.example.i18n.tr("章节加载失败")
             } finally {
                 if (requestSeq == chaptersRequestSeq) _comicChaptersLoading.value = false
             }
@@ -602,7 +604,7 @@ class LibraryViewModel private constructor(
         val source = sourceManager.availableSources.value
             .firstOrNull { it.id == _comicBook.value?.sourceId } as? ComicSource
         if (source == null) {
-            _comicChapterError.value = "该漫画的书源已停用"
+            _comicChapterError.value = com.example.i18n.tr("该漫画的书源已停用")
             _comicChapterLoading.value = false
             return
         }
@@ -633,13 +635,13 @@ class LibraryViewModel private constructor(
                         _comicChapterHeaders.value = headers
                     }
                     is SourceResult.Error -> {
-                        _comicChapterError.value = result.exception.message ?: "图片加载失败"
+                        _comicChapterError.value = result.exception.message ?: com.example.i18n.tr("图片加载失败")
                     }
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                if (requestSeq == imagesRequestSeq) _comicChapterError.value = e.message ?: "图片加载失败"
+                if (requestSeq == imagesRequestSeq) _comicChapterError.value = e.message ?: com.example.i18n.tr("图片加载失败")
             } finally {
                 if (requestSeq == imagesRequestSeq) _comicChapterLoading.value = false
             }
@@ -709,7 +711,7 @@ class LibraryViewModel private constructor(
         if (chapter.external) {
             AppToast.makeText(
                 getApplication(),
-                "站外链接章节暂不支持下载",
+                com.example.i18n.tr("站外链接章节暂不支持下载"),
                 android.widget.Toast.LENGTH_SHORT
             ).show()
             return
@@ -719,7 +721,7 @@ class LibraryViewModel private constructor(
         if (source == null) {
             AppToast.makeText(
                 getApplication(),
-                "当前书源不支持漫画",
+                com.example.i18n.tr("当前书源不支持漫画"),
                 android.widget.Toast.LENGTH_SHORT
             ).show()
             return
@@ -1049,7 +1051,7 @@ class LibraryViewModel private constructor(
                     com.example.download.DownloadStatus.DOWNLOADING -> DownloadState.Downloading(task.downloadedBytes, task.totalBytes,
                         task.progress)
                     com.example.download.DownloadStatus.PAUSED -> DownloadState.Paused(task.downloadedBytes, task.totalBytes)
-                    com.example.download.DownloadStatus.FAILED -> DownloadState.Error(task.errorMessage ?: "下载失败")
+                    com.example.download.DownloadStatus.FAILED -> DownloadState.Error(task.errorMessage ?: com.example.i18n.tr("下载失败"))
                     else -> DownloadState.Pending
                 })
         } + preparing.mapValues { it.value.state }
@@ -1089,7 +1091,7 @@ class LibraryViewModel private constructor(
             } else {
                 val e = firstError
                 val error = when (e) {
-                    null -> LibraryError.Unknown("没有找到相关结果")
+                    null -> LibraryError.Unknown(com.example.i18n.tr("没有找到相关结果"))
                     is SourceException.NetworkError -> {
                         val msg = e.message ?: ""
                         com.example.source.SourceLog.log(source.name, "搜索「$keyword」失败: $msg")
@@ -1101,11 +1103,11 @@ class LibraryViewModel private constructor(
                         }
                     }
                     is SourceException.LoginRequired -> LibraryError.AuthenticationRequired
-                    is SourceException.ParseError -> LibraryError.ParseFailed(e.message ?: "解析失败")
-                    else -> LibraryError.Unknown(e.message ?: "未知错误", e)
+                    is SourceException.ParseError -> LibraryError.ParseFailed(e.message ?: com.example.i18n.tr("解析失败"))
+                    else -> LibraryError.Unknown(e.message ?: com.example.i18n.tr("未知错误"), e)
                 }
                 _uiState.value = LibraryUiState.Error(error)
-                errorMessage.value = error.message ?: "发生错误"
+                errorMessage.value = error.message ?: com.example.i18n.tr("发生错误")
             }
         }
     }
@@ -1176,7 +1178,7 @@ class LibraryViewModel private constructor(
                         // 全部格式都不支持阅读：不再下载，提示换其他版本
                         _formatPickerBook.value = null
                         _pendingFormats.value = emptyList()
-                        errorMessage.value = "该书仅有 " +
+                        errorMessage.value = com.example.i18n.tr("该书仅有 ") +
                             fetched.joinToString(" / ") { it.format.uppercase() } +
                             " 格式，App 内暂不支持阅读，请换其他版本"
                         preparations.update { it + (key to DownloadPreparation(book, DownloadState.Error(errorMessage.value.orEmpty()))) }
@@ -1249,7 +1251,7 @@ class LibraryViewModel private constructor(
                     preparations.update { it - key }
                 }
                 is SourceResult.Error -> {
-                    errorMessage.value = result.exception.message ?: "获取下载信息失败"
+                    errorMessage.value = result.exception.message ?: com.example.i18n.tr("获取下载信息失败")
                     preparations.update { it + (key to DownloadPreparation(book, DownloadState.Error(errorMessage.value.orEmpty()))) }
                     if (replaceNovel) _novelUpdate.value?.takeIf {
                         it.local.sourceId == book.sourceId && it.local.comicId == book.id
@@ -1258,7 +1260,7 @@ class LibraryViewModel private constructor(
             }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
-                val message = e.message ?: "准备下载失败，请重试"
+                val message = e.message ?: com.example.i18n.tr("准备下载失败，请重试")
                 preparations.update { it + (key to DownloadPreparation(book, DownloadState.Error(message))) }
                 errorMessage.value = message
             }
@@ -1267,7 +1269,7 @@ class LibraryViewModel private constructor(
 
     suspend fun novelDetail(book: SearchBook): SourceResult<SearchBook> {
         val source = sourceManager.availableSources.value.firstOrNull { it.id == book.sourceId && it.isNovelSource }
-            ?: return SourceResult.Error(SourceException.ParseError("此小说源已停用"))
+            ?: return SourceResult.Error(SourceException.ParseError(com.example.i18n.tr("此小说源已停用")))
         return when (val result = source.getDetail(book.id)) {
             is SourceResult.Error -> result
             is SourceResult.Success -> SourceResult.Success(result.data.copy(
@@ -1298,7 +1300,7 @@ class LibraryViewModel private constructor(
         val source = sourceManager.availableSources.value.firstOrNull { it.id == local.sourceId } as? UpdatableNovelSource
         _novelUpdate.value = NovelUpdate(local, source?.name ?: "小说源")
         novelUpdateJob = viewModelScope.launch {
-            if (source == null) { _novelUpdate.value = NovelUpdate(local, "小说源", loading = false, error = "此小说源已停用"); return@launch }
+            if (source == null) { _novelUpdate.value = NovelUpdate(local, "小说源", loading = false, error = com.example.i18n.tr("此小说源已停用")); return@launch }
             try {
                 when (val result = source.refreshNovelDetail(local.comicId)) {
                     is SourceResult.Success -> {
@@ -1307,7 +1309,7 @@ class LibraryViewModel private constructor(
                         val changed = if (baseline?.hasRevision == true && remote?.hasRevision == true) baseline.revision != remote.revision else null
                         _novelUpdate.value = NovelUpdate(local, source.name, loading = false, remote = result.data, changed = changed)
                     }
-                    is SourceResult.Error -> _novelUpdate.value = NovelUpdate(local, source.name, loading = false, error = result.exception.message ?: "检查失败，请重试")
+                    is SourceResult.Error -> _novelUpdate.value = NovelUpdate(local, source.name, loading = false, error = result.exception.message ?: com.example.i18n.tr("检查失败，请重试"))
                 }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { _novelUpdate.value = NovelUpdate(local, source.name, loading = false, error = e.message ?: "检查失败，请重试") }

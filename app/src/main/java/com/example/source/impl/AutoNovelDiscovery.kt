@@ -1,5 +1,7 @@
 package com.example.source.impl
 
+import com.example.i18n.tr
+
 import com.example.discover.*
 import com.example.source.SearchBook
 import kotlinx.coroutines.async
@@ -37,7 +39,7 @@ internal class AutoNovelDiscovery(
         if (!ranking) return@coroutineScope DiscoverPage(supported = false, notice = guestListNotice, catalog = catalog)
         if (q.feedId == null && !catalog.supports(q.dimension, q.range)) return@coroutineScope DiscoverPage(supported = false, catalog = catalog)
         val categories = (listOfNotNull(q.categoryId) + q.categoryIds).distinct()
-        require(categories.all { id -> catalog.categories.any { it.id == id } }) { "轻小说分类已变化，请重新选择" }
+        require(categories.all { id -> catalog.categories.any { it.id == id } }) { tr("轻小说分类已变化，请重新选择") }
         val routes = categories.ifEmpty {
             if (q.feedId in setOf("syosetu", "kakuyomu")) listOf(q.feedId!!) else listOf("syosetu", "kakuyomu")
         }
@@ -47,12 +49,12 @@ internal class AutoNovelDiscovery(
                 val provider = route.substringBefore('|')
                 val genre = route.substringAfter('|', "")
                 if (provider == "syosetu") {
-                    addQueryParameter("type", if (genre.isEmpty()) "综合" else "流派")
+                    addQueryParameter("type", if (genre.isEmpty()) "综合" else tr("流派"))
                     addQueryParameter("page", q.page.toString())
                 }
                 if (genre.isNotEmpty()) addQueryParameter("genre", genre)
                 else if (provider == "kakuyomu") addQueryParameter("genre", "综合")
-                addQueryParameter("range", "每日").addQueryParameter("status", if (q.range == "完结" && provider == "syosetu") "完结" else "全部")
+                addQueryParameter("range", "每日").addQueryParameter("status", if (q.range == "完结" && provider == "syosetu") tr("完结") else tr("全部"))
             }.build()
             val data = json(url)
             val items = data.getJSONArray("items")
@@ -66,9 +68,9 @@ internal class AutoNovelDiscovery(
                 val genre = route.substringAfter('|', "").takeIf(String::isNotBlank)
                 val completed = q.range == "完结" && provider == "syosetu"
                 val enriched = b.copy(novelInfo = b.novelInfo?.copy(tags = (b.novelInfo.tags + listOfNotNull(genre)).distinct(),
-                    status = if (completed) "已完结" else b.novelInfo.status))
+                    status = if (completed) tr("已完结") else b.novelInfo.status))
                 DiscoverEntry(enriched, updatedAt = o.optLong("updateAt").takeIf { it > 0 }?.times(1000), native = true,
-                    origin = "${if (provider == "syosetu") "成为小说家" else "Kakuyomu"}·${genre ?: "综合"}日榜",
+                    origin = "${if (provider == "syosetu") tr("成为小说家") else "Kakuyomu"}·${genre ?: "综合"}日榜",
                     statistic = o.optString("extra").takeIf(String::isNotBlank))
             }
             // Kakuyomu's rank API has no page parameter. Never refetch its first page as a next page.

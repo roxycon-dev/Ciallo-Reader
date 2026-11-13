@@ -1,5 +1,7 @@
 package com.example.discover
 
+import com.example.i18n.tr
+
 import com.example.ui.components.PullOutIconButton
 import com.example.ui.components.PullOutVisibility
 import androidx.compose.animation.*
@@ -67,7 +69,7 @@ internal fun DiscoverFilters(tabs: List<Pair<String, Boolean>>, onTab: (Int) -> 
                 "分类${if (selected.isNotEmpty()) " ${selected.size}" else ""}",
                 onCategory, selected = selected.isNotEmpty(), compact = true, wenkuSymbol = WenkuSymbol.Filter,
             )
-            PullOutIconButton(icon = Icons.Outlined.Refresh, contentDescription = "刷新发现", onClick = onRefresh, enabled = !refreshing, glyphSize = 18.dp, tint = colors.onSurfaceVariant)
+            PullOutIconButton(icon = Icons.Outlined.Refresh, contentDescription = tr("刷新发现"), onClick = onRefresh, enabled = !refreshing, glyphSize = 18.dp, tint = colors.onSurfaceVariant)
         }
         PullOutVisibility(selected.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -87,7 +89,7 @@ internal fun DiscoverFilters(tabs: List<Pair<String, Boolean>>, onTab: (Int) -> 
                     }
                 }
                 VerticalDivider(Modifier.padding(horizontal = 8.dp).height(16.dp), thickness = .5.dp, color = colors.outline.copy(alpha = .24f))
-                WenkuTextButton("清除", onClear, compact = true, wenkuSymbol = WenkuSymbol.CloseCircle)
+                WenkuTextButton(tr("清除"), onClear, compact = true, wenkuSymbol = WenkuSymbol.CloseCircle)
             }
         }
         if (sorts.isNotEmpty()) {
@@ -105,7 +107,7 @@ internal fun DiscoverFilters(tabs: List<Pair<String, Boolean>>, onTab: (Int) -> 
         }
         if (statuses.isNotEmpty()) {
             Row(Modifier.testTag("discover_status_filters").padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("状态", fontSize = 12.sp, color = colors.onSurfaceVariant)
+                Text(tr("状态"), fontSize = 12.sp, color = colors.onSurfaceVariant)
                 Spacer(Modifier.width(8.dp))
                 Row(Modifier.horizontalScroll(rememberScrollState()).drawBehind {
                     val h = 32.dp.toPx().coerceAtMost(size.height)

@@ -1,5 +1,7 @@
 package com.example.transfer
 
+import com.example.i18n.tr
+
 import androidx.room.Entity
 import org.json.JSONObject
 import java.io.File
@@ -36,7 +38,7 @@ enum class TransferError { PERMISSION, WIFI_DISABLED, UNSUPPORTED, BUSY, CONNECT
 data class TransferRoute(val host:String,val port:Int,val networkHandle:Long?=null,val localAddress:String?=null,val nearby:Boolean=false)
 data class TransferPeer(val id: String, val name: String, val host: String? = null, val port: Int = 0,
     val p2pAddress: String? = null, val protocol: Int = 1, val routes:List<TransferRoute> = emptyList(),val directPort:Int?=null,val nearbyProtocol:Int=0) {
-    val routeLabel: String get() = if (host != null && routes.none {it.nearby}) "同 Wi-Fi · 加密连接" else "附近直连 · 无需网络"
+    val routeLabel: String get() = if (host != null && routes.none {it.nearby}) tr("同 Wi-Fi · 加密连接") else tr("附近直连 · 无需网络")
 }
 data class TransferSessionState(
     val phase: TransferPhase = TransferPhase.IDLE, val peer: TransferPeer? = null,

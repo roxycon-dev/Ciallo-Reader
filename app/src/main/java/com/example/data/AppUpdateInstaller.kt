@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.i18n.tr
+
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
@@ -26,7 +28,7 @@ internal class AppUpdateInstaller(
     else Intent(Settings.ACTION_SECURITY_SETTINGS)
 
     fun installationIntent(file: File): Intent {
-        check(file.isFile) { "安装包已不存在，请重新下载" }
+        check(file.isFile) { tr("安装包已不存在，请重新下载") }
         val uri = contentUri(file)
         return Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

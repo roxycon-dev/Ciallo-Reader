@@ -1,5 +1,7 @@
 package com.example.ui.mascot
 
+import com.example.i18n.tr
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -130,7 +132,7 @@ fun MoveBookAnimation(onComplete: () -> Unit) {
             Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = "📦 已移动到新书架",
+                text = tr("📦 已移动到新书架"),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF5CB8E4),
@@ -140,7 +142,7 @@ fun MoveBookAnimation(onComplete: () -> Unit) {
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "藏书整理得整整齐齐啦~",
+                text = tr("藏书整理得整整齐齐啦~"),
                 fontSize = 12.sp,
                 color = Color.White.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center

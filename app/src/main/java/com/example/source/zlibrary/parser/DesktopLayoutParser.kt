@@ -1,5 +1,7 @@
 package com.example.source.zlibrary.parser
 
+import com.example.i18n.tr
+
 import com.example.source.SearchBook
 import com.example.source.SourceException
 import com.example.source.zlibrary.ParsedBookDetail
@@ -84,10 +86,10 @@ class DesktopLayoutParser : ZLibraryLayoutParser {
         }
 
         val dlAnchor = doc.firstRealDownloadLink()
-            ?: throw SourceException.ParseError("未找到下载链接")
+            ?: throw SourceException.ParseError(tr("未找到下载链接"))
 
         var dlUrl = dlAnchor.attr("href")
-        if (dlUrl.isBlank()) throw SourceException.ParseError("解析下载链接为空")
+        if (dlUrl.isBlank()) throw SourceException.ParseError(tr("解析下载链接为空"))
         if (!dlUrl.startsWith("http")) dlUrl = formatUrl(baseUrl, dlUrl)
 
         val formatText = doc.selectFirst(".property_extension, div:contains(Extension) + div")?.text()

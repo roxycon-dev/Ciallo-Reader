@@ -1,5 +1,7 @@
 package com.example.ui.comic
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -76,15 +78,15 @@ internal object MangaJaNaiFull {
         val cancel = cleanup.scheduleAtFixedRate({ if (worker.isInterrupted) call.cancel() }, 100, 100, TimeUnit.MILLISECONDS)
         try {
             call.execute().use { response ->
-                if (!response.isSuccessful) throw IOException("完整模型下载失败：${response.code}")
-                val body = response.body ?: throw IOException("完整模型为空")
+                if (!response.isSuccessful) throw IOException(com.example.i18n.modelDownloadFailed(response.code))
+                val body = response.body ?: throw IOException(com.example.i18n.tr("完整模型为空"))
                 body.byteStream().buffered().use { source -> file.outputStream().buffered().use { target ->
                     val buffer = ByteArray(64 * 1024); var total = 0L
                     while (true) {
                         cancelled(); val count = source.read(buffer); if (count < 0) break
-                        total += count; if (total > limit) throw IOException("完整模型大小不符")
+                        total += count; if (total > limit) throw IOException(com.example.i18n.tr("完整模型大小不符"))
                         target.write(buffer, 0, count)
-                        report("完整模型 ${(total / (1024 * 1024))} MB")
+                        report(com.example.i18n.modelSizeMb(total / (1024 * 1024)))
                     }
                 } }
             }
@@ -98,34 +100,34 @@ internal object MangaJaNaiFull {
             ZipInputStream(archive.inputStream().buffered()).use { zip ->
                 while (true) {
                     cancelled(); val entry = zip.nextEntry ?: break
-                    if (entry.isDirectory || !seen.add(entry.name)) throw IOException("完整模型包无效")
-                    val limit = expected[entry.name] ?: if (entry.name in listOf("manifest.json", "NOTICE.txt")) 8192L else throw IOException("完整模型包无效")
+                    if (entry.isDirectory || !seen.add(entry.name)) throw IOException(com.example.i18n.tr("完整模型包无效"))
+                    val limit = expected[entry.name] ?: if (entry.name in listOf("manifest.json", "NOTICE.txt")) 8192L else throw IOException(com.example.i18n.tr("完整模型包无效"))
                     val part = File(directory, entry.name + ".part")
                     part.outputStream().buffered().use { target ->
                         val buffer = ByteArray(64 * 1024); var total = 0L
                         while (true) { cancelled(); val count = zip.read(buffer); if (count < 0) break; total += count
-                            if (total > limit) throw IOException("完整模型包过大")
+                            if (total > limit) throw IOException(com.example.i18n.tr("完整模型包过大"))
                             target.write(buffer, 0, count)
                         }
-                        if (entry.name in expected && total != limit) throw IOException("完整模型包不完整")
+                        if (entry.name in expected && total != limit) throw IOException(com.example.i18n.tr("完整模型包不完整"))
                     }
                     zip.closeEntry()
                 }
             }
             if (!seen.containsAll(expected.keys) || !verified(File(directory, "full.onnx.part"), MODEL_BYTES, SHA256) ||
                 !verified(File(directory, "full.param.part"), 102_736L, "92bb351b492ba789925b345710ad45c4d5e6cc696540a55348c5f82fb4c36cf8") ||
-                !verified(File(directory, "full.bin.part"), 66_814_088L, "c0f66830e66bbc75ce45364bfef1317fa7b16813bc427ff6903aceafb757cb80")) throw IOException("完整模型校验失败")
+                !verified(File(directory, "full.bin.part"), 66_814_088L, "c0f66830e66bbc75ce45364bfef1317fa7b16813bc427ff6903aceafb757cb80")) throw IOException(com.example.i18n.tr("完整模型校验失败"))
             for (name in expected.keys) {
                 val target = File(directory, name)
-                if (target.exists() && !target.delete()) throw IOException("无法替换完整模型")
-                if (!File(directory, "$name.part").renameTo(target)) throw IOException("无法保存完整模型")
+                if (target.exists() && !target.delete()) throw IOException(com.example.i18n.tr("无法替换完整模型"))
+                if (!File(directory, "$name.part").renameTo(target)) throw IOException(com.example.i18n.tr("无法保存完整模型"))
             }
         } finally {
             for (name in expected.keys + listOf("manifest.json", "NOTICE.txt")) File(directory, "$name.part").delete()
         }
     }
     private fun model(): File {
-        val app = context ?: throw IOException("完整增强尚未初始化")
+        val app = context ?: throw IOException(com.example.i18n.tr("完整增强尚未初始化"))
         val directory = File(app.filesDir, "mangajanai/full").apply { mkdirs() }
         val onnx = File(directory, "full.onnx")
         val valid = stamp == fileStamp(onnx) || verified(onnx, MODEL_BYTES, SHA256)
@@ -134,9 +136,9 @@ internal object MangaJaNaiFull {
         if (valid && (verifyNative(directory) || !retryAllowed)) { stamp = fileStamp(onnx); return directory }
         val archive = File(directory, "download.zip.part")
         try {
-            report("完整模型首次下载…")
+            report(com.example.i18n.tr("完整模型首次下载…"))
             prefs.edit().putLong("lastAttempt", System.currentTimeMillis()).apply()
-            try { download(PACK_URL, archive, 90_000_000L); report("模型校验中…"); unpack(archive, directory) }
+            try { download(PACK_URL, archive, 90_000_000L); report(com.example.i18n.tr("模型校验中…")); unpack(archive, directory) }
             catch (error: IOException) {
                 cancelled()
                 android.util.Log.w("MangaJaNaiFull", "Model pack unavailable; trying original CPU weights", error)
@@ -146,9 +148,9 @@ internal object MangaJaNaiFull {
                     val previous = File(app.filesDir, "mangajanai/2x-1200p-v1.onnx")
                     if (verified(previous, MODEL_BYTES, SHA256)) previous.inputStream().use { input -> part.outputStream().use { input.copyTo(it, 64 * 1024) } }
                     else download(MODEL_URL, part, MODEL_BYTES)
-                    if (!verified(part, MODEL_BYTES, SHA256)) throw IOException("完整模型校验失败")
-                    if (onnx.exists() && !onnx.delete()) throw IOException("无法替换完整模型")
-                    if (!part.renameTo(onnx)) throw IOException("无法保存完整模型")
+                    if (!verified(part, MODEL_BYTES, SHA256)) throw IOException(com.example.i18n.tr("完整模型校验失败"))
+                    if (onnx.exists() && !onnx.delete()) throw IOException(com.example.i18n.tr("无法替换完整模型"))
+                    if (!part.renameTo(onnx)) throw IOException(com.example.i18n.tr("无法保存完整模型"))
                 } finally { part.delete() }
             }
             stamp = fileStamp(onnx); return directory
@@ -162,7 +164,7 @@ internal object MangaJaNaiFull {
             val started = System.nanoTime()
             val directory = model()
             val engine = runtime ?: MangaJaNaiFullRuntime(checkNotNull(context)).also { runtime = it }
-            report("完整引擎准备中…")
+            report(com.example.i18n.tr("完整引擎准备中…"))
             val probeTile = MangaJaNaiFullRuntime.preferredTile()
             val probeSide = probeTile + HALO * 2
             val probePixels = IntArray(probeSide * probeSide)
@@ -201,7 +203,7 @@ internal object MangaJaNaiFull {
                         fun channel(c: Int): Int {
                             val from = (original shr ((2 - c) * 8)) and 255
                             val value = core[c * coreArea + i]
-                            if (!value.isFinite()) throw IOException("完整增强输出无效")
+                            if (!value.isFinite()) throw IOException(com.example.i18n.tr("完整增强输出无效"))
                             val to = value.coerceIn(0f, 1f) * 255f
                             return (from + (to - from) * strength.coerceIn(0f, 1f)).roundToInt().coerceIn(0, 255)
                         }
@@ -209,7 +211,7 @@ internal object MangaJaNaiFull {
                     }
                     tile.setPixels(pixels, 0, coreSide, 0, 0, tw, th)
                     canvas.drawBitmap(tile, Rect(0, 0, tw, th), RectF(x * sx, y * sy, (x + tw / 2) * sx, (y + th / 2) * sy), paint)
-                    report("完整增强 ${++completed * 100 / total}%")
+                    report(com.example.i18n.fullEnhanceProgress(++completed * 100 / total))
                 }
                 report("")
                 android.util.Log.i("MangaJaNaiFull", "engine=${engine.name} page=${source.width}x${source.height} core=$tileSize tiles=$total inferred=$inferred totalMs=${(System.nanoTime()-started)/1_000_000}")
@@ -218,8 +220,8 @@ internal object MangaJaNaiFull {
             finally { tile.recycle() }
         } catch (error: Throwable) {
             runtime?.close(); runtime = null; tileCache.clear(); cacheCore = 0
-            report(if (error is InterruptedException) "" else "完整增强失败，点击重试")
-            if (error is LinkageError) throw IOException("当前设备无法加载完整增强", error)
+            report(if (error is InterruptedException) "" else tr("完整增强失败，点击重试"))
+            if (error is LinkageError) throw IOException(com.example.i18n.tr("当前设备无法加载完整增强"), error)
             throw error
         } finally {
             try {

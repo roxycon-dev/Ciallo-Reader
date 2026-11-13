@@ -1,5 +1,7 @@
 package com.example.source.parser
 
+import com.example.i18n.tr
+
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 
@@ -305,7 +307,7 @@ object LegadoRule {
         return try {
             Regex(info.regex).replace(RuleBudget.text(value), info.replacement)
         } catch (e: StackOverflowError) {
-            throw IllegalArgumentException("书源正则回溯过深", e)
+            throw IllegalArgumentException(tr("书源正则回溯过深"), e)
         }
     }
 

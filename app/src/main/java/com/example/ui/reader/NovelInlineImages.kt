@@ -1,5 +1,7 @@
 package com.example.ui.reader
 
+import com.example.i18n.tr
+
 import com.example.ui.components.pullOutClickable
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
@@ -374,12 +376,12 @@ fun NovelInlineImage(path: String, onTap: () -> Unit, enabled: Boolean = true) {
         if (bmp != null) {
             Image(
                 bitmap = bmp.asImageBitmap(),
-                contentDescription = "插图",
+                contentDescription = tr("插图"),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
             )
         } else if (decodeDone) {
-            Text("图片读取失败", color = Color.Gray)
+            Text(tr("图片读取失败"), color = Color.Gray)
         }
     }
 }

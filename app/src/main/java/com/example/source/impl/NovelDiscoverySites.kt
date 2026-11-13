@@ -1,5 +1,7 @@
 package com.example.source.impl
 
+import com.example.i18n.tr
+
 import com.example.discover.*
 import okhttp3.HttpUrl
 import org.jsoup.nodes.Document
@@ -66,7 +68,7 @@ internal object NovelDiscoverySites {
                     // Parameter values are the actual category names; anchor text includes counts/descriptions.
                     val value = u.queryParameter(key)!!
                     val canonical = home.resolve("/novels")!!.newBuilder().addQueryParameter(key, value).build()
-                    DiscoverNativeCategory(canonical.toString(), value, if (key == "cat") "题材" else "标签")
+                    DiscoverNativeCategory(canonical.toString(), value, if (key == "cat") tr("题材") else tr("标签"))
                 }
             }
             "quanben" -> categories += doc.select("a[href]").mapNotNull { a ->
@@ -96,7 +98,7 @@ internal object NovelDiscoverySites {
             val paths = selected.map { home.resolve(it.id)!!.encodedPath.trim('/') to it.label }
                 .ifEmpty { listOf("girl" to "女频", "boy" to "男频", "tongren" to "同人") }
             val sort = if (q.dimension == DiscoverDimension.UPDATES) "updatetime" else if (q.range == "新作") "createtime" else "clickcount_days_7"
-            return paths.map { (p, label) -> home.resolve("/$p/$sort/1.html")!! to "$label·${if (sort == "updatetime") "章节更新" else if (sort == "createtime") "新书" else "七日点击榜"}" }
+            return paths.map { (p, label) -> home.resolve("/$p/$sort/1.html")!! to "$label·${if (sort == "updatetime") tr("章节更新") else if (sort == "createtime") tr("新书") else tr("七日点击榜")}" }
         }
         if (source == "ixdzs8" && selected.isNotEmpty()) return selected.map { c ->
             val path = home.resolve(c.id)!!.encodedPath

@@ -1,5 +1,7 @@
 package com.example.god
 
+import com.example.i18n.tr
+
 
 import com.example.ui.components.PullOutButton
 import com.example.ui.components.PullOutTextButton
@@ -334,7 +336,7 @@ fun GodMomentSheet(
         ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
         if (uri == null) {
-            Toast.makeText(context, "未选择图片", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, tr("未选择图片"), Toast.LENGTH_SHORT).show()
         } else {
             setCoverSource(CoverSource.Album(uri.toString()))
             setCrop(CropParams.DEFAULT)
@@ -496,12 +498,12 @@ fun GodMomentSheet(
                             runCatching {
                                 picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                             }.onFailure {
-                                Toast.makeText(context, "无法打开相册", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, tr("无法打开相册"), Toast.LENGTH_SHORT).show()
                             }
                         },
                         onCrop = {
                             if (sourceBitmap != null) showCrop = true
-                            else Toast.makeText(context, "封面尚未就绪", Toast.LENGTH_SHORT).show()
+                            else Toast.makeText(context, tr("封面尚未就绪"), Toast.LENGTH_SHORT).show()
                         },
                     )
                 }
@@ -509,7 +511,7 @@ fun GodMomentSheet(
                 Spacer(Modifier.height(18.dp))
                 // ③ 评分
                 GodSheetBlock(index = 2, reduce = reduce) {
-                    GodFormSection(number = "01", title = "为这一话打分", caption = "半星也能准确表达喜欢的程度") {
+                    GodFormSection(number = "01", title = tr("为这一话打分"), caption = tr("半星也能准确表达喜欢的程度")) {
                         GodStarRating(
                             rating = rating,
                             onRatingChange = { rating = it },
@@ -522,7 +524,7 @@ fun GodMomentSheet(
                 Spacer(Modifier.height(18.dp))
                 // ④ 名称
                 GodSheetBlock(index = 3, reduce = reduce) {
-                    GodFormSection(number = "02", title = "留下它的名字", caption = "留空时自动使用书名和章节号") {
+                    GodFormSection(number = "02", title = tr("留下它的名字"), caption = tr("留空时自动使用书名和章节号")) {
                         GodTitleField(
                             value = if (titleCustom) titleText else "",
                             placeholder = defaultTitle,
@@ -544,7 +546,7 @@ fun GodMomentSheet(
                 Spacer(Modifier.height(18.dp))
                 // ⑤ 随笔
                 GodSheetBlock(index = 4, reduce = reduce) {
-                    GodFormSection(number = "03", title = "这一刻的想法", caption = "写给下次重读的自己") {
+                    GodFormSection(number = "03", title = tr("这一刻的想法"), caption = tr("写给下次重读的自己")) {
                         GodNoteField(
                             value = note,
                             onValueChange = { note = it.take(NOTE_MAX) },
@@ -685,7 +687,7 @@ private fun GodSheetTitle(
             )
             Spacer(Modifier.height(7.dp))
             Text(
-                text = if (editing) "重写这一刻 ✦" else "收藏这一刻 ✦",
+                text = if (editing) tr("重写这一刻 ✦") else tr("收藏这一刻 ✦"),
                 // 字号 40 → 32，字距 +1 → -0.6：跟随全 App 的 iOS 字阶
                 //（字号越大字距越紧），40sp 配正字距在中文上显松散
                 style = MaterialTheme.typography.displayMedium.copy(
@@ -770,10 +772,10 @@ internal fun GodCoverSection(
         Spacer(Modifier.height(12.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            GodChipButton(text = "裁剪", icon = {
+            GodChipButton(text = tr("裁剪"), icon = {
                 Icon(Icons.Filled.Crop, contentDescription = null, modifier = Modifier.size(16.dp))
             }, onClick = onCrop)
-            GodChipButton(text = "从相册选择", icon = {
+            GodChipButton(text = tr("从相册选择"), icon = {
                 Icon(Icons.Filled.PhotoLibrary, contentDescription = null, modifier = Modifier.size(16.dp))
             }, onClick = onPickAlbum)
         }
@@ -873,7 +875,7 @@ private fun GodTiltCover(
             when {
                 bmp != null -> Image(
                     bitmap = bmp.asImageBitmap(),
-                    contentDescription = "神回封面预览",
+                    contentDescription = tr("神回封面预览"),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -950,9 +952,9 @@ private fun GodPageThumb(
             .semantics {
                 contentDescription = "第${indexLabel}页封面"
                 stateDescription = when {
-                    displayBitmap != null -> "已加载"
-                    failed -> "加载失败，点按重试"
-                    else -> "加载中"
+                    displayBitmap != null -> tr("已加载")
+                    failed -> tr("加载失败，点按重试")
+                    else -> tr("加载中")
                 }
             }
             .pullOutClickable {
@@ -1072,7 +1074,7 @@ private fun GodTitleField(
                 if (custom) {
                     PullOutIconButton(
                         icon = Icons.Filled.Refresh,
-                        contentDescription = "还原默认",
+                        contentDescription = tr("还原默认"),
                         onClick = onResetDefault,
                         glyphSize = 18.dp
                     )
@@ -1116,7 +1118,7 @@ private fun GodNoteField(
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            placeholder = { Text("写下这一话为什么是神回……", fontSize = 14.sp) },
+            placeholder = { Text(tr("写下这一话为什么是神回……"), fontSize = 14.sp) },
             modifier = Modifier.fillMaxWidth().height(132.dp),
             shape = RoundedCornerShape(12.dp),
             textStyle = TextStyle(fontSize = 14.sp, lineHeight = 22.sp),
@@ -1167,11 +1169,11 @@ private fun GodActionBar(
     Spacer(Modifier.height(9.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
         PullOutTextButton(onClick = onCancel, enabled = enabled) {
-            Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("取消"), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.width(12.dp))
         GodShineButton(
-            text = if (editing) "保存" else "添加到神回排行榜",
+            text = if (editing) tr("保存") else tr("添加到神回排行榜"),
             loading = saving,
             enabled = enabled && coverReady,
             reduce = reduce,
@@ -1377,12 +1379,12 @@ private fun GodBurstOverlay(preview: Bitmap?, reduce: Boolean) {
 private fun GodConfirmCloseDialog(onKeep: () -> Unit, onDiscard: () -> Unit) {
     PullOutAlertDialog(
         onDismissRequest = onKeep,
-        title = { Text("放弃这次编辑？") },
-        text = { Text("已经改过的内容不会保存。", fontSize = 14.sp) },
+        title = { Text(tr("放弃这次编辑？")) },
+        text = { Text(tr("已经改过的内容不会保存。"), fontSize = 14.sp) },
         confirmButton = {
-            PullOutTextButton(onClick = onDiscard) { Text("放弃", color = MaterialTheme.colorScheme.error) }
+            PullOutTextButton(onClick = onDiscard) { Text(tr("放弃"), color = MaterialTheme.colorScheme.error) }
         },
-        dismissButton = { PullOutTextButton(onClick = onKeep) { Text("继续编辑") } },
+        dismissButton = { PullOutTextButton(onClick = onKeep) { Text(tr("继续编辑")) } },
         shape = RoundedCornerShape(24.dp),
     )
 }

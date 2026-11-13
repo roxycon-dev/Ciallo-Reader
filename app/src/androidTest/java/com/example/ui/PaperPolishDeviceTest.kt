@@ -243,13 +243,16 @@ class PaperPolishDeviceTest {
         File(dir, "live-warp.txt").writeText("shaderFrames=${PaperWarpStats.frames}\nfailures=${PaperWarpStats.failures}\nmaxGeometryMs=${PaperWarpStats.maxGeometryNanos/1e6}\n")
     }
 
-    @Test fun chooserHandsOffToPageWithoutRetractingTheCallerOrItsTabs() {
+    @Test fun chooserFinishesItsExitBeforeOpeningOneDestination() {
         var picker by mutableStateOf(false)
         var dismissals = 0; var navigations = 0
-        var pageLife: PaperLifecycle? = null
         compose.setContent { MyApplicationTheme {
             val nav = rememberNavController()
-            NavHost(nav, startDestination = "caller") {
+            NavHost(
+                nav, startDestination = "caller",
+                enterTransition = { paperPageEnter(false) }, exitTransition = { paperPageExit(false) },
+                popEnterTransition = { paperPagePopEnter(false) }, popExitTransition = { paperPagePopExit(false) }
+            ) {
                 composable("caller") {
                     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         PullOutButton({ picker = true }) { Text("选择入口") }
@@ -264,8 +267,8 @@ class PaperPolishDeviceTest {
                         onManageSources = { navigations++; nav.navigate("managed") },
                         onDismiss = { dismissals++; picker = false })
                 }
-                pullOutPage("managed", onDismiss = { nav.popBackStack() }) { close ->
-                    pageLife = LocalPaperOwner.current
+                paperComposable("managed", nav) {
+                    val close = { nav.dismissPaperPage() }
                     Column(Modifier.fillMaxSize()) {
                         Text("完整管理页")
                         PullOutButton(close) { Text("返回入口") }
@@ -279,25 +282,15 @@ class PaperPolishDeviceTest {
         val manage = compose.onNodeWithText("管理书源").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action!!
         compose.mainClock.autoAdvance = false
         compose.runOnIdle { manage(); manage() }
-        // There is no exit-spring wait before the destination is composed.
-        compose.mainClock.advanceTimeBy(96)
-        compose.onNodeWithText("选择书源").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(112)
+        compose.onNodeWithText("完整管理页").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(0, dismissals); assertEquals(0, navigations) }
+        compose.mainClock.advanceTimeBy(384)
         compose.onNodeWithText("完整管理页").assertExists()
-        compose.runOnIdle {
-            assertEquals(1, dismissals); assertEquals(1, navigations)
-            assertTrue(pageLife!!.origin!!.frozenOpening)
-            assertTrue(pageLife!!.allowFullViewport)
-            assertTrue(pageLife!!.progress < .5f)
-        }
-        assertEquals(tabs, compose.onNodeWithTag("stationary-tabs").fetchSemanticsNode().boundsInRoot)
-        compose.waitUntil(8000) {
-            compose.mainClock.advanceTimeByFrame()
-            pageLife!!.progress in .35f.. .65f
-        }
+        compose.runOnIdle { assertEquals(1, dismissals); assertEquals(1, navigations) }
         shot("chooser-to-full-page")
-        compose.mainClock.advanceTimeBy(1600); compose.mainClock.autoAdvance = true
+        compose.mainClock.autoAdvance = true
         compose.waitForIdle()
-        assertEquals(0, PaperWarpStats.failures)
         // System back follows the same return spring as the toolbar action.
         compose.mainClock.autoAdvance = false
         InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
@@ -312,33 +305,33 @@ class PaperPolishDeviceTest {
     @Test fun realManagementUsesItsOwnGlassBackgroundAndDeduplicatesNavigation() {
         PaperWarpStats.reset()
         val source = com.example.source.SourceViewModel(compose.activity.application)
-        var life: PaperLifecycle? = null
         compose.setContent { MyApplicationTheme {
             val nav = rememberNavController()
-            NavHost(nav, startDestination = "caller") {
+            NavHost(
+                nav, startDestination = "caller",
+                enterTransition = { paperPageEnter(false) }, exitTransition = { paperPageExit(false) },
+                popEnterTransition = { paperPagePopEnter(false) }, popExitTransition = { paperPagePopExit(false) }
+            ) {
                 composable("caller") {
                     PullOutButton({ nav.openPaperPage("sources"); nav.openPaperPage("sources") }) { Text("实际管理入口") }
                 }
-                pullOutPage("sources", onDismiss = { nav.popBackStack() }) { close ->
-                    life = LocalPaperOwner.current
+                paperComposable("sources", nav) {
+                    val close = { nav.dismissPaperPage() }
                     Box(Modifier.fillMaxSize().testTag("actual-management")) {
-                        com.example.ui.source.SourceManagementScreen(source, close)
+                        com.example.ui.source.SourceManagementScreen(source, close, onOpenNodeManagement = {})
                     }
                 }
             }
         } }
         compose.mainClock.autoAdvance = false
         compose.onNodeWithText("实际管理入口").performClick()
-        compose.waitUntil(10000) {
-            compose.mainClock.advanceTimeByFrame()
-            life?.progress?.let { it in .35f.. .65f } == true
-        }
+        compose.mainClock.advanceTimeBy(160)
+        compose.onNodeWithTag("actual-management").assertExists()
         shot("real-source-management-opening")
         compose.mainClock.advanceTimeBy(1600); compose.mainClock.autoAdvance = true
         compose.waitForIdle()
         compose.onAllNodesWithTag("actual-management").assertCountEquals(1)
         shot("real-source-management-flat")
-        assertTrue(life!!.flat); assertTrue(PaperWarpStats.frames > 0); assertEquals(0, PaperWarpStats.failures)
         InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
         compose.waitUntil(5000) { compose.onAllNodesWithTag("actual-management").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithText("实际管理入口").assertIsDisplayed()

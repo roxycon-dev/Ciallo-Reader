@@ -1,5 +1,7 @@
 package com.example.source.impl
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.os.SystemClock
 import android.util.LruCache
@@ -57,7 +59,7 @@ class AutoNovelSource(
             .header("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/119.0.0.0 Mobile Safari/537.36")
             .header("Referer", baseUrl.toString()).build()
         return guestNovelIoRetry { http.newCall(request).executeCancellable().use { response ->
-            if (response.code == 401) throw SourceException.NetworkError("Novelia 当前未开放免登录访问（HTTP 401），请稍后重试或换源")
+            if (response.code == 401) throw SourceException.NetworkError(tr("Novelia 当前未开放免登录访问（HTTP 401），请稍后重试或换源"))
             if (!response.isSuccessful) throw SourceException.NetworkError("轻小说源返回 HTTP ${response.code}")
             SourceResponse.jsonObject(response.readSourceText())
         } }
@@ -81,7 +83,7 @@ class AutoNovelSource(
         val updated = data.optLong("updateAt", data.optLong("syncAt", 0))
         val tags = data.optJSONArray("keywords")?.let { a -> (0 until a.length()).mapNotNull { a.optString(it).takeIf(String::isNotBlank) } }.orEmpty()
         return SearchBook(bookId, id, title(data), author, format = "epub", language = "中文（机翻）",
-            description = "日本轻小说 Web 版，正文为中文机器翻译；缺译章节会提示等待译文。\n\n" +
+            description = tr("日本轻小说 Web 版，正文为中文机器翻译；缺译章节会提示等待译文。\n\n") +
                 (data.opt("introductionZh") as? String).orEmpty(),
             novelInfo = NovelInfo(synopsis = (data.opt("introductionZh") as? String),
                 originalTitle = (data.opt("titleJp") as? String), status = (data.opt("type") as? String),
@@ -96,7 +98,7 @@ class AutoNovelSource(
         try { SourceResult.Success(block()) }
         catch (e: CancellationException) { throw e }
         catch (e: SourceException) { SourceResult.Error(e) }
-        catch (e: java.io.IOException) { SourceResult.Error(SourceException.NetworkError("轻小说源连接失败，请稍后重试", e)) }
+        catch (e: java.io.IOException) { SourceResult.Error(SourceException.NetworkError(tr("轻小说源连接失败，请稍后重试"), e)) }
         catch (e: Exception) { SourceResult.Error(SourceException.ParseError(e.message ?: "轻小说数据格式异常")) }
     }
 
@@ -111,7 +113,7 @@ class AutoNovelSource(
             .addQueryParameter("query", query).addQueryParameter("provider", providers.joinToString(","))
             .addQueryParameter("type", "0").addQueryParameter("level", "1")
             .addQueryParameter("translate", "2").addQueryParameter("sort", "0").build()
-        val items = json(url).optJSONArray("items") ?: throw SourceException.ParseError("未返回小说列表")
+        val items = json(url).optJSONArray("items") ?: throw SourceException.ParseError(tr("未返回小说列表"))
         (0 until items.length()).mapNotNull { i ->
             val item = items.optJSONObject(i) ?: return@mapNotNull null
             val provider = item.optString("providerId")
@@ -127,15 +129,15 @@ class AutoNovelSource(
     override suspend fun getDetail(bookId: String) = result { book(bookId, detail(bookId)) }
     override suspend fun refreshNovelDetail(bookId: String) = result { book(bookId, detail(bookId, fresh = true)) }
     override suspend fun getChapters(bookId: String) = result {
-        val toc = detail(bookId).optJSONArray("toc") ?: throw SourceException.ParseError("未返回完整目录")
+        val toc = detail(bookId).optJSONArray("toc") ?: throw SourceException.ParseError(tr("未返回完整目录"))
         var group = ""
         (0 until toc.length()).mapNotNull { i ->
             val item = toc.optJSONObject(i) ?: return@mapNotNull null
             val chapterId = item.optString("chapterId")
             if (chapterId.isBlank()) { group = title(item); return@mapNotNull null }
-            require(chapterId.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { "章节标识无效" }
+            require(chapterId.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { tr("章节标识无效") }
             ComicChapter("$bookId/$chapterId", title(item), volume = group, order = i.toFloat())
-        }.distinctBy { it.id }.also { require(it.isNotEmpty()) { "小说目录为空" } }
+        }.distinctBy { it.id }.also { require(it.isNotEmpty()) { tr("小说目录为空") } }
     }
 
     override suspend fun getChapterText(chapterId: String) = result {
@@ -143,7 +145,7 @@ class AutoNovelSource(
             texts[chapterId] ?: run {
                 val bookId = chapterId.substringBeforeLast('/')
                 val chapter = chapterId.substringAfterLast('/')
-                require(chapter.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { "章节标识无效" }
+                require(chapter.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { tr("章节标识无效") }
                 val data = json(path(bookId).newBuilder().addPathSegment("chapter").addPathSegment(chapter).build())
                 paragraphText(data).also { texts.put(chapterId, it) }
             }
@@ -151,7 +153,7 @@ class AutoNovelSource(
     }
 
     internal fun paragraphText(data: JSONObject): String {
-        val original = data.optJSONArray("paragraphs") ?: throw SourceException.ParseError("正文缺失")
+        val original = data.optJSONArray("paragraphs") ?: throw SourceException.ParseError(tr("正文缺失"))
         val translations = listOf("sakuraParagraphs", "gptParagraphs", "youdaoParagraphs", "baiduParagraphs")
             .mapNotNull { data.optJSONArray(it)?.takeIf { a -> a.length() == original.length() } }
         var missing = 0
@@ -165,7 +167,7 @@ class AutoNovelSource(
             if (text.startsWith("<图片>")) "[插图] " + text.removePrefix("<图片>") else text
         }
         if (missing > 0) throw SourceException.ParseError("本章中文译文尚未齐全（缺 $missing 段），请稍后重试")
-        return paragraphs.filter(String::isNotBlank).joinToString("\n\n").also { require(it.isNotBlank()) { "本章中文译文为空" } }
+        return paragraphs.filter(String::isNotBlank).joinToString("\n\n").also { require(it.isNotBlank()) { tr("本章中文译文为空") } }
     }
 
     override suspend fun getDownloadInfo(bookId: String) = getDownloadInfo(bookId, "epub")
@@ -179,7 +181,7 @@ class AutoNovelSource(
         DownloadInfo(url.build().toString(), fileName, format, referer = baseUrl.toString())
     }
     override suspend fun getChapterImages(chapterId: String): SourceResult<List<String>> =
-        SourceResult.Error(SourceException.ParseError("请使用小说文字阅读器"))
+        SourceResult.Error(SourceException.ParseError(tr("请使用小说文字阅读器")))
     override suspend fun login(credential: LoginCredential) = SourceResult.Success(true)
     override suspend fun logout() = Unit
     override suspend fun isLoggedIn() = true

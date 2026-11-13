@@ -1,5 +1,7 @@
 package com.example.discover
 
+import com.example.i18n.tr
+
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import com.example.ui.wenku.WenkuSymbol
@@ -129,7 +131,7 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
     val selected = store.selection("categories") - DiscoverTaxonomy.roots.map { it.id }.toSet()
     val blocked = store.selection("blocked")
     var expanded by rememberSaveable { mutableStateOf(false) }
-    var statusFilter by rememberSaveable(sourceId) { mutableStateOf("全部") }
+    var statusFilter by rememberSaveable(sourceId) { mutableStateOf(com.example.i18n.AppLocale.t("全部")) }
     var nativeFeed by rememberSaveable(sourceId) { mutableStateOf<String?>(store.string("feed_$sourceId", "native").ifBlank { null }) }
     var nativeCategory by rememberSaveable(sourceId) { mutableStateOf<String?>(store.string("category_$sourceId", "").ifBlank { null }) }
     var noticesExpanded by remember { mutableStateOf(false) }
@@ -178,7 +180,7 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
     var filterScanCount by remember(viewportKey, statusFilter) { mutableIntStateOf(0) }
     LaunchedEffect(rows.size, state.loading, state.more, viewportKey, statusFilter) {
         if (!state.loading && rows.size < 4 && state.more.isNotEmpty() && filterScanCount < 3 &&
-            (selected.isNotEmpty() || effectiveStatus != "全部" || (nativeFeed == null && dimension == DiscoverDimension.UPDATES && range != "最新"))) {
+            (selected.isNotEmpty() || effectiveStatus != com.example.i18n.AppLocale.t("全部") || (nativeFeed == null && dimension == DiscoverDimension.UPDATES && range != com.example.i18n.AppLocale.t("最新")))) {
             filterScanCount++; model.more()
         }
     }
@@ -199,7 +201,7 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
         else onOpen(work.book)
     }
     fun switch(next: DiscoverDimension) { light(); nativeFeed = null; nativeCategory = null
-        dimension = next; statusFilter = "全部"; range = store.string("range_${next.name}", next.ranges.first()).takeIf { it in next.ranges } ?: next.ranges.first() }
+        dimension = next; statusFilter = com.example.i18n.AppLocale.t("全部"); range = store.string("range_${next.name}", next.ranges.first()).takeIf { it in next.ranges } ?: next.ranges.first() }
     fun follow(work: DiscoverWork, next: Boolean) {
         light()
         val followed = work.variants.filter { favoriteKey(it.book.sourceId, it.book.id) in favoriteKeys }
@@ -243,20 +245,20 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                         val native = nativeFeed != null || nativeCategory != null
                         val feeds = if (nativeFeed != null && sourceId != "aggregate") currentCatalogs.flatMap { it.feeds }.distinctBy { it.id } else emptyList()
                         val ranges = if (!native && availableRanges.size > 1) availableRanges else emptyList()
-                        val statusKnown = currentCatalogs.any { c -> c.statuses.isNotEmpty() || c.categories.any { serialLabel(it.label) in setOf("连载", "完结") } } ||
-                            state.entries.any { e -> activeSources.any { it.id == e.book.sourceId } && serialLabel(e.book.discoverStatus) in setOf("连载", "完结") }
-                        val unknownStatus = state.entries.any { serialLabel(it.book.discoverStatus) == "状态未知" }
+                        val statusKnown = currentCatalogs.any { c -> c.statuses.isNotEmpty() || c.categories.any { serialLabel(it.label) in setOf(com.example.i18n.AppLocale.t("连载"), com.example.i18n.AppLocale.t("完结")) } } ||
+                            state.entries.any { e -> activeSources.any { it.id == e.book.sourceId } && serialLabel(e.book.discoverStatus) in setOf(com.example.i18n.AppLocale.t("连载"), com.example.i18n.AppLocale.t("完结")) }
+                        val unknownStatus = state.entries.any { serialLabel(it.book.discoverStatus) == com.example.i18n.AppLocale.t("状态未知") }
                         Box(Modifier.wenkuTabTitle(2, strength = .55f)) {
                         DiscoverFilters(
-                            tabs = listOf("推荐" to native) + availableDimensions.map { it.label to (!native && dimension == it) },
+                            tabs = listOf(com.example.i18n.AppLocale.t("推荐") to native) + availableDimensions.map { it.label to (!native && dimension == it) },
                             onTab = { index -> if (index == 0) { light(); nativeFeed = store.string("native_feed_$sourceId", "native"); nativeCategory = null } else switch(availableDimensions[index - 1]) },
-                            source = if (sourceId == "aggregate") "聚合书源" else sources.firstOrNull { it.id == sourceId }?.name ?: "选择书源",
+                            source = if (sourceId == "aggregate") com.example.i18n.AppLocale.t("聚合书源") else sources.firstOrNull { it.id == sourceId }?.name ?: com.example.i18n.AppLocale.t("选择书源"),
                             onSource = { showSources = true }, selected = selected, onCategory = { expanded = true },
                             onRemove = { store.put("categories", selected - it) }, onClear = { store.put("categories", emptySet()) },
                             refreshing = state.loading, onRefresh = { light(); model.refresh() },
-                            sorts = if (feeds.isNotEmpty()) feeds.map { it.label to (nativeFeed == it.id || (nativeFeed == "native" && it == feeds.first())) } else ranges.map { it to (range == it) },
-                            onSort = { index -> light(); if (feeds.isNotEmpty()) { nativeFeed = feeds[index].id; nativeCategory = null; statusFilter = "全部" } else { range = ranges[index]; statusFilter = "全部" } },
-                            statuses = if (statusKnown && statusScope.showStatusChoices) listOf("全部", "连载", "完结") + (if (state.entries.any { serialLabel(it.book.discoverStatus) == "停更" }) listOf("停更") else emptyList()) + (if (unknownStatus) listOf("状态未知") else emptyList()) else emptyList(),
+                            sorts = if (feeds.isNotEmpty()) feeds.map { it.label to (nativeFeed == it.id || (nativeFeed == "native" && it == feeds.first())) } else ranges.map { com.example.discover.discoverRangeLabel(it) to (range == it) },
+                            onSort = { index -> light(); if (feeds.isNotEmpty()) { nativeFeed = feeds[index].id; nativeCategory = null; statusFilter = com.example.i18n.AppLocale.t("全部") } else { range = ranges[index]; statusFilter = com.example.i18n.AppLocale.t("全部") } },
+                            statuses = if (statusKnown && statusScope.showStatusChoices) listOf(com.example.i18n.AppLocale.t("全部"), com.example.i18n.AppLocale.t("连载"), com.example.i18n.AppLocale.t("完结")) + (if (state.entries.any { serialLabel(it.book.discoverStatus) == com.example.i18n.AppLocale.t("停更") }) listOf(com.example.i18n.AppLocale.t("停更")) else emptyList()) + (if (unknownStatus) listOf(com.example.i18n.AppLocale.t("状态未知")) else emptyList()) else emptyList(),
                             status = effectiveStatus, statusHint = statusScope.hint, onStatus = { light(); statusFilter = it })
                         }
         }
@@ -266,14 +268,14 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
     val headerFraction = remember(grid, headerDistance) { { if (grid.firstVisibleItemIndex > 0) 1f else (grid.firstVisibleItemScrollOffset / headerDistance).coerceIn(0f, 1f) } }
     Box(Modifier.fillMaxSize().testTag("discover_screen").onGloballyPositioned { screenOffset = it.positionInRoot() }) {
         Column(Modifier.align(Alignment.TopCenter).widthIn(max = if (windowWidth >= 840) 1360.dp else 1040.dp).fillMaxSize()) {
-            CollapsingTabScreenHeader(fractionSource = headerFraction, modifier = Modifier.statusBarsPadding(), title = "发现", subtitle = "DISCOVER",
+            CollapsingTabScreenHeader(fractionSource = headerFraction, modifier = Modifier.statusBarsPadding(), title = com.example.i18n.AppLocale.t("发现"), subtitle = "DISCOVER",
                 onTitleClick = { scope.launch { if (reduce) grid.scrollToItem(0) else grid.animateScrollToItem(0) } },
                 titleColor = glassTitleColor(), trailing = {
                     Row {
                         downloadEntry()
                         PullOutIconButton(
                             icon = Icons.Outlined.Tune,
-                            contentDescription = "发现设置",
+                            contentDescription = com.example.i18n.AppLocale.t("发现设置"),
                             onClick = { showSettings = true }
                         )
                     }
@@ -291,7 +293,7 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        WenkuSectionHeader("01", "DISCOVER / FILTERS", "浏览筛选")
+                        WenkuSectionHeader("01", "DISCOVER / FILTERS", com.example.i18n.AppLocale.t("浏览筛选"))
                         browseControls()
                     }
                 },
@@ -334,7 +336,7 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                             if (rows.isEmpty()) {
                                 sourceProgress?.invoke()
                             } else {
-                                WenkuSectionHeader("01", "BROWSE / CATALOGUE", "浏览结果", trailing = sourceProgress)
+                                WenkuSectionHeader("01", "BROWSE / CATALOGUE", com.example.i18n.AppLocale.t("浏览结果"), trailing = sourceProgress)
                             }
                         }
                     }
@@ -342,21 +344,21 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                         GlassCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(start = 12.dp, end = 4.dp)) {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    if (rows.isEmpty()) "连接中断，已保留上次内容" else "${state.errors.size} 个书源暂时连接不上",
+                                    if (rows.isEmpty()) com.example.i18n.AppLocale.t("连接中断，已保留上次内容") else "${state.errors.size} 个书源暂时连接不上",
                                     Modifier.weight(1f),
                                     style = MaterialTheme.typography.bodySmall,
                                 )
-                                PullOutIconButton(Icons.Outlined.Refresh, "重试", onClick = model::retry, glyphSize = 18.dp)
-                                PullOutIconButton(Icons.Outlined.Info, "查看详情", onClick = { noticesExpanded = true }, glyphSize = 18.dp)
+                                PullOutIconButton(Icons.Outlined.Refresh, com.example.i18n.AppLocale.t("重试"), onClick = model::retry, glyphSize = 18.dp)
+                                PullOutIconButton(Icons.Outlined.Info, com.example.i18n.AppLocale.t("查看详情"), onClick = { noticesExpanded = true }, glyphSize = 18.dp)
                             }
                         }
                     }
                     if (rows.isEmpty() && !state.loading) item(span = { GridItemSpan(maxLineSpan) }) {
                         DiscoverGlass(Modifier.fillMaxWidth()) {
                             DiscoverEmptyState(if (selected.isNotEmpty()) MascotSpriteSheet.sadDrawable else MascotSpriteSheet.idleDrawable,
-                                if (state.more.isNotEmpty()) "已加载作品暂无匹配" else if (selected.isNotEmpty() || statusFilter != "全部") "换个分类，遇见新故事" else "这个书源暂时没有数据",
-                                if (state.more.isNotEmpty()) "还有更多原站内容，可以继续查找" else if (selected.isNotEmpty()) "试试其他分类，或清除筛选继续浏览" else "下拉刷新，或换个书源继续发现", actionLabel = if (state.more.isNotEmpty()) "继续查找" else if (selected.isNotEmpty() || statusFilter != "全部") "清除筛选" else "原站推荐",
-                                onActionClick = { if (state.more.isNotEmpty()) model.more() else if (selected.isNotEmpty() || statusFilter != "全部") { store.put("categories", emptySet()); statusFilter = "全部" }
+                                if (state.more.isNotEmpty()) com.example.i18n.AppLocale.t("已加载作品暂无匹配") else if (selected.isNotEmpty() || statusFilter != com.example.i18n.AppLocale.t("全部")) com.example.i18n.AppLocale.t("换个分类，遇见新故事") else com.example.i18n.AppLocale.t("这个书源暂时没有数据"),
+                                if (state.more.isNotEmpty()) com.example.i18n.AppLocale.t("还有更多原站内容，可以继续查找") else if (selected.isNotEmpty()) com.example.i18n.AppLocale.t("试试其他分类，或清除筛选继续浏览") else com.example.i18n.AppLocale.t("下拉刷新，或换个书源继续发现"), actionLabel = if (state.more.isNotEmpty()) com.example.i18n.AppLocale.t("继续查找") else if (selected.isNotEmpty() || statusFilter != com.example.i18n.AppLocale.t("全部")) com.example.i18n.AppLocale.t("清除筛选") else com.example.i18n.AppLocale.t("原站推荐"),
+                                onActionClick = { if (state.more.isNotEmpty()) model.more() else if (selected.isNotEmpty() || statusFilter != com.example.i18n.AppLocale.t("全部")) { store.put("categories", emptySet()); statusFilter = com.example.i18n.AppLocale.t("全部") }
                                     else { nativeFeed = "native"; nativeCategory = null } })
                         }
                     }
@@ -380,7 +382,7 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                         DiscoverSkeleton(if (dimension == DiscoverDimension.RANKING) DiscoverLayout.LIST else layout)
                     }
                     if (!state.loading && state.more.isEmpty() && rows.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
-                        Text("已看完当前书源的可用内容 · 换个维度继续发现", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(16.dp))
+                        Text(tr("已看完当前书源的可用内容 · 换个维度继续发现"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(16.dp))
                     }
                 }
                 }
@@ -411,8 +413,8 @@ private fun DiscoverPartitionContent(manager: SourceManager, favorites: List<Fav
                 anchorInWindow = menuBounds.takeUnless { it == Rect.Zero }
             ) {
                 val followed = work.variants.any { favoriteKey(it.book.sourceId, it.book.id) in favoriteKeys }
-                val actions = listOf(Triple(Icons.Outlined.FavoriteBorder, if (followed) "取消喜欢" else "加入我喜欢的", { follow(work, !followed) }),
-                    Triple(Icons.Outlined.VisibilityOff, "不感兴趣", { block(work) }), Triple(Icons.Outlined.Share, "分享", { share(work) }))
+                val actions = listOf(Triple(Icons.Outlined.FavoriteBorder, if (followed) com.example.i18n.AppLocale.t("取消喜欢") else com.example.i18n.AppLocale.t("加入我喜欢的"), { follow(work, !followed) }),
+                    Triple(Icons.Outlined.VisibilityOff, com.example.i18n.AppLocale.t("不感兴趣"), { block(work) }), Triple(Icons.Outlined.Share, com.example.i18n.AppLocale.t("分享"), { share(work) }))
                 actions.forEachIndexed { index, action ->
                     com.example.ui.components.PullOutDropdownMenuItem(
                         text = { Text(action.second, color = if (index == 1) DiscoverRise else discoverInk()) },
@@ -457,19 +459,26 @@ internal fun DiscoverChip(label: String, selected: Boolean, onClick: () -> Unit,
     }
 }
 
+/**
+ * 把源站返回的状态归一化成界面用的三种状态之一。
+ *
+ * 注意 `when` 的条件里**中文原文必须单独列出来**：书源返回的是中文（"连载"/"已完结"…），
+ * 而 `AppLocale.t("连载")` 在英文模式下是 "Ongoing" —— 只用 `t(...)` 当 key 的话，
+ * 英文模式下所有中文状态都会掉进 `else` 变成"状态未知"。
+ */
 internal fun serialLabel(status: String?): String = when (status?.trim()?.lowercase(java.util.Locale.ROOT)) {
-    "ongoing", "publishing", "serial", "连载", "連載", "连载中", "連載中", "1" -> "连载"
-    "completed", "complete", "finished", "ended", "完结", "完結", "已完结", "已完結", "2" -> "完结"
-    "hiatus", "cancelled", "停更", "休刊", "暂停更新", "3", "4" -> "停更"
-    else -> "状态未知"
+    "ongoing", "publishing", "serial", "连载", "連載", "连载中", "連載中", "1" -> com.example.i18n.AppLocale.t("连载")
+    "completed", "complete", "finished", "ended", "完结", "完結", "已完结", "已完結", "2" -> com.example.i18n.AppLocale.t("完结")
+    "hiatus", "cancelled", "停更", "休刊", "暂停更新", "已暂停", "3", "4" -> com.example.i18n.AppLocale.t("停更")
+    else -> com.example.i18n.AppLocale.t("状态未知")
 }
 internal fun filterWorkStatus(works: List<DiscoverWork>, status: String): List<DiscoverWork> =
-    if (status == "全部") works else works.mapNotNull { work ->
+    if (status == com.example.i18n.AppLocale.t("全部")) works else works.mapNotNull { work ->
         work.variants.filter { serialLabel(it.book.discoverStatus) == status }.takeIf { it.isNotEmpty() }?.let { work.copy(variants = it) }
     }
 internal fun workStatus(work: DiscoverWork): String {
     val statuses = work.variants.map { serialLabel(it.book.discoverStatus) }.toSet()
-    return listOf("完结", "连载", "停更").firstOrNull { it in statuses } ?: "状态未知"
+    return listOf(com.example.i18n.AppLocale.t("完结"), com.example.i18n.AppLocale.t("连载"), com.example.i18n.AppLocale.t("停更")).firstOrNull { it in statuses } ?: com.example.i18n.AppLocale.t("状态未知")
 }
 internal fun dateLabel(time: Long?): String = time?.let {
-    java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.CHINA).format(java.util.Date(it)) } ?: "未提供"
+    java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.CHINA).format(java.util.Date(it)) } ?: com.example.i18n.AppLocale.t("未提供")

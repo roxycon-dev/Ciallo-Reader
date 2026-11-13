@@ -1,5 +1,7 @@
 package com.example.source.js
 
+import com.example.i18n.tr
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
@@ -29,8 +31,8 @@ internal object MyComicBrowserReader {
                 it.userInfo == null && (it.port == -1 || it.port == 443) } }.getOrDefault(false)
 
     fun response(url: String, title: String, html: String, httpStatus: Int): String {
-        require(accepts("mycomic", "GET", url, false)) { "MYCOMIC 返回了站外地址" }
-        require(html.length <= MAX_HTML_CHARS) { "MYCOMIC 页面超过读取上限" }
+        require(accepts("mycomic", "GET", url, false)) { tr("MYCOMIC 返回了站外地址") }
+        require(html.length <= MAX_HTML_CHARS) { tr("MYCOMIC 页面超过读取上限") }
         val challenge = title.contains("Just a moment", true) || title.contains("Attention Required", true) ||
             html.contains("__cf_chl_") || html.contains("cf-browser-verification")
         val status = when {

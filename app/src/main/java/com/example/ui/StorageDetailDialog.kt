@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.i18n.tr
+
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -61,9 +63,9 @@ object StorageDetailIndex {
             else -> null
         }
         if (book != null) return "《${book.title}》" to when (key) {
-            "covers" -> "书架封面"
-            "book_images" -> "书内插图"
-            "comics" -> "离线漫画页面"
+            "covers" -> tr("书架封面")
+            "book_images" -> tr("书内插图")
+            "comics" -> tr("离线漫画页面")
             else -> "${file.extension.uppercase()} 原文件"
         }
         if (key == "downloads") {
@@ -75,41 +77,41 @@ object StorageDetailIndex {
         }
         if (key in setOf("downloads", "imports", "comics", "covers", "book_images")) {
             return "未关联的${when (key) {
-                "covers" -> "封面"
-                "book_images" -> "书内插图"
-                "comics" -> "漫画"
-                else -> "书籍文件"
+                "covers" -> tr("封面")
+                "book_images" -> tr("书内插图")
+                "comics" -> tr("漫画")
+                else -> tr("书籍文件")
             }}" to file.name
         }
         if (key == "manga_tr_models") return "离线翻译模型" to file.name
         if (key == "webview") return when (file.name) {
-            "Cookies" -> "网页登录信息" to "Cookie"
-            "Local Storage" -> "网页本地数据" to "登录与浏览记录"
-            "Default" -> "网页浏览资料" to "浏览器数据"
-            else -> "网页浏览数据" to file.name
+            "Cookies" -> tr("网页登录信息") to "Cookie"
+            "Local Storage" -> tr("网页本地数据") to "登录与浏览记录"
+            "Default" -> tr("网页浏览资料") to "浏览器数据"
+            else -> tr("网页浏览数据") to file.name
         }
         if (key == "personalization") return when {
-            file.name == "custom_font.ttf" -> "自定义字体" to ""
-            file.name.startsWith("custom_poster_") -> "启动海报" to ""
-            else -> "软件背景" to ""
+            file.name == "custom_font.ttf" -> tr("自定义字体") to ""
+            file.name.startsWith("custom_poster_") -> tr("启动海报") to ""
+            else -> tr("软件背景") to ""
         }
         if (key == "sources") return if (file.name == "novel_reader_backup.json")
-            "设置备份" to "JSON" else "已安装书源" to file.name
+            "设置备份" to "JSON" else tr("已安装书源") to file.name
         if (key == "appdata") return when {
-            file.parentFile?.name == "databases" || file.name == "databases" -> "书架与阅读数据" to file.name
-            file.parentFile?.name == "shared_prefs" || file.name == "shared_prefs" -> "应用设置" to file.name
-            else -> "应用状态数据" to file.name
+            file.parentFile?.name == "databases" || file.name == "databases" -> tr("书架与阅读数据") to file.name
+            file.parentFile?.name == "shared_prefs" || file.name == "shared_prefs" -> tr("应用设置") to file.name
+            else -> tr("应用状态数据") to file.name
         }
         val category = when (key) {
-            "ehimg" -> "网页图片缓存"
-            "image_cache" -> "封面与图片缓存"
-            "comic_image_cache" -> "漫画图片缓存"
-            "comic_processed" -> "漫画增强缓存"
-            "external_cache" -> "外部缓存"
-            "temp" -> "临时文件"
-            "other" -> "其他应用数据"
-            "external_files" -> "外部应用文件"
-            else -> "缓存文件"
+            "ehimg" -> tr("网页图片缓存")
+            "image_cache" -> tr("封面与图片缓存")
+            "comic_image_cache" -> tr("漫画图片缓存")
+            "comic_processed" -> tr("漫画增强缓存")
+            "external_cache" -> tr("外部缓存")
+            "temp" -> tr("临时文件")
+            "other" -> tr("其他应用数据")
+            "external_files" -> tr("外部应用文件")
+            else -> tr("缓存文件")
         }
         return category to if (file.name.length > 18 && file.name.matches(Regex("[a-fA-F0-9_.-]+")))
             "内部编号 ${file.name.takeLast(8)}" else file.name
@@ -289,18 +291,18 @@ fun StorageDetailDialog(
                         Column(Modifier.weight(1f)) {
                             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                             val status = when {
-                                deleting -> "正在清理…"
-                                scanning -> "扫描中…"
-                                else -> "${entries.size} 项 · 共 ${formatCacheSize(entries.sumOf { it.size })}"
+                                deleting -> tr("正在清理…")
+                                scanning -> tr("扫描中…")
+                                else -> com.example.i18n.itemsOfTotal(entries.size, formatCacheSize(entries.sumOf { it.size }))
                             }
                             Text(status, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
                         }
-                        AppIconButton(Icons.Filled.Close, "关闭面板", onClick = paperDismiss {}, enabled = !deleting)
+                        AppIconButton(Icons.Filled.Close, tr("关闭面板"), onClick = paperDismiss {}, enabled = !deleting)
                     }
                     Spacer(Modifier.height(8.dp))
                     if (entries.isEmpty()) {
                         Text(
-                            if (scanning) "正在读取存储内容…" else "暂无可管理的内容",
+                            if (scanning) tr("正在读取存储内容…") else tr("暂无可管理的内容"),
                             Modifier.padding(vertical = 18.dp).wenkuPagePart(1),
                             style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
                         )
@@ -313,7 +315,7 @@ fun StorageDetailDialog(
                             if (eligibleFiles.isNotEmpty()) {
                                 item(key = "select_all") {
                                     WenkuTextButton(
-                                        if (allSelected) "取消全选" else "全选",
+                                        if (allSelected) tr("取消全选") else tr("全选"),
                                         onClick = { eligibleFiles.forEach { checked[it.file] = !allSelected } },
                                         modifier = Modifier.fillMaxWidth().wenkuPagePart(1),
                                         enabled = canEdit, selected = allSelected, compact = true,
@@ -391,9 +393,9 @@ fun StorageDetailDialog(
         WenkuActionSheet("确认清理 ${files.size} 项", onDismiss = { pendingDeletion = null }) {
             Text("预计清理 ${formatCacheSize(selectedBytes)}。")
             Text(confirmTip.orEmpty(), color = colors.onSurfaceVariant)
-            WenkuTextButton("清理", onClick = paperDismiss { deleteFiles(files) }, modifier = Modifier.fillMaxWidth(),
+            WenkuTextButton(tr("清理"), onClick = paperDismiss { deleteFiles(files) }, modifier = Modifier.fillMaxWidth(),
                 color = colors.error, wenkuSymbol = WenkuSymbol.Delete)
-            WenkuTextButton("取消", onClick = paperDismiss {}, modifier = Modifier.fillMaxWidth(),
+            WenkuTextButton(tr("取消"), onClick = paperDismiss {}, modifier = Modifier.fillMaxWidth(),
                 wenkuSymbol = WenkuSymbol.Close)
         }
     }

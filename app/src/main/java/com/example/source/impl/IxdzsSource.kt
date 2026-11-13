@@ -1,5 +1,7 @@
 package com.example.source.impl
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.os.SystemClock
 import android.util.LruCache
@@ -37,7 +39,7 @@ class IxdzsSource(
     private val mutex = Mutex()
 
     private fun bookUrl(bookId: String): HttpUrl {
-        require(bookId.matches(Regex("[1-9][0-9]{0,8}"))) { "无效的网文书籍标识" }
+        require(bookId.matches(Regex("[1-9][0-9]{0,8}"))) { tr("无效的网文书籍标识") }
         return baseUrl.newBuilder().addPathSegment("read").addPathSegment(bookId).addPathSegment("").build()
     }
     private suspend fun page(url: HttpUrl): org.jsoup.nodes.Document {
@@ -54,9 +56,9 @@ class IxdzsSource(
         cache[bookId]?.takeIf { !fresh && SystemClock.elapsedRealtime() - it.at < 60_000 } ?: run {
             val doc = page(bookUrl(bookId))
             val title = doc.selectFirst(".novel h1")?.text().orEmpty()
-            require(title.isNotBlank()) { "未找到小说详情，站点可能暂时不可用" }
+            require(title.isNotBlank()) { tr("未找到小说详情，站点可能暂时不可用") }
             val download = doc.select(".n-btn a[href]").firstOrNull { it.text().contains("TXT下载") }
-                ?.absUrl("href")?.toHttpUrl() ?: throw SourceException.ParseError("本书未提供 TXT 下载")
+                ?.absUrl("href")?.toHttpUrl() ?: throw SourceException.ParseError(tr("本书未提供 TXT 下载"))
             require(download.scheme == "https" && (download.host.matches(Regex("down[0-9]+\\.ixdzs8\\.com")) ||
                 download.host == baseUrl.host)) { "网文下载地址异常" }
             val info = doc.selectFirst(".n-text")!!
@@ -64,7 +66,7 @@ class IxdzsSource(
             val updated = info.select("p").firstOrNull { it.text().startsWith("更新:") }?.text().orEmpty()
             val book = SearchBook(bookId, id, title, info.selectFirst(".bauthor")?.text().orEmpty(),
                 cover = doc.selectFirst(".n-img img[src]")?.absUrl("src"), format = "txt", language = "中文",
-                description = "中文网文，TXT 下载到书架阅读。原站下载包可能缺章或更新滞后。\n" +
+                description = tr("中文网文，TXT 下载到书架阅读。原站下载包可能缺章或更新滞后。\n") +
                     "$latest\n$updated\n\n" + doc.selectFirst("#intro")?.text().orEmpty(),
                 novelInfo = NovelInfo(synopsis = doc.selectFirst("#intro")?.text(),
                     status = info.selectFirst(".lz")?.text(), category = info.selectFirst(".nsort")?.text(),
@@ -79,7 +81,7 @@ class IxdzsSource(
         try { SourceResult.Success(block()) }
         catch (e: CancellationException) { throw e }
         catch (e: SourceException) { SourceResult.Error(e) }
-        catch (e: java.io.IOException) { SourceResult.Error(SourceException.NetworkError("网文源连接失败，请稍后重试", e)) }
+        catch (e: java.io.IOException) { SourceResult.Error(SourceException.NetworkError(tr("网文源连接失败，请稍后重试"), e)) }
         catch (e: Exception) { SourceResult.Error(SourceException.ParseError(e.message ?: "网文页面解析失败")) }
     }
     override suspend fun search(keyword: String) = result {
@@ -93,7 +95,7 @@ class IxdzsSource(
             if (url.host != baseUrl.host || link.text().isBlank()) return@mapNotNull null
             SearchBook(bookId, id, link.text(), info.selectFirst(".bauthor")?.text().orEmpty(),
                 cover = info.parent()?.parent()?.selectFirst("img[src]")?.absUrl("src"), format = "txt", language = "中文",
-                description = "中文网文，TXT 下载到书架阅读；原站下载包可能缺章或更新滞后。\n" +
+                description = tr("中文网文，TXT 下载到书架阅读；原站下载包可能缺章或更新滞后。\n") +
                     info.selectFirst(".l-last")?.text().orEmpty() + "\n\n" + info.selectFirst(".l-p2")?.text().orEmpty(),
                 novelInfo = NovelInfo(synopsis = info.selectFirst(".l-p2")?.text(),
                     status = info.selectFirst(".lz")?.text(), category = info.selectFirst(".nsort")?.text(),

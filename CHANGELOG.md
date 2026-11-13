@@ -1,5 +1,67 @@
 # Changelog
 
+## 未发布 · 2026-11-11（R100：单渲染器打开动效 / 黑封面修复）
+
+- **修复「退出阅读器后，中间书右边某本变成黑封面」**：封面预光栅化窗口原本是死板的 `当前书 ± 5`，而一行里真正画出来的是 `焦点 ± (edgeSlots + 2)` 个槽位（411dp 屏上是 18 个，12 本书会全部出现在屏幕里）。落在窗口外的书拿不到贴图，只能填 `fallbackTint`，其中 1/3 的 id 是深蓝灰 —— 看起来就是一块黑封面。现在预热窗口按**实际绘制的槽位**取（含左右两侧的重复副本、按离焦点由近到远），并且兜底色全部改为纸色系，没有贴图时封面面填纸色。
+- 封面光栅化改成分批（每轮最多 6 本），补到新贴图就把 `coverGeneration` +1 让画布失效重绘：切书那一帧不会因为一次画 18 张封面掉帧，也不会出现"书已经在屏幕上但封面还没到"的中间态。
+- **打开 / 归位动效改成真正的单渲染器、单时间轴**：把整本书的绘制抽成 `ShelfVolumeArtist` + `ShelfVolumeArt`（纯 `android.graphics`，不依赖 Compose），书架和根覆盖层用**同一个**渲染器、**同一个** `ShelfOpenTimeline.poseAt(p)` 画同一本书 —— 交接不是"插值调得像"，而是同一个函数在同一个 p 上的求值。
+- 时间轴只有一条：位置与缩放共用一条两端导数为 0 的钟形曲线，转正（`depthX .66→1`、`depthY -.16→0`、`skew .10→0`、书脊收薄）与放**重叠**推进，几何在 78% 走到"封面铺满整屏"，之后才淡出交给阅读器；移动端不会再出现"转完 → 缩放从 0 速度重新起步"的速度断点。
+- 归位是打开的反向：封面先用 120ms 从阅读器这一侧淡入盖住整屏（这 120ms 里才切路由，横向转场被关掉），再沿同一条路径缩回书架原位，最后一帧与书架静止帧逐参数相同。
+- 被拿起的书现在画在**所有邻书之上**（它已经被拿出手了），不再夹在左右邻书之间。
+- 新增 `ShelfSeamTest`（纯 JVM）：逐像素证明"飞行第 0 帧 == 书架静止帧"（mean=0、max=0）、沿时间轴 60 帧扫描相邻帧色差无局部尖峰、几何单调、`p=.78` 封面铺满屏幕、归位末帧回到静止姿态。
+- 新增 `ShelfRenderProbeTest`：把书架离屏画成 PNG，用于回归"某本书是不是又变成没有封面的色块"。
+- 英文继续补齐：新增 `tr()` 入口（不必在 Composable 里先取 `str`），并**在共享控件层**统一翻译分段选择器与普通选择器的选项文案；补 162 条词条（帮助手册、下载管理、互传/迁移、漫画翻译、外观数值、通用按钮与空态）。
+- 英文第二轮：再包 324 处文案位置（新增 `desc=` / `state=` / `summary=` / `caption=` / `action=` / `note=` 等命名参数，`PanelSectionCard` / `PanelRow` / `ActionChip` / `PanelTextField` / `EngineCard` 的标题位置，以及 `if (…) "A" else "B"` 分支文案），补 259 条词条（阅读器/漫画设置全表、收藏与书架动作、下载与更新、登录与账号、互传校验、Z-Library、神回排行、翻译与模型、状态与 Toast）。
+- 带 `${}` 的界面短句改为**参数化函数**（`StringTable` + 同名顶层入口）：`chapterCounter` / `chapterLabel` / `pageLabel` / `pageCounter` / `stepCounter` / `dayReadLog` / `weekMinutes` / `restReminder` / `expandAll` / `clearSearchHistory` / `totalOf` / `itemsOfTotal` / `remainingOfTotal` / `pagesTotal`，中文拼原样、英文按英文语序拼；已改写阅读器休息提醒、周阅读图表标题与合计、统计页合计、引导步骤描述、存储详情、缓存管理、下载卡片等 12 处调用点。
+- `WenkuCoverFlight.kt` 中在历史批量改写里损坏的中文注释已清理：损坏内容不可逆（字节已被替换成 `?`），逐段替换为一行说明，注释定界符重新配平（50/50），文件编译通过。
+- 英文第三轮：**漫画阅读设置全表**（163 条文案加词条），并把漫画设置里的 10 个枚举改成**读取时翻译**——`ComicMode/ComicDirection/ComicFit/ComicDoubleAlign/ComicCropMode/ComicEnhanceMode/ComicBgType/ComicScene/ComicPageAnim/ComicGestureAction` 的构造器只存中文原文，`label`/`desc` 改成 `get() = tr(raw)`；枚举在类加载期就初始化，在构造器里翻译会把语言永久冻住，所以必须延后到读取时。
+- 缓存管理：`StorageRow` 的 `name` / `desc` / `confirmTip` 改为读取时翻译，一次覆盖"缓存/外部缓存/漫画译文缓存/网页浏览数据/离线模型…"整张清单（含 `\n\n注意：…` 这类长提示）。
+- 互传：`TransferManager.change(phase, message)` 与失败路径的 `message` 在**写入状态时**统一过词表，调用方继续写中文原文，界面按当前语言显示；互传的全部状态/错误文案（发送、接收、校验码、续传、附近直连）已入表。
+- 阅读器排版与主题、缓存管理、互传、存储详情、漫画设置补词条累计约 **500 条**（词表总量 873 → 1373）。
+- 新增静态校验脚本口径：**所有 `tr("…")` 的 key（不含带 `$` 插值的模板句）在词表里 100% 命中**，剩余 24 条全部是插值模板句（无法作为字典 key，需要继续参数化）。
+- 英文第四轮（修掉一个系统性漏包）：批量包裹脚本里判断"是否已经被 `tr()` 包过"的条件写成了 `'t(' in prefix`，而 `Text(` 本身就含 `t(` —— 于是**所有 `Text("…")` 内联文案从第一轮起就被跳过**。修正判断后补包 296 处，并把 `PanelTabData(` / `PanelHint(` / `SwitchRow(` / `paneTitle =` / `stateDescription =` / `when` 箭头分支等位置一起纳入，再补 280 处；累计 `tr()` 调用点 **1065 处**。
+- 23 处插值模板句改成参数化函数（`sourcesReadable` / `filterCount` / `titleDisabled` / `sourcesSubmitted` / `filesTotal` / `downloadChapters` / `categoryName` / `categorySelected` / `categoryLocked` / `categoryCreated` / `categoryEmpty` / `favouritesAdded` / `favouritesAddedPartial` / `comicIdLabel` / `highlightOf` / `closeNamed` / `yearLabel` / `minutesValue` / `dailyAverage` / `migrateIntro` / `expandRest` / `switchedTo` / `homeHttpCode`），并保留 `第 $chunkNo 部分` 这类**解析器生成的章节标题**不动（属于数据）。
+- 词表从约 1373 条增到 **1672 条**；`tr()` key 缺失数 **0**。
+- 顺手修正 `LegacyDatabaseMigration` 里两处被误包进 `tr()` 的 SQL 默认值比较（`"'默认'"` / `"'未知作者'"`），它们是数据库里的值，翻译会直接改坏迁移判断。
+- 修掉单测 JVM 的偶发崩溃：JBR 21.0.10 的 C2 在编译 `SQLiteStatement.executeInsert` 时 `EXCEPTION_ACCESS_VIOLATION`，整台测试 JVM 被杀，表现为"只跑了 183 个用例"。现在给单测 JVM 加 `-XX:TieredStopAtLevel=1`（只影响测试进程），607 个用例能完整跑完。
+- `TranslationFailure`（漫画翻译失败原因）同样改成"存原文 + `description` getter"，15 条失败文案入表；`TextTranslator` 里用 `copy(description=…)` 的那处改为 `copy(rawDescription=…)`。
+- 最后一轮补词条：缓存清单里的 `StorageRow` 长提示与标题（`图片加载缓存` / `漫画翻译模型` / `离线书籍` / `离线漫画`）、互传历史里的 `设备` / `发送完成`。
+- 口径：`tr()` 调用点 **1065** 处、词表 **约 1743** 条、`tr()` key 缺失 **0**；不算日志/数据/发布记录后，仍未覆盖的中文字面量从 1030 降到 **415**（长尾分布在 73 个文件，多半是引擎诊断与单条 Toast）。
+- `DiscoverDimension` / `DiscoverLayout` 改成"存中性原文 + `label` getter"；日期范围 chip 走新的 `discoverRangeLabel(range)` —— `ranges` 是 `DiscoverEngine.rangeStart` 的数据键，必须保持中文，只有显示层翻译。
+- 修掉一个只在英文模式才出现的真 bug：`serialLabel()` 的 `when` 条件里以前只写了 `AppLocale.t("连载")`，英文模式下它是 "Ongoing"，而书源返回的是中文「连载」→ 所有状态都会掉进 `else` 变成「状态未知」。现在条件里同时列出中文原文与英文。
+- 大数字紧凑化改成 `compactCount()`：中文 `亿 / 万`，英文 `M / k`（`%.1f亿` 这种带格式符的串不能进字典）。
+- `OnboardingScreen` 的页面列表、`LibraryViewModel` 的章节/图片加载错误、`TranslationFailure` 全部改成读取时翻译；引导页 14 条、书库错误 16 条、漫画章节页与发现页维度/范围共 30 余条入表。
+- 单测 JVM 的崩溃改法更精准：从"整体降到 C1"换成 `-XX:CompileCommand=exclude,…SQLiteStatement::executeInsert` + `UseSerialGC` —— 既避开 JBR 的 C2 崩溃，也不会让 Compose 测试因为变慢而超时。
+- 英文第六轮收尾：`PageTurnType` / `TouchAction` / `SwipeAction` 改成读取时翻译；漫画增强引擎的模型下载/校验文案（普通串 + 4 条插值）全部入表或参数化（`modelDownloadFailed` / `modelSizeMb` / `enhanceProgress` / `fullEnhanceProgress`）；再补解析器、书源、导入/备份、站点专属错误约 **350 条**；日历的月名/星期、图表星期名、主题配色名、隐私页、书源 JSON 帮助全部走函数（`monthName` / `weekdayShort` / `weekdayName` / `dayRecordSummary` / `minutesTotal` / `readDateOf` / `durationOf` / `pinFilled`）。
+- 最终口径：`tr()` 调用点 **1300+**、词表 **2900+** 条、`tr()` key 缺失 **0**；未覆盖的中文字面量 1030 → **163**，其中 **50 条是发布记录正文（有意不翻）**，其余是帮助长文与个别诊断串。
+
+## 未发布 · 2026-11-11（3D 书架实体化 / 打开动效 / 中英切换）
+
+- 3D 书架重做实体书外观：圆弧书脊（柱面明暗 + 堵头布）、书脊与封面之间的装订凹槽、封面大于内页的包边、纸页切口纹理与层次、布面/哑光/亮面三种材质、封面图沿书脊连续包裹；封面按封面面比例满版裁切，不再有纸边。
+- 新增页数 → 厚度的映射（章节数估算，无章节时按 id 稳定兜底）与 ±3.5% 高度差，整排不再一样厚、一样高。
+- 无封面书生成印刷风封面（书名/作者/格式/内框），3D 书、封面飞行动画、阅读器落点共用同一张，打开时不再出现纯黑封面。
+- 3D 书架打开书改为"拿起 → 转正 → 放大"的 380ms 过渡，再从立正后的封面矩形起飞，消除旧版把斜切封面硬拉正造成的扭曲；归位落点回到书架上的位置。
+- 打开阅读器再返回，3D 书架停在刚才那本（按分类作用域记忆），不再跳回第一本。
+- 3D 模式下恢复「正在阅读」区块，并修正 3D 书架标题条被悬浮 Tab 栏遮挡。
+- 新增中英文切换：设置页「02 / LANGUAGE」分区（沿用分段选择器），默认中文；已覆盖底部 Tab、书架页、设置页与 3D 书架标题条，缺失文案回退中文。
+
+- 修复 3D 书架每本书下方的纯黑斜线（地面墨影丢了渐变 shader，退化成实心多边形）。
+- 3D 书架改为**有头有尾**：第一本左边、最后一本右边不再接回另一端，滑到两端即停；书少时整排居中。
+- 修复 3D 书架惯性方向与拖拽方向相反（手指往左划却被回弹），这是"怎么划都到不了末尾"的真正原因。
+- 3D 书架首尾不再一边倒：整排放得下时保持整排居中，放不下时焦点书居中、两端留白。
+- 3D 书架恢复初版无限轮播：12 之后接 1、2、3…，每个位置都有书、焦点书永远居中；修掉"划到最后一本继续划就卡住"的 bug（焦点不再夹在 0..lastIndex，手势结束折回）。
+- 3D 书架打开动画改为"先移到屏幕中央 → 再转身 → 再放大"，第一帧不再瞬移到中央；打开尺寸 1.75×。
+- 修复打开/退出动画首帧错位：飞行前把封面按卡片比例中心裁切，起飞/落地与卡片严丝合缝。
+- 修复飞行过程中卡片圆角变尖角：网格绘制按行程插值裁剪圆角，并使用卡片真实圆角值。
+- 打开动画连成一段：位移随进度插值（不再瞬移）、书脊在转身结束时收到 0、飞行层立即起飞、封面铺满后才淡出、新增纸色 scrim 让阅读器渐变出现。
+- 修复 3D 书架层级：被拿起的书夹在左右邻书之间（左邻在后、右邻在前）。
+- 修复同一本书在轮播两侧的副本被一起隐藏的问题，只隐藏被点中的那一份。
+- 修复「我喜欢的」3D 书架没有封面（裸路径封面被 isCoverValid 误杀）。
+- 3D 投影改为更浅的俯视角（depthY -.30 → -.16），书脊不再显得比纸页矮；去掉生成封面的左缘压暗条与书脊包裹取样的暗边。
+- 英文补全书库页、发现页分类条、统计页周期切换、阅读器主控制栏（约 160 条词条）。
+- 打开动画改为真正的一段：飞行层无缝时间轴（去掉起步停顿）、视口立即起飞、先画同帧再切路由、封面工艺在放大末段收到 0 与飞行首帧逐像素对齐。
+- 英文补全阅读器控制栏、漫画阅读器、我喜欢的面板、缓存管理、存储详情与更新弹窗（约 143 条）。
+
 ## 1.6.1 · 2026-11-10
 
 - 平板设置将标题与对应内容归入同一组；书库与发现按可用宽度组织结果，书架移除重复的阅读空间。

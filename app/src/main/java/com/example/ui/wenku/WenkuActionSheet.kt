@@ -1,5 +1,7 @@
 package com.example.ui.wenku
 
+import com.example.i18n.tr
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -39,7 +41,7 @@ internal fun WenkuActionSheet(
             ) {
                 Row(Modifier.fillMaxWidth().wenkuPagePart(0), verticalAlignment = Alignment.CenterVertically) {
                     Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    AppIconButton(Icons.Filled.Close, "关闭面板", onClick = paperDismiss {}, enabled = dismissEnabled)
+                    AppIconButton(Icons.Filled.Close, tr("关闭面板"), onClick = paperDismiss {}, enabled = dismissEnabled)
                 }
                 Column(Modifier.fillMaxWidth().wenkuPagePart(1), verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
             }

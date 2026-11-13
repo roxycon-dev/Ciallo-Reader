@@ -1,5 +1,7 @@
 package com.example.library
 
+import com.example.i18n.tr
+
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.util.Log
@@ -84,9 +86,9 @@ object ComicLocalImporter {
         var comicDir: File? = null
         var pendingCover: File? = null
         try {
-            require(imageUrls.size <= 10_000) { "章节图片过多" }
+            require(imageUrls.size <= 10_000) { tr("章节图片过多") }
             if (imageUrls.isEmpty()) {
-                return@withContext Result.failure(Exception("章节没有图片"))
+                return@withContext Result.failure(Exception(tr("章节没有图片")))
             }
 
             val chapterDir = targetDir ?: File(context.filesDir, "comics_${System.currentTimeMillis()}")
@@ -140,7 +142,7 @@ object ComicLocalImporter {
                 if (fetchUrl.startsWith("file:")) {
                     val srcFile = java.io.File(java.net.URI.create(fetchUrl))
                     if (srcFile.exists() && hasImageBounds(srcFile)) {
-                        require(srcFile.length() <= 32L * 1024 * 1024) { "图片过大" }
+                        require(srcFile.length() <= 32L * 1024 * 1024) { tr("图片过大") }
                         srcFile.copyTo(pageFile, overwrite = true)
                         existingPageFiles[filePrefix.removeSuffix(".")].orEmpty()
                             .filter { it != pageFile }.forEach { check(it.delete() || !it.exists()) { "旧图片清理失败" } }
@@ -148,7 +150,7 @@ object ComicLocalImporter {
                         reportPageDone()
                         return pageFile
                     }
-                    throw IOException("本地缓存图片无效，请重新打开章节后重试")
+                    throw IOException(tr("本地缓存图片无效，请重新打开章节后重试"))
                 }
                 val requestBuilder = Request.Builder()
                     .url(fetchUrl)
@@ -176,7 +178,7 @@ object ComicLocalImporter {
                     if (!response.isSuccessful) {
                         throw IOException("图片下载失败 HTTP ${response.code} (${url.take(80)})")
                     }
-                    val raw = response.body?.byteStream()?.use { it.readImportBytes(32 * 1024 * 1024) } ?: throw IOException("图片响应为空")
+                    val raw = response.body?.byteStream()?.use { it.readImportBytes(32 * 1024 * 1024) } ?: throw IOException(tr("图片响应为空"))
                     var bytes = ImageBytes.normalizeImage(raw, response.header("Content-Encoding"), response.request.url.toString())
                     if (ImageBytes.isAvif(bytes) && !ImageBytes.decodeOk(bytes)) {
                         for (candidate in ImageBytes.webpVariants(fetchUrl)) {
@@ -218,7 +220,7 @@ object ComicLocalImporter {
                         throw IOException("图片不是可解码的图像 (${fetchUrl.take(80)})")
                     }
                     val part = File(chapterDir, "${pageFile.name}.part")
-                    require(chapterDir.usableSpace > bytes.size.toLong() + 16L * 1024 * 1024) { "磁盘空间不足" }
+                    require(chapterDir.usableSpace > bytes.size.toLong() + 16L * 1024 * 1024) { tr("磁盘空间不足") }
                     part.outputStream().use { output -> output.write(bytes) }
                     check(part.renameTo(pageFile)) { "图片保存失败" }
                     // A changed image URL may also change the extension. Remove
@@ -360,6 +362,6 @@ object ComicLocalImporter {
             }
             delay(700L * (attempt + 1))
         }
-        throw lastError ?: IOException("图片请求失败")
+        throw lastError ?: IOException(tr("图片请求失败"))
     }
 }
