@@ -2849,6 +2849,7 @@ private val EN: Map<String, String> = mapOf(
     "数据包保存失败" to "Could not save the package",
     "设置保存失败" to "Could not save settings",
     // ── 版本记录（发布摘要） ────────────────────────────────────
+    "修复一些已知bug" to "Fixed some known bugs",
     "首次发布" to "First release",
     "串珠翻页 · 漫画加载" to "Bead page turn · comic loading",
     "书源与界面修复" to "Source and UI fixes",

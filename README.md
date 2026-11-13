@@ -11,6 +11,7 @@
 
 [🌐 产品主页](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ 下载最新版 APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
+[1.6.4 更新说明](docs/release-1.6.4-2026-11-13.md) ·
 [1.6.3 更新说明](docs/release-1.6.3-2026-11-12.md) ·
 [1.6.2 更新说明](docs/release-1.6.2-2026-11-12.md) ·
 [1.6.1 更新说明](docs/release-1.6.1-2026-11-10.md) ·

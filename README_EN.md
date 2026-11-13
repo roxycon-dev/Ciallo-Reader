@@ -11,6 +11,7 @@ Read local ebooks, novels, and comics in one Android app.
 
 [🌐 Product site](https://roxycon-dev.github.io/Ciallo-Reader/) ·
 [⬇️ Download the latest APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
+[1.6.4 release notes](docs/release-1.6.4-2026-11-13.md) ·
 [1.6.3 release notes](docs/release-1.6.3-2026-11-12.md) ·
 [1.6.2 release notes](docs/release-1.6.2-2026-11-12.md) ·
 [1.6.1 release notes](docs/release-1.6.1-2026-11-10.md) ·

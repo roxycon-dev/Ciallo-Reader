@@ -29,6 +29,7 @@ import com.example.ui.wenku.WenkuTextButton
 
 internal data class ReleaseSummary(val version: String, val date: String, val summary: String)
 internal val releaseHistory = listOf(
+    ReleaseSummary("1.6.4", "11-13", tr("修复一些已知bug")),
     ReleaseSummary("1.6.3", "11-12", tr("英文界面补齐 · 分类与统计文案 · 仓库清理")),
     ReleaseSummary("1.6.2", "11-12", tr("3D 书架单时间轴 · 黑封面修复 · 可覆盖安装的正式签名")),
     ReleaseSummary("1.6.1", "11-10", tr("平板排版 · 旋转重排 · 启动检查更新 · 镜像下载")),
