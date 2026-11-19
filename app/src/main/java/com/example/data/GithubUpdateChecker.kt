@@ -30,6 +30,7 @@ internal data class UpdateRelease(val tag: String, val releaseUrl: String, val n
 
 internal const val UPDATE_REPOSITORY = "https://github.com/roxycon-dev/Ciallo-Reader"
 internal const val MAX_UPDATE_BYTES = 192L * 1024 * 1024
+private val checksumLine = Regex("([a-fA-F0-9]{64})[ \\t]+\\*?([^\\r\\n]+)")
 
 /** Only an APK belonging to this exact official release can enter the download path. */
 internal fun officialUpdateAsset(tag: String, name: String, url: String): Boolean {
@@ -87,8 +88,48 @@ internal class GithubUpdateChecker(
         val current = versionParts(currentVersion) ?: return@withContext UpdateCheckResult("无法识别当前版本，请打开 GitHub 发布页查看。")
         val newer = latest.zip(current).firstOrNull { (a, b) -> a != b }?.let { (a, b) -> a > b } == true
         val display = tag.removePrefix("v").removePrefix("V")
-        if (newer) UpdateCheckResult("发现新版本 $display，可下载并安装。", releaseUrl(tag), release)
+        if (newer) UpdateCheckResult("发现新版本 $display，可下载并安装。", releaseUrl(tag), withOfficialChecksum(transport, release))
         else UpdateCheckResult("当前已是最新版本（GitHub 正式版 $display）。")
+    }
+
+    // The HTML fallback has no API digest. Recover it from the same release
+    // so either update entry point can offer the verified APK mirror.
+    private suspend fun withOfficialChecksum(client: OkHttpClient, release: UpdateRelease): UpdateRelease {
+        val asset = release.apk ?: return release
+        if (asset.sha256 != null || !officialUpdateAsset(release.tag, asset.name, asset.url)) return release
+        val noRedirect = client.newBuilder().followRedirects(false).followSslRedirects(false).build()
+        for (name in listOf("SHA256SUMS.txt", "SHA256SUMS-${release.tag}.txt")) {
+            val url = "$UPDATE_REPOSITORY/releases/download/${release.tag}/$name"
+            val digest = try { checksumFromRelease(noRedirect, url, asset.name) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { null }
+            if (digest != null) return release.copy(apk = asset.copy(sha256 = digest))
+        }
+        return release
+    }
+
+    private suspend fun checksumFromRelease(client: OkHttpClient, url: String, apkName: String): String? {
+        var address = url.toHttpUrl()
+        repeat(4) {
+            val location = client.newCall(request(address.toString()).newBuilder().header("Accept", "text/plain").build())
+                .executeCancellable().use { response ->
+                    if (response.code == 200) {
+                        val content = response.body?.byteStream()?.use { it.readImportBytes(16 * 1024).toString(Charsets.UTF_8) }
+                            ?: return null
+                        return content.removePrefix("\uFEFF").lineSequence().mapNotNull { line ->
+                            checksumLine.matchEntire(line.trimEnd())?.takeIf { it.groupValues[2] == apkName }
+                                ?.groupValues?.get(1)?.lowercase()
+                        }.take(2).toList().singleOrNull()
+                    }
+                    if (response.code !in setOf(301, 302, 303, 307, 308)) return null
+                    response.header("Location") ?: return null
+                }
+            address = address.resolve(location)?.takeIf {
+                it.isHttps && it.port == 443 && it.host in GITHUB_DOWNLOAD_HOSTS &&
+                    it.username.isEmpty() && it.password.isEmpty() && it.fragment == null
+            } ?: return null
+        }
+        return null
     }
 
     private fun request(url: String) = Request.Builder().url(url)

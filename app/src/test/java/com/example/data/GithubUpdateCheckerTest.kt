@@ -46,9 +46,11 @@ class GithubUpdateCheckerTest {
         val calls=mutableListOf<String>()
         val result=checker { request ->
             calls+=request.url.host
-            if (request.url.host=="api.github.com") 403 to "{}" else 302 to "/roxycon-dev/Ciallo-Reader/releases/tag/v1.2.2"
+            if (request.url.host=="api.github.com") 403 to "{}"
+            else if (request.url.encodedPath.endsWith("/latest")) 302 to "/roxycon-dev/Ciallo-Reader/releases/tag/v1.2.2"
+            else 404 to ""
         }.check("1.2.1")
-        assertEquals(listOf("api.github.com","github.com"),calls)
+        assertEquals(listOf("api.github.com","github.com","github.com","github.com"),calls)
         assertNotNull(result.releaseUrl)
         assertTrue(result.message.contains("1.2.2"))
     }
@@ -140,5 +142,35 @@ class GithubUpdateCheckerTest {
         assertEquals("Ciallo-Reader-v1.2.4.apk", result.release!!.apk!!.name)
         assertNull(result.release!!.apk!!.sha256)
         assertTrue(officialUpdateAsset(result.release!!.tag, result.release!!.apk!!.name, result.release!!.apk!!.url))
+    }
+
+    @Test fun rateLimitedCheckStillOffersMirrorUsingTheOfficialReleaseChecksum() = runBlocking {
+        val digest = "A".repeat(64)
+        val result = checker { request ->
+            when {
+                request.url.host == "api.github.com" -> 403 to "{}"
+                request.url.encodedPath.endsWith("/latest") -> 302 to "$UPDATE_REPOSITORY/releases/tag/v1.6.5.1"
+                request.url.encodedPath.endsWith("/SHA256SUMS.txt") -> 302 to "https://release-assets.githubusercontent.com/fixture"
+                request.url.host == "release-assets.githubusercontent.com" -> 200 to "$digest *Ciallo-Reader-v1.6.5.1.apk\r\n"
+                else -> 404 to ""
+            }
+        }.check("1.6.5")
+        val release = requireNotNull(result.release)
+        val apk = requireNotNull(release.apk)
+        assertEquals(digest.lowercase(), apk.sha256)
+        assertEquals(UPDATE_MIRROR_PREFIX + apk.url, mirrorDownloadUrl(release.tag, apk))
+    }
+
+    @Test fun checksumWithWrongFileNameOrExternalRedirectCannotEnableMirror() = runBlocking {
+        val result = checker { request ->
+            when {
+                request.url.host == "api.github.com" -> 200 to """{"tag_name":"v1.2.4","assets":[${assetJson(digest = "")}]}"""
+                request.url.host != "github.com" -> fail("Unexpected checksum host ${request.url.host}").let { 500 to "" }
+                request.url.encodedPath.endsWith("/SHA256SUMS.txt") -> 302 to "https://example.org/checksum"
+                else -> 200 to "${"a".repeat(64)}  Another.apk\n"
+            }
+        }.check("1.2.3")
+        val release = requireNotNull(result.release)
+        assertNull(mirrorDownloadUrl(release.tag, requireNotNull(release.apk)))
     }
 }

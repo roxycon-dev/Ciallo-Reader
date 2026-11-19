@@ -252,7 +252,7 @@ internal fun AppUpdateDialog(
                             wenkuSymbol = if (state.stage == AppUpdateStage.FAILED) WenkuSymbol.Refresh else WenkuSymbol.Download,
                         )
                         WenkuTextButton(
-                            tr("HTTPS 镜像下载（gh-proxy.com）"),
+                            tr("国内镜像下载（gh-proxy.com）"),
                             onDownloadMirror, full,
                             enabled = mirrorUrl != null && !exporting,
                             wenkuSymbol = WenkuSymbol.Globe,

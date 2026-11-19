@@ -7,6 +7,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -39,13 +40,13 @@ class AppUpdateDialogTest {
     private var action: String? = null
     private var visible by mutableStateOf(true)
     private var dialogGeneration by mutableIntStateOf(0)
-    private fun show(stage: AppUpdateStage) {
+    private fun show(stage: AppUpdateStage, offeredRelease: UpdateRelease = release) {
         compose.setContent { MaterialTheme {
             if (visible) key(dialogGeneration) {
-            AppUpdateDialog(AppUpdateState(release, stage, visible = true, downloaded = 10 * 1024 * 1024, total = 20 * 1024 * 1024),
+            AppUpdateDialog(AppUpdateState(offeredRelease, stage, visible = true, downloaded = 10 * 1024 * 1024, total = 20 * 1024 * 1024),
                 onDismiss = { visible = false; action = "dismiss" }, onDownload = { action = "download" }, onCancel = { action = "cancel" },
                 onInstall = { action = "install" }, onPermission = { action = "permission" }, onExport = { action = "export" },
-                onBrowser = { action = "browser" }, onReleasePage = { action = "release" })
+                onBrowser = { action = "browser" }, onReleasePage = { action = "release" }, onDownloadMirror = { action = "mirror" })
             }
         } }
     }
@@ -67,7 +68,15 @@ class AppUpdateDialogTest {
         compose.onNodeWithText("Ciallo Reader 1.2.4").assertExists()
         compose.onNodeWithText("更新说明").assertExists()
         assertEquals(null, action)
-        clickAndAwait("下载并安装", "download")
+        compose.onNodeWithText("国内镜像下载（gh-proxy.com）").assertIsNotEnabled()
+        clickAndAwait("GitHub 下载并安装", "download")
+    }
+
+    @Test fun verifiedReleaseLetsTheUserChooseMirror() {
+        val apk = requireNotNull(release.apk)
+        show(AppUpdateStage.AVAILABLE, release.copy(apk = apk.copy(sha256 = "a".repeat(64))))
+        assertEquals(null, action)
+        clickAndAwait("国内镜像下载（gh-proxy.com）", "mirror")
     }
 
     @Test fun downloadingShowsProgressAndCanBeCancelled() {

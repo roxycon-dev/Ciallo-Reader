@@ -19,7 +19,7 @@ try{
 }catch(error){if(error.code!=='ENOENT')throw error;if(await fs.stat(output).catch(()=>null))throw Error('Refusing to replace an unmarked directory')}
 await fs.cp(source,output,{recursive:true});
 await fs.mkdir(path.join(output,'assets'),{recursive:true});
-const files=['site.css','experience.css','site.js','curve-engine.js','flow-worker.js'];
+const files=['site.css','site.js'];
 const assets={};let jsBytes=0;
 for(const file of files){
  const input=await fs.readFile(path.join(source,file),'utf8');
@@ -29,14 +29,16 @@ for(const file of files){
  await fs.writeFile(path.join(output,'assets',name),result.code);
  assets[file]=name;if(extension==='.js')jsBytes+=Buffer.byteLength(result.code);
 }
-if(jsBytes>=30000)throw Error('Published JavaScript exceeds the 30 KB budget');
-const version=createHash('sha256').update(JSON.stringify(assets)).digest('hex').slice(0,16);
+if(jsBytes>4096)throw Error('Published JavaScript exceeds the 4 KiB budget');
+const contentHash=createHash('sha256').update(JSON.stringify(assets));
+for(const file of ['index.html','en/index.html', ...((await fs.readdir(path.join(source,'media'))).sort().map(name=>`media/${name}`))]){
+ contentHash.update(file).update(await fs.readFile(path.join(source,file)));
+}
+const version=contentHash.digest('hex').slice(0,16);
 for(const file of ['index.html','en/index.html']){
  let html=await fs.readFile(path.join(source,file),'utf8');
  const prefix=file.startsWith('en/')?'../':'./';
- for(const name of ['site.css','experience.css','site.js'])html=html.replace(prefix+name,prefix+'assets/'+assets[name]);
- html=html.replace('data-flow-worker="./flow-worker.js"','data-flow-worker="./'+assets['flow-worker.js']+'"');
- html=html.replace('data-flow-engine="./curve-engine.js"','data-flow-engine="./'+assets['curve-engine.js']+'"');
+ for(const name of files)html=html.replace(`"${prefix}${name}"`,`"${prefix}assets/${assets[name]}"`);
  html=html.replace('<meta charset="utf-8">','<meta charset="utf-8">\n  <meta name="ciallo-site-version" content="'+version+'">');
  await fs.writeFile(path.join(output,file),html);
 }

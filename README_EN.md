@@ -12,7 +12,7 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 [1.6.5 release notes](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.6.5)
 
-[Discovery and shelf](#discovery-and-shelf) · [Novels and ebooks](#novels-and-ebooks) · [Listening and annotations](#listening-dictionaries-and-annotations) · [Manga](#manga) · [Stats and appearance](#stats-and-appearance) · [Sources and backups](#sources-and-backups) · [Getting started](#getting-started)
+[Discovery and shelf](#discovery-and-shelf) · [Novels and ebooks](#novels-and-ebooks) · [Listening and annotations](#listening-dictionaries-and-annotations) · [Manga](#manga) · [Stats and appearance](#stats-and-appearance) · [Built-in sources](#built-in-sources) · [Backups and transfers](#backups-and-device-transfer) · [Getting started](#getting-started)
 
 ## Discovery and shelf
 
@@ -29,9 +29,9 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 </tr>
 </table>
 
-- Search novels and manga across sources, filter by provider, and use multilingual keywords. Browse recommendations, updates, rankings, shared categories, and source categories.
-- Favorite online titles and resume from your saved position. Organize the shelf with categories, search, sorting, a list, and a 3D view with book-opening transitions.
-- Download whole novels or selected manga chapters and volumes where the source supports it. Pause, resume, or retry downloads in the download center. Finished titles open offline from the shelf.
+- Search novels and manga across sources, filter by provider, and use Chinese, Japanese, or English title aliases. Reuse search history. Browse recommendations, updates, rankings, shared categories, and source categories.
+- Favorite online titles and resume from your saved position. Organize the shelf with categories, search, sorting, a list, and a 3D view with book-opening transitions. Import in batches, organize local and downloaded books, and mark them as finished.
+- Download whole novels or selected manga chapters and volumes where the source supports it. Pause, resume, or retry downloads in the download center. Finished titles open offline from the shelf. Clear download records independently from shelf files.
 
 ## Novels and ebooks
 
@@ -46,7 +46,7 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 - Keep supported headings, bold, italic, underline, strikethrough, superscript, and subscript. EPUB also reads linked in-book CSS, cover art, chapter lists, illustrations, and writing direction. Markdown and HTML open as rendered text.
 - Follow the book’s writing mode or select horizontal or vertical text per book. Vertical reading supports both column directions, illustrations, and saved progress.
-- Set typeface, font size, character and line spacing, margins, brightness, and reader theme. Choose page curl, cover, slide, fade, or scroll. Use adjustable touch zones, break reminders, bookmarks, chapter navigation, and text search.
+- Set typeface, font size, character and line spacing, margins, brightness, and reader theme. Choose page curl, cover, slide, fade, or scroll. Use adjustable touch zones, break reminders, bookmarks, chapter navigation, and chapter or whole-book search.
 
 | Formats | Reading support |
 | --- | --- |
@@ -69,9 +69,9 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 </tr>
 </table>
 
-- Start listening at your reading position or a selected paragraph with Android system voices, online Edge voices, or a custom speech endpoint. Adjust speed, pitch, pauses, and the sleep timer.
+- Start listening at your reading position or a selected paragraph with Android system voices, online Edge voices, or a custom speech endpoint. Follow the highlighted text, resume listening, or change chapters. Adjust speed, pitch, pauses, and the sleep timer.
 - Skip 15 seconds backward or forward with Edge and custom voices. Keep listening in the background, use media controls on the lock screen or in notifications, and continue into the next chapter.
-- Long-press text to look up the selection, or enter a word in the dictionary panel. Import StarDict, common MDX v1/v2 files, and MOBI/PRC dictionaries with readable entries for offline use. A browser lookup is also available.
+- Long-press text to look up the selection, or enter a word in the dictionary panel. Import StarDict, common MDX v1/v2 files, and MOBI/PRC dictionaries with readable entries for offline use. Manage or disable imported dictionaries, or use a browser lookup.
 - Select a passage to copy, highlight, underline, or annotate it. Save or share a Reading Moment PNG with the selected text, title, and chapter.
 
 ## Manga
@@ -87,10 +87,11 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 <p align="center"><img src="docs/readme-media/landscape.png" width="570" alt="Manga in a landscape spread"><br><sub>Manga in a landscape spread</sub></p>
 
-- Read in single-page, two-page, webtoon, or seamless scrolling mode. Set reading direction, page snapping, double-tap zoom, trimming, spread splitting, background, and preloading.
-- Use built-in sharpening, line enhancement, or JaNai fast processing. The full MangaJaNai model runs offline after download.
-- Detect speech bubbles and recognize text on device. Translate pages using the selected online service or custom AI endpoint, and switch back to the original image.
-- Configure manga reading presets, touch zones, and ambient sound.
+- Read in single-page, two-page, webtoon, or seamless scrolling mode. Set reading direction, page snapping, double-tap zoom, automatic or manual trimming, spread splitting, auto page turns, background, and preloading.
+- Use built-in sharpening, line enhancement, lightweight upscaling, or fast JaNai. Adjust brightness, contrast, saturation, hue, gamma, shadows, or grayscale. The full MangaJaNai model runs offline after the initial download of about 76 MB.
+- Detect speech bubbles and recognize text on device. Translate pages using the selected online service or custom AI endpoint, place the translation in the speech bubbles, and switch back to the original image. Manage cached translations from the reader.
+- Save presets or settings per title. Customize touch zones, ambient sound, and effects.
+- Choose slide, fade, or simulated page turns. Turn pages with the volume keys, scrub thumbnails, or hide system bars. Align spreads, show the cover on its own, and adjust spacing or auto-scroll speed in webtoon mode.
 
 ## Stats and appearance
 
@@ -103,30 +104,68 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 </tr>
 </table>
 
-- View reading time, history, calendar, and trends. Rate favorite chapters and see them in the chapter rankings.
-- Customize accent colors, light or dark themes, backgrounds, graphics quality, haptics, and orientation lock. Switch between Chinese and English.
+- View reading time, streaks, history, calendar, and trends. Rate favorite chapters and change how the ranking is displayed.
+- Customize accent colors, light or dark themes, backgrounds, startup artwork, graphics quality, haptics, and orientation lock. Switch between Chinese and English.
 - Use phone, tablet, and landscape layouts with minimal graphics and reduced-motion options.
-- Use a PIN to protect selected shelf categories and favorites. Settings also provides cache management, automatic backups, and update checks.
+- Use a PIN to protect selected shelf categories and favorites. Settings also provides storage cleanup, eye comfort, reading reminders, and data management.
 
-## Sources and backups
+## Built-in sources
+
+<img src="docs/readme-media/source-management.png" width="220" alt="Source management">
+
+### Ebooks and novels
+
+| Built-in source | What the app supports |
+| --- | --- |
+| **Z-Library** | Multilingual ebook search, details, available file formats, account sign-in, and node selection and testing. Downloads follow the source and account rules. |
+| **Alice’s Library (爱丽丝书屋)** | Automatic endpoint selection, search, and complete EPUB downloads. Browse categories, updates, and daily, weekly, monthly, and overall rankings. |
+| **Fanqie Novel (public aggregator)** | Public title search, book IDs and official links, chapter lists, online reading for available chapters, and chapter-by-chapter EPUB downloads. |
+| **Novelia** | Search light novels and translations, view long chapter lists, read online, and download complete books. Discovery shows the source’s public daily ranking. |
+| **Wenku8 Library** | Find light novels, view catalog metadata, download complete EPUBs, and browse by public popularity or update date. |
+| **Aixia Ebooks (爱下电子书)** | Search, categories, updates, and whole-book downloads where provided, including tested TXT books. |
+| **Quanben Novels (全本小说网)** | Search, chapter lists, and complete EPUB downloads for available works. |
+| **Huaben Novels (话本小说)** | Search web fiction and fan works. Download complete EPUBs with available illustrations. |
+| **SF Light Novels (SF轻小说)** | Search light novels, browse categories and available rankings, and download eligible works as EPUB. |
+| **Shuge (书阁)** | Search, chapters, online reading, and EPUB packaging with chapter completeness checks. |
+
+### Manga
+
+| Built-in source | What the app supports |
+| --- | --- |
+| **MangaDex** | Search multilingual titles and aliases. Browse genres and chapter languages, read online, or download chapters. |
+| **19 Manga (19漫画)** | Chinese title search, updates, series details, chapter lists, online reading, and downloads. |
+| **Xipi Manga (嬉皮漫画)** | Search, updates, categories, and chapter downloads with original titles, extras, and fractional chapter numbers. |
+| **Bili Manga (嗶哩漫畫)** | Search, browse categories and updates, and read or download available chapters. |
+| **Aiman (爱漫画)** | Search, browse paginated chapter lists, and read or download via the source’s available HTTPS routes. |
+| **Pufei Manga (扑飞漫画)** | Search, browse categories, load chapter lists, read online, and download available chapters. |
+| **vomic** | Search and browse chapters, with in-app sign-in for gated actions. |
+
+### Source management and extensions
+
+- Enable, disable, or verify providers in **Settings → Source management**. Cross-source search can query multiple providers. Switch when a title has another available source.
+- Import **Legado JSON** with CSS, JSONPath, and supported discovery rules. **Venera-compatible manga sources** can sync from a script repository. The catalog varies with the repository version. Examples include MYCOMIC with site verification and optionally synced sources such as WNACG, E-Hentai, and JMComic.
+- Discovery remembers separate sources and filters for novels and manga. Browse aggregated and single-source lists, updates, rankings, and multiple categories. Inspect participating sources and errors. See results in a list, grid, or large-cover view.
+- Third-party availability, sign-in, regional access, and downloadable chapters depend on each service. [Novel source checks](docs/source-repair-2026-10-20.md) · [Whole-book EPUB verification](docs/novel-guest-sources-verification-2026-10-19.md) · [Manga source checks](docs/latest-comic-source-verification-2026-10-18.md)
+
+## Backups and device transfer
 
 <table>
 <tr>
-<td width="33%" align="center"><img src="docs/readme-media/source-management.png" width="220" alt="Source management"><br><sub>Source management</sub></td>
 <td width="33%" align="center"><img src="docs/readme-media/backup-preview.png" width="220" alt="Local backup restore preview"><br><sub>Local backup restore preview</sub></td>
 <td width="33%" align="center"><img src="docs/readme-media/device-transfer.png" width="220" alt="Device transfer completed"><br><sub>Device transfer completed</sub></td>
 </tr>
 </table>
 
-- Manage built-in novel and manga sources or import custom Legado JSON sources with CSS and JSON selection rules. Availability, sign-in, and verification depend on the provider.
-- Export books, progress, favorites, annotations, history, settings, and sources as a portable `.ciallo` backup. Preview imports, merge or migrate the whole device, and undo the last migration.
+- Export books, progress, favorites, annotations, history, settings, and sources as a portable `.ciallo` backup. Preview imports, merge or migrate the whole device, and undo the last migration. Enable automatic backups to restore an empty shelf when prompted.
 - Transfer files over the same Wi-Fi network, a hotspot, or Wi-Fi Direct. Confirm the pairing code for encrypted transfers with progress, cancellation, and resume. [Device transfer and backup guide](docs/device-transfer.md)
+- Import older ZIP backups as well. Merging keeps local settings and matching sources while keeping the latest reading position. Unlock protected content with its PIN before including it. Sign-in sessions, secrets, and PINs are set up again on the receiving device.
 
 ## Getting started
 
 1. Download the ARM64 APK from [GitHub Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) and follow Android’s install prompt. Each release includes `SHA256SUMS.txt`.
 2. Open **Shelf → Import books** for local files, or search for titles in **Library**. Enable your preferred providers in **Settings → Source management**.
 3. Tap the novel reader to show its controls. Select the headphones to start listening. Long-press text to look up a word, mark a passage, or export a Reading Moment.
+4. The app checks for updates at startup. You can also use **Settings → About → Check for updates**. The same panel offers GitHub and a mirror for downloads. Mirror APKs are verified against the official checksum, and Android asks you to confirm installation.
 
 ## Development, feedback, and licenses
 

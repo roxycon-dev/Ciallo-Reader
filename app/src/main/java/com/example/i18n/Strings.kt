@@ -1355,6 +1355,7 @@ private val EN: Map<String, String> = mapOf(
     "查看下载进度" to "View download progress",
     "查看更新" to "View update",
     "检查更新" to "Check for updates",
+    "国内镜像下载（gh-proxy.com）" to "Download via mirror (gh-proxy.com)",
     "继续安装更新" to "Continue installing the update",
     "导出安装包" to "Export package",
     "可读离线版本 · 更新下载失败" to "Offline copy readable · update download failed",

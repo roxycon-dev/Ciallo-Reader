@@ -26,7 +26,7 @@ import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.coroutineContext
 
-private val GITHUB_DOWNLOAD_HOSTS =
+internal val GITHUB_DOWNLOAD_HOSTS =
     setOf("github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com")
 
 internal class AppUpdateDownload(
