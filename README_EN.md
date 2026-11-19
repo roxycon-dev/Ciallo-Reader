@@ -12,7 +12,7 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 </div>
 
-[1.6.5 release notes](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.6.5)
+[1.6.6 release notes](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.6.6)
 
 [Discovery and shelf](#discovery-and-shelf) · [Novels and ebooks](#novels-and-ebooks) · [Listening and annotations](#listening-dictionaries-and-annotations) · [Manga](#manga) · [Stats and appearance](#stats-and-appearance) · [Built-in sources](#built-in-sources) · [Backups and transfers](#backups-and-device-transfer) · [Getting started](#getting-started)
 

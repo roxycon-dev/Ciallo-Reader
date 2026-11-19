@@ -57,7 +57,7 @@ python novel-reader/.workbuddy/stale_check.py
 
 | 项目 | 内容 |
 | --- | --- |
-| 当前版本 | **1.5.16 / 258**；本轮修复与验证见第 95 章 |
+| 当前版本 | **1.6.6 / 267**；本轮发布记录见第 98 章 |
 | applicationId | `com.aistudio.novelreader.kxmpzq` |
 | 最低系统 | Android 7.0（API 24）；compileSdk / targetSdk = 35 |
 | 技术栈 | Kotlin + Compose M3 + Room + WorkManager + OkHttp + Jsoup + Coil + QuickJS（quickjs-kt）+ **ONNX Runtime**（漫画 OCR / 画质增强 CPU 推理）+ **Cronet**（JS 源网络）+ Brotli + core-splashscreen |
@@ -5222,3 +5222,19 @@ Commit `8d6e3847b1a8fd53df9adbee0ded4f89701bdc4e`；Release 413307957：https://
 
 - 书阁 CF managed challenge 无法在本机无头环境自动求解验证，需真机（Android WebView 指纹）确认 `CfWebViewSolver` 是否解出；若个别网络仍过不去，靠 cookie 持久携带（过盾一次后免重复）。
 - 爱下 `__cn_v` 值取自站点固定脚本，若站点更换常数需同步更新。
+
+## 98. 第一百零四轮执行（2026-11-20：发布 1.6.6 / 267）
+
+### 已落地
+
+- 按用户指定版本将 `versionName` 设为 **1.6.6**、`versionCode` 从 266 递增到 267；README.md / README_EN.md 版本高亮、CHANGELOG、`docs/release-1.6.6-2026-11-20.md`、本指南「当前版本」基准同步。
+- 本版内容 = 第 96 + 97 轮全部修复（听书动效、zlib 节点、登录态显示、5 个书源适配与爱下根因修正）。
+- 发布分支 `feature/wenku8-ui-port` 领先 `origin/main`（1.6.5 / c726eea7）两个修复提交（8cc2c9e6、099bf9e8），为祖先关系，可快进推送。
+
+### 验证
+
+- 正式 ARM64 APK 用固定发布签名 `.signing/release.keystore`（证书 `3ee5fb40…0794`）构建；校验包名、版本、签名，并与 1.6.5 做覆盖升级验证。
+
+### 未做
+
+- 未上真机端到端验收（站点策略与 CF 自动过盾仍需设备确认）；版本号、发布说明与资产在发布回执中补齐。
