@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="./app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp" width="96" alt="Ciallo Reader 图标">
+
 # Ciallo Reader
 
 Android 小说、漫画与电子书阅读器。在线找书，离线续读，也能整理自己的藏书。

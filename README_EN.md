@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="./app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp" width="96" alt="Ciallo Reader app icon">
+
 # Ciallo Reader
 
 An Android reader for novels, manga, and ebooks. Find titles online, organize your collection, and pick up where you left off offline.
