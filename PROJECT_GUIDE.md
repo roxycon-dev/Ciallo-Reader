@@ -5233,8 +5233,15 @@ Commit `8d6e3847b1a8fd53df9adbee0ded4f89701bdc4e`；Release 413307957：https://
 
 ### 验证
 
-- 正式 ARM64 APK 用固定发布签名 `.signing/release.keystore`（证书 `3ee5fb40…0794`）构建；校验包名、版本、签名，并与 1.6.5 做覆盖升级验证。
+- 正式 ARM64 APK 用工作树外的交接私钥 `D:/Ciallo-Private-Signing/handoff-20261106/ciallo-release-portable.p12`（alias `ciallo-reader-release`，密码独立文件）构建——仓库内 `.signing/release.keystore` 是旧证书 `d2115e3c…1146`，会被 `verifyReleaseSigning` 拦截，必须通过环境变量 `KEYSTORE_PATH`/`KEY_ALIAS`/`STORE_PASSWORD`/`KEY_PASSWORD` 覆盖。apksigner 确认证书 `3ee5fb40…0794`；`verify-apk-upgrade.py` 对 1.6.5 判定满足覆盖升级。
+- APK 31,428,070 B，SHA-256 `122144ef6b16cc82447ac03dc9156ae59a60514840cf09af2a12bc85142e3b0d`。
+
+### 发布回执
+
+- 代码提交 `afd2d3b1` 已推送 `origin/main`（`c726eea7..afd2d3b1`，快进），标签 `v1.6.6` 已推送（指向 `afd2d3b1`）。
+- GitHub Release <https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.6.6> 已公开、为 latest，资产 `Ciallo-Reader-v1.6.6.apk`（31,428,070 B）与 `SHA256SUMS.txt`（91 B）；从公网下载 APK 校验 SHA-256 与本地一致。
+- 推送坑：会话环境注入的 `HTTP_PROXY/HTTPS_PROXY=http://127.0.0.1:64236` 会让 `git push` 报 TLS `unexpected eof`；`env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy -u ALL_PROXY -u all_proxy git push ...` 清除代理后恢复正常（curl 直连 github.com 200）。
 
 ### 未做
 
-- 未上真机端到端验收（站点策略与 CF 自动过盾仍需设备确认）；版本号、发布说明与资产在发布回执中补齐。
+- 未上真机端到端验收（站点策略与 CF 自动过盾仍需设备确认）。
