@@ -4,10 +4,14 @@ import android.content.Intent
 import android.speech.tts.TextToSpeech
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -49,6 +53,7 @@ import com.example.ui.components.AppIconButton
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.wenku.LocalWenkuDecorativeMotion
 import com.example.ui.wenku.rememberWenkuAccessibility
+import com.example.ui.wenku.WenkuMotion
 import com.example.ui.wenku.WenkuReaderProgressSlider
 import com.example.ui.wenku.WenkuSheetDialog
 import java.util.Locale
@@ -199,9 +204,12 @@ internal fun ReaderListeningPanel(
                 Text("${String.format(Locale.ROOT, "%.2f", speed)}× · ${timerLabel(state.timer)}",
                     style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
             }
-            AnimatedVisibility(settings, enter = if (motion) fadeIn() else EnterTransition.None,
-                exit = if (motion) fadeOut() else ExitTransition.None) {
-                Column {
+            AnimatedVisibility(
+                settings,
+                enter = if (motion) expandVertically(tween(WenkuMotion.ENTER_MS, easing = WenkuMotion.ease)) + fadeIn() else EnterTransition.None,
+                exit = if (motion) shrinkVertically(tween(WenkuMotion.EXIT_MS, easing = WenkuMotion.ease)) + fadeOut() else ExitTransition.None
+            ) {
+                Column(Modifier.animateContentSize(tween(WenkuMotion.ENTER_MS, easing = WenkuMotion.ease))) {
                     ListeningValue("语速", speed, .5f..3f, 24, { speed = it }) {
                         prefs.ttsSpeed = speed
                         manager.setSpeech(speed, pitch)
@@ -247,9 +255,15 @@ internal fun ReaderListeningPanel(
                     }
                     if (provider == SpeechSource.Custom) {
                         PullOutTextButton(onClick = { showCustom = !showCustom }) { Text(tr("配置自定义语音")) }
-                        if (showCustom) CustomVoiceSettings(manager.customService) {
-                            manager.configureCustomVoice(it)
-                            showCustom = false
+                        AnimatedVisibility(
+                            showCustom,
+                            enter = if (motion) expandVertically(tween(WenkuMotion.ENTER_MS, easing = WenkuMotion.ease)) + fadeIn() else EnterTransition.None,
+                            exit = if (motion) shrinkVertically(tween(WenkuMotion.EXIT_MS, easing = WenkuMotion.ease)) + fadeOut() else ExitTransition.None
+                        ) {
+                            CustomVoiceSettings(manager.customService) {
+                                manager.configureCustomVoice(it)
+                                showCustom = false
+                            }
                         }
                     } else {
                         PullOutTextButton(onClick = { voices = !voices },
@@ -257,7 +271,11 @@ internal fun ReaderListeningPanel(
                             Text(tr(if (voices) "收起音色" else "选择音色"))
                         }
                     }
-                    if (voices && provider == SpeechSource.Edge) {
+                    AnimatedVisibility(
+                        voices && provider == SpeechSource.Edge,
+                        enter = if (motion) expandVertically(tween(WenkuMotion.ENTER_MS, easing = WenkuMotion.ease)) + fadeIn() else EnterTransition.None,
+                        exit = if (motion) shrinkVertically(tween(WenkuMotion.EXIT_MS, easing = WenkuMotion.ease)) + fadeOut() else ExitTransition.None
+                    ) {
                         ListeningOption(tr("自动匹配"), edgeVoice.isEmpty()) {
                             edgeVoice = ""
                             manager.selectEdgeVoice("")
@@ -284,7 +302,11 @@ internal fun ReaderListeningPanel(
                             }
                         }
                     }
-                    if (voices && provider == SpeechSource.System) {
+                    AnimatedVisibility(
+                        voices && provider == SpeechSource.System,
+                        enter = if (motion) expandVertically(tween(WenkuMotion.ENTER_MS, easing = WenkuMotion.ease)) + fadeIn() else EnterTransition.None,
+                        exit = if (motion) shrinkVertically(tween(WenkuMotion.EXIT_MS, easing = WenkuMotion.ease)) + fadeOut() else ExitTransition.None
+                    ) {
                         ListeningOption(tr("自动匹配"), voice.isEmpty()) {
                             voice = ""
                             manager.selectVoice("")

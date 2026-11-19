@@ -73,7 +73,9 @@ object JsSourceRepo {
     }
 
     /** 本地补丁版本：升级后尝试更新源脚本，失败时仍可使用旧缓存。 */
-    private const val PATCH_VERSION = 50
+    // 51：强制重拉远程源——goda 上游 v1.2.1 修复站点改版（/api/v2 章节图片混淆解码），
+    // 旧缓存脚本搜不到/打不开，需随本次启动刷新（2026-11-19 实测搜索/目录/取图全链路可用）。
+    private const val PATCH_VERSION = 51
     // Raw cache format stays stable when compatibility patches change.
     private const val RAW_CACHE_PREFIX = "// EASYREADER_RAW_SOURCE_V28\n"
 

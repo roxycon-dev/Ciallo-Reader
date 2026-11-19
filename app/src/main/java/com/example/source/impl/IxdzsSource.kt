@@ -31,6 +31,7 @@ class IxdzsSource(
     override suspend fun getShareUrl(bookId: String): String = bookUrl(bookId).toString()
     override suspend fun getCoverHeaders(url: String) = mapOf("Referer" to baseUrl.toString())
     override val capabilities = SourceCapabilities(supportEbook = true)
+    private val appContext: Context = context.applicationContext
     private val http = client ?: JsSourceProxy.failoverClient(context.applicationContext,
         SharedHttpTransport.builder().connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS).callTimeout(60, TimeUnit.SECONDS).build())
@@ -43,14 +44,40 @@ class IxdzsSource(
         return baseUrl.newBuilder().addPathSegment("read").addPathSegment(bookId).addPathSegment("").build()
     }
     private suspend fun page(url: HttpUrl): org.jsoup.nodes.Document {
-        val request = Request.Builder().url(url).header("Referer", baseUrl.toString())
-            .header("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/139.0.0.0 Mobile Safari/537.36").build()
-        return guestNovelIoRetry { http.newCall(request).executeCancellable().use { response ->
-            if (!response.isSuccessful) throw SourceException.NetworkError("爱下电子书返回 HTTP ${response.code}")
-            val html = response.readSourceText()
+        val ua = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/139.0.0.0 Mobile Safari/537.36"
+        fun request(cookie: String?) = Request.Builder().url(url).header("Referer", baseUrl.toString())
+            .header("User-Agent", ua)
+            .apply { if (!cookie.isNullOrBlank()) header("Cookie", cookie) }.build()
+        suspend fun fetchOnce(): org.jsoup.nodes.Document {
+            val storedCookie = com.example.source.js.JsCookieJar.cookieHeader(appContext, url.toString())
+            val response = http.newCall(request(storedCookie.ifBlank { null })).executeCancellable()
+            val code = response.code
+            val html = response.use { it.readSourceText() }
+            val blocked = code !in 200..299 || SourceResponse.problem(html) != null
+            if (!blocked) return Jsoup.parse(html, url.toString())
+            // WAF 指纹/Cookie 门：OkHttp 被拦，但同一网络下真实 Chromium WebView 往往能过门。
+            val webHtml = com.example.source.js.WebViewPageLoader.loadHtml(appContext, url.toString(), ua)
+            if (webHtml != null) {
+                val cookie = com.example.source.js.JsCookieJar.cookieHeader(appContext, url.toString())
+                if (cookie.isNotBlank()) {
+                    val retry = http.newCall(request(cookie)).executeCancellable()
+                    val retryCode = retry.code
+                    val retryHtml = retry.use { it.readSourceText() }
+                    if (retryCode in 200..299 && SourceResponse.problem(retryHtml) == null) {
+                        return Jsoup.parse(retryHtml, url.toString())
+                    }
+                }
+                if (SourceResponse.problem(webHtml) == null) {
+                    return Jsoup.parse(webHtml, url.toString())
+                }
+            }
+            if (code !in 200..299) {
+                throw SourceException.NetworkError("爱下电子书返回 HTTP $code（站点拦截，请稍后重试或检查网络）")
+            }
             SourceResponse.problem(html)?.let { throw SourceException.ParseError(it) }
-            Jsoup.parse(html, url.toString())
-        } }
+            return Jsoup.parse(html, url.toString())
+        }
+        return guestNovelIoRetry { fetchOnce() }
     }
     private suspend fun detail(bookId: String, fresh: Boolean = false): Detail = mutex.withLock {
         cache[bookId]?.takeIf { !fresh && SystemClock.elapsedRealtime() - it.at < 60_000 } ?: run {

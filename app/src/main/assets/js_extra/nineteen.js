@@ -2,7 +2,7 @@
 class Nineteen extends ComicSource {
     name = "19漫画";
     key = "nineteen";
-    version = "1.1.1";
+    version = "1.2.0";
     minAppVersion = "1.6.0";
     url = "https://m.sxchex.com";
     baseUrl = "https://m.sxchex.com";
@@ -45,20 +45,53 @@ class Nineteen extends ComicSource {
         throw new Error("19漫画两个站点线路均不可用：" + String(lastError));
     }
 
+    coverFrom(img) {
+        if (!img) return "";
+        const attrs = img.attributes || {};
+        let url = attrs["data-original"] || attrs["data-src"] || "";
+        if (!url || url.indexOf("data:") === 0) {
+            const m = String(attrs["style"] || "").match(/url\(['"]?(https?:\/\/[^'")]+)['"]?\)/);
+            url = m ? m[1] : "";
+        }
+        if (!url || url.indexOf("data:") === 0) {
+            const src = attrs["src"] || "";
+            url = src.indexOf("data:") === 0 ? "" : src;
+        }
+        return url ? this.abs(url) : "";
+    }
+
     parseCards(html, page) {
         const doc = new HtmlDocument(html);
         try {
             const comics = [], seen = new Set();
-            for (const item of doc.querySelectorAll(".common-comic-item")) {
-                const title = item.querySelector(".comic__title a"), image = item.querySelector("img");
-                if (!title || !/^\/comic\/\d+$/.test(title.attributes.href || "")) continue;
-                const id = this.abs(title.attributes.href);
+            // 新模板（2026-11）：ul.comic-sort > li.comic-item > a[href=/comic/N]
+            for (const item of doc.querySelectorAll(".comic-item")) {
+                const link = item.querySelector("a[href]");
+                const href = link ? (link.attributes.href || "") : "";
+                if (!/^\/comic\/\d+$/.test(href)) continue;
+                const id = this.abs(href);
                 if (seen.has(id)) continue;
+                const titleEl = item.querySelector("p.title");
+                const title = (titleEl ? titleEl.text : (link.attributes.title || "")).trim();
+                if (!title) continue;
                 seen.add(id);
-                const latest = item.querySelector(".comic-update a");
-                comics.push(new Comic({id, title: title.text.trim(),
-                    cover: image ? this.abs(image.attributes["data-original"] || image.attributes.src) : "",
+                const latest = item.querySelector("span.chapter");
+                comics.push(new Comic({id, title, cover: this.coverFrom(item.querySelector("img")),
                     latestChapter: latest ? latest.text.trim() : null, tags: []}));
+            }
+            // 旧模板兜底：.common-comic-item
+            if (!comics.length) {
+                for (const item of doc.querySelectorAll(".common-comic-item")) {
+                    const title = item.querySelector(".comic__title a"), image = item.querySelector("img");
+                    if (!title || !/^\/comic\/\d+$/.test(title.attributes.href || "")) continue;
+                    const id = this.abs(title.attributes.href);
+                    if (seen.has(id)) continue;
+                    seen.add(id);
+                    const latest = item.querySelector(".comic-update a");
+                    comics.push(new Comic({id, title: title.text.trim(),
+                        cover: image ? this.abs(image.attributes["data-original"] || image.attributes.src) : "",
+                        latestChapter: latest ? latest.text.trim() : null, tags: []}));
+                }
             }
             let maxPage = page;
             for (const link of doc.querySelectorAll("a[href]")) {
@@ -93,15 +126,17 @@ class Nineteen extends ComicSource {
             const doc = new HtmlDocument(await this.page("/category/"));
             try {
                 const rows = [], seen = new Set();
-                for (const section of doc.querySelectorAll(".cate-col")) {
-                    const heading = section.querySelector(".cate-title");
-                    const name = heading ? heading.text.trim().replace(/[：:]$/, "") : "";
-                    for (const link of section.querySelectorAll("a[href]")) {
+                // 新模板（2026-11）：两个 .sort-class-container，依次为 类型(list)、标签(tags)
+                const groupNames = ["类型", "标签"];
+                const blocks = doc.querySelectorAll(".sort-class-container");
+                blocks.forEach((block, bi) => {
+                    const name = groupNames[bi] || ("分组" + (bi + 1));
+                    for (const link of block.querySelectorAll("a[href]")) {
                         const route = link.attributes.href || "", label = link.text.trim();
-                        if (!/^\/category\/(list|tags|theme|quality|city|copyright|pay|finish)\/\d+$/.test(route) || !label || seen.has(route)) continue;
+                        if (!/^\/category\/(list|tags)\/\d+$/.test(route) || !label || seen.has(route)) continue;
                         seen.add(route); rows.push({group:name, label, route});
                     }
-                }
+                });
                 if (!rows.length) throw new Error("19漫画未返回源站分类，请稍后刷新");
                 this.browseCategories = {at:Date.now(), rows};
             } finally { doc.dispose(); }
@@ -110,7 +145,7 @@ class Nineteen extends ComicSource {
             target:{page:"category", attributes:{category:row.label, param:row.route}}}));
     }
 
-    category = {title:"19漫画分类", parts:["分类", "标签", "类型", "品质", "地区", "版权", "资费", "进度"]
+    category = {title:"19漫画分类", parts:["类型", "标签"]
         .map(name => ({name, type:"dynamic", loader:() => this.nativeCategories(name)}))};
 
     async browse(route, options, page) {
@@ -156,39 +191,69 @@ class Nineteen extends ComicSource {
     parseMetadata(html, book) {
         const doc = new HtmlDocument(html);
         try {
-            const title = doc.querySelector(".de-info__box .j-comic-title"), cover = doc.querySelector(".de-info__cover img");
-            if (!title) throw new Error("19漫画作品已下架或详情页面无效");
+            // 新模板（2026-11）
+            let title = doc.querySelector(".comic-detail h1.name") || doc.querySelector("h1.name");
+            let cover = doc.querySelector(".comic-cover img");
+            let description = doc.querySelector(".comic-describe") || doc.querySelector("#js_desc_content");
             const author = doc.querySelector(".comic-author .name");
-            const description = doc.querySelector(".comic-intro .intro-total") || doc.querySelector(".comic-intro .intro");
-            const tags = doc.querySelectorAll('.comic-status a[href*="/category/tags/"]').map(n => n.text.trim()).filter(Boolean);
+            let tags = doc.querySelectorAll('.comic-types a[href*="/category/tags/"]').map(n => n.text.trim()).filter(Boolean);
+            // 旧模板兜底
+            if (!title) {
+                title = doc.querySelector(".de-info__box .j-comic-title");
+                cover = cover || doc.querySelector(".de-info__cover img");
+                description = description || doc.querySelector(".comic-intro .intro-total") || doc.querySelector(".comic-intro .intro");
+                if (!tags.length) tags = doc.querySelectorAll('.comic-status a[href*="/category/tags/"]').map(n => n.text.trim()).filter(Boolean);
+            }
+            if (!title) throw new Error("19漫画作品已下架或详情页面无效");
+            const descText = (description ? description.text.trim() : "").replace(/(全文|收起)$/, "").trim();
             return {id: book, title: title.text.trim(),
-                cover: cover ? this.abs(cover.attributes["data-original"] || cover.attributes.src) : "",
-                author: author ? author.text.trim() : "", description: description ? description.text.trim() : "", tags};
+                cover: cover ? this.coverFrom(cover) : "",
+                author: author ? author.text.trim() : "", description: descText, tags};
         } finally { doc.dispose(); }
     }
 
     async discoverMetadata(book) { return this.parseMetadata(await this.page("/comic/" + this.workId(book)), book); }
 
     parseImages(html, bookId, chapterPath) {
+        // 旧模板：readPic 权限校验 + .rd-article__pic
         const permission = html.match(/\breadPic\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
-        if (!permission || permission[1] !== String(bookId) || "/chapter/" + permission[2] !== chapterPath)
-            throw new Error("19漫画阅读页与所选章节不匹配");
-        if (Number(permission[3]) > 0 || Number(permission[4]) > 0) throw new Error("该章节需要源站登录或购买");
+        if (permission) {
+            if (permission[1] !== String(bookId) || "/chapter/" + permission[2] !== chapterPath)
+                throw new Error("19漫画阅读页与所选章节不匹配");
+            if (Number(permission[3]) > 0 || Number(permission[4]) > 0) throw new Error("该章节需要源站登录或购买");
+            const doc = new HtmlDocument(html);
+            try {
+                const counter = doc.querySelector(".page-index__btn .count");
+                const expected = counter ? Number(counter.text.trim()) : 0;
+                const pages = doc.querySelectorAll(".rd-article-wr .rd-article__pic");
+                if (!Number.isInteger(expected) || expected <= 0 || pages.length !== expected)
+                    throw new Error("19漫画章节图片不完整：" + pages.length + "/" + expected);
+                const seen = new Set();
+                const images = pages.map((node, index) => {
+                    const image = node.querySelector("img[data-original]");
+                    const url = image ? image.attributes["data-original"] : "";
+                    if (Number(node.attributes["data-index"]) !== index + 1 || !/^https:\/\//.test(url) || seen.has(url))
+                        throw new Error("19漫画章节存在缺页或无效图片");
+                    seen.add(url);
+                    return url;
+                });
+                return {images};
+            } finally { doc.dispose(); }
+        }
+        // 新模板（2026-11）：ul.comic-list > li.comic-page[data-index] > img.lazy[data-original]
         const doc = new HtmlDocument(html);
         try {
-            const counter = doc.querySelector(".page-index__btn .count");
-            const expected = counter ? Number(counter.text.trim()) : 0;
-            const pages = doc.querySelectorAll(".rd-article-wr .rd-article__pic");
-            if (!Number.isInteger(expected) || expected <= 0 || pages.length !== expected)
-                throw new Error("19漫画章节图片不完整：" + pages.length + "/" + expected);
+            const pages = doc.querySelectorAll("li.comic-page");
+            if (!pages.length) throw new Error("19漫画未返回章节图片（可能已下架或需要权限）");
             const seen = new Set();
-            const images = pages.map((node, index) => {
+            const images = [];
+            pages.forEach(node => {
                 const image = node.querySelector("img[data-original]");
-                const url = image ? image.attributes["data-original"] : "";
-                if (Number(node.attributes["data-index"]) !== index + 1 || !/^https:\/\//.test(url) || seen.has(url))
+                const url = image ? (image.attributes["data-original"] || "") : "";
+                if (!/^https?:\/\//.test(url) || seen.has(url))
                     throw new Error("19漫画章节存在缺页或无效图片");
                 seen.add(url);
-                return url;
+                images.push(url);
             });
             return {images};
         } finally { doc.dispose(); }

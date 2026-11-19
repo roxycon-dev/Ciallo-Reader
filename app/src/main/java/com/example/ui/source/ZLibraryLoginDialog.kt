@@ -54,7 +54,7 @@ fun ZLibraryLoginDialog(
         value = withTimeoutOrNull(5_000) { source.getRegistrationUrl() }
     }
     val isJsSource = source.id.startsWith("js_")
-    val siteVerification = source.id == "js_mycomic"
+    val siteVerification = source.id in setOf("js_mycomic", "js_bilimanga")
     var loginMode by remember(source.id) { mutableIntStateOf(0) }
     var username by remember(source.id) { mutableStateOf("") }
     var password by remember(source.id) { mutableStateOf("") }

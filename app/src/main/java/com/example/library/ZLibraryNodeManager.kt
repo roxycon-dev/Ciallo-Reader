@@ -19,6 +19,9 @@ object ZLibraryNodeManager {
     private const val KEY_SCRAPED_NODES = "scraped_nodes"
     private const val KEY_CUSTOM_NODES = "custom_nodes"
     private const val KEY_SELECTED_NODE = "selected_node"
+    // 用户亲自选定的节点（手动“使用”时写入）。自动容灾只临时改运行时路由，
+    // 不覆盖它；该节点恢复后自动切回，避免“选了能用的节点却被换到不能用的”。
+    private const val KEY_PINNED_NODE = "pinned_node"
 
     // Historical checks are not a live availability guarantee.
     val VERIFIED_LIVE_NODES = emptySet<String>()
@@ -80,6 +83,9 @@ object ZLibraryNodeManager {
     fun removeCustomNode(context: Context, node: String) {
         val list = getCustomNodes(context).filterNot { it == node }
         prefs(context).edit().putString(KEY_CUSTOM_NODES, list.joinToString("\n")).apply()
+        if (getPinnedNode(context) == node) {
+            prefs(context).edit().remove(KEY_PINNED_NODE).apply()
+        }
         if (getSelectedNode(context) == node) {
             selectNode(context, DEFAULT_NODE)
         }
@@ -92,16 +98,34 @@ object ZLibraryNodeManager {
             ?: DEFAULT_NODE
     }
 
-    fun selectNode(context: Context, rawNode: String) {
+    fun selectNode(context: Context, rawNode: String, byUser: Boolean = false) {
         val clean = cleanNode(rawNode) ?: return
-        prefs(context).edit().putString(KEY_SELECTED_NODE, clean).apply()
+        val p = prefs(context)
+        if (byUser) {
+            p.edit().putString(KEY_SELECTED_NODE, clean).putString(KEY_PINNED_NODE, clean).apply()
+        } else {
+            // 自动切换：用户已固化选择时不覆盖 selected_node（界面仍显示用户的选择），
+            // 仅改运行时路由；无固化选择时才把可用节点持久化为当前节点。
+            val pinned = p.getString(KEY_PINNED_NODE, null)?.trim()
+            if (pinned.isNullOrBlank()) {
+                p.edit().putString(KEY_SELECTED_NODE, clean).apply()
+            }
+        }
         ZLibraryNodeConfig.domain = clean
     }
+
+    /** 用户手动固化的节点（可能为空：从未手动选择过）。 */
+    fun getPinnedNode(context: Context): String? =
+        prefs(context).getString(KEY_PINNED_NODE, null)?.trim()?.takeIf { it.isNotBlank() }
 
     /** 启动时恢复上次选择的节点。
      *  迁移（2026-09-04）：旧默认 zh.101k.by 已整站 301 → zlib.bz，存的是它就
      *  就地升级为新默认，避免老用户启动即落在重定向域上（搜索全卡/假结果）。 */
     fun restoreSelection(context: Context) {
+        val pinned = prefs(context).getString(KEY_PINNED_NODE, null)?.trim()
+        if (pinned != null && MIGRATED_NODES.containsKey(pinned)) {
+            prefs(context).edit().putString(KEY_PINNED_NODE, MIGRATED_NODES[pinned]!!).apply()
+        }
         val stored = prefs(context).getString(KEY_SELECTED_NODE, null)?.trim()
         if (stored != null && MIGRATED_NODES.containsKey(stored)) {
             val migrated = MIGRATED_NODES[stored]!!

@@ -296,7 +296,7 @@ python novel-reader/.workbuddy/stale_check.py
 | `MhttuImageDecryptor.kt`（47 行） | 图床解密 | 特定域名（mhttu）图片字节解密 + 扩展名判定 |
 | `ImageBytes.kt`（153 行） | 图片字节工具 | gzip / **brotli** 解压、`normalizeImage`、`isAvif`、`webpVariants`、`decodeOk` |
 | `ZLibraryNodeConfig.kt`（21 行） | 节点配置常量 | 默认域名等 |
-| `ZLibraryNodeManager.kt`（197 行） | 节点管理 | `VERIFIED_LIVE_NODES` / `INITIAL_SCRAPED_NODES` / `RETIRED_NODES` 三张表，自定义节点增删、`selectNode` / `restoreSelection` / `scrapeNodes` |
+| `ZLibraryNodeManager.kt`（221 行） | 节点管理 | `VERIFIED_LIVE_NODES` / `INITIAL_SCRAPED_NODES` / `RETIRED_NODES` 三张表，自定义节点增删、`selectNode`（`byUser` 固化 `pinned_node`）/ `getPinnedNode` / `restoreSelection` / `scrapeNodes` |
 | `ZLibraryNativeSession.kt`（369 行） | 原生会话 | 用隐藏 WebView 承载登录/搜索/取真实下载链接；`clickDiamWallGate`、`parseCurrentPage`、轮询调度 |
 
 ### 4.5 `mangatranslate/` 漫画翻译（含子包 13 个 Kotlin 文件 / 4854 行）
@@ -360,7 +360,7 @@ python novel-reader/.workbuddy/stale_check.py
 | `JsonBookSource.kt`（665 行） | 自定义 JSON 书源（原生 + Legado 兼容） | 模板 `{keyword}` / `{keyword_b64}`；URL 模板 `{{$.id}}` 取值；`insecureTls` 时 trust-all SSLContext；**漫画源判定** `isComicLike`（配置优先，否则看 imageSelector 是否含 `@src`/`data-src`/`img`）；`extractImageUrls` 支持纯 URL 列表与 `<img>` 片段（`data-src`/`data-original`/`data-lazy-src`/`src` 优先级）；`searchHtml` / `searchHtmlJson` 双通道 |
 | `MangaDexSource.kt`（950 行） | MangaDex 源 | `searchOfficialApi` + `searchMirror` 双路（镜像 ↔ 官方 UUID 与 slug 互查缓存）、`officialChapterImages` / `mirrorFallbackImages`、`parseJsonLdAuthor` 补作者、`languageLabel` |
 | `MockBookSource.kt`（93 行） | 测试用假源 | 样例书（生产构建会被过滤隐藏） |
-| `XbookcnSource.kt`（395 行） | 书阁（xbookcn.app）成人小说源 | 搜索 `/search?q=` 取 `#search-books li`；详情与目录同页解析，只保存 12 位 hex 作品 id（slug 变化由站点重定向兜底）；正文 `article.reading-text p`；整本下载返回 `#ciallo-xbookcn-epub-v1` 标记，由 `XbookcnEpub` 逐章打包；有界重试 + `CfWebViewSolver` 过盾 |
+| `XbookcnSource.kt`（410 行） | 书阁（xbookcn.app）成人小说源 | 搜索 `/search?q=` 取 `#search-books li`；详情与目录同页解析，只保存 12 位 hex 作品 id（slug 变化由站点重定向兜底）；正文 `article.reading-text p`；整本下载返回 `#ciallo-xbookcn-epub-v1` 标记，由 `XbookcnEpub` 逐章打包；有界重试 + `CfWebViewSolver` 过盾（403/503 先读 body 交 `statusProblem` 判定再过盾，Cookie 持久携带） |
 
 #### 4.6.4 `source/importer/`（1 文件 / 639 行）
 
@@ -375,9 +375,10 @@ python novel-reader/.workbuddy/stale_check.py
 | `JsSourceEngine.kt`（558 行） | 单源 QuickJS 运行环境 | 注入 Venera 运行时 + 源脚本；同步/异步桥；同源互斥与异步收尾；bootstrap 取消时完成一次性 guard 注册，缓存原 runtime；像素级 modifyImage |
 | `AimanhuaTls.kt`（54 行） | 爱漫画证书链兼容 | 系统 CA→官方 ISRG Root X2 CA→已知公钥到期后 14 天缓冲；保留域名验证，其他书源不启用此策略 |
 | `JsMessageHandler.kt`（1035 行） | JS↔Kotlin 消息桥 | `load_data`/`save_data`/`load_setting`、`convert`（utf8/gbk/base64/md5/sha1/sha256/sha512/hmac/aes-ecb·cbc·cfb·ofb/rsa/hex）、`http`（Cronet 实现）、`cookie`、`html`（DOM）、`image`、`ui`、`async`、`random` |
-| `JsComicSource.kt`（926 行） | JS 漫画源封装 | 包装成 `ComicSource`；`numericIdFallback`（**号码牌直达**：纯数字 ID 搜索无结果时按 ID 直接加载详情）、`resolveEhentaiImage`、`resolveImageConfig`、`extractComicId`、`VeneraRuntime` |
-| `JsSourceRepo.kt`（1549 行） | JS 源仓库 | `ADULT_KEYS` / `LOGIN_KEYS` / `EXCLUDED_KEYS` / `INSECURE_KEYS` 四张策略表；`LOCAL_EXTRA_SOURCES`（`assets/js_extra/` 下的 `bilimanga.js` / `vomic.js`）；索引镜像 `INDEX_MIRRORS`、`fetchIndex` / `fetchScript` / `parseIndex`（891 行的 `patchScript` 做兼容补丁）、`healthCheck` / `needsRepair` |
+| `JsComicSource.kt`（934 行） | JS 漫画源封装 | 包装成 `ComicSource`；`numericIdFallback`（**号码牌直达**：纯数字 ID 搜索无结果时按 ID 直接加载详情）、`resolveEhentaiImage`、`resolveImageConfig`、`extractComicId`、`VeneraRuntime`；bilimanga 验证成功写 `setLoggedIn(true)` |
+| `JsSourceRepo.kt`（1552 行） | JS 源仓库 | `ADULT_KEYS` / `LOGIN_KEYS` / `EXCLUDED_KEYS` / `INSECURE_KEYS` 四张策略表；`LOCAL_EXTRA_SOURCES`（`assets/js_extra/` 下的 `bilimanga.js` / `vomic.js`）；索引镜像 `INDEX_MIRRORS`、`fetchIndex` / `fetchScript` / `parseIndex`（891 行的 `patchScript` 做兼容补丁）、`healthCheck` / `needsRepair`；`PATCH_VERSION=51` 触发拉取上游 goda v1.2.1 |
 | `CfWebViewSolver.kt`（293 行） | **Cloudflare 挑战求解** | `isChallengeResponse` 识别 → 隐藏 WebView 求解 → `clearanceOf` 提取 cf_clearance → `syncToJsCookieJar` 回写；`inflight` 去重 + `lastFailAt` 冷却 |
+| `WebViewPageLoader.kt`（168 行） | **通用 WebView 取页兜底** | `loadHtml`：隐藏 WebView 加载目标 URL，等页面非拦截后取 `outerHTML`，并把 Cookie 同步进 `JsCookieJar`；适配非 CF 的 TLS 指纹/Cookie 门（如爱下 Tengine WAF）；`looksBlocked` 判拦截页、`lastFailAt` 每 host 5 分钟冷却 |
 | `JsHtmlStore.kt`（185 行） | JS HTML DOM 存储 | Jsoup DOM；按所属文档释放元素与节点句柄，最多 8 文档 / 4MiB 估算驻留，身份映射避免线性查找 |
 | `QuickJsAsyncLifecycle.kt`（39 行） | 固定 alpha13 的异步任务收尾 | 同源互斥锁内等待 native 桥任务完成，删除已完成 Job、恢复取消的内部 scope、清理异常并 GC；现有 ProGuard 保留 QuickJs 字段 |
 | `JsUiDialogs.kt`（176 行） | JS 侧弹输入 | `JsActivityTracker` 拿当前 Activity，`awaitJsInputDialog` 挂起等待用户输入 |
@@ -397,7 +398,7 @@ python novel-reader/.workbuddy/stale_check.py
 | `ZLibraryEapiClient.kt`（264 行） | eapi JSON 客户端 | `login` / `getDailyDownloadLimit` / `search` / `getBookInfo` / `getFormats` / `getDownloadLink`；`md5Hex` 签名 |
 | `EncryptedCookieJar.kt`（124 行） | 加密 Cookie 存储 | `remix_userid` / `remix_userkey` 登录态，按 domain 作用域匹配请求主机 |
 | `ZLibraryCredentialStorage.kt`（64 行） | 凭证存储 | 账号 / Cookie / 当前域名持久化 |
-| `ZLibraryEndpointProvider.kt`（239 行） | 节点提供者 + 容灾 | `isNodeReachable` / `scanForLiveNode` / `adoptLiveNode` / `failoverFrom` / `getEndpoint` / `setCustomEndpoint` / `diagnoseAllEndpoints` |
+| `ZLibraryEndpointProvider.kt`（278 行） | 节点提供者 + 容灾 | `isNodeReachable`（直连 + 系统代理双路，不误判代理节点）/ `confirmAlive`（换节点前全量二次确认）/ `scanForLiveNode` / `adoptLiveNode` / `failoverFrom` / `getEndpoint`（尊重 `pinned_node`，死亡才临时换节点、恢复后自动切回）/ `setCustomEndpoint` / `diagnoseAllEndpoints` |
 | `RemoteEndpointProvider.kt`（179 行） | 远程节点表 | 从多个 `PORTAL_SOURCES` 抓最新入口，`parseConfigs` + 缓存 |
 | `EndpointHealthChecker.kt`（212 行） | 节点健康检查 | 见下方算法 |
 | `ZLibraryDomainResolver.kt`（48 行） | 域名解析门面 | 组合 endpointProvider + healthChecker，`resolveDomain` / `invalidateCache` |
@@ -615,7 +616,7 @@ python novel-reader/.workbuddy/stale_check.py
 | 包 | 文件 |
 | --- | --- |
 | `help/` | `LibraryHelpBottomSheet.kt`（358 行）、`JsonSourceGuideCard.kt`（358 行）、`HelpSection.kt`（115 行：`HelpSectionHeader` / `FlowStepItem` / `TextDetailCard`）、`FaqExpandableItem.kt`（358 行） |
-| `source/` | `SourceManagementScreen.kt`（1607 行：**v1.1.0 重排版**——一张玻璃卡内三等分快捷入口 + `SourceTileDivider`、分组标题去吸顶玻璃改纯文字、行高 56、`SourceRow` / `SourceGroupCard` / `SourceImportEntryRow` / `SourceCollapsingTopBar`）、`ZLibraryNodeManagementScreen.kt`（517 行，节点测速与选择）、`ZLibraryLoginDialog.kt`（1556 行） |
+| `source/` | `SourceManagementScreen.kt`（1499 行：**v1.1.0 重排版**——一张玻璃卡内三等分快捷入口 + `SourceTileDivider`、分组标题去吸顶玻璃改纯文字、行高 56、`SourceRow` / `SourceGroupCard` / `SourceImportEntryRow` / `SourceCollapsingTopBar`；`sourceAuthEpoch` 登录态刷新 + `SourceMiniLabel` 已登录/需登录动态标签）、`ZLibraryNodeManagementScreen.kt`（513 行，节点测速与选择 + `testAll` 全部检测 / `probeNode`）、`ZLibraryLoginDialog.kt`（245 行，验证入口覆盖 mycomic/bilimanga） |
 | `theme/` | `Theme.kt`（92 行，主/辅色 StateFlow 过渡 + 明暗配色）、`Color.kt`（62 行，六套阅读主题色 + `glassTitleColor` 自适应）、`Type.kt`（142 行）、`AppFonts.kt`（147 行，**字体唯一来源**：`uiSans`/`uiSerif` 打包 Noto 子集 + `readingFontFamily()`）、`IosMotion.kt`（80 行，iOS 缓动曲线）、`ModifierExtensions.kt`（152 行，iOS 按压反馈 `clickableRowFeedback`）、`AppInsets.kt`（33 行，`LocalAppBottomInset` / `LocalAppBottomInsetNoTabBar`） |
 | `design/` | `DesignTokens.kt`（111 行，圆角 / 间距 / 字号 / 行高 / elevation 令牌 + `shape()`；`ReadingPalette` 统一固定阅读叠色） |
 
@@ -948,7 +949,7 @@ python novel-reader/.workbuddy/stale_check.py
 | `app/src/main/java/com/example/source/NovelInfo.kt`（33 行） | 小说详情模型 |
 | `app/src/main/java/com/example/source/PufeiImageCacheRetry.kt`（27 行） | 扑飞图片缓存重试 |
 | `app/src/main/java/com/example/source/impl/AutoNovelSource.kt`（186 行） | 自动小说源 |
-| `app/src/main/java/com/example/source/impl/IxdzsSource.kt`（120 行） | 爱下电子书小说源 |
+| `app/src/main/java/com/example/source/impl/IxdzsSource.kt`（149 行） | 爱下电子书小说源（WAF 拦截时 `WebViewPageLoader` 兜底 + Cookie 重试） |
 | `app/src/main/java/com/example/source/impl/Wenku8LibrarySource.kt`（111 行） | 文库8小说源 |
 | `app/src/main/java/com/example/source/js/JsComicMetadata.kt`（66 行） | JS 漫画元数据 |
 | `app/src/main/java/com/example/ui/ComicMetadataUi.kt`（87 行） | 漫画元数据界面：标签点按搜索；SelectionContainer 长按选字复制，无自定义菜单 |
@@ -5173,4 +5174,29 @@ Commit `8d6e3847b1a8fd53df9adbee0ded4f89701bdc4e`；Release 413307957：https://
 - GitHub 附件 `01.zip` 在本机不可达（`github.com` / `objects.githubusercontent.com` 全部超时，只有 `api.github.com` 通），先用等价 fixture 复现、再由用户提供原始 EPUB 复核。
 - Robolectric 的 main looper 是暂停的：回归用例要用 `compose.waitForIdle()` 推进一帧，`runOnUiThread {}` 空转不足以让 `LaunchedEffect` + `Dispatchers.IO` 的回写落到缓存。
 - 首次写的回归用例在修复前后都失败（等待方式问题），改成 `waitForIdle` 后先确认"旧代码失败、新代码通过"，避免假绿。
+
+## 96. 第一百零二轮执行（2026-11-20：五类用户反馈修复，未升版本号）
+
+> 本轮为跨会话续做：改动在上一会话已完成，本次完成核实、编译复验、文档同步与提交收尾。
+
+### 已落地
+
+- **听书设置展开动效**（`ui/reader/ReaderListeningPanel.kt`，394 行）：设置面板原仅 `fadeIn/fadeOut`，弹窗高度瞬间跳变。改为 `expandVertically + fadeIn` / `shrinkVertically + fadeOut`（`WenkuMotion` 曲线），内层 `Column` 加 `animateContentSize`，`showCustom` / 音色 Edge/System 子面板套 `AnimatedVisibility`。尊重 reduce-motion 开关。
+- **zlib 节点批量检测与自动切换**（`ui/source/ZLibraryNodeManagementScreen.kt` 513 行、`library/ZLibraryNodeManager.kt` 221 行、`source/zlibrary/ZLibraryEndpointProvider.kt` 278 行）：单飞锁 `testingNode` 改为 `testingNodes` 集合 + 「全部检测」（`Semaphore(3)` 并发、HTTP-only 8s 限时、不走 WebView 提速）；`probeNode` 抽出单节点逻辑供单个（12s + WebView 兜底）与批量复用。新增 `pinned_node`：UI「使用」按 `byUser=true` 固化用户选择，容灾/登录重定向按 `byUser=false` 只改运行时路由、不覆盖用户选择；`getEndpoint` 优先复探固化节点（活了自动切回）、快速体检直连 + 系统代理双路（`isNodeReachable` 不再因 `NO_PROXY` 直连失败误判代理用户节点死亡）、换节点前 `confirmAlive` 全量二次确认。自定义节点删除同步清理 pinned。
+- **书源管理登录态**（`ui/source/SourceManagementScreen.kt` 1499 行、`ui/source/ZLibraryLoginDialog.kt` 245 行、`source/js/JsComicSource.kt` 934 行）：文件级 `sourceAuthEpoch` 在登录/验证成功后自增，`LaunchedEffect` 触发 `SourceRow` 重新查 `source.isLoggedIn()`，`SourceMiniLabel` 在「已登录」(tertiary 成功色)/「需登录」间切换（不再只读静态 `capabilities.requiresLogin`）。验证入口扩到 `js_bilimanga`；bilimanga 验证成功 `setLoggedIn(true)`，`verifyWebsite` 改打开搜索页（首页含 detail 链接会误报成功）。
+- **哔哩漫画**（`assets/js_extra/bilimanga.js` v1.2.0，290 行）：旧 `search_guard` 三步换票失效（redeem 返回普通页），改为直接带 Cookie 搜索 + 命中 `search_challenge`/`搜尋驗證` 页抛验证引导（通过后 30 分钟免验证）；去掉 `ensureSearchTicket`。
+- **19 漫画**（`assets/js_extra/nineteen.js` v1.2.0，281 行）：适配 `m.sxchex.com` 2026-11 改版——卡片 `.comic-item`、详情 `h1.name`/`.comic-cover`、阅读页 `li.comic-page[data-index] > img[data-original]`、分类两个 `.sort-class-container`；新增 `coverFrom` 从 style `url()` 取封面。新旧模板双兼容。
+- **goda 漫画**（`source/js/JsSourceRepo.kt` 1552 行）：`PATCH_VERSION` 50→51 触发拉取上游 `venera-configs` goda.js v1.2.1（`/api/v2` 章节图片混淆解码）。
+- **书阁 / 爱下**：`XbookcnSource.kt`（410 行）403/503 先读 body 交 `statusProblem` 判定再触发 `CfWebViewSolver`，Cookie 持久携带；`IxdzsSource.kt`（149 行）Tengine WAF 拦截时走新增 `source/js/WebViewPageLoader.kt`（168 行，隐藏 WebView 取 `outerHTML` + 同步 Cookie 回 `JsCookieJar`，每 host 5 分钟失败冷却）再带 Cookie 重试。
+
+### 验证
+
+- `:app:compileDebugKotlin` **BUILD SUCCESSFUL**（exit 0，JBR21）；`node --check` 两个 JS 源通过；新增/改写调用符号（`callTimeoutMs`、`rememberRoute`、`SystemProxyResolver.resolve`、`EndpointHealthChecker(context, direct)`、`syncToJsCookieJar`、`JsCookieJar.cookieHeader`）均确认存在。
+- 上一会话实网验证：19 漫画搜索/详情/章节 API/分类/分页路由 200；goda 搜索/目录/取图全链路 200；bilibili 验证码页存在且目录可用；ixdzs 本机出口 IP 被 Tengine WAF 全 403（无法本机验证，已加 WebView 兜底）。
+- 工作区原有 4 个历史误删的 `promo/experience/review-v5~v8` 演示 mp4 已 `git restore` 还原，与本次修复无关。
+
+### 未做
+
+- 未升版本号、未发版（版本号只由用户指定）；未上真机端到端验收。
+- ixdzs 站点行为仍待真机/可用出口 IP 复核；goda 依赖上游 `venera-configs` 仓库可达性。
 - `RealEpubPipelineTest`（缺本机真实 EPUB）与 `Round7DataTest.variantBuilder_originalFirst_capAndDedupe` 在改动前后同样失败，属既有环境/数据问题，不计入本轮回归。

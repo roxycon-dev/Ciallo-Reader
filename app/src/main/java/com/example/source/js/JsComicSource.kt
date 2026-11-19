@@ -181,7 +181,7 @@ class JsComicSource(
     private suspend fun applyVerifiedUserAgent(runtime: JsSourceEngine, userAgent: String) {
         if (sourceKey !in setOf("mycomic", "bilimanga") || userAgent.isBlank()) return
         if (sourceKey == "bilimanga") {
-            runtime.call("src.headers['User-Agent'] = ${q(userAgent)}; src.searchGuardsReadyAt = 0")
+            runtime.call("src.headers['User-Agent'] = ${q(userAgent)}")
             return
         }
         runtime.call("""
@@ -696,7 +696,13 @@ class JsComicSource(
     override suspend fun login(credential: LoginCredential): SourceResult<Boolean> =
         withContext(Dispatchers.IO) {
             try {
-                if (sourceKey == "bilimanga") return@withContext verifyWebsite()
+                if (sourceKey == "bilimanga") {
+                    val verification = verifyWebsite()
+                    if (verification is SourceResult.Success && verification.data) {
+                        getEngine().setLoggedIn(true)
+                    }
+                    return@withContext verification
+                }
                 if (sourceKey == "mycomic") {
                     var supplied = credential.cookie.orEmpty().trim()
                     if (supplied.isBlank()) {
@@ -767,7 +773,7 @@ class JsComicSource(
         val url = when (sourceKey) {
             "mycomic" -> "https://mycomic.com/cn/comics?sort=-id"
             "nhentai" -> "https://nhentai.net/"
-            "bilimanga" -> "https://www.bilimanga.net/"
+            "bilimanga" -> "https://www.bilimanga.net/search/%E6%BC%AB%E7%95%AB_1.html"
             else -> return SourceResult.Error(SourceException.Unknown(tr("该源不支持此验证入口")))
         }
         return try {

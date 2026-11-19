@@ -50,6 +50,18 @@ class ZLibraryEndpointProvider(
         .writeTimeout(PROBE_TIMEOUT_S, TimeUnit.SECONDS)
         .build()
 
+    // 系统代理探测客户端：很多用户经代理才能访问 zlib，直连失败不代表节点死亡。
+    private val proxyCheckClient: okhttp3.OkHttpClient by lazy {
+        val builder = com.example.source.SharedHttpTransport.builder()
+            .dns(ZLibraryDns.INSTANCE)
+            .callTimeout(PROBE_TIMEOUT_S, TimeUnit.SECONDS)
+            .connectTimeout(PROBE_TIMEOUT_S, TimeUnit.SECONDS)
+            .readTimeout(PROBE_TIMEOUT_S, TimeUnit.SECONDS)
+            .writeTimeout(PROBE_TIMEOUT_S, TimeUnit.SECONDS)
+        com.example.source.zlibrary.network.SystemProxyResolver.resolve(context)?.let { builder.proxy(it) }
+        builder.build()
+    }
+
     @Volatile
     private var lastProbe: Triple<String, Boolean, Long>? = null
 
@@ -60,17 +72,28 @@ class ZLibraryEndpointProvider(
             if (d == domain && now - at < PROBE_TTL_MS) return ok
         }
         if ((failedUntil[domain] ?: 0L) > now) return false
-        val ok = try {
-            val request = Request.Builder().url("https://$domain/").get().build()
-            val direct = quickCheckClient.newBuilder().proxy(java.net.Proxy.NO_PROXY).build()
-            val directOk = direct.newCall(request).executeCancellable().use {
+        val request = Request.Builder().url("https://$domain/").get().build()
+        suspend fun probe(client: okhttp3.OkHttpClient, direct: Boolean): Boolean = try {
+            val ok = client.newCall(request).executeCancellable().use {
                 it.isSuccessful && isZLibraryPage(it.peekBody(256 * 1024).string())
             }
-            if (directOk) ZLibraryNodeConfig.rememberRoute(domain, true)
-            directOk
-        } catch(e: Exception) { currentCoroutineContext().ensureActive(); false }
+            if (ok) ZLibraryNodeConfig.rememberRoute(domain, direct)
+            ok
+        } catch (e: Exception) { currentCoroutineContext().ensureActive(); false }
+        // 先直连，失败再走系统代理：不能因为 NO_PROXY 直连不通就误判节点死亡。
+        val directClient = quickCheckClient.newBuilder().proxy(java.net.Proxy.NO_PROXY).build()
+        val ok = probe(directClient, true) || probe(proxyCheckClient, false)
         lastProbe = Triple(domain, ok, now)
         return ok
+    }
+
+    /** 换节点前的二次确认：全量健康检查（代理 + 直连双路），任一通过即认为节点仍活。
+     *  快速体检可能因瞬时抖动/挑战页误报，全量检查带 DiamWall PoW 解算与搜索探针，更可靠。 */
+    private suspend fun confirmAlive(domain: String): Boolean {
+        val proxyHealth = runCatching { healthChecker.checkHealth(domain) }.getOrNull()
+        if (proxyHealth != null && proxyHealth.isAvailable && proxyHealth.isRealZlib) return true
+        val directHealth = runCatching { EndpointHealthChecker(context, direct = true).checkHealth(domain) }.getOrNull()
+        return directHealth != null && directHealth.isAvailable && directHealth.isRealZlib
     }
 
     /**
@@ -138,19 +161,35 @@ class ZLibraryEndpointProvider(
     }
 
     suspend fun getEndpoint(forceRefresh: Boolean = false): String = withContext(Dispatchers.IO) {
-        // 0. 用户在“节点管理”里选中的节点优先（立即生效，不被缓存/扫描结果覆盖）。
-        //    容灾（2026-09-04）：选中节点先做 4s 快速体检——挂了/被墙时不再原地
-        //    卡死，自动扫描候选池换活节点并固化，登录/搜索/下载全部跟随新节点，
-        //    用户零操作。全池探不通（无 VPN 整段被墙等极端情况）仍返回选中节点
-        //    本身，交给 WebView（Chromium TLS 指纹 + 系统代理）兜底再试。
+        // 0. 用户选择优先。容灾只在节点确认死亡时临时换活节点，且不覆盖用户固化选择；
+        //    用户固化的节点恢复后自动切回。快速体检直连+代理双路，换节点前再做全量
+        //    二次确认，最大限度避免“选了能用的节点却被换到不能用的”。
         val selectedNode = runCatching { ZLibraryNodeConfig.domain }
             .getOrDefault("")
             ?.trim()
             ?.removePrefix("https://")
             ?.removePrefix("http://")
             ?.removeSuffix("/")
+        val pinnedNode = runCatching { ZLibraryNodeManager.getPinnedNode(context) }
+            .getOrNull()
+            ?.trim()
+            ?.removePrefix("https://")
+            ?.removePrefix("http://")
+            ?.removeSuffix("/")
         if (!selectedNode.isNullOrBlank() && !forceRefresh) {
+            // 运行时停在容灾临时节点上：复探用户固化节点，活了立即切回用户的选择。
+            if (!pinnedNode.isNullOrBlank() && pinnedNode != selectedNode && isNodeReachable(pinnedNode)) {
+                ZLibraryNodeConfig.domain = pinnedNode
+                saveCache(pinnedNode)
+                lastProbe = Triple(pinnedNode, true, System.currentTimeMillis())
+                return@withContext pinnedNode
+            }
             if (isNodeReachable(selectedNode)) {
+                return@withContext selectedNode
+            }
+            // 快速体检失败 ≠ 节点死亡：全量健康检查二次确认，仍活就继续用，绝不轻易换走。
+            if (confirmAlive(selectedNode)) {
+                lastProbe = Triple(selectedNode, true, System.currentTimeMillis())
                 return@withContext selectedNode
             }
             failoverFrom(selectedNode)?.let { return@withContext it }

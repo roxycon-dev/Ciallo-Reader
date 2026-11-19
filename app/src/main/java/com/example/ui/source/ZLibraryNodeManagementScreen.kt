@@ -38,7 +38,12 @@ import com.example.ui.wenku.WenkuSymbol
 import com.example.ui.wenku.WenkuTextButton
 import com.example.ui.wenku.wenkuPagePart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.net.URLEncoder
 
@@ -68,122 +73,58 @@ fun ZLibraryNodeManagementScreen(
     var foundNodes by remember { mutableStateOf<List<String>>(emptyList()) }
 
     val statuses = remember { mutableStateMapOf<String, String>() }
-    var testingNode by remember { mutableStateOf<String?>(null) }
-
-    fun testNode(node: String) {
-        if (testingNode != null) return
-        testingNode = node
-        statuses[node] = "测试中…"
-        scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                try {
-                    val httpClient = ZLibraryHttpClient(
-                        credentialStorage = ZLibraryCredentialStorage(context),
-                        context = context
-                    )
-                    val encodedKw = URLEncoder.encode("三体", "UTF-8").replace("+", "%20")
-                    val url = "https://$node/s/$encodedKw"
-                    val response = httpClient.get(url, referer = "https://$node/")
-                    val code = response.code
-                    val html = response.body?.string() ?: ""
-                    // 修复"搜索出40本"假通过：入口跳转域会把 /s/{kw} 302 丢路径跳到
-                    // 主页，主页书卡片被当搜索结果充数。真实搜索 ① 最终 URL 仍在 /s/
-                    // ② 结果与关键词相关（命中书名含"三体"）。
-                    val finalPath = response.request.url.encodedPath
-                    val redirectedOffSearch = !finalPath.startsWith("/s/")
-                    response.close()
-
-                    // 官网搜索服务故障（2026-08 全站性）：节点本身可达但搜索不可用。
-                    // 此时不算"不可用"，也不再走 WebView 兜底（只会浪费 ~36s 后同样失败）。
-                    if (html.contains("Search service temporary unavailable", ignoreCase = true)) {
-                        return@withContext "站点可达，搜索服务暂不可用（官网故障）"
-                    }
-
-                    // 重定向丢路径：搜索请求根本没到搜索服务，主页书卡不算数
-                    if (redirectedOffSearch) {
-                        return@withContext "不可用（搜索被重定向到主页，非真实镜像）"
-                    }
-
-                    val httpResult = if (code !in 200..299) {
-                        "不可用（HTTP $code）"
-                    } else if (
-                        html.contains("Verifying your browser", ignoreCase = true) ||
-                        html.contains("Checking your browser", ignoreCase = true) ||
-                        html.contains("Just a moment", ignoreCase = true) ||
-                        html.contains("solve this captcha", ignoreCase = true) ||
-                        html.contains("cpt.lib")
-                    ) {
-                        "需验证（无法自动搜索）"
-                    } else {
-                        val books: List<SearchBook> = try {
-                            ZLibraryParserManager.parseSearchPage(html, "https://$node", "zlibrary")
-                        } catch (e: Exception) {
-                            emptyList()
-                        }
-                        // 关键词相关性校验：真实搜索结果必然含命中书名
-                        val relevant = books.isNotEmpty() &&
-                            (html.contains("三体") || books.any { it.title.contains("三体") })
-                        when {
-                            books.isNotEmpty() && relevant -> "可用（搜索到 ${books.size} 本）"
-                            books.isNotEmpty() -> tr("不可用（结果与关键词无关，疑似主页充数）")
-                            html.contains("/book/") ||
-                            html.contains("z-bookcard") ||
-                            html.contains("resItemBox") ||
-                            html.contains("book-item") -> tr("可用（页面可打开）")
-                            html.contains("Z-Library", ignoreCase = true) -> tr("可用（站点可达）")
-                            else -> tr("不可用（无搜索结果）")
-                        }
-                    }
-                    // 仅"不可用 / 需验证"才尝试 WebView（挑战/JS 渲染场景），
-                    // "搜索服务暂不可用"直接返回，不再浪费 WebView 超时。
-                    if (httpResult.startsWith("不可用") || httpResult.startsWith("需验证")) {
-                        val web = ZLibraryWebViewHelper.searchViaWebView(
-                            context,
-                            node,
-                            "三体",
-                            cookies = ZLibraryCredentialStorage(context).getCookies()
-                        )
-                        when {
-                            web.books.isNotEmpty() -> "可用（搜索到 ${web.books.size} 本）"
-                            web.pageHasZlibMarkers -> tr("可用（页面可打开）")
-                            web.stillChallenged -> tr("需验证（无法自动搜索）")
-                            else -> httpResult
-                        }
-                    } else {
-                        httpResult
-                    }
-                } catch (e: Exception) {
-                    val web = ZLibraryWebViewHelper.searchViaWebView(
-                        context,
-                        node,
-                        "三体",
-                        cookies = ZLibraryCredentialStorage(context).getCookies()
-                    )
-                    if (web.books.isNotEmpty()) {
-                        "可用（搜索到 ${web.books.size} 本）"
-                    } else if (web.pageHasZlibMarkers) {
-                        "可用（页面可打开）"
-                    } else {
-                        "不可用（${e.message?.take(40) ?: "连接失败"}）"
-                    }
-                }
-            }
-            if (testingNode == node) {
-                statuses[node] = result
-                testingNode = null
-            }
-        }
-    }
-
-    fun selectNode(node: String) {
-        ZLibraryNodeManager.selectNode(context, node)
-        selectedNode = node
-        AppToast.makeText(context, com.example.i18n.switchedTo(node), Toast.LENGTH_SHORT).show()
-    }
+    var testingNodes by remember { mutableStateOf(setOf<String>()) }
+    var batchProgress by remember { mutableStateOf<String?>(null) }
 
     val defaultNode = ZLibraryNodeManager.DEFAULT_NODE
     val builtinNodes = (listOf(defaultNode) + scrapedNodes).distinct()
     val customNodeList = customNodes.filterNot { it in builtinNodes }
+
+    fun testNode(node: String) {
+        if (node in testingNodes) return
+        testingNodes = testingNodes + node
+        statuses[node] = "测试中…"
+        scope.launch {
+            val result = withContext(Dispatchers.IO) { probeNode(context, node, 12_000, useWebView = true) }
+            statuses[node] = result
+            testingNodes = testingNodes - node
+        }
+    }
+
+    fun testAll() {
+        if (batchProgress != null) return
+        val nodes = (builtinNodes + customNodeList).distinct()
+        if (nodes.isEmpty()) return
+        scope.launch {
+            batchProgress = "检测中 0/${nodes.size}"
+            nodes.forEach { statuses[it] = "排队中…" }
+            val gate = Semaphore(3)
+            val done = java.util.concurrent.atomic.AtomicInteger(0)
+            coroutineScope {
+                nodes.map { node ->
+                    async {
+                        gate.withPermit {
+                            testingNodes = testingNodes + node
+                            statuses[node] = "测试中…"
+                            val result = withContext(Dispatchers.IO) { probeNode(context, node, 8_000, useWebView = false) }
+                            statuses[node] = result
+                            testingNodes = testingNodes - node
+                            batchProgress = "检测中 ${done.incrementAndGet()}/${nodes.size}"
+                        }
+                    }
+                }.awaitAll()
+            }
+            batchProgress = null
+            val ok = nodes.count { (statuses[it] ?: "").startsWith("可用") || (statuses[it] ?: "").startsWith("站点可达") }
+            AppToast.makeText(context, tr("检测完成：$ok/${nodes.size} 个节点可用"), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    fun selectNode(node: String) {
+        ZLibraryNodeManager.selectNode(context, node, byUser = true)
+        selectedNode = node
+        AppToast.makeText(context, com.example.i18n.switchedTo(node), Toast.LENGTH_SHORT).show()
+    }
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val headerHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 48.dp
@@ -221,26 +162,35 @@ fun ZLibraryNodeManagementScreen(
                                     fontWeight = FontWeight.Bold,
                                     style = MaterialTheme.typography.titleSmall
                                 )
-                                WenkuTextButton(
-                                    text = if (scraping) tr("扒取中…") else tr("扒取节点"),
-                                    onClick = {
-                                        scope.launch {
-                                            scraping = true
-                                            val nodes = ZLibraryNodeManager.scrapeNodes(context)
-                                            scraping = false
-                                            if (nodes.isNotEmpty()) {
-                                                foundNodes = nodes
-                                                showReplaceDialog = true
-                                            } else {
-                                                AppToast.makeText(context, tr("扒取失败，请检查网络后重试"), Toast.LENGTH_LONG).show()
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    WenkuTextButton(
+                                        text = if (scraping) tr("扒取中…") else tr("扒取节点"),
+                                        onClick = {
+                                            scope.launch {
+                                                scraping = true
+                                                val nodes = ZLibraryNodeManager.scrapeNodes(context)
+                                                scraping = false
+                                                if (nodes.isNotEmpty()) {
+                                                    foundNodes = nodes
+                                                    showReplaceDialog = true
+                                                } else {
+                                                    AppToast.makeText(context, tr("扒取失败，请检查网络后重试"), Toast.LENGTH_LONG).show()
+                                                }
                                             }
-                                        }
-                                    },
-                                    selected = true,
-                                    compact = true,
-                                    wenkuSymbol = WenkuSymbol.Refresh,
-                                    enabled = !scraping
-                                )
+                                        },
+                                        selected = true,
+                                        compact = true,
+                                        wenkuSymbol = WenkuSymbol.Refresh,
+                                        enabled = !scraping
+                                    )
+                                    WenkuTextButton(
+                                        text = batchProgress ?: tr("全部检测"),
+                                        onClick = { testAll() },
+                                        compact = true,
+                                        wenkuSymbol = WenkuSymbol.Search,
+                                        enabled = batchProgress == null
+                                    )
+                                }
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
@@ -276,7 +226,7 @@ fun ZLibraryNodeManagementScreen(
                         label = label,
                         isSelected = selectedNode == node,
                         status = statuses[node] ?: "未测试",
-                        isTesting = testingNode == node,
+                        isTesting = node in testingNodes,
                         canDelete = false,
                         modifier = Modifier.wenkuPagePart(index + 3),
                         onTest = { testNode(node) },
@@ -307,7 +257,7 @@ fun ZLibraryNodeManagementScreen(
                         label = tr("自定义节点"),
                         isSelected = selectedNode == node,
                         status = statuses[node] ?: "未测试",
-                        isTesting = testingNode == node,
+                        isTesting = node in testingNodes,
                         canDelete = true,
                         modifier = Modifier.wenkuPagePart(builtinNodes.size + index + 4),
                         onTest = { testNode(node) },
@@ -374,6 +324,101 @@ fun ZLibraryNodeManagementScreen(
                 wenkuSymbol = WenkuSymbol.Check
             )
             WenkuTextButton(tr("取消"), onClick = paperDismiss {}, modifier = Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Close)
+        }
+    }
+}
+
+/** 单节点检测：真实搜索“三体”并校验。callTimeoutMs 控制 HTTP 限时；
+ *  useWebView=true 时对不可用/需验证/异常再走 WebView 兜底（批量检测关闭以提速）。 */
+private suspend fun probeNode(
+    context: android.content.Context,
+    node: String,
+    callTimeoutMs: Long,
+    useWebView: Boolean
+): String {
+    return try {
+        val httpClient = ZLibraryHttpClient(
+            credentialStorage = ZLibraryCredentialStorage(context),
+            context = context
+        )
+        val encodedKw = URLEncoder.encode("三体", "UTF-8").replace("+", "%20")
+        val url = "https://$node/s/$encodedKw"
+        val response = httpClient.get(url, referer = "https://$node/", callTimeoutMs = callTimeoutMs)
+        val code = response.code
+        val html = response.body?.string() ?: ""
+        // 修复"搜索出40本"假通过：入口跳转域会把 /s/{kw} 302 丢路径跳到
+        // 主页，主页书卡片被当搜索结果充数。真实搜索 ① 最终 URL 仍在 /s/
+        // ② 结果与关键词相关（命中书名含"三体"）。
+        val finalPath = response.request.url.encodedPath
+        val redirectedOffSearch = !finalPath.startsWith("/s/")
+        response.close()
+
+        // 官网搜索服务故障（2026-08 全站性）：节点本身可达但搜索不可用。
+        if (html.contains("Search service temporary unavailable", ignoreCase = true)) {
+            return "站点可达，搜索服务暂不可用（官网故障）"
+        }
+        if (redirectedOffSearch) {
+            return "不可用（搜索被重定向到主页，非真实镜像）"
+        }
+
+        val httpResult = if (code !in 200..299) {
+            "不可用（HTTP $code）"
+        } else if (
+            html.contains("Verifying your browser", ignoreCase = true) ||
+            html.contains("Checking your browser", ignoreCase = true) ||
+            html.contains("Just a moment", ignoreCase = true) ||
+            html.contains("solve this captcha", ignoreCase = true) ||
+            html.contains("cpt.lib")
+        ) {
+            "需验证（无法自动搜索）"
+        } else {
+            val books: List<SearchBook> = try {
+                ZLibraryParserManager.parseSearchPage(html, "https://$node", "zlibrary")
+            } catch (e: Exception) {
+                emptyList()
+            }
+            val relevant = books.isNotEmpty() &&
+                (html.contains("三体") || books.any { it.title.contains("三体") })
+            when {
+                books.isNotEmpty() && relevant -> "可用（搜索到 ${books.size} 本）"
+                books.isNotEmpty() -> tr("不可用（结果与关键词无关，疑似主页充数）")
+                html.contains("/book/") ||
+                html.contains("z-bookcard") ||
+                html.contains("resItemBox") ||
+                html.contains("book-item") -> tr("可用（页面可打开）")
+                html.contains("Z-Library", ignoreCase = true) -> tr("可用（站点可达）")
+                else -> tr("不可用（无搜索结果）")
+            }
+        }
+        if (useWebView && (httpResult.startsWith("不可用") || httpResult.startsWith("需验证"))) {
+            val web = ZLibraryWebViewHelper.searchViaWebView(
+                context, node, "三体",
+                cookies = ZLibraryCredentialStorage(context).getCookies()
+            )
+            when {
+                web.books.isNotEmpty() -> "可用（搜索到 ${web.books.size} 本）"
+                web.pageHasZlibMarkers -> tr("可用（页面可打开）")
+                web.stillChallenged -> tr("需验证（无法自动搜索）")
+                else -> httpResult
+            }
+        } else {
+            httpResult
+        }
+    } catch (e: Exception) {
+        if (useWebView) {
+            val web = runCatching {
+                ZLibraryWebViewHelper.searchViaWebView(
+                    context, node, "三体",
+                    cookies = ZLibraryCredentialStorage(context).getCookies()
+                )
+            }.getOrNull()
+            when {
+                web != null && web.books.isNotEmpty() -> "可用（搜索到 ${web.books.size} 本）"
+                web != null && web.pageHasZlibMarkers -> tr("可用（页面可打开）")
+                else -> "不可用（${e.message?.take(40) ?: "连接失败"}）"
+            }
+        } else {
+            "不可用（${e.message?.take(40) ?: "连接失败"}）"
         }
     }
 }

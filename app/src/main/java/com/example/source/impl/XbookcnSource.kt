@@ -187,19 +187,30 @@ class XbookcnSource(
             .apply { if (!cookie.isNullOrBlank()) header("Cookie", cookie) }
             .build()
 
-        fun read(response: okhttp3.Response): String = response.use { res ->
+        // 403/503 也可能是 Cloudflare 挑战页：必须先拿到响应体交给 blockedReason 判定，
+        // 不能像旧实现那样非 2xx 直接抛错（那样 WebView 过盾永远没机会触发）。
+        fun readBody(response: okhttp3.Response): Pair<Int, String> = response.use { res ->
             if (res.code == 404) throw SourceException.BookNotFound
-            if (res.code == 429 || res.code >= 500) throw RetryableStatus(res.code)
-            if (!res.isSuccessful) throw SourceException.NetworkError("书阁返回 HTTP ${res.code}")
             if (res.request.url.host != url.host) {
                 throw SourceException.NetworkError(tr("书阁跳转到了站外地址"))
             }
-            res.body?.byteStream()?.use { it.readImportBytes(8 * 1024 * 1024).toString(Charsets.UTF_8) }
+            val body = res.body?.byteStream()?.use { it.readImportBytes(8 * 1024 * 1024).toString(Charsets.UTF_8) }
                 ?: throw java.io.IOException(tr("书阁返回空页面"))
+            res.code to body
         }
 
-        var html = read(http.newCall(buildRequest(null)).executeCancellable())
-        var problem = blockedReason(html)
+        fun statusProblem(code: Int, html: String): String? {
+            val problem = blockedReason(html)
+            if (problem != null) return problem
+            if (code in 200..299) return null
+            if (code == 429 || code >= 500) throw RetryableStatus(code)
+            throw SourceException.NetworkError("书阁返回 HTTP $code")
+        }
+
+        // 已过盾的 Cookie 持久携带，避免每个请求都重新触发挑战。
+        val storedCookie = com.example.source.js.JsCookieJar.cookieHeader(appContext, url.toString())
+        var (code, html) = readBody(http.newCall(buildRequest(storedCookie.ifBlank { null })).executeCancellable())
+        var problem = statusProblem(code, html)
         if (problem != null) {
             // 真正的 Cloudflare 挑战/广告门：用真实 Chromium WebView 过一次盾，再把 Cookie 带回 OkHttp。
             val solved = runCatching {
@@ -208,8 +219,10 @@ class XbookcnSource(
             if (solved) {
                 val cookie = com.example.source.js.JsCookieJar.cookieHeader(appContext, url.toString())
                 if (cookie.isNotBlank()) {
-                    html = read(http.newCall(buildRequest(cookie)).executeCancellable())
-                    problem = blockedReason(html)
+                    val retry = readBody(http.newCall(buildRequest(cookie)).executeCancellable())
+                    code = retry.first
+                    html = retry.second
+                    problem = statusProblem(code, html)
                 }
             }
         }

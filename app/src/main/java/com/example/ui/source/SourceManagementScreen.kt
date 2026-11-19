@@ -640,6 +640,7 @@ fun SourceManagementScreen(
                             loginLoading = false
                             loginMessage = tr("登录成功")
                             loggedIn = true
+                            sourceAuthEpoch.intValue++
                             close()
                         }
                         is SourceResult.Error -> {
@@ -657,7 +658,7 @@ fun SourceManagementScreen(
         ZLibraryLoginDialog(
             source = src,
             onDismiss = { loginSource = null },
-            onSuccess = { loginSource = null },
+            onSuccess = { loginSource = null; sourceAuthEpoch.intValue++ },
             // vomic 支持站内注册：登录窗口下方出现「注册新账号」（弹窗链驱动）
             onRegister = if (src.id == "js_vomic") {
                 {
@@ -1242,6 +1243,9 @@ private fun SourceExpandRestRow(
  *   触觉反馈原样保留，只是尺寸变小）；
  * - 禁用态：整行 0.55 透明 + 头像去饱和。
  */
+/** 登录/验证成功后自增，通知所有 SourceRow 重新查询登录态（静态能力位不会随登录改变）。 */
+private val sourceAuthEpoch = mutableIntStateOf(0)
+
 @Composable
 private fun SourceRow(
     source: BookSource,
@@ -1256,6 +1260,13 @@ private fun SourceRow(
 ) {
     var showSourceInfo by remember(source.id) { mutableStateOf(false) }
     if (showSourceInfo) SourceInfoDialog(source = source, enabled = isEnabled, onDismiss = { showSourceInfo = false })
+    // “需登录/已登录”必须反映真实登录态，而非构造期的静态能力位：
+    // 登录成功后 capabilities.requiresLogin 不变，旧实现因此永远显示“需登录”。
+    val needsAuth = source.capabilities.requiresLogin || source.id in setOf("js_mycomic", "js_bilimanga")
+    var authed by remember(source.id) { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(source.id, sourceAuthEpoch.intValue) {
+        if (needsAuth) authed = runCatching { source.isLoggedIn() }.getOrDefault(false)
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -1291,9 +1302,9 @@ private fun SourceRow(
                     Spacer(modifier = Modifier.width(6.dp))
                     ActiveDot()
                 }
-                if (source.capabilities.requiresLogin) {
+                if (needsAuth) {
                     Spacer(modifier = Modifier.width(6.dp))
-                    SourceMiniLabel(text = tr("需登录"))
+                    SourceMiniLabel(text = if (authed == true) tr("已登录") else tr("需登录"), success = authed == true)
                 }
             }
             Spacer(modifier = Modifier.height(2.dp))
@@ -1357,13 +1368,16 @@ private fun ActiveDot(modifier: Modifier = Modifier) {
     )
 }
 
-/** 名称后面的小标签（「需登录」）：primary 12% 底 + 加深 20% 的主色文字，11sp。 */
+/** 名称后面的小标签（「需登录/已登录」）：默认 primary 12% 底 + 加深 20% 的主色文字，11sp；
+ *  success=true 时改用 tertiary 成功色调，便于一眼区分已登录。 */
 @Composable
-private fun SourceMiniLabel(text: String, modifier: Modifier = Modifier) {
+private fun SourceMiniLabel(text: String, modifier: Modifier = Modifier, success: Boolean = false) {
+    val container = if (success) MaterialTheme.colorScheme.tertiaryContainer else accentContainer()
+    val content = if (success) MaterialTheme.colorScheme.onTertiaryContainer else accentText()
     Box(
         modifier = modifier
             .clip(PillShape)
-            .background(accentContainer())
+            .background(container)
             .padding(horizontal = 6.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -1371,7 +1385,7 @@ private fun SourceMiniLabel(text: String, modifier: Modifier = Modifier) {
             text = text,
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
-            color = accentText()
+            color = content
         )
     }
 }

@@ -1,7 +1,7 @@
 /** @type {import('../venera/_vener_.js')} */
 class BiliManga extends ComicSource {
     // 依据 keiyoushi/extensions-source 的 BiliManga.kt 契约移植（2026-08 #18140/#18556 后版本）：
-    // - 搜索需 search_guard 三步换取 jieqiSearchTicket cookie，缺凭证时给出明确错误；
+    // - 搜索需图形验证码（search_challenge）：命中验证页时引导用户走「验证」WebView，通过后 30 分钟免验证；
     // - 章节目录存在 javascript:cid(1) 占位链接：真实地址 = 相邻章节页里的
     //   url_previous/url_next JS 变量指向的 ..._2.html（配 night=1 cookie 可读）；
     // - 详情 author 取 .illname（画师名），.authorname 是漫画家，两者别写反。
@@ -10,7 +10,7 @@ class BiliManga extends ComicSource {
 
     key = "bilimanga"
 
-    version = "1.1.6"
+    version = "1.2.0"
 
     minAppVersion = "1.6.0"
 
@@ -29,7 +29,7 @@ class BiliManga extends ComicSource {
         return Object.assign({}, this.headers);
     }
 
-    verificationError() { return new Error("哔哩漫画访问受限（HTTP 403），请在书源管理中打开该源的「验证」后重试"); }
+    verificationError() { return new Error("哔哩漫画搜索需要验证码：请在书源管理中打开该源的「验证」，输入验证码后重试（通过后 30 分钟内搜索免验证）"); }
 
     async page(url, headers) {
         const res = await Network.get(url, headers || this.headers);
@@ -45,65 +45,24 @@ class BiliManga extends ComicSource {
         return (cookies || []).map(c => `${c.name}=${c.value}`).join("; ");
     }
 
-    hasCookie(names, want) {
-        return names.indexOf(want) !== -1;
-    }
-
-    async ensureSearchTicket() {
-        const cookies = await Network.getCookies(this.baseUrl);
-        const names = (cookies || []).map(c => c.name);
-        const freshGuards = this.hasCookie(names, "jieqiSearchCss") && this.hasCookie(names, "jieqiSearchJs") &&
-            this.searchGuardsReadyAt && Date.now() - this.searchGuardsReadyAt < 10 * 60 * 1000;
-        // The host's legacy cookie store does not keep expiry times. Refresh old guards
-        // together; their mere presence does not mean they are still accepted by the site.
-        if (!freshGuards) {
-            const [cssRes, jsRes] = await Promise.all([
-                Network.get(`${this.baseUrl}/search.html?search_guard=css`, this.headers),
-                Network.get(`${this.baseUrl}/search.html?search_guard=js`, this.headers)
-            ]);
-            if (cssRes.status === 403 || jsRes.status === 403) throw this.verificationError();
-            if (cssRes.status !== 200 || jsRes.status !== 200) throw "搜索凭证请求失败，请稍后重试";
-            if (typeof jsRes.body !== "string" || !jsRes.body.trim()) throw new Error("哔哩搜索凭证返回空响应，请重试");
-            const m = jsRes.body.match(/cookie="(.*?)";/);
-            if (m) {
-                // 形如 "名字=值; path=/"，取第一段
-                const pair = m[1].split(";")[0];
-                const eq = pair.indexOf("=");
-                if (eq > 0) {
-                    await Network.setCookies(this.baseUrl, [{
-                        name: pair.slice(0, eq).trim(),
-                        value: pair.slice(eq + 1).trim(),
-                        domain: "www.bilimanga.net"
-                    }]);
-                }
-            }
-            this.searchGuardsReadyAt = Date.now();
-        }
-        // The ticket is consumed by each search. Only the CSS/JS guards may be reused.
-        const redeemed = await Network.get(`${this.baseUrl}/search.html?search_guard=redeem`,
-            Object.assign({}, this.headers, { "Cache-Control": "no-cache" }));
-        if (redeemed.status === 403) throw this.verificationError();
-        const after = (await Network.getCookies(this.baseUrl) || []).map(c => c.name);
-        if (redeemed.status !== 200 || !this.hasCookie(after, "jieqiSearchTicket")) {
-            throw "獲取搜索憑證失敗，請稍後重試";
-        }
+    isCaptchaPage(body) {
+        return typeof body === "string" &&
+            (body.indexOf("search_challenge") !== -1 || body.indexOf("搜尋驗證") !== -1 || body.indexOf("搜索验证") !== -1);
     }
 
     search = {
         load: async (keyword, options, page) => {
-            for (let attempt = 0; attempt < 2; attempt++) {
-                await this.ensureSearchTicket();
-                const cookie = await this.cookieHeader();
-                const res = await Network.get(
-                    `${this.baseUrl}/search/${encodeURIComponent(keyword)}_${page}.html`,
-                    Object.assign({}, this.headers, cookie ? { Cookie: cookie } : {})
-                );
-                if (res.status === 403 && attempt === 0) { this.searchGuardsReadyAt = 0; continue; }
-                if (res.status === 403) throw "哔哩漫画访问受限（HTTP 403），请在书源管理中打开该源的「验证」后重试";
-                if (res.status !== 200) throw `搜索失败: ${res.status}`;
-                if (typeof res.body !== "string" || !res.body.length) throw "搜索响应为空，请稍后重试";
-                return this.parseSearch(res, page);
-            }
+            page = Math.max(1, Number(page) || 1);
+            const cookie = await this.cookieHeader();
+            const res = await Network.get(
+                `${this.baseUrl}/search/${encodeURIComponent(keyword)}_${page}.html`,
+                Object.assign({}, this.headers, cookie ? { Cookie: cookie } : {})
+            );
+            if (res.status === 403) throw this.verificationError();
+            if (res.status !== 200) throw `搜索失败: ${res.status}`;
+            if (typeof res.body !== "string" || !res.body.length) throw "搜索响应为空，请稍后重试";
+            if (this.isCaptchaPage(res.body)) throw this.verificationError();
+            return this.parseSearch(res, page);
         }
     }
 
