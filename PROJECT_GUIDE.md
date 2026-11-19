@@ -949,7 +949,7 @@ python novel-reader/.workbuddy/stale_check.py
 | `app/src/main/java/com/example/source/NovelInfo.kt`（33 行） | 小说详情模型 |
 | `app/src/main/java/com/example/source/PufeiImageCacheRetry.kt`（27 行） | 扑飞图片缓存重试 |
 | `app/src/main/java/com/example/source/impl/AutoNovelSource.kt`（186 行） | 自动小说源 |
-| `app/src/main/java/com/example/source/impl/IxdzsSource.kt`（149 行） | 爱下电子书小说源（WAF 拦截时 `WebViewPageLoader` 兜底 + Cookie 重试） |
+| `app/src/main/java/com/example/source/impl/IxdzsSource.kt`（149 行） | 爱下电子书小说源（非浏览器 UA + 固定 `__cn_v` Cookie 直取，2026-11-20 实测；浏览器 UA 会被 Tengine 403） |
 | `app/src/main/java/com/example/source/impl/Wenku8LibrarySource.kt`（111 行） | 文库8小说源 |
 | `app/src/main/java/com/example/source/js/JsComicMetadata.kt`（66 行） | JS 漫画元数据 |
 | `app/src/main/java/com/example/ui/ComicMetadataUi.kt`（87 行） | 漫画元数据界面：标签点按搜索；SelectionContainer 长按选字复制，无自定义菜单 |
@@ -5187,7 +5187,7 @@ Commit `8d6e3847b1a8fd53df9adbee0ded4f89701bdc4e`；Release 413307957：https://
 - **哔哩漫画**（`assets/js_extra/bilimanga.js` v1.2.0，290 行）：旧 `search_guard` 三步换票失效（redeem 返回普通页），改为直接带 Cookie 搜索 + 命中 `search_challenge`/`搜尋驗證` 页抛验证引导（通过后 30 分钟免验证）；去掉 `ensureSearchTicket`。
 - **19 漫画**（`assets/js_extra/nineteen.js` v1.2.0，281 行）：适配 `m.sxchex.com` 2026-11 改版——卡片 `.comic-item`、详情 `h1.name`/`.comic-cover`、阅读页 `li.comic-page[data-index] > img[data-original]`、分类两个 `.sort-class-container`；新增 `coverFrom` 从 style `url()` 取封面。新旧模板双兼容。
 - **goda 漫画**（`source/js/JsSourceRepo.kt` 1552 行）：`PATCH_VERSION` 50→51 触发拉取上游 `venera-configs` goda.js v1.2.1（`/api/v2` 章节图片混淆解码）。
-- **书阁 / 爱下**：`XbookcnSource.kt`（410 行）403/503 先读 body 交 `statusProblem` 判定再触发 `CfWebViewSolver`，Cookie 持久携带；`IxdzsSource.kt`（149 行）Tengine WAF 拦截时走新增 `source/js/WebViewPageLoader.kt`（168 行，隐藏 WebView 取 `outerHTML` + 同步 Cookie 回 `JsCookieJar`，每 host 5 分钟失败冷却）再带 Cookie 重试。
+- **书阁 / 爱下**：`XbookcnSource.kt`（410 行）403/503 先读 body 交 `statusProblem` 判定再触发 `CfWebViewSolver`，Cookie 持久携带；`IxdzsSource.kt`（149 行）Tengine WAF 拦截兜底走 `source/js/WebViewPageLoader.kt`（168 行，隐藏 WebView 取 `outerHTML` + 同步 Cookie 回 `JsCookieJar`，每 host 5 分钟失败冷却）。
 
 ### 验证
 
@@ -5200,3 +5200,25 @@ Commit `8d6e3847b1a8fd53df9adbee0ded4f89701bdc4e`；Release 413307957：https://
 - 未升版本号、未发版（版本号只由用户指定）；未上真机端到端验收。
 - ixdzs 站点行为仍待真机/可用出口 IP 复核；goda 依赖上游 `venera-configs` 仓库可达性。
 - `RealEpubPipelineTest`（缺本机真实 EPUB）与 `Round7DataTest.variantBuilder_originalFirst_capAndDedupe` 在改动前后同样失败，属既有环境/数据问题，不计入本轮回归。
+
+## 97. 第一百零三轮执行（2026-11-20：书源实网复测与爱下根因修正）
+
+延续第 96 轮，用户要求「源想办法测试，一定确保全部通过」，对 5 个反馈源逐一实网复测（本机代理 `http_proxy` 会被 CF/WAF 按出口 IP 拦，站点测试统一 `--noproxy` 直连，与 App 直连阶段一致）。
+
+### 已落地
+
+- **19 漫画**（`m.sxchex.com`）：搜索 `/search?key=三体`（`li.item.comic-item` + `a[href=/comic/N]` + `p.title` + `span.chapter`，5 条）、详情 `/comic/26478`（`h1.name`=原罪三体：潘多拉、`comic-cover img[data-original]`、`.comic-describe`、`.comic-types`，旧 `.de-info` 已不存在）、阅读 `/chapter/823066`（`li.comic-page[data-index]`×20 + `img.lazy[data-original]`，`rd-article__pic` 已不存在）、分类 `/category/`（2 个 `.sort-class-container`，27 条 list/tags 路由）全部 200 且新选择器命中——第 96 轮改版适配确认正确。
+- **goda**：上游 `venera-configs/goda.js` 确为 v1.2.1；搜索 `godamh.com/s/三体` 30 条 `.pb-2`、详情 `/manga/santi-huanchuangweilai` 取到 `data-mid=1098`；`v2.apikk.top/api/v2/manga/get?mid=1098` 返回 330 章、`chapter/getinfo?m=1098&c=953350` 返回混淆串 `J7r…nQ`，用 Python 精确复现 v1.2.1 解码器（分段重排+去锯齿+自定义字母表+base64）成功解出 26 张 `/scomic/...webp`——解码修复确认正确。`PATCH_VERSION=51` 的 `needsRepair` 机制已核实会触发老用户重拉。
+- **哔哩漫画**：首页 200；搜索表单为 `POST /search.html`(searchkey)，但脚本用的 `GET /search/{kw}_{page}.html`（与 keiyoushi BiliManga.kt 当前实现一致）也有效——实测 `GET /search/三体_1.html` 200 且返回「搜尋驗證」页（`search_challenge`+`搜尋驗證`），`isCaptchaPage` 正确命中并抛验证引导；验证通过后 30 分钟免搜索验证。第 96 轮方案确认正确。
+- **爱下（根因修正）**：实测发现 Tengine WAF 按 **UA** 拦截——所有 Chrome/Mozilla 浏览器 UA 一律 403（含 WebView 真实 UA），而 `curl/okhttp/自定义 UA` 返回 200；详情页另有 `__cn_v` JS Cookie 门，站点脚本固定写 `(882654).toString(36)_(1583867302136).toString(36)` = `ix26_k7m9p3w8`。故第 96 轮「WebView 浏览器 UA 兜底」方向错误（仍会被 403）。本次改 `IxdzsSource.page()`：改用非浏览器 UA `EASYREADER/1.6` + 固定 `__cn_v` Cookie 直取；实测搜索 `/bsearch?q=三体`（19 条 `.l-info`）、详情 `/read/551152/`（标题正常、下载链 `down7.ixdzs8.com/551152.zip`）、下载（206）全链路 200。`WebViewPageLoader` 保留为兜底但 UA 同步改非浏览器 UA。`:app:compileDebugKotlin` 再次 BUILD SUCCESSFUL。
+- **书阁**：`xbookcn.app` 是 Cloudflare `managed` 挑战（`cType:'managed'`，含 turnstile），curl/代理全部 403；WebFetch 渲染后端能取到真实搜索结果（7 本书 + 章节链接，`#search-books`/`/book/{hex}` 结构与 `blockedReason` 判定一致）。本机桌面/无头 Chrome 用 CDP 等待 90s 仍停在「请稍候…」，属无头环境指纹限制；App 侧 `CfWebViewSolver`（真实 Android WebView + 同 UA + cf_clearance 同步）是 Mihon 成熟方案，第 96 轮已修复「403 直接抛错致 solver 永不触发」的关键 bug。
+
+### 验证
+
+- 5 个源逐一实网探测（HTTP 状态码 + DOM 选择器命中 + 解码器复现），记录见本轮「已落地」。
+- 爱下修正后 `:app:compileDebugKotlin` BUILD SUCCESSFUL（exit 0）。
+
+### 未做
+
+- 书阁 CF managed challenge 无法在本机无头环境自动求解验证，需真机（Android WebView 指纹）确认 `CfWebViewSolver` 是否解出；若个别网络仍过不去，靠 cookie 持久携带（过盾一次后免重复）。
+- 爱下 `__cn_v` 值取自站点固定脚本，若站点更换常数需同步更新。

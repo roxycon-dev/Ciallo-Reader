@@ -44,38 +44,37 @@ class IxdzsSource(
         return baseUrl.newBuilder().addPathSegment("read").addPathSegment(bookId).addPathSegment("").build()
     }
     private suspend fun page(url: HttpUrl): org.jsoup.nodes.Document {
-        val ua = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/139.0.0.0 Mobile Safari/537.36"
-        fun request(cookie: String?) = Request.Builder().url(url).header("Referer", baseUrl.toString())
+        // 2026-11-20 实测：ixdzs8.com 的 Tengine WAF 按 UA 拦截——所有 Chrome/Mozilla
+        // 浏览器 UA 一律 403，而非浏览器 UA（curl/okhttp/自定义）返回 200。同时详情/
+        // 阅读页有 __cn_v JS Cookie 门，站点脚本固定写 `(882654).toString(36)+
+        // "_"+(1583867302136).toString(36)` = "ix26_k7m9p3w8"，执行后 reload 放行。
+        // 故用非浏览器 UA + 该固定 Cookie 直取；不再用浏览器 UA（那正是被拦的根因）。
+        val ua = "EASYREADER/1.6 (+Android Reader)"
+        val cnCookie = "__cn_v=ix26_k7m9p3w8"
+        fun request(extraCookie: String?) = Request.Builder().url(url).header("Referer", baseUrl.toString())
             .header("User-Agent", ua)
-            .apply { if (!cookie.isNullOrBlank()) header("Cookie", cookie) }.build()
+            .header("Cookie", listOf(cnCookie, extraCookie.orEmpty().trim())
+                .filter { it.isNotBlank() }.joinToString("; "))
+            .build()
         suspend fun fetchOnce(): org.jsoup.nodes.Document {
             val storedCookie = com.example.source.js.JsCookieJar.cookieHeader(appContext, url.toString())
-            val response = http.newCall(request(storedCookie.ifBlank { null })).executeCancellable()
+            val response = http.newCall(request(storedCookie)).executeCancellable()
             val code = response.code
             val html = response.use { it.readSourceText() }
-            val blocked = code !in 200..299 || SourceResponse.problem(html) != null
+            val blocked = code !in 200..299 || SourceResponse.problem(html) != null ||
+                html.contains("<title>Loading...</title>", ignoreCase = true)
             if (!blocked) return Jsoup.parse(html, url.toString())
-            // WAF 指纹/Cookie 门：OkHttp 被拦，但同一网络下真实 Chromium WebView 往往能过门。
+            // 兜底：真实 WebView 执行站点 JS 拿 Cookie（同样用非浏览器 UA，避免 Tengine 403）。
             val webHtml = com.example.source.js.WebViewPageLoader.loadHtml(appContext, url.toString(), ua)
-            if (webHtml != null) {
-                val cookie = com.example.source.js.JsCookieJar.cookieHeader(appContext, url.toString())
-                if (cookie.isNotBlank()) {
-                    val retry = http.newCall(request(cookie)).executeCancellable()
-                    val retryCode = retry.code
-                    val retryHtml = retry.use { it.readSourceText() }
-                    if (retryCode in 200..299 && SourceResponse.problem(retryHtml) == null) {
-                        return Jsoup.parse(retryHtml, url.toString())
-                    }
-                }
-                if (SourceResponse.problem(webHtml) == null) {
-                    return Jsoup.parse(webHtml, url.toString())
-                }
+            if (webHtml != null && SourceResponse.problem(webHtml) == null &&
+                !webHtml.contains("<title>Loading...</title>", ignoreCase = true)) {
+                return Jsoup.parse(webHtml, url.toString())
             }
             if (code !in 200..299) {
                 throw SourceException.NetworkError("爱下电子书返回 HTTP $code（站点拦截，请稍后重试或检查网络）")
             }
             SourceResponse.problem(html)?.let { throw SourceException.ParseError(it) }
-            return Jsoup.parse(html, url.toString())
+            throw SourceException.ParseError(tr("爱下电子书页面未就绪（Cookie 门），请稍后重试"))
         }
         return guestNovelIoRetry { fetchOnce() }
     }
