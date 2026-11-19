@@ -10,8 +10,6 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 </div>
 
-<img src="docs/readme-media/shelf-motion.gif" width="100%" alt="Ciallo Reader importing an ebook and browsing the 3D bookshelf">
-
 [1.6.5 release notes](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.6.5)
 
 [Discovery and shelf](#discovery-and-shelf) · [Novels and ebooks](#novels-and-ebooks) · [Listening and annotations](#listening-dictionaries-and-annotations) · [Manga](#manga) · [Stats and appearance](#stats-and-appearance) · [Sources and backups](#sources-and-backups) · [Getting started](#getting-started)
@@ -20,12 +18,14 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 <table>
 <tr>
-<td width="50%"><img src="docs/readme-media/discover.webp" alt="Discovery rankings and cross-source search"><br><sub>Rankings and cross-source search</sub></td>
-<td width="50%"><img src="docs/readme-media/detail.webp" alt="Title details with a resume reading button"><br><sub>Title details and resume reading</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/discover.png" width="220" alt="Manga recommendations in Discovery"><br><sub>Manga recommendations in Discovery</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/search.png" width="220" alt="Search results from multiple sources"><br><sub>Search results from multiple sources</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/detail.png" width="220" alt="Title details and resume reading"><br><sub>Title details and resume reading</sub></td>
 </tr>
 <tr>
-<td><img src="docs/readme-media/offline.webp" alt="Completed download and offline reader"><br><sub>Download center and offline reading</sub></td>
-<td><img src="docs/readme-media/shelf.webp" alt="Ebook import and 3D bookshelf"><br><sub>Local import and 3D bookshelf</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/downloads.png" width="220" alt="Completed tasks in the download center"><br><sub>Completed tasks in the download center</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/shelf.png" width="220" alt="Shelf grid with local books"><br><sub>Shelf grid with local books</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/shelf-motion.gif" width="220" alt="Swiping through the 3D bookshelf"><br><sub>Swiping through the 3D bookshelf</sub></td>
 </tr>
 </table>
 
@@ -37,8 +37,10 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 <table>
 <tr>
-<td width="70%"><img src="docs/readme-media/novel-reader.webp" alt="Novel reader font, bookmark, and chapter panels"><br><sub>Fonts, bookmarks, and chapter list</sub><br><img src="docs/readme-media/page-turns.webp" alt="Page curl, slide, and fade in the novel reader"><br><sub>Page curl, slide, and fade</sub></td>
-<td width="30%" align="center"><img src="docs/readme-media/vertical.webp" width="215" alt="EPUB text in right-to-left vertical columns"><br><sub>Vertical EPUB text</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/novel-layout.png" width="172" alt="Novel fonts and typography settings"><br><sub>Novel fonts and typography settings</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/novel-toc.png" width="172" alt="Chapter list and search"><br><sub>Chapter list and search</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/page-turns.gif" width="172" alt="Simulated page turns"><br><sub>Simulated page turns</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/vertical.png" width="172" alt="Vertical EPUB text"><br><sub>Vertical EPUB text</sub></td>
 </tr>
 </table>
 
@@ -60,10 +62,10 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 <table>
 <tr>
-<td width="25%"><img src="docs/readme-media/listening.webp" alt="Playback controls over a novel"><br><sub>Listening player</sub></td>
-<td width="25%"><img src="docs/readme-media/speech-settings.webp" alt="Listening speed and pitch sliders"><br><sub>Playback settings</sub></td>
-<td width="25%"><img src="docs/readme-media/dictionary.webp" alt="Dictionary panel opened from a text selection"><br><sub>Look up selected text</sub></td>
-<td width="25%"><img src="docs/readme-media/selection.webp" alt="Passage selection with options to share or save a Reading Moment"><br><sub>Selection and Reading Moment</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/listening.png" width="172" alt="Listening player"><br><sub>Listening player</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/speech-settings.png" width="172" alt="Listening settings"><br><sub>Listening settings</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/dictionary.png" width="172" alt="Look up selected text"><br><sub>Look up selected text</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/selection.png" width="172" alt="Selection and Reading Moment"><br><sub>Selection and Reading Moment</sub></td>
 </tr>
 </table>
 
@@ -76,14 +78,14 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 <table>
 <tr>
-<td width="50%"><img src="docs/readme-media/landscape.webp" alt="Manga in a landscape two-page spread"><br><sub>Landscape and two-page spreads</sub></td>
-<td width="50%"><img src="docs/readme-media/comic-modes.webp" alt="Single page, seamless scrolling, and page snapping"><br><sub>Single page, continuous scrolling, and snapping</sub></td>
-</tr>
-<tr>
-<td><img src="docs/readme-media/comic-quality.webp" alt="Matched crops before and after MangaJaNai processing"><br><sub>Before and after MangaJaNai</sub></td>
-<td><img src="docs/readme-media/comic-translation.webp" alt="Chinese translation placed in the original comic speech bubbles"><br><sub>Translated speech bubbles</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/comic-modes.png" width="172" alt="Manga modes and page snapping settings"><br><sub>Manga modes and page snapping settings</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/comic-motion.gif" width="172" alt="Horizontal swipes and page snapping"><br><sub>Horizontal swipes and page snapping</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/translation-before.png" width="172" alt="Original manga page"><br><sub>Original manga page</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/translation-after.png" width="172" alt="Translated speech bubbles"><br><sub>Translated speech bubbles</sub></td>
 </tr>
 </table>
+
+<p align="center"><img src="docs/readme-media/landscape.png" width="570" alt="Manga in a landscape spread"><br><sub>Manga in a landscape spread</sub></p>
 
 - Read in single-page, two-page, webtoon, or seamless scrolling mode. Set reading direction, page snapping, double-tap zoom, trimming, spread splitting, background, and preloading.
 - Use built-in sharpening, line enhancement, or JaNai fast processing. The full MangaJaNai model runs offline after download.
@@ -94,8 +96,10 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 <table>
 <tr>
-<td width="50%"><img src="docs/readme-media/statistics.webp" alt="Reading stats and favorite chapter rankings"><br><sub>Reading calendar, trends, and chapter rankings</sub></td>
-<td width="50%"><img src="docs/readme-media/appearance.webp" alt="Theme, accent color, and layout settings"><br><sub>Themes, accent colors, and layout</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/statistics-calendar.png" width="172" alt="Reading calendar"><br><sub>Reading calendar</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/statistics-trend.png" width="172" alt="Reading trends"><br><sub>Reading trends</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/chapter-ratings.png" width="172" alt="Chapter rating and ranking"><br><sub>Chapter rating and ranking</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/appearance.png" width="172" alt="Themes and accent colors"><br><sub>Themes and accent colors</sub></td>
 </tr>
 </table>
 
@@ -108,8 +112,9 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 <table>
 <tr>
-<td width="50%"><img src="docs/readme-media/sources-backup.webp" alt="Source management and backup restore"><br><sub>Source management and backup restore</sub></td>
-<td width="50%"><img src="docs/readme-media/device-transfer.webp" alt="Sending and receiving books in device transfer"><br><sub>Sending and receiving books</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/source-management.png" width="220" alt="Source management"><br><sub>Source management</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/backup-preview.png" width="220" alt="Local backup restore preview"><br><sub>Local backup restore preview</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/device-transfer.png" width="220" alt="Device transfer completed"><br><sub>Device transfer completed</sub></td>
 </tr>
 </table>
 
@@ -129,4 +134,4 @@ Built with Kotlin, Jetpack Compose, Material 3, Room, and WorkManager. Use JDK 1
 
 Thanks to the readers and contributors who reported issues, and to the Wenku8 Flutter contributors for sharing reader UI and interaction references. [GitHub Issues](https://github.com/roxycon-dev/Ciallo-Reader/issues) · [Contributors](https://github.com/roxycon-dev/Ciallo-Reader/graphs/contributors) · [Wenku8 Flutter](https://github.com/mikufoxxx/Wenku8_Flutter)
 
-Original project code is MIT licensed. Third-party components and content follow their respective terms. The translation demo uses a cropped and enlarged portion of page 2 from episode 1 of David Revoy’s *Pepper&Carrot*. [MIT license](LICENSE) · [Third-party licenses](docs/vendor-licenses/README.md) · [Original comic](https://www.peppercarrot.com/en/webcomic/ep01_Potion-of-Flight.html) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+Original project code is MIT licensed. Third-party components and content follow their respective terms. The translation screenshots show page 2 from episode 1 of David Revoy’s *Pepper&Carrot*. [MIT license](LICENSE) · [Third-party licenses](docs/vendor-licenses/README.md) · [Original comic](https://www.peppercarrot.com/en/webcomic/ep01_Potion-of-Flight.html) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)

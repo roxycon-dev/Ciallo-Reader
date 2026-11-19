@@ -10,8 +10,6 @@ Android 7.0+ · ARM64 · [更新记录](CHANGELOG.md)
 
 </div>
 
-<img src="docs/readme-media/shelf-motion.gif" width="100%" alt="Ciallo Reader 导入本地电子书、3D 书架与收藏演示">
-
 [1.6.5 发布说明](docs/release-1.6.5-2026-11-19.md)
 
 [找书与书架](#找书与书架) · [小说与电子书](#小说与电子书) · [听书查词与批注](#听书查词与批注) · [漫画](#漫画) · [统计与个性化](#统计与个性化) · [书源与备份](#书源与备份) · [安装与上手](#安装与上手)
@@ -20,12 +18,14 @@ Android 7.0+ · ARM64 · [更新记录](CHANGELOG.md)
 
 <table>
 <tr>
-<td width="50%"><img src="docs/readme-media/discover.webp" alt="发现页榜单与聚合书名搜索"><br><sub>榜单与聚合搜索</sub></td>
-<td width="50%"><img src="docs/readme-media/detail.webp" alt="作品详情、收藏与继续阅读按钮"><br><sub>作品详情与续读</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/discover.png" width="220" alt="发现页的漫画推荐"><br><sub>发现页的漫画推荐</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/search.png" width="220" alt="多书源搜索结果"><br><sub>多书源搜索结果</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/detail.png" width="220" alt="作品详情与继续阅读"><br><sub>作品详情与继续阅读</sub></td>
 </tr>
 <tr>
-<td><img src="docs/readme-media/offline.webp" alt="章节下载完成与离线阅读画面"><br><sub>下载中心与离线阅读</sub></td>
-<td><img src="docs/readme-media/shelf.webp" alt="本地书导入、立体书架和书架视图"><br><sub>导入本地书与 3D 书架</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/downloads.png" width="220" alt="下载中心的已完成任务"><br><sub>下载中心的已完成任务</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/shelf.png" width="220" alt="书架网格与本地藏书"><br><sub>书架网格与本地藏书</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/shelf-motion.gif" width="220" alt="拖动浏览 3D 书架"><br><sub>拖动浏览 3D 书架</sub></td>
 </tr>
 </table>
 
@@ -37,8 +37,10 @@ Android 7.0+ · ARM64 · [更新记录](CHANGELOG.md)
 
 <table>
 <tr>
-<td width="70%"><img src="docs/readme-media/novel-reader.webp" alt="小说阅读器的字号、字体、书签和章节面板"><br><sub>字体、书签与目录</sub><br><img src="docs/readme-media/page-turns.webp" alt="小说阅读器仿真卷页、平移和渐变翻页"><br><sub>仿真卷页、平移与渐变</sub></td>
-<td width="30%" align="center"><img src="docs/readme-media/vertical.webp" width="215" alt="排成自右向左竖列的 EPUB 正文"><br><sub>EPUB 竖排正文</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/novel-layout.png" width="172" alt="小说字体与排版设置"><br><sub>小说字体与排版设置</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/novel-toc.png" width="172" alt="小说目录与章节搜索"><br><sub>小说目录与章节搜索</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/page-turns.gif" width="172" alt="小说仿真翻页"><br><sub>小说仿真翻页</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/vertical.png" width="172" alt="EPUB 竖排正文"><br><sub>EPUB 竖排正文</sub></td>
 </tr>
 </table>
 
@@ -60,10 +62,10 @@ Android 7.0+ · ARM64 · [更新记录](CHANGELOG.md)
 
 <table>
 <tr>
-<td width="25%"><img src="docs/readme-media/listening.webp" alt="小说正文上的听书播放器和播放控制"><br><sub>听书播放器</sub></td>
-<td width="25%"><img src="docs/readme-media/speech-settings.webp" alt="可调语速和音调的听书设置"><br><sub>播放设置</sub></td>
-<td width="25%"><img src="docs/readme-media/dictionary.webp" alt="从正文选词进入的离线词典面板"><br><sub>选词直达词典</sub></td>
-<td width="25%"><img src="docs/readme-media/selection.webp" alt="长按选区及分享、保存阅读摘录的操作"><br><sub>正文选段与阅读时刻</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/listening.png" width="172" alt="听书播放器"><br><sub>听书播放器</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/speech-settings.png" width="172" alt="听书播放设置"><br><sub>听书播放设置</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/dictionary.png" width="172" alt="选词直达词典"><br><sub>选词直达词典</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/selection.png" width="172" alt="正文选段与阅读时刻"><br><sub>正文选段与阅读时刻</sub></td>
 </tr>
 </table>
 
@@ -76,14 +78,14 @@ Android 7.0+ · ARM64 · [更新记录](CHANGELOG.md)
 
 <table>
 <tr>
-<td width="50%"><img src="docs/readme-media/landscape.webp" alt="漫画阅读器横屏双页"><br><sub>横屏与双页跨页</sub></td>
-<td width="50%"><img src="docs/readme-media/comic-modes.webp" alt="漫画单页、无缝滚动和横向磁吸演示"><br><sub>单页、连续滚动与磁吸停靠</sub></td>
-</tr>
-<tr>
-<td><img src="docs/readme-media/comic-quality.webp" alt="MangaJaNai 对同一区域的增强前后对照"><br><sub>MangaJaNai 增强前后</sub></td>
-<td><img src="docs/readme-media/comic-translation.webp" alt="同页气泡中回填的中文译文"><br><sub>识别并翻译漫画气泡</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/comic-modes.png" width="172" alt="漫画阅读模式与磁吸设置"><br><sub>漫画阅读模式与磁吸设置</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/comic-motion.gif" width="172" alt="横向拖动与磁吸停靠"><br><sub>横向拖动与磁吸停靠</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/translation-before.png" width="172" alt="漫画原文"><br><sub>漫画原文</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/translation-after.png" width="172" alt="气泡内的中文译文"><br><sub>气泡内的中文译文</sub></td>
 </tr>
 </table>
+
+<p align="center"><img src="docs/readme-media/landscape.png" width="570" alt="漫画横屏双页"><br><sub>漫画横屏双页</sub></p>
 
 - 单页、双页、条漫和无缝滚动，支持更改阅读方向、磁吸停靠、双击缩放、裁边、跨页拆分、背景和预加载数量。
 - 内置锐化与线条增强。JaNai 极速可直接使用，MangaJaNai 完整版下载模型后可离线增强。
@@ -94,8 +96,10 @@ Android 7.0+ · ARM64 · [更新记录](CHANGELOG.md)
 
 <table>
 <tr>
-<td width="50%"><img src="docs/readme-media/statistics.webp" alt="阅读统计趋势、阅读记录和神回榜"><br><sub>阅读日历、趋势与神回榜</sub></td>
-<td width="50%"><img src="docs/readme-media/appearance.webp" alt="应用主题、强调色、画质和界面语言设置"><br><sub>主题、强调色与显示布局</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/statistics-calendar.png" width="172" alt="阅读日历"><br><sub>阅读日历</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/statistics-trend.png" width="172" alt="阅读趋势"><br><sub>阅读趋势</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/chapter-ratings.png" width="172" alt="章节评分与神回榜"><br><sub>章节评分与神回榜</sub></td>
+<td width="25%" align="center"><img src="docs/readme-media/appearance.png" width="172" alt="主题与强调色"><br><sub>主题与强调色</sub></td>
 </tr>
 </table>
 
@@ -108,8 +112,9 @@ Android 7.0+ · ARM64 · [更新记录](CHANGELOG.md)
 
 <table>
 <tr>
-<td width="50%"><img src="docs/readme-media/sources-backup.webp" alt="书源管理与备份恢复进度"><br><sub>书源管理与备份恢复</sub></td>
-<td width="50%"><img src="docs/readme-media/device-transfer.webp" alt="两台设备间发送与接收书籍的确认画面"><br><sub>设备互传的发送端和接收端</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/source-management.png" width="220" alt="书源管理"><br><sub>书源管理</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/backup-preview.png" width="220" alt="本地备份恢复预览"><br><sub>本地备份恢复预览</sub></td>
+<td width="33%" align="center"><img src="docs/readme-media/device-transfer.png" width="220" alt="设备互传完成"><br><sub>设备互传完成</sub></td>
 </tr>
 </table>
 
@@ -129,4 +134,4 @@ Android 7.0+ · ARM64 · [更新记录](CHANGELOG.md)
 
 欢迎报告问题和补充复现步骤。感谢所有参与反馈的读者、贡献者，以及分享阅读界面与交互参考的 Wenku8 Flutter 作者和贡献者。[GitHub Issues](https://github.com/roxycon-dev/Ciallo-Reader/issues) · [贡献者](https://github.com/roxycon-dev/Ciallo-Reader/graphs/contributors) · [Wenku8 Flutter](https://github.com/mikufoxxx/Wenku8_Flutter)
 
-原创源代码采用 MIT。第三方内容和组件依各自许可使用。漫画翻译示意图取自 David Revoy 的《Pepper&Carrot》第 1 话第 2 页，画面经过裁切和放大。[MIT 许可](LICENSE) · [第三方许可](docs/vendor-licenses/README.md) · [漫画原作](https://www.peppercarrot.com/en/webcomic/ep01_Potion-of-Flight.html) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+原创源代码采用 MIT。第三方内容和组件依各自许可使用。漫画翻译示意图取自 David Revoy 的《Pepper&Carrot》第 1 话第 2 页。[MIT 许可](LICENSE) · [第三方许可](docs/vendor-licenses/README.md) · [漫画原作](https://www.peppercarrot.com/en/webcomic/ep01_Potion-of-Flight.html) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
