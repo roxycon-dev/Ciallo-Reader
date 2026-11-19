@@ -10,9 +10,9 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 </div>
 
-[<img src="docs/readme-media/shelf-motion.gif" width="100%" alt="Ciallo Reader importing an ebook and browsing the 3D bookshelf">](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.6.5/Ciallo-Reader-Showcase-4K.mp4)
+<img src="docs/readme-media/shelf-motion.gif" width="100%" alt="Ciallo Reader importing an ebook and browsing the 3D bookshelf">
 
-[Watch the full product film (92 seconds, 4K MP4)](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.6.5/Ciallo-Reader-Showcase-4K.mp4) · [Film chapters](#film-chapters) · [1.6.5 release notes](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.6.5)
+[1.6.5 release notes](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.6.5)
 
 [Discovery and shelf](#discovery-and-shelf) · [Novels and ebooks](#novels-and-ebooks) · [Listening and annotations](#listening-dictionaries-and-annotations) · [Manga](#manga) · [Stats and appearance](#stats-and-appearance) · [Sources and backups](#sources-and-backups) · [Getting started](#getting-started)
 
@@ -122,30 +122,6 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 1. Download the ARM64 APK from [GitHub Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) and follow Android’s install prompt. Each release includes `SHA256SUMS.txt`.
 2. Open **Shelf → Import books** for local files, or search for titles in **Library**. Enable your preferred providers in **Settings → Source management**.
 3. Tap the novel reader to show its controls. Select the headphones to start listening. Long-press text to look up a word, mark a passage, or export a Reading Moment.
-
-## Film chapters
-
-<details>
-<summary>Show timestamps</summary>
-
-| Time | Feature |
-| --- | --- |
-| 00:03 | Recommendations, rankings, categories, and title search |
-| 00:11 | Title details, favorites, and online reading |
-| 00:16 | Book and volume downloads, then offline reading |
-| 00:22 | Local import and 3D bookshelf |
-| 00:29 | Novel typography, chapters, bookmarks, and reading aloud |
-| 00:37 | Novel page turns |
-| 00:45 | Landscape spreads and zoom |
-| 00:52 | Manga modes and page snapping |
-| 00:58 | MangaJaNai, OCR, and translation |
-| 01:07 | Reading calendar, trends, and chapter rankings |
-| 01:14 | Themes, graphics, landscape layout, and language |
-| 01:21 | Sources, backup restore, and device transfer |
-
-The film was recorded on 1.6.4 and illustrates features available in 1.6.5.
-
-</details>
 
 ## Development, feedback, and licenses
 

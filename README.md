@@ -10,9 +10,9 @@ Android 7.0+ · ARM64 · [更新记录](CHANGELOG.md)
 
 </div>
 
-[<img src="docs/readme-media/shelf-motion.gif" width="100%" alt="Ciallo Reader 导入本地电子书、3D 书架与收藏演示">](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.6.5/Ciallo-Reader-Showcase-4K.mp4)
+<img src="docs/readme-media/shelf-motion.gif" width="100%" alt="Ciallo Reader 导入本地电子书、3D 书架与收藏演示">
 
-[观看完整产品影片（92 秒，4K MP4）](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.6.5/Ciallo-Reader-Showcase-4K.mp4) · [影片章节](#影片章节) · [1.6.5 发布说明](docs/release-1.6.5-2026-11-19.md)
+[1.6.5 发布说明](docs/release-1.6.5-2026-11-19.md)
 
 [找书与书架](#找书与书架) · [小说与电子书](#小说与电子书) · [听书查词与批注](#听书查词与批注) · [漫画](#漫画) · [统计与个性化](#统计与个性化) · [书源与备份](#书源与备份) · [安装与上手](#安装与上手)
 
@@ -123,34 +123,10 @@ Android 7.0+ · ARM64 · [更新记录](CHANGELOG.md)
 2. 打开「书架 → 导入新书」选择本地文件，或从「书库」选择小说、漫画或聚合搜索。可到「设置 → 书源管理」启用需要的来源。
 3. 在小说阅读页点按正文呼出工具栏。点耳机开始听书，长按正文可选段、查词、批注和导出阅读时刻。
 
-## 影片章节
-
-<details>
-<summary>展开时间轴</summary>
-
-| 时间 | 功能 |
-| --- | --- |
-| 00:03 | 推荐、排行榜、分类和书名搜索 |
-| 00:11 | 作品详情、收藏与在线阅读 |
-| 00:16 | 整本／分卷下载与离线续读 |
-| 00:22 | 导入本地书与 3D 书架 |
-| 00:29 | 小说设置、书签、目录与朗读 |
-| 00:37 | 小说翻页方式 |
-| 00:45 | 漫画横屏双页与缩放 |
-| 00:52 | 漫画阅读模式与磁吸停靠 |
-| 00:58 | MangaJaNai 增强、识别与翻译 |
-| 01:07 | 阅读日历、趋势与神回榜 |
-| 01:14 | 主题、画质、横屏布局与语言 |
-| 01:21 | 书源管理、备份恢复与设备互传 |
-
-主体影片沿用 1.6.4 的实录，展示保留在 1.6.5 的功能。
-
-</details>
-
 ## 开发、反馈与许可
 
 使用 Kotlin、Jetpack Compose、Material 3、Room 和 WorkManager。需要 JDK 17+、Android SDK 35、Build Tools 36.1.0、NDK 29.0.14206865 和 CMake 3.22.1。运行 `./gradlew :app:assembleDebug` 构建调试版。Windows 使用 `gradlew.bat :app:assembleDebug`。正式构建见 [发布签名](docs/app-signing.md)。
 
 欢迎报告问题和补充复现步骤。感谢所有参与反馈的读者、贡献者，以及分享阅读界面与交互参考的 Wenku8 Flutter 作者和贡献者。[GitHub Issues](https://github.com/roxycon-dev/Ciallo-Reader/issues) · [贡献者](https://github.com/roxycon-dev/Ciallo-Reader/graphs/contributors) · [Wenku8 Flutter](https://github.com/mikufoxxx/Wenku8_Flutter)
 
-原创源代码采用 MIT。第三方内容和组件依各自许可使用。影片中的漫画翻译演示取自 David Revoy 的《Pepper&Carrot》第 1 话第 2 页，画面经过裁切和放大。[MIT 许可](LICENSE) · [第三方许可](docs/vendor-licenses/README.md) · [漫画原作](https://www.peppercarrot.com/en/webcomic/ep01_Potion-of-Flight.html) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+原创源代码采用 MIT。第三方内容和组件依各自许可使用。漫画翻译示意图取自 David Revoy 的《Pepper&Carrot》第 1 话第 2 页，画面经过裁切和放大。[MIT 许可](LICENSE) · [第三方许可](docs/vendor-licenses/README.md) · [漫画原作](https://www.peppercarrot.com/en/webcomic/ep01_Potion-of-Flight.html) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
