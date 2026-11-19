@@ -168,7 +168,7 @@ internal object BackupArchive {
                         if(table in setOf("reading_records","reading_sessions")) require(row.getLong("durationSeconds")>=0)
                         val columns = columnCache.getValue(table)
                         val names = row.keys().asSequence().toList()
-                        require(names.toSet() == columns.keys) { tr("备份列与数据库不一致") }
+                        require(compatibleReaderColumns(table, names.toSet(), columns.keys)) { tr("备份列与数据库不一致") }
                         val values = names.map { name ->
                             val value=row.get(name)
                             val (type,required)=columns.getValue(name)

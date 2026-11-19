@@ -24,8 +24,12 @@ class AppDatabaseMigrationTest {
             seed.bookDao().insertBookWithChapters(Book(title="升级前的书",filePath="",totalChapters=1),listOf(Chapter(bookId=0,chapterOrder=0,title="第一章",content="保留正文")))
             val sql=seed.openHelper.writableDatabase
             sql.execSQL("DROP TABLE transfer_identities");sql.execSQL("DROP TABLE transfer_receipts")
-            sql.execSQL("DROP INDEX index_chapters_bookId_chapterOrder");restoreDownloadTableV13(sql);sql.version=12;seed.close()
-            val upgraded=Room.databaseBuilder(context,AppDatabase::class.java,name).addMigrations(AppDatabase.MIGRATION_12_13, AppDatabase.MIGRATION_13_14)
+            restoreReaderTablesV14(sql)
+            sql.execSQL("DROP INDEX index_chapters_bookId_chapterOrder")
+            restoreDownloadTableV13(sql)
+            sql.version = 12
+            seed.close()
+            val upgraded=Room.databaseBuilder(context,AppDatabase::class.java,name).addMigrations(AppDatabase.MIGRATION_12_13, AppDatabase.MIGRATION_13_14, AppDatabase.MIGRATION_14_15)
                 .setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE).allowMainThreadQueries().build()
             try {
                 val book=upgraded.bookDao().getAllBooksSync().single()
@@ -37,7 +41,7 @@ class AppDatabaseMigrationTest {
     }
 
     @Test
-    fun upgradingVersion11PreservesChapterStateAndAddsBookmarkAndGodMomentTables() = runBlocking {
+    fun version11KeepsComicState() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "migration-11-12-${System.nanoTime()}.db"
         try {
@@ -71,13 +75,14 @@ class AppDatabaseMigrationTest {
                     "ON comic_chapter_read (sourceId, comicId)"
             )
             sql.execSQL("DROP TABLE god_moments")
+            restoreReaderTablesV14(sql)
             restoreDownloadTableV13(sql)
             sql.version = 11
             seed.close()
 
             val upgraded = Room.databaseBuilder(context, AppDatabase::class.java, name)
                 .setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE)
-                .addMigrations(AppDatabase.MIGRATION_11_12, AppDatabase.MIGRATION_12_13, AppDatabase.MIGRATION_13_14)
+                .addMigrations(AppDatabase.MIGRATION_11_12, AppDatabase.MIGRATION_12_13, AppDatabase.MIGRATION_13_14, AppDatabase.MIGRATION_14_15)
                 .allowMainThreadQueries()
                 .build()
             try {
@@ -97,6 +102,18 @@ class AppDatabaseMigrationTest {
             context.deleteDatabase(name)
         }
     }
+    private fun restoreReaderTablesV14(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE chapters RENAME TO chapters_from_v15")
+        db.execSQL("CREATE TABLE chapters (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, bookId INTEGER NOT NULL, chapterOrder INTEGER NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, startCharIndex INTEGER NOT NULL, endCharIndex INTEGER NOT NULL)")
+        db.execSQL("INSERT INTO chapters SELECT id, bookId, chapterOrder, title, content, startCharIndex, endCharIndex FROM chapters_from_v15")
+        db.execSQL("DROP TABLE chapters_from_v15")
+        db.execSQL("CREATE INDEX index_chapters_bookId_chapterOrder ON chapters (bookId, chapterOrder)")
+        db.execSQL("ALTER TABLE highlights RENAME TO highlights_from_v15")
+        db.execSQL("CREATE TABLE highlights (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, bookId INTEGER NOT NULL, chapterIndex INTEGER NOT NULL, selectedText TEXT NOT NULL, note TEXT NOT NULL, colorHex TEXT NOT NULL, createdTime INTEGER NOT NULL)")
+        db.execSQL("INSERT INTO highlights SELECT id, bookId, chapterIndex, selectedText, note, colorHex, createdTime FROM highlights_from_v15")
+        db.execSQL("DROP TABLE highlights_from_v15")
+    }
+
     private fun restoreDownloadTableV13(db: androidx.sqlite.db.SupportSQLiteDatabase) {
         db.execSQL("""CREATE TABLE IF NOT EXISTS `download_tasks_v13` (`id` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT NOT NULL, `coverUrl` TEXT, `downloadUrl` TEXT NOT NULL, `format` TEXT NOT NULL, `status` TEXT NOT NULL, `downloadedBytes` INTEGER NOT NULL, `totalBytes` INTEGER NOT NULL, `filePath` TEXT NOT NULL, `errorMessage` TEXT, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))""")
         db.execSQL("INSERT INTO download_tasks_v13 (`id`,`sourceId`,`title`,`author`,`coverUrl`,`downloadUrl`,`format`,`status`,`downloadedBytes`,`totalBytes`,`filePath`,`errorMessage`,`updatedAt`) SELECT `id`,`sourceId`,`title`,`author`,`coverUrl`,`downloadUrl`,`format`,`status`,`downloadedBytes`,`totalBytes`,`filePath`,`errorMessage`,`updatedAt` FROM download_tasks")
@@ -108,13 +125,18 @@ class AppDatabaseMigrationTest {
         val context=ApplicationProvider.getApplicationContext<Context>()
         val name="migration-13-14-${System.nanoTime()}.db"
         try {
-            val seed=Room.databaseBuilder(context,AppDatabase::class.java,name).allowMainThreadQueries().build()
+            val seed=Room.databaseBuilder(context,AppDatabase::class.java,name)
+                .setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE).allowMainThreadQueries().build()
             val dao=seed.downloadTaskDao()
             dao.insertOrUpdate(com.example.download.DownloadTaskEntity("active","fixture","进度","",null,"url","txt",com.example.download.DownloadStatus.PAUSED,50,100,"/file"))
             dao.insertOrUpdate(com.example.download.DownloadTaskEntity("done","fixture","完成","",null,"url","txt",com.example.download.DownloadStatus.COMPLETED,100,100,"/done"))
             val sql=seed.openHelper.writableDatabase
-            restoreDownloadTableV13(sql);sql.version=13;seed.close()
-            val upgraded=Room.databaseBuilder(context,AppDatabase::class.java,name).addMigrations(AppDatabase.MIGRATION_13_14).allowMainThreadQueries().build()
+            restoreReaderTablesV14(sql)
+            restoreDownloadTableV13(sql)
+            sql.version = 13
+            seed.close()
+            val upgraded=Room.databaseBuilder(context,AppDatabase::class.java,name).addMigrations(AppDatabase.MIGRATION_13_14, AppDatabase.MIGRATION_14_15)
+                .setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE).allowMainThreadQueries().build()
             try {
                 assertEquals(.5f,upgraded.downloadTaskDao().getTaskById("active")!!.progress)
                 assertEquals(1f,upgraded.downloadTaskDao().getTaskById("done")!!.progress)

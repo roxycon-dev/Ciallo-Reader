@@ -1,6 +1,8 @@
 package com.example.ui
 
 import androidx.compose.runtime.mutableStateOf
+import com.example.data.PreferencesManager
+import com.example.data.TtsManager
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -36,6 +38,8 @@ class OnlineNovelReaderDeviceTest {
         val state = mutableStateOf(OnlineNovelChapterState(requested = first, loading = true))
         var requests = 0
         var retries = 0
+        val ttsManager = TtsManager(compose.activity)
+        val prefs = PreferencesManager(compose.activity)
         compose.setContent {
             MyApplicationTheme {
                 val nav = rememberNavController()
@@ -43,6 +47,9 @@ class OnlineNovelReaderDeviceTest {
                     composable("reader") {
                         NovelReaderScreen(
                             bookTitle = "在线小说验证",
+                            listeningBookKey = "online:device-fixture",
+                            ttsManager = ttsManager,
+                            prefs = prefs,
                             state = state.value,
                             hasNextChapter = state.value.page?.chapter == first,
                             hasPrevChapter = state.value.page?.chapter == second,
@@ -64,6 +71,15 @@ class OnlineNovelReaderDeviceTest {
         compose.onNodeWithContentDescription("正在加载正文").assertIsDisplayed()
         compose.runOnIdle { state.value = OnlineNovelChapterState(initial, first) }
         compose.onNodeWithText("旧段落 0").assertIsDisplayed()
+        compose.onNodeWithContentDescription("听书模式").performClick()
+        compose.onNodeWithText("从阅读位置听起").assertIsDisplayed()
+        compose.onNodeWithContentDescription("关闭").performClick()
+        compose.onNodeWithText("从阅读位置听起").assertDoesNotExist()
+        compose.onNodeWithContentDescription("词典查词").performClick()
+        compose.onNodeWithText("从正文选词").performClick()
+        compose.onNodeWithText("查询选中文字").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("关闭").performClick()
+        compose.onNodeWithText("查询选中文字").assertDoesNotExist()
         compose.onNodeWithContentDescription("下一章").performClick()
         compose.onNodeWithContentDescription("下一章").assertIsNotEnabled()
         compose.onNodeWithText("旧段落 0").assertIsDisplayed()
@@ -89,6 +105,7 @@ class OnlineNovelReaderDeviceTest {
         compose.onNodeWithContentDescription("本章进度").assertDoesNotExist()
         compose.onRoot().performTouchInput { click(center) }
         compose.onNodeWithContentDescription("本章进度").assertIsDisplayed()
+        compose.runOnIdle { ttsManager.release() }
     }
 
     private fun body(prefix: String): String = List(60) { "${prefix}段落 $it" }.joinToString("\n\n")

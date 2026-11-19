@@ -53,8 +53,14 @@ interface BookDao {
     @Query("SELECT * FROM chapters WHERE bookId = :bookId ORDER BY chapterOrder ASC")
     suspend fun getChaptersListForBook(bookId: Int): List<Chapter>
 
-    @Query("SELECT id, bookId, chapterOrder, title, startCharIndex, endCharIndex, '' as content FROM chapters WHERE bookId = :bookId ORDER BY chapterOrder ASC")
+    @Query("SELECT id, bookId, chapterOrder, title, startCharIndex, endCharIndex, writingMode, NULL as formatting, '' as content FROM chapters WHERE bookId = :bookId ORDER BY chapterOrder ASC")
     suspend fun getChaptersMetadataList(bookId: Int): List<Chapter>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM chapters WHERE bookId = :bookId AND (formatting IS NOT NULL OR writingMode IS NOT NULL))")
+    suspend fun hasChapterFormatting(bookId: Int): Boolean
+
+    @Query("UPDATE chapters SET formatting = :formatting, writingMode = :writingMode WHERE bookId = :bookId AND id = :id AND content = :text AND formatting IS NULL AND writingMode IS NULL")
+    suspend fun setChapterFormatting(bookId: Int, id: Int, text: String, formatting: String?, writingMode: String?)
 
     @Query("SELECT * FROM chapters WHERE bookId = :bookId AND content LIKE '%' || :query || '%' ORDER BY chapterOrder ASC")
     suspend fun searchChapters(bookId: Int, query: String): List<Chapter>
@@ -249,7 +255,7 @@ data class AniListTitleEntity(
 
 @Database(
     entities = [Book::class, Chapter::class, Bookmark::class, Highlight::class, CategoryEntity::class, ReadingRecord::class, ReadingSession::class, com.example.download.DownloadTaskEntity::class, AniListTitleEntity::class, com.example.data.favorite.FavoriteEntity::class, com.example.data.favorite.ComicProgressEntity::class, com.example.data.favorite.ChapterReadEntity::class, com.example.data.favorite.FavoriteCategoryEntity::class, com.example.god.GodMomentEntity::class, com.example.transfer.TransferIdentityEntity::class, com.example.transfer.TransferReceiptEntity::class],
-    version = 14,
+    version = 15,
     exportSchema = true
 )
 @TypeConverters(com.example.download.DownloadTypeConverters::class)
@@ -263,6 +269,16 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
+
+        val MIGRATION_14_15 = object : androidx.room.migration.Migration(14, 15) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE chapters ADD COLUMN formatting TEXT")
+                db.execSQL("ALTER TABLE chapters ADD COLUMN writingMode TEXT")
+                db.execSQL("ALTER TABLE highlights ADD COLUMN startOffset INTEGER")
+                db.execSQL("ALTER TABLE highlights ADD COLUMN endOffset INTEGER")
+                db.execSQL("ALTER TABLE highlights ADD COLUMN markStyle TEXT")
+            }
+        }
 
         val MIGRATION_13_14 = object : androidx.room.migration.Migration(13, 14) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
@@ -532,7 +548,7 @@ abstract class AppDatabase : RoomDatabase() {
                         LegacyDatabaseMigration(3), LegacyDatabaseMigration(4),
                         MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
                         MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
-                        MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14
+                        MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15
                     )
                     
                     .addCallback(object : RoomDatabase.Callback() {

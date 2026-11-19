@@ -286,8 +286,8 @@ internal object PortableArchive {
             var protected=(manifest?.optBoolean("containsProtected") ?: false) || protectedFavorites
             ArchiveRows.forEach(rows) { table,row,_ ->
                 val schema=schemas.getValue(table)
-                require(row.keys().asSequence().toSet()==schema.keys) { tr("数据字段与当前版本不兼容") }
-                schema.forEach { (key,type) -> val value=row.get(key)
+                require(com.example.data.compatibleReaderColumns(table, row.keys().asSequence().toSet(), schema.keys)) { tr("数据字段与当前版本不兼容") }
+                schema.forEach { (key,type) -> val value=row.opt(key) ?: JSONObject.NULL
                     require(value!=JSONObject.NULL || !type.second) { tr("必填数据为空") }
                     require(value==JSONObject.NULL || when(type.first) { "TEXT" -> value is String; "INTEGER" -> value is Int || value is Long; "REAL" -> value is Number && value.toDouble().isFinite(); else -> false })
                     if(value is String && "@FILES@" in value) {

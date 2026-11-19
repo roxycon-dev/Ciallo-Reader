@@ -9,6 +9,7 @@
 - [EhTagTranslation 多语言搜索词库](keyword-data.md)：CC BY-NC-SA 3.0 中国大陆。
 - [ncnn 推理库](ncnn/README.md)：BSD 3-Clause 及随附第三方条款。
 - [FluidSlider](fluidslider/README.md)：查看其目录中的上游许可证。
+- [Edge 语音验证代码](../../app/src/main/java/com/example/data/EdgeVoiceProof.kt) 改编自 [edge-tts](https://github.com/rany2/edge-tts)，适用 LGPL-3.0-only。上游许可随 APK 提供。[许可文本](../../app/src/main/assets/licenses/edge-tts.txt)
 - [AMD FidelityFX FSR](FidelityFX-FSR-MIT.txt)：MIT。
 - APK 内的 [环境音效署名记录](../../app/src/main/assets/ambient/CREDITS.md) 和第三方组件许可文件亦适用各自条款。
 

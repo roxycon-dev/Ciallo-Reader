@@ -32,9 +32,7 @@ internal suspend fun loadReaderChapterWindow(
             chapters[index] = previous[index]
         } else {
             val content = mapping.logicalToPhysicalOrders[index].asIterable().mapNotNull { parts[it] }
-            if (content.isNotEmpty()) chapters[index] = metadata[index].copy(
-                content = content.joinToString(separator = "") { it.content },
-            )
+            if (content.isNotEmpty()) chapters[index] = mergeChapterParts(metadata[index], content)
         }
     }
     ReaderChapterWindow(chapters, complete)

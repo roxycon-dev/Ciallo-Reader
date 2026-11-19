@@ -102,11 +102,19 @@ object EpubParser {
 
             val chapters = mutableListOf<Chapter>()
             var chapterOrder = 0
+            val cssCache = mutableMapOf<File, String>()
+            val packageMode = org.jsoup.Jsoup.parse(readTextWithCharsetDetection(opfFile), "", org.jsoup.parser.Parser.xmlParser())
+                .select("meta").mapNotNull { meta ->
+                    if (meta.attr("name").equals("primary-writing-mode", true) ||
+                        meta.attr("property").substringAfter(':').equals("writing-mode", true)) {
+                        normalizeWritingMode(meta.attr("content").ifBlank { meta.text() })
+                    } else null
+                }.lastOrNull()
 
             // 5. Load XHTML files in spine order
             for (idref in opfData.spineItemRefs) {
                 val href = opfData.manifestItems[idref] ?: continue
-                val xhtmlFile = File(opfDir, decodeUrl(href)).canonicalFile
+                val xhtmlFile = File(opfDir, decodeUrl(href.substringBefore('#').substringBefore('?'))).canonicalFile
                 require(xhtmlFile.canonicalPath.startsWith(tempDir.canonicalPath.trimEnd(File.separatorChar) + File.separator)) { tr("EPUB正文路径越界") }
                 if (!xhtmlFile.exists()) {
                     error("EPUB 缺少正文文件：$href")
@@ -121,14 +129,12 @@ object EpubParser {
                 val withImages = embedImageTokens(rawContent, xhtmlFile, tempDir, imageDir, uri.toString())
 
                 val chapterTitle = extractChapterTitle(rawContent, opfData.tocTitles[decodeUrl(href.substringBefore('#'))])
-                val cleanText = extractCleanTextFromHtml(withImages)
-
-                if (cleanText.isNotBlank()) {
-                    splitChapterText(cleanText).forEachIndexed { index, part ->
-                        chapters.add(Chapter(bookId=bookId, chapterOrder=chapterOrder++,
-                            title=if(index==0) chapterTitle else "$chapterTitle (续${index+1})", content=part))
-                        if(chapters.size>=32) { bookDao.insertChapters(chapters); chapters.clear() }
-                    }
+                val sheets = epubStyleSheets(rawContent, xhtmlFile, tempDir, cssCache)
+                val richText = readBookHtml(withImages, sheets, packageMode)
+                for (part in richText.chapters(bookId, chapterOrder, chapterTitle)) {
+                    chapters.add(part)
+                    chapterOrder++
+                    if (chapters.size >= 32) { bookDao.insertChapters(chapters); chapters.clear() }
                 }
             }
 
@@ -809,6 +815,42 @@ object EpubParser {
         copied[src] = target.absolutePath
         return "[IMG:${target.absolutePath}|${opts.outWidth}|${opts.outHeight}]"
     }
+
+    private fun epubStyleSheets(
+        html: String,
+        chapter: File,
+        root: File,
+        cache: MutableMap<File, String>
+    ): List<String> = buildList {
+        val visited = mutableSetOf<File>()
+        val rootPrefix = root.canonicalPath.trimEnd(File.separatorChar) + File.separator
+        fun load(reference: String, parent: File, depth: Int) {
+            if (depth > 4 || visited.size >= 24 || reference.isBlank()) return
+            val relative = decodeUrl(reference.substringBefore('#').substringBefore('?').trim())
+            if (relative.startsWith('/') || ':' in relative || relative.startsWith('\\')) return
+            val file = runCatching { File(parent, relative).canonicalFile }.getOrNull() ?: return
+            if (!file.canonicalPath.startsWith(rootPrefix) || !file.isFile ||
+                file.length() > 512_000 || !visited.add(file)) return
+            val css = cache[file] ?: readTextWithCharsetDetection(file).also {
+                if (cache.size < 48) cache[file] = it
+            }
+            cssImport.findAll(css).forEach { match ->
+                load(match.groupValues[1], file.parentFile ?: root, depth + 1)
+            }
+            add(cssImport.replace(css, ""))
+        }
+        val page = org.jsoup.Jsoup.parse(html)
+        for (link in page.select("link[rel=stylesheet][href]")) {
+            load(link.attr("href"), chapter.parentFile ?: root, 0)
+        }
+        for (style in page.select("style")) {
+            cssImport.findAll(style.data()).forEach { match ->
+                load(match.groupValues[1], chapter.parentFile ?: root, 0)
+            }
+        }
+    }
+
+    private val cssImport = Regex("""(?i)@import\s+(?:url\(\s*)?["']?([^"')\s;]+)["']?\s*\)?[^;]*;""")
 
     private val supportedImageExtensions = setOf("jpg", "jpeg", "png", "webp", "gif", "bmp")
 

@@ -8,6 +8,58 @@
 - Issue #7 对照参考仓库的宽屏限宽。书库和发现居中，发现网格按宽度使用 2／3／4 列。漫画设置的图片预加载支持自动或 0–12 张，独立于画质和双页排版。
 - Roxy 庆祝 GIF 由现有角色素材编排，保留减少动态效果及低版本系统的静态路径。
 
+## 2026-11-19 文件排版兼容与阅读功能补齐
+
+| 范围 | 对照源码 | 源码检查 |
+|---|---|---|
+| 文件导入与正文排版 | Flutter 的 `reader_rich_content.dart`、`reader_book_layout.dart`，EPUB 的 XHTML 与 CSS 写向声明 | Ciallo 的正文与样式范围分别保存，分页和实际文本共用字形样式。EPUB 读取包元数据、内联样式及归档内 CSS，识别同一章节里的标题、粗体、斜体、下划线、删除线、上下标、列表、表格行和代码。DOCX 读文本运行属性、样式、编号和表格，Markdown 用 CommonMark 与 GFM 扩展。HTML、FB2 和 MOBI 接入同一正文样式数据 |
+| 旧书和备份 | Ciallo 章节窗口、进度、备份和跨设备导入 | 旧 EPUB 可通过仍可访问的原始归档恢复匹配的样式。恢复只写元数据，原有文字、偏移、书签和进度保留。Room 从 14 迁移到 15。旧备份与旧互传包允许缺少新增字段，新包包含样式及离线阅读器的批注范围 |
+| 横排与竖排 | `reader_vertical_text.dart`、`reader_embedded_vertical.dart` | 本地排版新增随书籍、横排、竖排。竖排采用受限的本地文字视图，支持自右向左或自左向右的列、混合文字、进度、跟读和正文插图，正文只来自应用生成的文档 |
+| 长按选段和批注 | `reader_selection.dart`、`reader_annotation_range.dart`、`reader_annotation_editor.dart` | 本地横排正文和在线正文长按打开选段，支持调整范围、复制、预填词典、加高亮或下划线和笔记。本地竖排使用系统选区的查词与批注动作。已保存的范围按原文位置渲染；本地从书签与批注进入，在线从章内批注按钮进入 |
+| 导出阅读时刻 | `reading_moment_export.dart`、`reading_moment_content.dart` | 从选段面板生成带书名、章名、摘录和主题强调色的 PNG。通过系统分享或文档保存选择器交接 |
+| 听书来源、秒级进度与锁屏接续 | `listening/edge_tts.dart`、`listening/controller.dart`、`listening/widgets.dart` | 系统语音、Edge 音色与自定义语音共用实际音频播放器。自定义接口发送 JSON，接受音频响应。按已解码时长快退或快进，跨同章语段。MediaSession、通知和前台服务管理播放，切章由数据层完成，可在阅读页面离场后继续 |
+| 词典格式 | `dictionary_engine.dart`、`dictionary_validation.dart`、`dictionary_mobi.dart` | StarDict 之外支持 MDX v1/v2 的未压缩和 zlib，以及 MOBI 词头索引或显式词条。统一落地 SQLite 词头索引，离线查词渲染文本，按需读取释义 |
+
+**新增交互复核**
+
+- 听书、查词、选段及在线批注沿用 `WenkuSheetDialog` 的双向开合、遮罩、拖拽和返回路径，开放期间保留正文。听书按钮沿用 `AppIconButton` 的纸片图标状态，文本按钮沿用 `PullOutTextButton` 的按压和释放反馈。
+- 听书与词典的面板内切换现统一读取 Ciallo 的减少动态效果和极简画质状态。静态路径停用词典的内容尺寸动画。横竖排选项及翻页方式使用阅读器共用的按压反馈，选中状态在减少动态效果时直接更新。
+- 横竖排正文切换当前直接更新排版，竖排拖动由原生 WebView 处理。系统选区、文件选择器及分享窗口使用 Android 原生交互。逐帧比较进退曲线和真机帧耗时仍待核对。
+- Android 30 模拟器复跑 3 项常规回归。关闭系统动画后另复跑本地、在线阅读器的听书、选段和词典入口及开合，两项通过。验收结束恢复系统动画选项。
+
+**设备已验证**
+
+- Android 30 模拟器 8 项通过。用真实 EPUB ZIP 导入夹具验证相对路径链接的 CSS、实际字重为 700、自动竖列及可横向浏览。验证本地和在线小说的听书与词典面板，并从正文长按把选词带入词典。
+- 1.6.5 发布复核发现 Android 30 的 WebView 83 在根节点启用竖排时会将列高算成零。改用尺寸固定的竖排滚动容器。增强回归测试检查同一列中相邻字形的实际坐标，并在 Android 30 验收通过。
+- 系统语音已通过启动、暂停、选段和续听。Edge 用无用户数据的测试样句生成真实音频。自定义语音用本机测试接口验证前进 15 秒跨语段、停止阅读 Activity 后熄屏及屏幕保持关闭时进入下一章。StarDict 验证实际压缩文件导入及启停删除。
+- 单元测试覆盖写入并重组富文本范围、DOCX 样式继承、Markdown/GFM、旧 EPUB 偏移对齐、MDX 压缩、MOBI 词头索引、数据库升级、章节窗口、分页缓存、EPUB 兼容和互传。依赖工作区之外旧 EPUB 原件的 `RealEpubPipelineTest` 缺少原件，无法复跑该书的路径。
+
+**待逐项复验**
+
+- 真实长书、CSS 完整层叠、固定版式 EPUB、嵌入书籍字体、复杂表格及 Word 打印级排版。当前表格用清晰的按行和单元格分隔保留内容。旧 EPUB 样式恢复需要原文件和可对齐的正文。
+- MDX v3、LZO 数据块、受保护的词典正文及 MDD 图片和发音媒体。不同厂商设备上的锁屏、在线章节请求和通知控制也需要补充验证。
+- Android 真机同画质、同刷新率和等规模的首访／复访与帧耗时。本轮重点是小说阅读链路，五个 Tab、3D 书架和发布版同条件性能仍待复测。
+
+## 2026-11-19 小说听书与词典
+
+| 范围 | Wenku8 Flutter 源码 | Ciallo 源码检查 |
+|---|---|---|
+| 听书入口与面板 | `listening/widgets.dart` 的 `ListeningPanel`、`reader_tools.dart` 的听书工具 | 本地 `ReaderScreen` 顶栏、底栏和自定义点击区，在线 `NovelReaderScreen` 顶栏，共用 `ReaderListeningPanel`。关闭按钮、遮罩、系统返回和拖拽沿用 `WenkuSheetDialog`，阅读正文留在面板下面。播放／暂停和耳机／扬声器随状态更新，按钮沿用 Ciallo 的按压和释放反馈 |
+| 播放、跟读与续听 | `listening/controller.dart`、`reader_listening_follow.dart`、`reader_speech_highlight.dart` | `TtsManager` 延迟初始化系统语音，听书通知提供上段、暂停和下段。可拖动章内段落进度、从当前阅读位置起播、暂停续接和关闭后续听。活动阅读器接续加载下一章。跟读按正文偏移更新本地分页、滚动正文和在线列表，跳过插图占位符。进度回调按播放批次识别，系统语音支持范围回调时可在当前段内续接 |
+| 播放设置 | `listening/listening_speed_control.dart`、`listening/system_tts_page.dart`、`listening/store.dart` | 阅读器内修改语速、音调、段落间隔、跟读、系统音色及自动语言匹配。15／30／60 分钟或本章结束可定时停止。语速和音调使用原偏好键，音色、间隔、跟读和每章续听位置使用本机偏好 |
+| 离线与在线查词 | `reader_dictionary.dart`、`reader_text_picker.dart`、`dictionary_sheet.dart`、`dictionary_stardict.dart` | 本地小说从更多菜单进入，在线小说从顶栏进入。可输入词语或从当前正文片段中选词。支持 StarDict ZIP 或同名文件组、压缩索引和正文、同义词、多个词典启停和删除。SQLite 索引查询在 IO 调度器上运行，释义只渲染文本。用户点击有道入口后才将查询词交给浏览器 |
+
+**设备已验证**
+
+- Android 35 和 Android 30 模拟器各通过 4 项定向测试。覆盖系统 TTS 前台服务启动、指定段落播放、暂停跳段及续播，正文偏移与 Unicode 分段，压缩 StarDict 导入、同义词查询及启停删除，以及在线阅读器听书和查词面板开合、切章失败重试、原正文保留和工具栏恢复。
+- Android 30 另通过 1 项本地小说夹具。使用 Ciallo 导入逻辑将 TXT 写入内存数据库，随后进入正式本地阅读器组件，检查听书和播放设置、返回正文及从更多菜单进入词典。系统文件选择器到书架的完整手动链路仍待复验。
+
+**待验证**
+
+- 真机确认不同厂商的语音引擎、音色下载、定时、耳机打断、后台通知、跨章衔接、折叠屏和减少动态效果。听书的首访与复访、长章滚动跟读和开关面板的帧耗时待在同设备、同画质、同刷新率和相同正文规模下对照。本轮未重测五个 Tab 与 3D 书架。
+- 与参考实现仍有功能差距。Ciallo 使用 Android 系统语音和段落进度。Edge／自定义语音接口、合成音频缓存、按秒快进和后退、锁屏跨章、段落双击起播待补。词典目前支持 StarDict 和浏览器查询，MDX／MDD、MOBI、词典改名和排序待补。正文选词从查词面板进入，参考端的长按工具栏直达查词待补。
+- 更广的阅读器对照中，Ciallo 的本地书签、章内／整书搜索、插图及阅读时长已有入口。Flutter 参考端的竖排正文、长按直接创建范围标记与批注、阅读时刻图文导出仍有迁移空间，分别见 `reader_vertical_text.dart`、`reader_selection.dart`、`reader_annotations.dart` 和 `reading_moment_export.dart`。
+
 ## 2026-11-11 Issue #9 书架视图与封面飞行
 
 | 检查 | 结果 |

@@ -20,6 +20,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.Bookmarks
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.*
@@ -38,6 +46,23 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.ReadingSession
+import com.example.data.ListeningChapter
+import com.example.data.PreferencesManager
+import com.example.data.SpokenParagraph
+import com.example.data.TtsManager
+import com.example.data.spokenParagraphs
+import com.example.ui.reader.ReaderListeningPanel
+import com.example.ui.reader.ReaderDictionarySheet
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.platform.LocalContext
+import com.example.ui.reader.ReaderSelectionSheet
+import com.example.ui.reader.ReaderTextSelection
+import com.example.ui.reader.ReaderMark
+import com.example.ui.reader.readerTextLongPress
+import com.example.ui.reader.addReaderMarks
+import com.example.ui.reader.OnlineNovelMarks
+import androidx.compose.ui.text.buildAnnotatedString
 import com.example.library.OnlineNovelChapterState
 import com.example.library.OnlineNovelPage
 import com.example.ui.components.AppIconButton
@@ -52,6 +77,9 @@ import kotlin.math.roundToInt
 @Composable
 internal fun NovelReaderScreen(
     bookTitle: String?,
+    listeningBookKey: String,
+    ttsManager: TtsManager,
+    prefs: PreferencesManager,
     state: OnlineNovelChapterState,
     hasNextChapter: Boolean,
     hasPrevChapter: Boolean,
@@ -60,7 +88,9 @@ internal fun NovelReaderScreen(
     onLoadPrev: () -> Unit,
     onLoadNext: () -> Unit,
     onRecordTime: (Long) -> Unit = {},
-    onSessionEnd: (ReadingSession) -> Unit = {}
+    onSessionEnd: (ReadingSession) -> Unit = {},
+    listeningContinuation: (suspend (ListeningChapter) -> ListeningChapter?)? = null,
+    onOpenListeningChapter: ((String) -> Unit)? = null
 ) {
     ReadingTimerEffect(
         bookId = null,
@@ -87,6 +117,77 @@ internal fun NovelReaderScreen(
             delay(500)
             delayedLoading = true
         }
+    }
+
+    var showListening by remember { mutableStateOf(false) }
+    var dictionaryPassage by remember { mutableStateOf<String?>(null) }
+    var dictionaryWord by remember { mutableStateOf("") }
+    var selection by remember(page?.chapter?.id) { mutableStateOf<ReaderTextSelection?>(null) }
+    val context = LocalContext.current
+    val markStore = remember(context, listeningBookKey, page?.chapter?.id) {
+        OnlineNovelMarks(context, listeningBookKey, page?.chapter?.id.orEmpty())
+    }
+    var marks by remember(markStore) { mutableStateOf(markStore.load()) }
+    var showMarks by remember(markStore) { mutableStateOf(false) }
+    val visibleMarks = remember(page?.text, marks) {
+        val text = page?.text.orEmpty()
+        marks.filter { it.mark.start >= 0 && it.mark.end <= text.length &&
+            it.mark.start < it.mark.end && text.regionMatches(it.mark.start, it.text, 0, it.text.length) }
+    }
+    var followListening by remember(ttsManager) { mutableStateOf(ttsManager.followText) }
+    var pendingNext by remember(listeningBookKey) { mutableStateOf<String?>(null) }
+    val listening by ttsManager.state.collectAsState()
+    val ownsListening = listening.chapter?.bookKey == listeningBookKey
+    val isListening = ownsListening && (listening.playing || listening.preparing)
+    val listeningChapter = remember(page, listeningBookKey, bookTitle) {
+        page?.let { ListeningChapter(listeningBookKey, it.chapter.id, bookTitle.orEmpty(), it.chapter.title,
+            spokenParagraphs(it.text)) }
+    }
+    val activeParagraph = listening.paragraph.takeIf {
+        isListening && followListening && listening.chapter?.chapterKey == page?.chapter?.id
+    }
+
+    fun play(from: Int? = null, useReadingPosition: Boolean = false) {
+        val existing = listening.chapter?.takeIf { ownsListening && !useReadingPosition }
+        val target = existing ?: listeningChapter ?: return
+        val start = from ?: if (useReadingPosition || (existing == null && ttsManager.savedParagraph(target) == null))
+            (listState.firstVisibleItemIndex - 1).coerceAtLeast(0) else null
+        ttsManager.play(target, start, prefs.ttsSpeed, prefs.ttsPitch, listeningContinuation)
+    }
+
+    var observedListeningChapter by remember(listeningBookKey) { mutableStateOf<String?>(null) }
+    LaunchedEffect(listening.chapter?.chapterKey, ownsListening) {
+        val previous = observedListeningChapter
+        val next = listening.chapter?.chapterKey?.takeIf { ownsListening }
+        observedListeningChapter = next
+        if (next != null && previous == page?.chapter?.id && next != previous) onOpenListeningChapter?.invoke(next)
+    }
+
+    LaunchedEffect(listening.completion) {
+        val finished = listening.chapter ?: return@LaunchedEffect
+        if (!ownsListening || !ttsManager.awaitingChapter(finished)) return@LaunchedEffect
+        if (finished.chapterKey == page?.chapter?.id && canNext) {
+            pendingNext = finished.chapterKey
+            onLoadNext()
+        } else ttsManager.finishBook()
+    }
+    LaunchedEffect(pendingNext, page?.chapter?.id, state.loading, state.error, isListening) {
+        val previous = pendingNext ?: return@LaunchedEffect
+        if (state.error != null || !isListening) {
+            pendingNext = null
+            if (ownsListening) ttsManager.finishBook()
+        } else if (!state.loading && listeningChapter != null && listeningChapter.chapterKey != previous) {
+            pendingNext = null
+            ttsManager.continueWith(listeningChapter, prefs.ttsSpeed, prefs.ttsPitch)
+        }
+    }
+    LaunchedEffect(activeParagraph, listState) {
+        val item = (activeParagraph ?: return@LaunchedEffect) + 1
+        val visible = listState.layoutInfo.visibleItemsInfo.any {
+            it.index == item && it.offset >= listState.layoutInfo.viewportStartOffset &&
+                it.offset < listState.layoutInfo.viewportEndOffset * .75f
+        }
+        if (!visible) listState.scrollToItem(item)
     }
 
     Box(Modifier.fillMaxSize().background(colors.background)) {
@@ -132,6 +233,12 @@ internal fun NovelReaderScreen(
                         fontSizeSp = fontSizeSp,
                         motion = motion,
                         active = active,
+                        highlighted = activeParagraph.takeIf { active },
+                        marks = visibleMarks.map { it.mark }.takeIf { active }.orEmpty(),
+                        onSelect = if (active) ({ value: ReaderTextSelection -> selection = value }) else null,
+                        paragraphs = if (active) listeningChapter?.paragraphs.orEmpty() else remember(chapter.text) {
+                            spokenParagraphs(chapter.text)
+                        },
                         canPrevious = canPrevious,
                         canNext = canNext,
                         onToggleChrome = { showBars = !showBars },
@@ -157,6 +264,18 @@ internal fun NovelReaderScreen(
                     AppIconButton(Icons.AutoMirrored.Filled.ArrowBack, tr("返回"), onBack, tint = colors.onSurface)
                 },
                 actions = {
+                    if (marks.isNotEmpty()) {
+                        AppIconButton(Icons.Filled.Bookmarks, tr("范围批注"), { showMarks = true })
+                    }
+                    AppIconButton(Icons.AutoMirrored.Filled.MenuBook, tr("词典查词"), {
+                        val paragraphs = listeningChapter?.paragraphs.orEmpty()
+                        dictionaryPassage = paragraphs.drop((listState.firstVisibleItemIndex - 1).coerceAtLeast(0))
+                            .take(6).joinToString("\n") { it.text }.take(1200)
+                    }, enabled = page != null)
+                    AppIconButton(if (isListening) Icons.AutoMirrored.Filled.VolumeUp else Icons.Filled.Headphones,
+                        tr("听书模式"), { followListening = ttsManager.followText; showListening = true },
+                        enabled = page != null, active = isListening,
+                        tint = if (isListening) colors.primary else colors.onSurface)
                     PullOutTextButton(
                         onClick = { fontSizeSp = (fontSizeSp - 1f).coerceAtLeast(12f) },
                         enabled = fontSizeSp > 12f,
@@ -215,6 +334,63 @@ internal fun NovelReaderScreen(
                 }
             }
         }
+        if (showListening) {
+            ReaderListeningPanel(ttsManager,
+                if (ownsListening) listening else listening.copy(chapter = null, playing = false, preparing = false),
+                listeningChapter, prefs, followListening,
+                onFollow = { followListening = it; ttsManager.followText = it },
+                onPlay = { play(it) }, onPlayFromReading = { play(useReadingPosition = true) },
+                onDismiss = { showListening = false })
+        }
+        if (showMarks) {
+            var close by remember { mutableStateOf(false) }
+            var target by remember { mutableStateOf<Int?>(null) }
+            WenkuSheetDialog(
+                onDismissRequest = {
+                    showMarks = false
+                    val offset = target
+                    val paragraphs = listeningChapter?.paragraphs.orEmpty()
+                    if (offset != null && paragraphs.isNotEmpty()) scope.launch {
+                        val index = paragraphs.indexOfLast { it.start <= offset }.coerceAtLeast(0)
+                        listState.scrollToItem(index + 1)
+                    }
+                }, requestDismiss = close
+            ) {
+                Column(Modifier.fillMaxWidth().heightIn(max = 440.dp).verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(tr("范围批注"), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                        AppIconButton(Icons.Filled.Close, tr("关闭"), { close = true })
+                    }
+                    marks.forEach { item ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f).pullOutClickable {
+                                target = item.mark.start
+                                close = true
+                            }.padding(vertical = 8.dp)) {
+                                Text(item.text, maxLines = 2)
+                                if (item.note.isNotBlank()) Text(item.note, maxLines = 2,
+                                    style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                            }
+                            AppIconButton(Icons.Filled.DeleteOutline, tr("删除"), {
+                                marks = markStore.remove(marks, item.id)
+                            })
+                        }
+                        HorizontalDivider(color = colors.outlineVariant)
+                    }
+                }
+            }
+        }
+        selection?.let {
+            ReaderSelectionSheet(it, bookTitle.orEmpty(), title,
+                onDismiss = { selection = null },
+                onDictionary = { word -> dictionaryWord = word; dictionaryPassage = word },
+                onMark = { start, end, text, note, underline ->
+                    marks = markStore.save(marks, start, end, text, note, underline)
+                })
+        }
+        dictionaryPassage?.let { ReaderDictionarySheet(it, dictionaryWord,
+            onDismiss = { dictionaryPassage = null; dictionaryWord = "" }) }
     }
 }
 
@@ -225,13 +401,16 @@ private fun OnlineNovelBody(
     fontSizeSp: Float,
     motion: Boolean,
     active: Boolean,
+    highlighted: Int?,
+    paragraphs: List<SpokenParagraph>,
+    marks: List<ReaderMark>,
+    onSelect: ((ReaderTextSelection) -> Unit)?,
     canPrevious: Boolean,
     canNext: Boolean,
     onToggleChrome: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit
 ) {
-    val paragraphs = remember(page.text) { page.text.split("\n\n").map(String::trim).filter(String::isNotEmpty) }
     val colors = MaterialTheme.colorScheme
     val input = if (active) Modifier.pullOutClickable(onClickLabel = tr("切换阅读控件"), onClick = onToggleChrome)
         else Modifier.clearAndSetSemantics { }.wenkuBlockPointer()
@@ -252,10 +431,19 @@ private fun OnlineNovelBody(
                 }
             }
             items(paragraphs.size) { index ->
+                val paragraph = paragraphs[index]
+                val offset = paragraph.start + page.text.substring(paragraph.start, paragraph.end).indexOf(paragraph.text).coerceAtLeast(0)
+                var layout by remember(paragraph) { mutableStateOf<TextLayoutResult?>(null) }
                 Text(
-                    paragraphs[index], fontSize = fontSizeSp.sp, lineHeight = (fontSizeSp * 1.75f).sp,
+                    buildAnnotatedString {
+                        append(paragraph.text)
+                        addReaderMarks(marks, offset, length)
+                        if (highlighted == index) addStyle(SpanStyle(background = colors.primary.copy(alpha = .16f)), 0, length)
+                    }, fontSize = fontSizeSp.sp, lineHeight = (fontSizeSp * 1.75f).sp,
                     color = colors.onSurface.copy(alpha = .9f),
-                    modifier = if (motion) Modifier.wenkuReveal(index + 1) else Modifier
+                    onTextLayout = { layout = it },
+                    modifier = (if (motion) Modifier.wenkuReveal(index + 1) else Modifier)
+                        .readerTextLongPress(paragraph.text, offset, { layout }, onSelect)
                 )
             }
             if (paragraphs.isEmpty()) item(key = "empty") { Text(tr("本章没有内容"), color = colors.onSurfaceVariant) }

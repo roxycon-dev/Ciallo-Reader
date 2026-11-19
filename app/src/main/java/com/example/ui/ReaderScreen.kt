@@ -15,7 +15,28 @@ import com.example.ui.components.PullOutAlertDialog
 import com.example.ui.components.PullOutBottomSheet
 import com.example.ui.components.PullOutDropdownMenu
 import com.example.ui.components.PullOutVisibility
+import com.example.ui.reader.ReaderListeningPanel
+import com.example.ui.reader.ReaderDictionarySheet
+import com.example.ui.reader.addListeningHighlight
+import com.example.ui.reader.addBookSpans
+import com.example.ui.reader.layoutBookSpans
+import com.example.ui.reader.ReaderTextSelection
+import com.example.ui.reader.ReaderSelectionSheet
+import com.example.ui.reader.ReaderTextCoordinates
+import com.example.ui.reader.ReaderMark
+import com.example.ui.reader.readerTextLongPress
+import com.example.ui.reader.addReaderMarks
+import com.example.ui.reader.toReaderMark
+import com.example.ui.reader.VerticalNovelBody
+import com.example.data.BookTextSpan
+import com.example.data.ListeningChapter
+import com.example.data.spokenParagraphs
+import com.example.data.paragraphAt
 import com.example.ui.components.pullOutClickable
+import com.example.ui.wenku.LocalWenkuDecorativeMotion
+import com.example.ui.wenku.rememberWenkuAccessibility
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import com.example.ui.wenku.WenkuReaderChromeLayer
 import com.example.ui.wenku.WenkuReaderChromePart
 import com.example.ui.wenku.WenkuReaderProgressSlider
@@ -128,7 +149,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.foundation.text.selection.SelectionContainer
 
 import androidx.compose.foundation.verticalScroll
 
@@ -217,6 +237,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
@@ -273,7 +294,6 @@ import java.util.*
 import kotlin.math.abs
 import androidx.compose.foundation.layout.widthIn
 import com.example.ui.adaptive.AdaptiveSpec
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.AppToast
 
 
@@ -326,7 +346,9 @@ fun ReaderScreen(
     onRecordTime: (Long) -> Unit,
 
     onSessionEnd: (ReadingSession) -> Unit = {},
-    onCheckNovelUpdate: (() -> Unit)? = null
+    onCheckNovelUpdate: (() -> Unit)? = null,
+    listeningContinuation: ((Boolean) -> (suspend (ListeningChapter) -> ListeningChapter?)?)? = null,
+    onAddRangeHighlight: ((Int, Int, Int, Int, String, String, Boolean) -> Unit)? = null
 
 ) {
 
@@ -360,6 +382,14 @@ fun ReaderScreen(
     var showEasterEgg by remember { mutableStateOf(false) }
 
     var showTtsBar by remember { mutableStateOf(false) }
+    var dictionaryPassage by remember { mutableStateOf<String?>(null) }
+    var dictionaryWord by remember { mutableStateOf("") }
+    var textSelection by remember { mutableStateOf<ReaderTextSelection?>(null) }
+    var pendingAnnotation by remember { mutableStateOf<Highlight?>(null) }
+    var followListening by remember(ttsManager) { mutableStateOf(ttsManager.followText) }
+    var pendingListeningChapter by remember(book?.id) { mutableStateOf<Int?>(null) }
+    var listeningBodyTop by remember { mutableFloatStateOf(0f) }
+    var listeningViewportTop by remember { mutableFloatStateOf(0f) }
 
     var showRestDialog by remember { mutableStateOf(false) }
 
@@ -429,14 +459,17 @@ fun ReaderScreen(
 
     var readerBrightness by remember { mutableFloatStateOf(prefs.readerBrightness) }
 
-    val isScrollMode = pageTurnMode == PageTurnType.SCROLL.id
+    var writingPreference by remember(book?.id) { mutableStateOf(book?.let { prefs.novelWritingMode(it.id) } ?: "auto") }
+    val writingMode = if (writingPreference == "auto") chapters.getOrNull(currentChapterIndex)?.writingMode
+        else writingPreference
+    val isVertical = writingMode == "vertical-rl" || writingMode == "vertical-lr"
+    val isScrollMode = !isVertical && pageTurnMode == PageTurnType.SCROLL.id
 
 
     var currentCharOffset by remember { mutableIntStateOf(0) }
 
 
 
-    val isTtsPlaying by ttsManager.isPlaying.collectAsStateWithLifecycle()
 
     var searchKeyword by remember { mutableStateOf("") }
 
@@ -1285,6 +1318,21 @@ fun ReaderScreen(
 
 
 
+            val coordinates = remember(currentChapter, firstLineIndent) {
+                ReaderTextCoordinates(currentChapter?.content.orEmpty(), firstLineIndent)
+            }
+            val chapterMarks = remember(currentChapter, highlights, coordinates, currentChapterIndex) {
+                highlights.filter { it.chapterIndex == currentChapterIndex }.mapNotNull {
+                    it.toReaderMark(currentChapter?.content.orEmpty(), coordinates)
+                }
+            }
+            val openSelection: (ReaderTextSelection) -> Unit = {
+                isAutoScrolling = false
+                scrubberVisible = false
+                textSelection = it
+            }
+
+            val bookSpans = remember(currentChapter, firstLineIndent) { layoutBookSpans(currentChapter, firstLineIndent) }
             val pagesList = rememberChapterPages(
 
                 content = formattedContent,
@@ -1297,7 +1345,8 @@ fun ReaderScreen(
 
                 titleReservePx = currentTitleReservePx,
 
-                isScrollMode = isScrollMode
+                isScrollMode = isScrollMode || isVertical,
+                bookSpans = bookSpans
 
             )
 
@@ -1348,6 +1397,7 @@ fun ReaderScreen(
 
             }
 
+            val nextBookSpans = remember(nextChapter, firstLineIndent) { layoutBookSpans(nextChapter, firstLineIndent) }
             val nextChapterPages = rememberChapterPages(
 
                 content = nextChapterFormattedContent,
@@ -1360,7 +1410,8 @@ fun ReaderScreen(
 
                 titleReservePx = nextTitleReservePx,
 
-                isScrollMode = isScrollMode
+                isScrollMode = isScrollMode || isVertical,
+                bookSpans = nextBookSpans
 
             )
 
@@ -1408,6 +1459,7 @@ fun ReaderScreen(
 
             }
 
+            val prevBookSpans = remember(prevChapter, firstLineIndent) { layoutBookSpans(prevChapter, firstLineIndent) }
             val prevChapterPages = rememberChapterPages(
 
                 content = prevChapterFormattedContent,
@@ -1420,7 +1472,8 @@ fun ReaderScreen(
 
                 titleReservePx = prevTitleReservePx,
 
-                isScrollMode = isScrollMode
+                isScrollMode = isScrollMode || isVertical,
+                bookSpans = prevBookSpans
 
             )
 
@@ -1436,6 +1489,148 @@ fun ReaderScreen(
 
                 currentCharOffset = pageAnchors.startOf(clamped)
 
+            }
+
+            val listening by ttsManager.state.collectAsState()
+            val listeningBookKey = "local:${book?.id ?: bookTitle}"
+            val ownsListening = listening.chapter?.bookKey == listeningBookKey
+            val isTtsPlaying = ownsListening && (listening.playing || listening.preparing)
+            val listeningChapter by remember(listeningBookKey, currentChapterIndex, currentChapter?.title, formattedContent) {
+                val title = currentChapter?.title.orEmpty()
+                val chapterKey = currentChapterIndex.toString()
+                lazy {
+                    ListeningChapter(listeningBookKey, chapterKey, bookTitle, title, spokenParagraphs(formattedContent))
+                }
+            }
+            val spoken = listening.chapter?.takeIf {
+                ownsListening && it.chapterKey == currentChapterIndex.toString()
+            }?.paragraphs?.getOrNull(listening.paragraph)
+            val listeningHighlight = spoken?.takeIf { isTtsPlaying && followListening && textSelection == null }
+            val listeningHighlightColor = textColor.copy(alpha = .15f)
+            val scrollBlockOffsets by remember(scrollChunks) {
+                lazy {
+                    var offset = 0
+                    buildList {
+                        scrollChunks.forEach { chunk ->
+                            NovelInlineImages.splitIntoBlocks(chunk, textWidthPx.toFloat(), Float.MAX_VALUE).forEach { block ->
+                                add(offset)
+                                offset += block.raw.length
+                            }
+                        }
+                    }
+                }
+            }
+
+            fun readingOffset(): Int {
+                if (!isScrollMode) return currentCharOffset
+                val viewportTop = scrollState.value - listeningBodyTop
+                val block = chunkTextLayouts.keys.filter { (chunkTopYs[it] ?: Float.MAX_VALUE) <= viewportTop }
+                    .maxOrNull() ?: return 0
+                val layout = chunkTextLayouts[block] ?: return 0
+                val localY = viewportTop - (chunkTopYs[block] ?: return 0)
+                return (scrollBlockOffsets.getOrNull(block) ?: 0) +
+                    layout.getLineStart(layout.getLineForVerticalPosition(localY))
+            }
+
+            fun startListening(from: Int? = null, useReadingPosition: Boolean = false) {
+                isAutoScrolling = false
+                val existing = listening.chapter?.takeIf { ownsListening && !useReadingPosition }
+                val target = existing ?: listeningChapter
+                val start = when {
+                    from != null -> from
+                    useReadingPosition -> target.paragraphs.paragraphAt(readingOffset())
+                    existing != null -> null
+                    ttsManager.savedParagraph(target) != null -> null
+                    else -> target.paragraphs.paragraphAt(readingOffset())
+                }
+                ttsManager.play(target, start, prefs.ttsSpeed, prefs.ttsPitch, listeningContinuation?.invoke(firstLineIndent))
+            }
+
+            val openListening = {
+                isAutoScrolling = false
+                followListening = ttsManager.followText
+                showTtsBar = true
+            }
+
+            var observedListeningChapter by remember(listeningBookKey) { mutableStateOf<String?>(null) }
+            LaunchedEffect(listening.chapter?.chapterKey, ownsListening) {
+                val previous = observedListeningChapter
+                val next = listening.chapter?.chapterKey?.takeIf { ownsListening }
+                observedListeningChapter = next
+                val index = next?.toIntOrNull() ?: return@LaunchedEffect
+                if (textSelection == null && previous == currentChapterIndex.toString() &&
+                    index != currentChapterIndex && index in chapters.indices) {
+                    currentChapterIndex = index
+                    currentCharOffset = 0
+                    scrollState.scrollTo(0)
+                }
+            }
+
+            LaunchedEffect(listening.completion) {
+                val finished = listening.chapter ?: return@LaunchedEffect
+                if (!ownsListening || !ttsManager.awaitingChapter(finished)) return@LaunchedEffect
+                if (finished.chapterKey == currentChapterIndex.toString() && currentChapterIndex < chapters.lastIndex) {
+                    pendingListeningChapter = currentChapterIndex + 1
+                    currentChapterIndex++
+                    currentCharOffset = 0
+                    scrollState.scrollTo(0)
+                } else ttsManager.finishBook()
+            }
+            LaunchedEffect(pendingListeningChapter, currentChapterIndex, contentReady, formattedContent, readerLoadError, isTtsPlaying) {
+                val next = pendingListeningChapter ?: return@LaunchedEffect
+                val previous = listening.chapter
+                if (previous == null || !ttsManager.awaitingChapter(previous) || currentChapterIndex != next ||
+                    readerLoadError != null) {
+                    pendingListeningChapter = null
+                    if (previous?.bookKey == listeningBookKey) ttsManager.finishBook()
+                } else if (contentReady && formattedContent.isNotBlank()) {
+                    pendingListeningChapter = null
+                    ttsManager.continueWith(listeningChapter, prefs.ttsSpeed, prefs.ttsPitch)
+                } else if (contentReady && next in loadedChapterIndices) {
+                    pendingListeningChapter = null
+                    ttsManager.finishBook()
+                }
+            }
+            suspend fun revealTextOffset(offset: Int, follow: Boolean) {
+                if (isVertical) {
+                    currentCharOffset = offset
+                } else if (!isScrollMode) {
+                    if (pagesList.isNotEmpty() && (!follow || pageAnchors.pageAt(offset) != activeSubPageIndex)) {
+                        currentCharOffset = offset
+                    }
+                } else {
+                    val block = scrollBlockOffsets.binarySearch(offset).let { if (it >= 0) it else -it - 2 }
+                    if (block < 0) return
+                    repeat(6) {
+                        val top = chunkTopYs[block]
+                        val layout = chunkTextLayouts[block]
+                        if (top != null && layout != null && layout.layoutInput.text.isNotEmpty()) {
+                            val local = (offset - scrollBlockOffsets[block]).coerceIn(0, layout.layoutInput.text.length - 1)
+                            val line = layout.getLineForOffset(local)
+                            val y = (listeningBodyTop + top + layout.getLineTop(line)).toInt()
+                            val viewport = scrollState.viewportSize
+                            if (!follow || y < scrollState.value || y >= scrollState.value + viewport * .75f) {
+                                scrollState.scrollTo((y - viewport / 5).coerceIn(0, scrollState.maxValue))
+                            }
+                            return
+                        }
+                        withFrameNanos { }
+                    }
+                }
+            }
+
+            LaunchedEffect(listeningHighlight?.start, isScrollMode, isVertical, pagesList.isNotEmpty(), contentReady) {
+                val offset = listeningHighlight?.start ?: return@LaunchedEffect
+                if (contentReady) revealTextOffset(offset, follow = true)
+            }
+            LaunchedEffect(pendingAnnotation, currentChapterIndex, contentReady, pagesList.isNotEmpty()) {
+                val annotation = pendingAnnotation ?: return@LaunchedEffect
+                if (annotation.chapterIndex != currentChapterIndex || !contentReady ||
+                    currentChapterIndex !in loadedChapterIndices) return@LaunchedEffect
+                annotation.toReaderMark(currentChapter?.content.orEmpty(), coordinates)?.let {
+                    revealTextOffset(it.start, follow = false)
+                }
+                pendingAnnotation = null
             }
 
             // 搜索结果点击后的精确跳转 + 页内高亮（pendingSearchJump / searchHighlightQuery
@@ -1578,6 +1773,11 @@ fun ReaderScreen(
 
                 // 页文本拼接 = formattedContent：取结果条目对应的第 N 处出现，再按累计页长度换算目标页
                 val pos = com.example.data.SearchLocator.nthOccurrence(formattedContent, q, jump.occurrence)
+                if (isVertical) {
+                    if (pos >= 0) currentCharOffset = pos
+                    pendingSearchJump = null
+                    return@LaunchedEffect
+                }
 
                 var acc = 0
 
@@ -1706,12 +1906,47 @@ fun ReaderScreen(
                     TouchAction.SETTINGS -> showSettingsSheet = true
                     TouchAction.CONTENTS -> showTocSheet = true
                     TouchAction.LISTEN -> {
-                        showTtsBar = true; isAutoScrolling = false
-                        if (!isTtsPlaying) currentChapter?.let { ttsManager.startReading(NovelInlineImages.stripTokens(it.content), speed = prefs.ttsSpeed, pitch = prefs.ttsPitch) }
+                        openListening()
+                        if (!isTtsPlaying && contentReady) startListening()
                     }
                     TouchAction.EXIT -> onBack()
                     TouchAction.NONE -> Unit
                 }
+            }
+
+            if (showTtsBar) {
+                ReaderListeningPanel(
+                    manager = ttsManager,
+                    state = if (ownsListening) listening else listening.copy(
+                        chapter = null, paragraph = 0, playing = false, preparing = false
+                    ),
+                    chapter = listeningChapter,
+                    prefs = prefs,
+                    follow = followListening,
+                    onFollow = { followListening = it; ttsManager.followText = it },
+                    onPlay = { startListening(it) },
+                    onPlayFromReading = { startListening(useReadingPosition = true) },
+                    onDismiss = { showTtsBar = false }
+                )
+            }
+            dictionaryPassage?.let { passage ->
+                ReaderDictionarySheet(passage, dictionaryWord, onDismiss = { dictionaryPassage = null; dictionaryWord = "" })
+            }
+            textSelection?.let { selected ->
+                val raw = currentChapter?.content.orEmpty()
+                val addMark = onAddRangeHighlight
+                val bookId = book?.id
+                ReaderSelectionSheet(selected, bookTitle, currentChapter?.title.orEmpty(),
+                    onDismiss = { textSelection = null },
+                    onDictionary = { word -> dictionaryWord = word; dictionaryPassage = word },
+                    onMark = if (addMark == null || bookId == null) null else { start, end, _, note, underline ->
+                        val rawStart = coordinates.raw(start).coerceIn(0, raw.length)
+                        val rawEnd = coordinates.raw(end).coerceIn(rawStart, raw.length)
+                        if (rawEnd > rawStart) {
+                            addMark(bookId, currentChapterIndex, rawStart, rawEnd, raw.substring(rawStart, rawEnd), note, underline)
+                        }
+                    }
+                )
             }
 
             if (readerLoadError != null) {
@@ -1975,6 +2210,7 @@ fun ReaderScreen(
 
                                                     }
 
+                                                    .onGloballyPositioned { listeningViewportTop = it.positionInRoot().y }
                                                     .verticalScroll(scrollState)
 
                                                     .padding(horizontal = marginHorizontal.dp, vertical = DesignTokens.SpaceLg)
@@ -2017,9 +2253,11 @@ fun ReaderScreen(
 
 
 
-                                                SelectionContainer {
+                                                Box {
 
-                                                    Column {
+                                                    Column(Modifier.onGloballyPositioned {
+                                                        listeningBodyTop = it.positionInRoot().y - listeningViewportTop + scrollState.value
+                                                    }) {
 
                                                         // 大章节块驱动渲染：文本块 BasicText、图片块独立占空间。
                                                         // 全局块序号（跨 chunk 累计）供搜索跳转定位；图片块不走
@@ -2061,6 +2299,18 @@ fun ReaderScreen(
                                                                         // 文本块：搜索关键词高亮标注（坐标精确，无 token 混杂）
                                                                         val blockAnnotated = buildAnnotatedString {
                                                                             append(block.text)
+                                                                            if (bookSpans.isNotEmpty() || chapterMarks.isNotEmpty()) {
+                                                                                scrollBlockOffsets.getOrNull(gb)?.let { offset ->
+                                                                                    addBookSpans(bookSpans, offset, block.text.length)
+                                                                                    addReaderMarks(chapterMarks, offset, block.text.length)
+                                                                                }
+                                                                            }
+                                                                            if (listeningHighlight != null) {
+                                                                                scrollBlockOffsets.getOrNull(gb)?.let { offset ->
+                                                                                    addListeningHighlight(listeningHighlight, offset,
+                                                                                        block.text.length, listeningHighlightColor)
+                                                                                }
+                                                                            }
                                                                             if (searchHighlightChunk == gb && searchHighlightQuery != null && searchHighlightStyle != null) {
                                                                                 var at = block.text.indexOf(searchHighlightQuery!!, ignoreCase = true)
                                                                                 while (at >= 0) {
@@ -2074,6 +2324,10 @@ fun ReaderScreen(
                                                                             onTextLayout = { chunkTextLayouts[gb] = it },
                                                                             modifier = Modifier
                                                                                 .fillMaxWidth()
+                                                                                .readerTextLongPress(
+                                                                                    block.text, scrollBlockOffsets.getOrElse(gb) { 0 },
+                                                                                    { chunkTextLayouts[gb] }, openSelection
+                                                                                )
                                                                                 .onGloballyPositioned { coords ->
                                                                                     chunkTopYs[gb] = coords.positionInParent().y
                                                                                 },
@@ -2160,6 +2414,12 @@ fun ReaderScreen(
                                                 showBars = showBars,
                                                 highlightQuery = searchHighlightQuery,
                                                 highlightStyle = searchHighlightStyle,
+                                                spokenParagraph = listeningHighlight,
+                                                pageOffset = pageAnchors.startOf(activeSubPageIndex),
+                                                bookSpans = bookSpans,
+                                                marks = chapterMarks,
+                                                onSelect = openSelection,
+                                                spokenColor = listeningHighlightColor,
 
                                             )
 
@@ -2205,6 +2465,9 @@ fun ReaderScreen(
                                                     showBars = showBars,
                                                     highlightQuery = searchHighlightQuery,
                                                     highlightStyle = searchHighlightStyle,
+                                                    bookSpans = bookSpans,
+                                                    marks = chapterMarks,
+                                                    pageOffset = pageAnchors.startOf(activeSubPageIndex + 1),
 
                                                 )
 
@@ -2240,6 +2503,8 @@ fun ReaderScreen(
                                                     showBars = showBars,
                                                     highlightQuery = searchHighlightQuery,
                                                     highlightStyle = searchHighlightStyle,
+                                                    bookSpans = nextBookSpans,
+                                                    pageOffset = 0,
 
                                                 )
 
@@ -2322,6 +2587,9 @@ fun ReaderScreen(
                                                     showBars = showBars,
                                                     highlightQuery = searchHighlightQuery,
                                                     highlightStyle = searchHighlightStyle,
+                                                    bookSpans = bookSpans,
+                                                    marks = chapterMarks,
+                                                    pageOffset = pageAnchors.startOf(activeSubPageIndex - 1),
 
                                                 )
 
@@ -2359,6 +2627,9 @@ fun ReaderScreen(
                                                     showBars = showBars,
                                                     highlightQuery = searchHighlightQuery,
                                                     highlightStyle = searchHighlightStyle,
+                                                    bookSpans = prevBookSpans,
+                                                    pageOffset = (prevChapterFormattedContent.length -
+                                                        prevChapterPages.getOrNull(lastIdx).orEmpty().length).coerceAtLeast(0),
 
                                                 )
 
@@ -2405,7 +2676,20 @@ fun ReaderScreen(
 
 
 
-                                    if (!isScrollMode && pageTurnMode == PageTurnType.SIMULATE.id && !com.example.ui.components.LocalRenderQuality.current.minimal) {
+                                    if (isVertical) {
+                                        val searchMark = searchHighlightQuery?.takeIf { it.isNotBlank() &&
+                                            formattedContent.regionMatches(currentCharOffset, it, 0, it.length, ignoreCase = true)
+                                        }?.let { ReaderMark(currentCharOffset, currentCharOffset + it.length, false, MintGold) }
+                                        VerticalNovelBody(
+                                            title = chapter.title, text = formattedContent, spans = bookSpans,
+                                            marks = if (searchMark == null) chapterMarks else chapterMarks + searchMark,
+                                            mode = writingMode.orEmpty(), fontSize = fontSize, lineHeight = lineHeight,
+                                            foreground = textColor, background = bgColor, offset = currentCharOffset,
+                                            highlight = listeningHighlight?.start, onOffset = { currentCharOffset = it },
+                                            onToggleChrome = { showBars = !showBars }, onSelect = openSelection,
+                                            onImage = { fullscreenNovelImage = it }, modifier = Modifier.fillMaxSize()
+                                        )
+                                    } else if (!isScrollMode && pageTurnMode == PageTurnType.SIMULATE.id && !com.example.ui.components.LocalRenderQuality.current.minimal) {
 
                                         // C1 pagecurl 引擎（SIMULATE 专用）：三页窗口 + 中央点击唤出菜单
 
@@ -2538,7 +2822,10 @@ fun ReaderScreen(
                                                     onImageClick = { p -> fullscreenNovelImage = p },
                                                     showBars = false,
                                                     highlightQuery = searchHighlightQuery,
-                                                    highlightStyle = searchHighlightStyle
+                                                    highlightStyle = searchHighlightStyle,
+                                                    bookSpans = bookSpans,
+                                                    marks = chapterMarks,
+                                                    pageOffset = pageAnchors.startOf(idx)
                                                 )
                                             },
                                             onDismiss = { scrubberVisible = false },
@@ -2722,132 +3009,6 @@ fun ReaderScreen(
                                     Text(pageProgressText, fontSize = DesignTokens.TypeMicro, color = textColor.copy(alpha = 0.5f))
 
                                     Text("$pct%", fontSize = DesignTokens.TypeMicro, color = textColor.copy(alpha = 0.5f))
-
-                                }
-
-                            }
-
-                        }
-
-
-
-                        // B5：TTS 播放器原先直接显隐、无任何进出场，
-                        // 与其它浮层（目录/设置面板都有动画）观感不一致。
-                        PullOutVisibility(
-                            visible = showTtsBar,
-                            modifier = Modifier.align(Alignment.BottomCenter)) {
-
-                            Card(
-
-                                modifier = Modifier
-
-                                    .padding(DesignTokens.SpaceLg)
-
-                                    .fillMaxWidth()
-
-                                    .consistentShadow(DesignTokens.SpaceSm, RoundedCornerShape(DesignTokens.RadiusLg)),
-
-                                shape = RoundedCornerShape(DesignTokens.RadiusLg),
-
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-
-                                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-
-                            ) {
-
-                                Column(modifier = Modifier.padding(DesignTokens.SpaceLg)) {
-
-                                    Row(
-
-                                        modifier = Modifier.fillMaxWidth(),
-
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-
-                                        verticalAlignment = Alignment.CenterVertically
-
-                                    ) {
-
-                                        Text(com.example.i18n.AppLocale.t("朗读播放器"), fontWeight = FontWeight.Bold, fontSize = DesignTokens.TypeBodySmall)
-
-                                        AppIconButton(
-                                            icon = Icons.Filled.Close,
-                                            contentDescription = com.example.i18n.AppLocale.t("关闭"),
-                                            onClick = { showTtsBar = false }
-                                        )
-
-                                    }
-
-
-
-                                    Row(
-
-                                        modifier = Modifier.fillMaxWidth(),
-
-                                        horizontalArrangement = Arrangement.SpaceEvenly,
-
-                                        verticalAlignment = Alignment.CenterVertically
-
-                                    ) {
-
-                                        AppIconButton(
-                                            icon = Icons.Filled.SkipPrevious,
-                                            contentDescription = com.example.i18n.AppLocale.t("上一段"),
-                                            onClick = { ttsManager.previousParagraph() }
-                                        )
-
-
-
-                                        Box(
-
-                                            modifier = Modifier
-
-                                                .size(56.dp)
-
-                                                .background(MintPrimary, CircleShape)
-
-                                                .clickableWithFeedback {
-
-                                                    if (isTtsPlaying) {
-
-                                                        ttsManager.pause()
-
-                                                    } else {
-
-                                                        currentChapter?.let { ch ->
-
-                                                            ttsManager.startReading(NovelInlineImages.stripTokens(ch.content), speed = prefs.ttsSpeed, pitch = prefs.ttsPitch)
-
-                                                        }
-
-                                                    }
-
-                                                },
-
-                                            contentAlignment = Alignment.Center
-
-                                        ) {
-
-                                            com.example.ui.components.AnimatedStateIcon(
-
-                                                if (isTtsPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-
-                                                contentDescription = com.example.i18n.AppLocale.t("播放暂停"),
-
-                                                tint = Color.White
-
-                                            )
-
-                                        }
-
-
-
-                                        AppIconButton(
-                                            icon = Icons.Filled.SkipNext,
-                                            contentDescription = com.example.i18n.AppLocale.t("下一段"),
-                                            onClick = { ttsManager.nextParagraph() }
-                                        )
-
-                                    }
 
                                 }
 
@@ -3146,20 +3307,7 @@ fun ReaderScreen(
                                                 tint = if (isTtsPlaying) MintGold else barContentColor,
                                                 glyphSize = DesignTokens.SpaceXl,
                                                 active = isTtsPlaying,
-                                                onClick = {
-                                                    showTtsBar = true
-                                                    isAutoScrolling = false
-                                                    if (!isTtsPlaying) {
-                                                        currentChapter?.let { chapter ->
-                                                            ttsManager.startReading(
-                                                                NovelInlineImages.stripTokens(chapter.content),
-                                                                speed = prefs.ttsSpeed,
-                                                                pitch = prefs.ttsPitch
-                                                            )
-                                                            AppToast.makeText(context, com.example.i18n.AppLocale.t("已开启语音听书"), Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    }
-                                                }
+                                                onClick = openListening
                                             )
                                             AppIconButton(
                                                 icon = Icons.Filled.Menu,
@@ -3197,7 +3345,20 @@ fun ReaderScreen(
                                                         onClick = com.example.ui.components.paperOpen { isAutoScrolling = false; showSearchDialog = true }
                                                     )
                                                     PullOutDropdownMenuItem(
-                                                        text = { Text(com.example.i18n.AppLocale.t("书签列表")) },
+                                                        text = { Text(tr("词典查词")) },
+                                                        leadingIcon = { Icon(Icons.Filled.Search, null, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
+                                                        onClick = com.example.ui.components.paperOpen {
+                                                            showReaderMoreMenu = false
+                                                            isAutoScrolling = false
+                                                            val excerpt = if (isScrollMode) readingOffset().coerceIn(0, formattedContent.length).let { offset ->
+                                                                formattedContent.substring(offset, (offset + 1200).coerceAtMost(formattedContent.length))
+                                                            }
+                                                                else pagesList.getOrNull(activeSubPageIndex).orEmpty()
+                                                            dictionaryPassage = NovelInlineImages.stripTokens(excerpt)
+                                                        }
+                                                    )
+                                                    PullOutDropdownMenuItem(
+                                                        text = { Text(com.example.i18n.AppLocale.t("书签与批注")) },
                                                         leadingIcon = { Icon(Icons.Filled.Bookmarks, null, tint = MintPrimary, modifier = Modifier.size(DesignTokens.SpaceLoose)) },
                                                         onClick = com.example.ui.components.paperOpen { showReaderMoreMenu = false; showAnnotationsSheet = true }
                                                     )
@@ -3251,6 +3412,7 @@ fun ReaderScreen(
                         val position = dragPos ?: when {
                             !onstage -> 0f
                             isScrollMode -> scrollState.value.toFloat() / scrollState.maxValue.coerceAtLeast(1)
+                            isVertical -> (currentCharOffset.toFloat() / formattedContent.length.coerceAtLeast(1)).coerceIn(0f, 1f)
                             pagedProgress -> activeSubPageIndex.toFloat() / lastPage
                             else -> 0f
                         }
@@ -3276,7 +3438,7 @@ fun ReaderScreen(
                                 value = position,
                                 label = com.example.i18n.AppLocale.t("本章进度"),
                                 tint = barContentColor,
-                                enabled = pagedProgress || isScrollMode,
+                                enabled = pagedProgress || isScrollMode || isVertical,
                                 onValueChange = { dragPos = it },
                                 onCommit = {
                                     val target = dragPos
@@ -3284,6 +3446,8 @@ fun ReaderScreen(
                                     if (target != null) {
                                         if (isScrollMode) {
                                             scope.launch { scrollState.scrollTo((target * scrollState.maxValue).toInt()) }
+                                        } else if (isVertical) {
+                                            currentCharOffset = (target * formattedContent.length).toInt()
                                         } else if (pagedProgress) {
                                             val targetPage = Math.round(target * lastPage).coerceIn(0, pageCount - 1)
                                             if (targetPage != activeSubPageIndex) updateSubPage(targetPage)
@@ -3337,19 +3501,7 @@ fun ReaderScreen(
                                 contentDescription = com.example.i18n.AppLocale.t("听书模式"),
                                 tint = if (isTtsPlaying) MintGold else barContentColor,
                                 active = isTtsPlaying,
-                                onClick = {
-                                    showTtsBar = true
-                                    isAutoScrolling = false
-                                    if (!isTtsPlaying) {
-                                        currentChapter?.let { chapter ->
-                                            ttsManager.startReading(
-                                                NovelInlineImages.stripTokens(chapter.content),
-                                                speed = prefs.ttsSpeed, pitch = prefs.ttsPitch
-                                            )
-                                            AppToast.makeText(context, "开启语音听书：${chapter.title}", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                }
+                                onClick = openListening
                             )
                         }
                     }
@@ -3849,6 +4001,28 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                     }
                 }
 
+                Spacer(Modifier.height(DesignTokens.SpaceLoose))
+                Text(tr("正文方向"), style = MaterialTheme.typography.labelMedium, color = textColor)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
+                    listOf("auto" to "随书籍", "horizontal-tb" to "横排", "vertical-rl" to "竖排").forEach { (mode, label) ->
+                        ReaderPageModeChip(label = tr(label), selected = writingPreference == mode,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                if (mode != writingPreference) {
+                                    val ratio = if (isScrollMode) scrollState.value.toFloat() / scrollState.maxValue.coerceAtLeast(1)
+                                        else currentCharOffset.toFloat() / formattedContent.length.coerceAtLeast(1)
+                                    currentCharOffset = (ratio * formattedContent.length).toInt()
+                                    if (!isScrollMode && pageTurnMode == PageTurnType.SCROLL.id && mode != "vertical-rl") {
+                                        pendingScrollRatio = ratio
+                                    }
+                                    writingPreference = mode
+                                    book?.let { prefs.setNovelWritingMode(it.id, mode) }
+                                }
+                            }
+                        )
+                    }
+                }
+
                 /* ── 分组：翻页（选中态明显的紧凑选择卡）── */
                 Spacer(modifier = Modifier.height(DesignTokens.SpaceLoose))
                 Text(
@@ -4013,6 +4187,28 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
                         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
 Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidth().padding(DesignTokens.SpaceLg).padding(bottom = DesignTokens.SpaceSection)) {
 
+                if (highlights.isNotEmpty()) {
+                    Text(tr("范围批注"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    LazyColumn(Modifier.heightIn(max = 176.dp)) {
+                        itemsIndexed(highlights, key = { _, mark -> mark.id }) { _, mark ->
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f).clickableWithFeedback {
+                                    closeAnnotations {
+                                        currentChapterIndex = mark.chapterIndex
+                                        pendingAnnotation = mark
+                                    }
+                                }.padding(vertical = 8.dp)) {
+                                    Text(mark.selectedText, maxLines = 2, style = MaterialTheme.typography.bodyMedium)
+                                    if (mark.note.isNotBlank()) Text(mark.note, maxLines = 2,
+                                        style = MaterialTheme.typography.bodySmall)
+                                }
+                                AppIconButton(Icons.Filled.Delete, tr("删除"), { onDeleteHighlight(mark.id) })
+                            }
+                        }
+                    }
+                    HorizontalDivider()
+                    Spacer(Modifier.height(8.dp))
+                }
                 Text("书签记录 (${bookmarks.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
                 Spacer(modifier = Modifier.height(DesignTokens.SpaceMd))
@@ -4370,25 +4566,8 @@ private fun BookmarkHangingRibbon(
 
 /** 首行缩进格式化（与旧逻辑一致）。 */
 
-private fun formatForReader(text: String, firstLineIndent: Boolean): String {
-
-    return if (firstLineIndent) {
-
-        text.split("\n").joinToString("\n") { line ->
-
-            if (line.isNotBlank() && !line.startsWith("\u3000\u3000")) "\u3000\u3000$line" else line
-
-        }
-
-    } else {
-
-        text
-
-    }
-
-}
-
-
+private fun formatForReader(text: String, firstLineIndent: Boolean): String =
+    com.example.data.formatNovelReadingText(text, firstLineIndent)
 
 /** 把超大章节切成不超过 maxChars 的文本块（优先在换行处切），保持滚动位置语义不变。 */
 
@@ -4541,7 +4720,13 @@ private fun RenderSinglePage(
     // clickable 会拦截所有点击 —— 非当前层必须禁用让触摸穿透）
     interactive: Boolean = true,
     highlightQuery: String? = null,
-    highlightStyle: SpanStyle? = null
+    highlightStyle: SpanStyle? = null,
+    spokenParagraph: com.example.data.SpokenParagraph? = null,
+    pageOffset: Int = 0,
+    bookSpans: List<BookTextSpan> = emptyList(),
+    marks: List<ReaderMark> = emptyList(),
+    onSelect: ((ReaderTextSelection) -> Unit)? = null,
+    spokenColor: Color = Color.Transparent
 
 ) {
 
@@ -4611,8 +4796,11 @@ private fun RenderSinglePage(
             ) {
                 val blockDensity = LocalDensity.current
 
-                fun annotatedBlock(text: String) = buildAnnotatedString {
+                fun annotatedBlock(text: String, offset: Int) = buildAnnotatedString {
                     append(text)
+                    addBookSpans(bookSpans, offset, text.length)
+                    addReaderMarks(marks, offset, text.length)
+                    spokenParagraph?.let { addListeningHighlight(it, offset, text.length, spokenColor) }
                     if (!highlightQuery.isNullOrBlank() && highlightStyle != null) {
                         var at = text.indexOf(highlightQuery, ignoreCase = true)
                         while (at >= 0) {
@@ -4622,9 +4810,12 @@ private fun RenderSinglePage(
                     }
                 }
 
+                var blockOffset = pageOffset
                 NovelInlineImages.splitIntoBlocks(
                     pageText, contentWidthPx, maxImageHeightPx, blockDensity.density
                 ).forEachIndexed { blockIndex, block ->
+                    val offset = blockOffset
+                    blockOffset += block.raw.length
                     when (block) {
                         is com.example.ui.reader.NovelInlineImages.InlineBlock.Image -> {
                             if (registerImageHit) {
@@ -4661,11 +4852,14 @@ private fun RenderSinglePage(
                             }
                         }
                         is com.example.ui.reader.NovelInlineImages.InlineBlock.Text -> {
+                            var selectionLayout by remember(block.text) { mutableStateOf<TextLayoutResult?>(null) }
                             BasicText(
-                                text = annotatedBlock(block.text),
+                                text = annotatedBlock(block.text, offset),
                                 style = bodyStyle,
+                                onTextLayout = if (onSelect == null) null else { result: TextLayoutResult -> selectionLayout = result },
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .readerTextLongPress(block.text, offset, { selectionLayout }, onSelect)
                                     .clipToBounds()
                             )
                         }
@@ -4747,16 +4941,20 @@ private fun ReaderPageModeChip(
 ) {
     val accentColor = MintPrimary
     val contentColor = LocalContentColor.current
-    val selectedTint by androidx.compose.animation.animateColorAsState(
-        if (selected) accentColor.copy(alpha = 0.12f) else contentColor.copy(alpha = 0.04f),
-        label = "readerModeTint"
-    )
+    val tint = if (selected) accentColor.copy(alpha = 0.12f) else contentColor.copy(alpha = 0.04f)
+    val motion = rememberWenkuAccessibility().decorativeMotion && LocalWenkuDecorativeMotion.current
+    val selectedTint = if (motion) androidx.compose.animation.animateColorAsState(tint, label = "readerModeTint").value else tint
+    val shape = RoundedCornerShape(DesignTokens.RadiusSm)
     Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(DesignTokens.RadiusSm),
+        shape = shape,
         color = Color.Transparent,
         border = if (selected) BorderStroke(1.dp, MintPrimary.copy(alpha = 0.8f)) else null,
-        modifier = modifier.heightIn(min = 40.dp).readingGlass(RoundedCornerShape(DesignTokens.RadiusSm)).background(selectedTint)
+        modifier = modifier
+            .heightIn(min = 40.dp)
+            .clickableWithFeedback(onClick = onClick)
+            .semantics { this.selected = selected }
+            .readingGlass(shape)
+            .background(selectedTint, shape)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = DesignTokens.SpaceSm, vertical = DesignTokens.SpaceTight),

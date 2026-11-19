@@ -56,7 +56,9 @@ data class Chapter(
     val title: String,
     val content: String,
     val startCharIndex: Long = 0,
-    val endCharIndex: Long = 0
+    val endCharIndex: Long = 0,
+    val formatting: String? = null,
+    val writingMode: String? = null
 )
 
 @Entity(
@@ -81,7 +83,10 @@ data class Highlight(
     val selectedText: String,
     val note: String = "",
     val colorHex: String = "#7FD8C8",
-    val createdTime: Long = System.currentTimeMillis()
+    val createdTime: Long = System.currentTimeMillis(),
+    val startOffset: Int? = null,
+    val endOffset: Int? = null,
+    val markStyle: String? = null
 )
 
 /** 第七轮第 6.1 条：默认分类名——书架不再有聚合视图"全部"，所有书籍必须归属

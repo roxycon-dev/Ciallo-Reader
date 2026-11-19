@@ -19,6 +19,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import com.example.ui.reader.NovelInlineImages
+import com.example.ui.reader.bookSpanRanges
+import com.example.data.BookTextSpan
 import com.example.ui.theme.AppFonts
 import java.lang.ref.WeakReference
 import kotlin.math.ceil
@@ -47,7 +49,7 @@ object ReaderPaginationCache {
     fun put(key: PaginationKey, pages: List<String>) {
         synchronized(lock) {
             // Account for both chapter text and page strings, plus conservative object overhead.
-            val size = key.content.length * 2L + pages.sumOf { it.length * 2L + 40L } + 128L
+            val size = key.content.length * 2L + key.bookSpans.size * 32L + pages.sumOf { it.length * 2L + 40L } + 128L
             if (size > MAX_BYTES) return
             bytes -= entries.remove(key)?.bytes ?: 0L
             entries[key] = Entry(pages, size)
@@ -73,7 +75,8 @@ data class PaginationKey(
     val includeFontPadding: Boolean,
     val titleReservePx: Int,
     // Opaque, optional environment retains source compatibility with existing cache callers.
-    val layoutEnvironment: Any? = null
+    val layoutEnvironment: Any? = null,
+    val bookSpans: List<BookTextSpan> = emptyList()
 )
 
 /** Draw-only color/shadow changes must not discard useful text layout work. */
@@ -205,7 +208,8 @@ fun rememberChapterPages(
     heightPx: Int,
     bodyStyle: TextStyle,
     titleReservePx: Int,
-    isScrollMode: Boolean
+    isScrollMode: Boolean,
+    bookSpans: List<BookTextSpan> = emptyList()
 ): List<String> {
     if (isScrollMode || content.isEmpty() || widthPx <= 20 || heightPx <= 20) {
         return listOf(content)
@@ -231,7 +235,8 @@ fun rememberChapterPages(
         fontFamily = bodyStyle.fontFamily ?: AppFonts.Default,
         includeFontPadding = false,
         titleReservePx = titleReservePx,
-        layoutEnvironment = environment
+        layoutEnvironment = environment,
+        bookSpans = bookSpans
     )
 
     val cached = remember(key) { ReaderPaginationCache.get(key) }
@@ -253,7 +258,8 @@ fun rememberChapterPages(
             fontSizePx = fontSizePx,
             lineHeightPx = lineHeightPx,
             density = density,
-            fontFamilyResolver = fontFamilyResolver
+            fontFamilyResolver = fontFamilyResolver,
+            bookSpans = bookSpans
         )
 
         if (content.length <= EAGER_CHAPTER_THRESHOLD) {
@@ -289,7 +295,8 @@ private class LayoutParams(
     val fontSizePx: Float,
     val lineHeightPx: Float,
     val density: androidx.compose.ui.unit.Density,
-    val fontFamilyResolver: androidx.compose.ui.text.font.FontFamily.Resolver
+    val fontFamilyResolver: androidx.compose.ui.text.font.FontFamily.Resolver,
+    val bookSpans: List<BookTextSpan>
 )
 
 /**
@@ -311,7 +318,7 @@ private fun paginateChunked(
     for (range in paginationChunkRanges(content, cancellationCheck = cancellationCheck)) {
         cancellationCheck()
         val chunk = content.substring(range.first, range.last + 1)
-        allPages += paginateChunk(chunk, params, reserveTitle = range.first == 0, cancellationCheck = cancellationCheck)
+        allPages += paginateChunk(chunk, range.first, params, reserveTitle = range.first == 0, cancellationCheck = cancellationCheck)
         // The original <=40k path returned directly; it does not need a duplicate snapshot.
         if (range.last < content.lastIndex) progressiveSink?.invoke(allPages.toList())
     }
@@ -460,6 +467,7 @@ private class PaginationItems(initialCapacity: Int) {
  */
 private fun paginateChunk(
     chunk: String,
+    chunkOffset: Int,
     params: LayoutParams,
     reserveTitle: Boolean,
     cancellationCheck: () -> Unit
@@ -480,7 +488,7 @@ private fun paginateChunk(
                 is NovelInlineImages.InlineBlock.Text -> {
                     if (block.text.isEmpty()) return@forEach
                     // 纯文本段：真实排版后按行拆成原子项（行不可跨页）
-                    val paragraph = buildParagraph(block.text, params)
+                    val paragraph = buildParagraph(block.text, params, chunkOffset + blockStart)
                     val lineCount = paragraph.lineCount
                     if (lineCount == 0) {
                         items.add(blockStart + block.text.length, 1f)
@@ -529,7 +537,7 @@ private fun paginateChunk(
         fun fits(end: Int): Boolean {
             cancellationCheck()
             return measurePageHeightPx(
-                chunk.substring(startChar, items.endAt(end - 1)), params
+                chunk.substring(startChar, items.endAt(end - 1)), params, chunkOffset + startChar
             ) <= pageHeight
         }
 
@@ -555,16 +563,19 @@ private fun paginateChunk(
 }
 
 /** 与 RenderSinglePage 的块布局一致，计入首尾字体边界、末尾空行和像素取整。 */
-private fun measurePageHeightPx(text: String, params: LayoutParams): Float =
-    NovelInlineImages.splitIntoBlocks(
+private fun measurePageHeightPx(text: String, params: LayoutParams, offset: Int): Float {
+    var position = offset
+    return NovelInlineImages.splitIntoBlocks(
         text, params.widthPx.toFloat(), params.pageHeightPx.toFloat(), params.density.density
-    )
-        .sumOf { block ->
-            when (block) {
-                is NovelInlineImages.InlineBlock.Text -> ceil(buildParagraph(block.text, params).height).toInt()
-                is NovelInlineImages.InlineBlock.Image -> block.heightPx.roundToInt()
-            }
-        }.toFloat()
+    ).sumOf { block ->
+        val height = when (block) {
+            is NovelInlineImages.InlineBlock.Text -> ceil(buildParagraph(block.text, params, position).height).toInt()
+            is NovelInlineImages.InlineBlock.Image -> block.heightPx.roundToInt()
+        }
+        position += block.raw.length
+        height
+    }.toFloat()
+}
 
 /**
  * Builds a [Paragraph] that lays out [text] exactly like RenderSinglePage's Text:
@@ -573,13 +584,13 @@ private fun measurePageHeightPx(text: String, params: LayoutParams): Float =
  *
  * Image tokens have already been split into independently sized blocks by both callers.
  */
-private fun buildParagraph(text: String, params: LayoutParams): Paragraph {
+private fun buildParagraph(text: String, params: LayoutParams, offset: Int): Paragraph {
     // Both callers already split valid image tokens into independent image blocks.
     // Literal malformed markers remain ordinary text, with unchanged UTF-16 offsets.
     val intrinsics = ParagraphIntrinsics(
         text = text,
         style = params.bodyStyle,
-        spanStyles = emptyList(),
+        spanStyles = bookSpanRanges(params.bookSpans, offset, text.length),
         placeholders = emptyList(),
         density = params.density,
         fontFamilyResolver = params.fontFamilyResolver

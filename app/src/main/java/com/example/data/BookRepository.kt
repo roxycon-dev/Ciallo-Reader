@@ -93,6 +93,10 @@ class BookRepository(
         return false
     }
 
+    suspend fun recoverBookLayout(book: Book) {
+        recoverArchivedEpubLayout(context, book, bookDao)
+    }
+
     /* ───────── 老书内嵌图片懒迁移 ─────────
      * 旧版本导入的本地书不提取内嵌图片（EPUB/FB2/DOCX/MOBI 的 <img> 直接被丢弃）。
      * 打开书时懒迁移：先廉价嗅探源文件格式（且 EPUB/DOCX 需真的带图），再用对应解析器
@@ -400,23 +404,27 @@ class BookRepository(
                 return@withContext Result.success(existing)
             }
             val effectiveUri = uri
-            if (EpubParser.isEpubFile(fileName)) {
+            val recognized = recognizeBookMarkup(context, effectiveUri, fileName)
+            if (recognized in setOf("md", "html")) {
+                return@withContext importMarkupBook(context, effectiveUri, fileName, bookDao, recognized == "md")
+            }
+            if (recognized == "epub") {
                 return@withContext EpubParser.importEpub(context, effectiveUri, fileName, bookDao)
+            }
+            // MOBI / AZW3 / AZW：支持解析正文章节并直接阅读
+            if (recognized == "mobi") {
+                return@withContext MobiParser.importMobi(context, effectiveUri, fileName, bookDao)
+            }
+            // FB2 / DOCX：XML 电子书与 Word 文档正文提取
+            if (recognized == "fb2") {
+                return@withContext Fb2Parser.importFb2(context, effectiveUri, fileName, bookDao)
+            }
+            if (recognized == "docx") {
+                return@withContext DocxParser.importDocx(context, effectiveUri, fileName, bookDao)
             }
             // PDF 与 CBZ/ZIP 一样走 ComicParser 逐页位图渲染（翻页模式阅读，位图渲染不会乱码）
             if (ComicParser.isComicFile(fileName)) {
                 return@withContext ComicParser.importComic(context, effectiveUri, fileName, bookDao)
-            }
-            // MOBI / AZW3 / AZW：支持解析正文章节并直接阅读
-            if (MobiParser.isMobiFile(fileName)) {
-                return@withContext MobiParser.importMobi(context, effectiveUri, fileName, bookDao)
-            }
-            // FB2 / DOCX：XML 电子书与 Word 文档正文提取
-            if (Fb2Parser.isFb2File(fileName)) {
-                return@withContext Fb2Parser.importFb2(context, effectiveUri, fileName, bookDao)
-            }
-            if (DocxParser.isDocxFile(fileName)) {
-                return@withContext DocxParser.importDocx(context, effectiveUri, fileName, bookDao)
             }
             if (unsupportedBinaryExtensions.any { fileName.lowercase().endsWith(it) }) {
                 return@withContext importUnsupportedFormat(effectiveUri, fileName)

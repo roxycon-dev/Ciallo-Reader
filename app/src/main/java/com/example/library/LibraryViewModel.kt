@@ -325,6 +325,22 @@ class LibraryViewModel private constructor(
         loadChapters(book)
     }
 
+    internal fun onlineListeningContinuation(book: SearchBook?):
+        (suspend (com.example.data.ListeningChapter) -> com.example.data.ListeningChapter?)? {
+        val source = sourceManager.availableSources.value.firstOrNull { it.id == book?.sourceId } as? ComicSource
+            ?: return null
+        val chapters = _comicChapters.value
+        return { previous ->
+            val index = chapters.indexOfFirst { it.id == previous.chapterKey }
+            val next = chapters.getOrNull(index + 1)?.takeIf { index >= 0 }
+            if (next == null) null else when (val text = source.getChapterText(next.id)) {
+                is SourceResult.Error -> throw text.exception
+                is SourceResult.Success -> com.example.data.ListeningChapter(previous.bookKey, next.id,
+                    previous.bookTitle, next.title, com.example.data.spokenParagraphs(text.data))
+            }
+        }
+    }
+
     /** 文本小说源：加载章节正文 */
     fun loadChapterText(chapter: ComicChapter) {
         val previous = _onlineNovelChapter.value

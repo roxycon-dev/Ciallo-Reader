@@ -73,7 +73,7 @@ object Fb2Parser {
                     if (opts.outWidth <= 0 || opts.outHeight <= 0) return@forEach
                     val ext = detectImageExt(bytes) ?: "jpg"
                     if (!fb2ImageDir.exists()) fb2ImageDir.mkdirs()
-                    val f = File(fb2ImageDir, "$binId.$ext")
+                    val f = File(fb2ImageDir, "inline_" + binaryImages.size + "_" + System.nanoTime() + "." + ext)
                     f.writeBytes(bytes)
                     binaryImages[binId] = Fb2Image(f.absolutePath, opts.outWidth, opts.outHeight)
                 }
@@ -90,48 +90,25 @@ object Fb2Parser {
                     val sectionTitle = section.select("title").firstOrNull()?.text()?.trim()
                         ?.ifBlank { null }
                         ?: "第 ${index + 1} 章"
-                    // 按文档顺序遍历 p 与 image：文本与内嵌图片占位符交错排列
-                    val contentParts = mutableListOf<String>()
-                    section.select("p, image").forEach { el ->
-                        when (el.tagName().lowercase()) {
-                            "image" -> {
-                                val href = (el.attr("l:href").ifBlank { el.attr("href") }).trimStart('#')
-                                binaryImages[href]?.let { img ->
-                                    contentParts.add("[IMG:${img.path}|${img.w}|${img.h}]")
-                                }
+                    val builder = StyledTextBuilder()
+                    section.select("p, image, subtitle, v, text-author").forEach { element ->
+                        if (element.parents().firstOrNull { it.normalName() == "section" } != section ||
+                            element.parents().any { it.normalName() == "title" }) return@forEach
+                        builder.breakLine(element.normalName() != "v")
+                        if (element.normalName() == "image") {
+                            val reference = element.attr("l:href").ifBlank { element.attr("href") }.trimStart('#')
+                            binaryImages[reference]?.let {
+                                builder.append("[IMG:" + it.path + "|" + it.w + "|" + it.h + "]", 0)
                             }
-                            else -> {
-                                if (el.parent()?.tagName() != "title") {
-                                    val text = el.text().trim()
-                                    if (text.isNotEmpty()) contentParts.add(text)
-                                }
-                            }
+                        } else {
+                            builder.append(readBookHtml(element.outerHtml()))
                         }
                     }
-                    val contentText = contentParts.joinToString("\n\n").trim()
-                    if (contentText.isNotEmpty()) {
-                        addChaptersWithSplit(chapters, bookId, order, sectionTitle, contentText)
-                        order = chapters.size
-                    }
+                    chapters.addAll(builder.build().chapters(bookId, order, sectionTitle))
+                    order = chapters.size
                 }
-            } else {
-                // 无 section 结构：整书文本按固定长度兜底分章
-                val flatText = body?.select("p")
-                    ?.joinToString("\n\n") { it.text().trim() }
-                    ?.trim()
-                    ?: ""
-                if (flatText.isNotEmpty()) {
-                    flatText.let { splitChapterText(it, 5000) }.forEachIndexed { index, part ->
-                        chapters.add(
-                            Chapter(
-                                bookId = bookId,
-                                chapterOrder = chapters.size,
-                                title = "第 ${index + 1} 部分",
-                                content = part
-                            )
-                        )
-                    }
-                }
+            } else if (body != null) {
+                chapters.addAll(readBookHtml(body.outerHtml()).chapters(bookId, 0, title, 5000))
             }
 
             if (chapters.isEmpty()) {
@@ -210,53 +187,6 @@ private fun decodeFb2Text(bytes: ByteArray): String {
             }
         } catch (_: Exception) {
             String(bytes, StandardCharsets.UTF_8)
-        }
-    }
-
-    private fun addChaptersWithSplit(
-        chapters: MutableList<Chapter>,
-        bookId: Int,
-        startOrder: Int,
-        title: String,
-        content: String
-    ) {
-        if (content.length <= MAX_CHAPTER_LENGTH) {
-            chapters.add(
-                Chapter(
-                    bookId = bookId,
-                    chapterOrder = startOrder,
-                    title = title,
-                    content = content
-                )
-            )
-            return
-        }
-        // 拆分点优先取换行，避免把 [IMG:...] 内嵌图片占位符从中间截断
-        var start = 0
-        while (start < content.length) {
-            val end = minOf(content.length, start + MAX_CHAPTER_LENGTH)
-            if (end >= content.length) {
-                chapters.add(
-                    Chapter(
-                        bookId = bookId,
-                        chapterOrder = startOrder + chapters.size,
-                        title = title,
-                        content = content.substring(start)
-                    )
-                )
-                break
-            }
-            val nl = content.lastIndexOf('\n', end)
-            val cut = if (nl > start + MAX_CHAPTER_LENGTH / 2) nl + 1 else end
-            chapters.add(
-                Chapter(
-                    bookId = bookId,
-                    chapterOrder = startOrder + chapters.size,
-                    title = if (start == 0) title else "$title (续${chapters.size - startOrder + 1})",
-                    content = content.substring(start, cut)
-                )
-            )
-            start = cut
         }
     }
 

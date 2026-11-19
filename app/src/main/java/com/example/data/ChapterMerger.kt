@@ -51,14 +51,15 @@ object ChapterMerger {
             val first = byOrder.getValue(parts.first())
             val last = byOrder.getValue(parts.last())
             logical.add(
-                Chapter(
+                mergeChapterParts(Chapter(
                     bookId = first.bookId,
                     chapterOrder = logical.size,
                     title = baseTitle ?: first.title,
-                    content = buffer.toString(),
+                    content = "",
                     startCharIndex = first.startCharIndex,
-                    endCharIndex = last.endCharIndex
-                )
+                    endCharIndex = last.endCharIndex,
+                    writingMode = first.writingMode
+                ), parts.map(byOrder::getValue))
             )
             logToPhys.add(parts.toIntArray())
             parts = mutableListOf()

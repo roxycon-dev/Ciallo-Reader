@@ -162,10 +162,13 @@ object MobiParser {
         val coverBytes: ByteArray?,
         val failureReason: String?,
         val records: List<ByteArray> = emptyList(),
-        val firstImageIndex: Int = 0
+        val firstImageIndex: Int = 0,
+        val dictionaryText: ByteArray? = null,
+        val dictionaryEncoding: Int = 0,
+        val orthRecord: Int = -1
     )
 
-    internal fun parseMobi(bytes: ByteArray): ParsedMobi? {
+    internal fun parseMobi(bytes: ByteArray, forDictionary: Boolean = false): ParsedMobi? {
         if (bytes.size < 80) return null
         val recordCount = readU16(bytes, 76)
         if (recordCount <= 0 || recordCount > 100_000) return null
@@ -243,7 +246,10 @@ object MobiParser {
 
         val html = decodeMobiText(decompressed, active.textEncoding)
         val cover = extractCover(records, active, startRecord)
-        return ParsedMobi(title, author, 0, html, cover, null, records, active.firstImageIndex)
+        val orth = if (forDictionary) readU32(records[active.recordIndex], 40).takeIf { it < records.size }
+            ?.toInt()?.plus(active.recordIndex) ?: -1 else -1
+        return ParsedMobi(title, author, 0, html, cover, null, records, active.firstImageIndex,
+            decompressed.takeIf { forDictionary }, active.textEncoding, orth)
     }
 
     private fun parseMobiHeader(record: ByteArray, recordIndex: Int): MobiHeader? {
@@ -256,7 +262,7 @@ object MobiParser {
         val recordCount = readU16(record, 8)
         val encryptionType = readU16(record, 12)
         val headerLength = readU32(record, 20).toInt()
-        val textEncoding = readU16(record, 28)
+        val textEncoding = readU32(record, 28).toInt()
         val fullNameOffset = readU32(record, 84).toInt()
         val fullNameLength = readU32(record, 88).toInt()
         val minVersion = readU32(record, 104).toInt()
@@ -865,10 +871,10 @@ object MobiParser {
         val chapters = mutableListOf<Chapter>()
         var order = 0
         for ((hint, segment) in rawSegments) {
-            val text = cleanHtmlText(segment)
-            if (text.isBlank()) continue
+            val text = readBookHtml(segment)
+            if (text.text.isBlank()) continue
             val title = hint.ifBlank { "第 ${chapters.size + 1} 章" }
-            addChaptersWithSplit(chapters, bookId, order, title, text)
+            chapters.addAll(text.chapters(bookId, order, title))
             order = chapters.size
         }
 
@@ -876,59 +882,14 @@ object MobiParser {
 
         // 3. 完全没有章节结构的书：按固定长度兜底切分
         if (chapters.size == 1 && chapters[0].content.length > 5000 && rawSegments.size == 1) {
-            val fullText = chapters[0].content
-            val fallback = mutableListOf<Chapter>()
-            var idx = 0
-            var chunkNo = 1
-            while (idx < fullText.length) {
-                val end = minOf(idx + 5000, fullText.length)
-                fallback.add(
-                    Chapter(
-                        bookId = bookId,
-                        chapterOrder = fallback.size,
-                        title = "第 $chunkNo 部分",
-                        content = fullText.substring(idx, end)
-                    )
-                )
-                chunkNo++
-                idx = end
+            val chapter = chapters.single()
+            val text = FormattedBookText(chapter.content, decodeBookSpans(chapter.formatting), chapter.writingMode)
+            return text.chapters(bookId, 0, "第 1 部分", 5000).mapIndexed { index, part ->
+                part.copy(title = "第 ${index + 1} 部分")
             }
-            return fallback
         }
 
         return chapters
-    }
-
-    /** 超大章节按 MAX_CHAPTER_LENGTH 拆分，与 EpubParser/TXT 导入保持一致。 */
-    private fun addChaptersWithSplit(
-        chapters: MutableList<Chapter>,
-        bookId: Int,
-        startOrder: Int,
-        title: String,
-        content: String
-    ) {
-        if (content.length <= MAX_CHAPTER_LENGTH) {
-            chapters.add(
-                Chapter(
-                    bookId = bookId,
-                    chapterOrder = startOrder,
-                    title = title,
-                    content = content
-                )
-            )
-            return
-        }
-        val parts = content.let { splitChapterText(it) }
-        parts.forEachIndexed { index, part ->
-            chapters.add(
-                Chapter(
-                    bookId = bookId,
-                    chapterOrder = startOrder + index,
-                    title = if (index == 0) title else "$title (续${index + 1})",
-                    content = part
-                )
-            )
-        }
     }
 
     private fun cleanHeadingText(raw: String): String {

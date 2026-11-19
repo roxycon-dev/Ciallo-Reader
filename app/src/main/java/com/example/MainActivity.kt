@@ -1446,6 +1446,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 prefs = viewModel.prefs,
                                 ttsManager = viewModel.ttsManager,
+                                listeningContinuation = { indent ->
+                                    selectedBook?.let { viewModel.localListeningContinuation(it.id, it.title, indent) }
+                                },
                                 highlights = highlights,
                                 bookmarks = bookmarks,
                                 onAddBookmark = { bookId, chIdx, offset, title, snippet ->
@@ -1457,6 +1460,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onAddHighlight = { bookId, chIdx, text, note, color ->
                                     viewModel.addHighlight(bookId, chIdx, text, note, color)
+                                },
+                                onAddRangeHighlight = { bookId, chapter, start, end, text, note, underline ->
+                                    viewModel.addHighlight(bookId, chapter, text, note, "#71CCBA", start, end, underline)
                                 },
                                 onDeleteHighlight = { id ->
                                     viewModel.deleteHighlight(id)
@@ -1994,6 +2000,13 @@ class MainActivity : ComponentActivity() {
 
                             com.example.ui.NovelReaderScreen(
                                 bookTitle = comicBook?.title,
+                                listeningBookKey = comicBook?.let { "online:${it.sourceId}:${it.id}" } ?: "online:$librarySessionId",
+                                ttsManager = viewModel.ttsManager,
+                                listeningContinuation = libraryViewModel.onlineListeningContinuation(comicBook),
+                                onOpenListeningChapter = { id ->
+                                    chapters.firstOrNull { it.id == id }?.let(libraryViewModel::loadChapterText)
+                                },
+                                prefs = viewModel.prefs,
                                 state = chapterState,
                                 hasPrevChapter = idx > 0,
                                 hasNextChapter = idx >= 0 && idx < chapters.size - 1,

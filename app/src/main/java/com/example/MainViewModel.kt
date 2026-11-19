@@ -611,6 +611,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    internal fun localListeningContinuation(bookId: Int, title: String, indent: Boolean):
+        (suspend (ListeningChapter) -> ListeningChapter?)? {
+        val mapping = chapterMapping?.takeIf { lastLoadedBookId == bookId } ?: return null
+        return { previous ->
+            withContext(Dispatchers.Default) {
+                var next = (previous.chapterKey.toIntOrNull() ?: return@withContext null) + 1
+                while (next in mapping.chapters.indices) {
+                    val orders = mapping.logicalToPhysicalOrders[next].asList()
+                    val rows = repository.getChaptersByOrders(bookId, orders).associateBy { it.chapterOrder }
+                    check(orders.all { it in rows })
+                    val text = orders.joinToString("") { rows.getValue(it).content }
+                    val paragraphs = spokenParagraphs(formatNovelReadingText(text, indent))
+                    if (paragraphs.isNotEmpty()) {
+                        return@withContext ListeningChapter(previous.bookKey, next.toString(), title,
+                            mapping.chapters[next].title, paragraphs)
+                    }
+                    next++
+                }
+                null
+            }
+        }
+    }
+
     fun selectBook(book: Book) {
         searchJob?.cancel()
         _searchResults.value = emptyList()
@@ -658,6 +681,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         null
                     }
                     val effectiveBook = migratedBook ?: book
+                    try {
+                        repository.recoverBookLayout(effectiveBook)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        android.util.Log.w("BookImport", "Could not restore EPUB layout", failure)
+                    }
                     val metadata = repository.getChaptersMetadataList(effectiveBook.id)
                     val logical = withContext(Dispatchers.Default) { ChapterMerger.buildLogicalChapters(metadata) }
                     check(logical.chapters.isNotEmpty()) { "这本书没有可读取的章节" }
@@ -976,7 +1006,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun addHighlight(bookId: Int, chapterIndex: Int, selectedText: String, note: String, colorHex: String) {
+    fun addHighlight(bookId: Int, chapterIndex: Int, selectedText: String, note: String, colorHex: String,
+        start: Int? = null, end: Int? = null, underline: Boolean = false
+    ) {
         viewModelScope.launch {
             val physicalIndex = chapterMapping?.physicalIndexFor(chapterIndex) ?: chapterIndex
             repository.addHighlight(
@@ -985,7 +1017,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     chapterIndex = physicalIndex,
                     selectedText = selectedText,
                     note = note,
-                    colorHex = colorHex
+                    colorHex = colorHex,
+                    startOffset = start,
+                    endOffset = end,
+                    markStyle = if (underline) "underline" else "highlight"
                 )
             )
         }

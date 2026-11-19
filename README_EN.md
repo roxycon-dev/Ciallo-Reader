@@ -1,271 +1,156 @@
 <div align="center">
 
-<img src="./app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp" width="96" alt="Ciallo Reader app icon"/>
+# Ciallo Reader
 
-[简体中文](README.md) · [English](README_EN.md)
+An Android reader for novels, manga, and ebooks. Find titles online, organize your collection, and pick up where you left off offline.
 
-# Ciallo Reader — Android Novel, Manga & Ebook Reader
+**[Download APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)** · [Product site](https://roxycon-dev.github.io/Ciallo-Reader/) · [简体中文](README.md)
 
-**Find books online. Keep your library organized. Read offline.**  
-Read local ebooks, novels, and comics in one Android app.
-
-[🌐 Product site](https://roxycon-dev.github.io/Ciallo-Reader/) ·
-[⬇️ Download the latest APK](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) ·
-[1.6.4 release notes](docs/release-1.6.4-2026-11-13.md) ·
-[1.6.3 release notes](docs/release-1.6.3-2026-11-12.md) ·
-[1.6.2 release notes](docs/release-1.6.2-2026-11-12.md) ·
-[1.6.1 release notes](docs/release-1.6.1-2026-11-10.md) ·
-[See screenshots](#screenshots) ·
-[Features](#features) ·
-[Report an issue](https://github.com/roxycon-dev/Ciallo-Reader/issues)
-
-[![Latest release](https://img.shields.io/github/v/release/roxycon-dev/Ciallo-Reader?display_name=tag)](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest)
-![Android 7.0+](https://img.shields.io/badge/Android-7.0%2B-3DDC84?logo=android&logoColor=white)
-![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 </div>
 
-Ciallo Reader is an **Android ebook reader, novel reader, and manga/comic reader** for local files and configurable online sources. Search books across sources, import your own files, download novels or comic chapters, and continue reading from your library offline.
+[<img src="docs/readme-media/shelf-motion.gif" width="100%" alt="Ciallo Reader importing an ebook and browsing the 3D bookshelf">](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.6.5/Ciallo-Reader-Showcase-4K.mp4)
 
-**1.6.1 / 260 · Tablet layout and update checks.** Tablet settings keep each title with its content, Library and Discover arrange results to the available width, and the bookshelf drops duplicate reading space. Rotation, split-screen, and window size changes trigger a fresh layout. Update checks run silently at startup and on demand from Settings; downloads use the official GitHub release or an explicitly chosen HTTPS mirror, still verify the official signature, and offer the mirror only when the official SHA-256 is published. See the [UI guide](docs/UI_MOTION_INTERACTION_GUIDE.md) and [release notes](docs/release-1.6.1-2026-11-10.md).
+[Watch the full product film (92 seconds, 4K MP4)](https://github.com/roxycon-dev/Ciallo-Reader/releases/download/v1.6.5/Ciallo-Reader-Showcase-4K.mp4) · [Film chapters](#film-chapters) · [1.6.5 release notes](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.6.5)
 
-**1.6.0 / 259 · UI redesign and tablet support.** The bookshelf, library, Discover, statistics, settings, and readers share a redesigned layout, glass panels, and coordinated page, text, and icon motion. The bookshelf keeps its 3D view and Ciallo themes. [Issue #7](https://github.com/roxycon-dev/Ciallo-Reader/issues/7) brings adaptive tablet layouts across the app, including a navigation rail, split browsing and detail panes, and an automatic or custom 0–12 image preload setting under Manga Reader → Settings → Image. [Release notes](docs/release-1.6.0-2026-11-10.md).
+[Discovery and shelf](#discovery-and-shelf) · [Novels and ebooks](#novels-and-ebooks) · [Listening and annotations](#listening-dictionaries-and-annotations) · [Manga](#manga) · [Stats and appearance](#stats-and-appearance) · [Sources and backups](#sources-and-backups) · [Getting started](#getting-started)
 
-**1.5.16 / 258 · Consecutive EPUB illustrations fixed:** Under the minimal render quality every page after the first one kept drawing the previous illustration; images are now keyed by their path, so the inline image and the full-screen viewer always agree. Small EPUB art (dividers, ornaments) is no longer stretched to the full column width. Verified page by page in curl, cover, slide, fade and scroll page turns. [Release notes](docs/release-1.5.16-2026-11-07.md).
-
-**1.5.14 / 256 · Consistent state feedback:** The download entry keeps its navigation arrow, acknowledges fresh completion briefly and shows uncropped counts. Favorites, bookmarks, playback, disclosure, selection and loading share consistent transitions and theme colors. Glass and paper motion remain. [Release notes](docs/release-1.5.14-2026-11-05.md).
-
-**1.5.13 / 255 · Smoother paper transitions:** Preserve the existing deformation and spring tuning while fixing stretched timing after missed frames. Blur and dimming follow the same transition; nested windows keep independent backdrop ownership. [Release notes](docs/release-1.5.13-2026-11-05.md).
-
-**1.5.12 / 254 · Unified download center:** Library and Discover share one compact glass queue with a dimmed, blurred backdrop. The single toolbar entry shows task counts, live progress and task status. Progress and completed records persist; every record deletion requires confirmation and preserves imported books. EPUB import uses bounded batches and reports validation/import after transfer. [Release notes](docs/release-1.5.12-2026-11-05.md).
-
-**1.5.10 / 252 · Resumable novel downloads:** Public novel EPUB downloads, including Fanqie, now preserve completed chapters and illustrations across network changes and manual pauses. Temporary network failures retry with bounded backoff. Canceling removes checkpoints; changed catalogues and incomplete content still fail integrity checks. Keeps the signing certificate used since 1.5.6 for in-place upgrades from 1.5.6–1.5.9. All 21 related regression tests passed; physical-device network switching and source throughput have not been measured. [Release notes](docs/release-1.5.10-2026-10-29.md).
-
-**1.5.9 / 251 · Bili and 19 Manga connections and security hardening:** Deduplicates Bili cookies, renews expired search tickets and adds visible website verification. 19 Manga gains a same-site fallback host. Chapter downloads retry truncated response bodies. Shared image transport blocks credentials over plaintext HTTP, including redirects, while retaining the fixed release certificate. **System antivirus classification remains unconfirmed; no emulator or new antivirus test was run, as requested.** Host checks passed for 46 Bili pages and 27 19 Manga pages, including saved-file offline decoding. Previously verified sources are not repeated. [Release notes](docs/release-1.5.9-2026-10-28.md).
-
-**1.5.8 / 250 · Comic search and image recovery:** Repairs WNACG, 19 Manhua and AiManhua empty responses, corrupted images and download failures on some proxy routes. Public requests try a complete direct response before fallback; WNACG no longer waits for the publisher page when its configured origin is usable. The three sources passed real search, online reading, fresh chapter download and offline decoding for 22, 24 and 45 pages respectively. Uses the fixed release certificate and upgrades 1.5.6/1.5.7 in place. [Release notes](docs/release-1.5.8-2026-10-27.md) · [Verification](docs/comic-source-repair-2026-10-27.md).
-
-**1.5.7 / 249 · Startup compatibility and diagnostics:** Repairs legacy-system home rendering paths, avoids unused backdrop capture where realtime blur is unsupported, and adds recovery after early home rendering failures. Settings → About now has a visible diagnostic export button without the old small print. Reports include operation stages, exception chains, threads, device environment, crash history and available system exit information. **Existing permissions and transfer, background download and text-to-speech capabilities are retained.** Uses the same fixed signing certificate as 1.5.6 and upgrades that version in place; retired-signature releases still require backup and migration. HarmonyOS 3.0 physical-device verification and a new antivirus retest remain unavailable. [Release notes](docs/release-1.5.7-2026-10-26.md).
-
-**1.5.6 / 248 · Signing migration:** Includes today's motion and Z Fold fixes, source certificate verification, HTTP credential protection, and complete retirement of the exposed release key. The final APK was not listed as risk software in two paired Tencent Mobile Manager tests; the original 1.5.5 control was still flagged. HarmonyOS 3.0 physical-device validation remains unavailable. Android 7+, adult sources enabled by default, and system installation remain. **First export a backup, uninstall the old release, install this release, then import the backup. It cannot update the retired signature in place.** See the [release and migration steps](docs/release-1.5.6-2026-10-26.md), [security record](docs/security-remediation-2026-10-26.md), and [signing notes](docs/app-signing.md).
-
-**Algorithm and adaptation (included in 1.5.6):** Reduces repeated motion work and fixes long-chapter resize anchors, dropped boundary newlines, manga region resolution caching and resource teardown. Existing visuals and quality tiers remain. All 145 JVM checks and 19 Android emulator checks passed; reducing whole-app consumption to 10–20% has not been established. [Validation report](docs/performance-stability-2026-10-26.md).
-
-**1.6.3 / 263 · English coverage and repo cleanup**: Reading durations and the "N days" figures on the statistics page, the highlights settings with its three ranking styles, the discover category sheet (125 genre terms) and the comic/novel partitions, the "Sources N / M" line, source management, the shelf search scope (All / Title / Author) and the comic reader status text are now fully translated. Duration formatting follows the language (`3 分钟` → `3 min`). Removed the 13 MB generated `promo/output/` page and the `promo/experience/archive-v*` experiments that had been committed by mistake. See [release notes](docs/release-1.6.3-2026-11-12.md).
-
-**1.6.2 / 262 · 3D shelf and bilingual UI**: Opening a book used to cross two renderers (the shelf canvas turning the book flat, then a cover overlay scaling a bitmap), which always left a velocity seam. The whole book is now drawn by one renderer (`ShelfVolumeArtist`) along one timeline (`ShelfOpenTimeline`): the first frame is pixel-identical to the resting shelf frame and the return trip is the same path reversed. Fixes the "one book turns into a black cover after leaving the reader" bug (the cover pre-raster window now follows the slots actually drawn, and fallback fills are paper-coloured). The spine no longer prints the title, only the number and cylindrical shading. English coverage completed: 1300+ `tr()` call sites, 2900+ entries, zero missing keys, plus a fix for work status collapsing to "unknown" in English mode. See [release notes](docs/release-1.6.2-2026-11-12.md).
-**1.5.4 / 246** reserves the existing paper deformation, liquid buttons, waterdrop selectors, liquid sliders and squishy switches for High/Max quality. Balanced/Low/Minimal use ordinary transitions and basic controls, preserving values and selected options when quality changes. Adult sources remain enabled by default, the existing update installation flow stays available, and startup exception handling includes local diagnostic export. [Release notes](docs/release-1.5.4-2026-10-26.md).
-
-**1.5.5 / 247 · In-place upgrade correction:** Restores the original release package `com.aistudio.novelreader.kxmpzq` and keeps the fixed signing certificate. Releases such as 1.5.2 with the same package and certificate can upgrade in place while retaining data. The motion quality tiers and startup fixes from 1.5.4 remain. Users of the 1.5.3 probe or 1.5.4 with package `com.roxycon.ciallo.reader.probe` must export a backup under Settings → Device transfer and backup, install this release, then import it; the packages do not share data automatically. [Release notes](docs/release-1.5.5-2026-10-26.md). No antivirus retest was performed for this release.
-
-**1.5.2 / 244** keeps the existing visual quality and animation parameters while reducing repeated shadow, glass, and slider work. Resizing and folding retain the current chapter and text anchor. Adult sources are always included; the six-tap unlock and dedicated switch card have been removed, and legacy disabled values no longer hide them. [Release notes](docs/release-1.5.2-2026-10-26.md).
-
-**1.5.1 / 243** improves tablet scrolling, chapter reuse, database projections, and cache memory without changing the existing layout, graphics quality, or animation parameters. Novel progress observation no longer recomposes the whole reader. Vertical comics reuse measured geometry and update continuous progress inside the bottom bar. Pagination has a byte budget, with safe cache eviction on memory pressure. [Release notes](docs/release-1.5.1-2026-10-23.md).
-
-**1.5.0 / 242**: The built-in "Ciallo Reader guide" book is gone: new installs no longer seed it, and existing installs remove it together with its chapters and reading record on the next launch. Entering shelf multi-select by long-pressing a book no longer plays the paper pull-out: the top selection bar and the floating action bar now use their own spring slide and fade, so switching selection state never drags a paper surface across the screen. [Release notes](docs/release-1.5.0-2026-10-21.md).
-
-**1.4.18 / 241**: Novel Discover now combines the public recommendation, update and ranking data of seven sources, with source-specific categories and pagination. Novelia's guest list endpoint now answers HTTP 401, so that source keeps only its public daily ranks and explains the reason instead of issuing a request that cannot succeed; Quanben likewise keeps its real recommendations and reports unavailable feeds. Wenku rankings use its published heat grades, with their basis disclosed. Card customization labels and values now sit above the slider and its bubble. [Release notes](docs/release-1.4.18-2026-10-21.md).
-
-**1.4.17 / 240**: Independent manga and novel Discover sections use the existing liquid selector and retain separate filters, sources, layout and caches. Public novel catalogues and static Legado discovery rules reuse the same browsing UI. Transfer, backup, books and reader pages share one paper presentation lifecycle. Reader settings retain their sampled background through the actual exit and no longer rebuild content while returning from a menu. [Release notes](docs/release-1.4.17-2026-10-21.md).
-
-**1.4.16 / 239** opens source management directly from the clicked button, with the caller and tabs staying in place. A shared handoff and full-page host distinguish navigation from dismissal and confirmation. Paper opening settles without a late rebound, and cache details no longer stack an independent scale animation. Shared window bounds and safe insets prevent clipped footer labels; buttons can grow for larger text. See [release notes](docs/release-1.4.16-2026-10-21.md).
-
-**1.4.15 / 238** adds a lightweight live-content paper warp: one GPU sample retains the neck, progressive release, bend, flutter and return without snapshots or hidden source cards. Tab height and label space now share one progress value, eliminating the final-frame icon jump. Partial-window corner glints are removed, and the source picker waits for the shared close lifecycle. See [release notes](docs/release-1.4.15-2026-10-21.md).
-
-**1.4.14 / 237** replaces the complex paper mesh with one lightweight spring transition to address disappearing cards and displaced text reported during rapid scrolling and repeated taps in 1.4.13. It removes the extra offscreen renderer, GPU readbacks, trigger hiding and capture waits. Existing glass styling, themes, dismissal ordering, sliders and reading gestures remain. Glass press tracking stops as soon as scrolling takes over. See [release notes](docs/release-1.4.14-2026-10-21.md).
-
-**1.4.13 / 236** fixes slider jumps caused by vertical scrolling, touching a settling lens and additional fingers. Paper transitions retain the full mesh, glass refraction and shadows, with isolated backdrop sampling, on-demand source capture and less repeated curve work. It removes the session-wide slow-frame downgrade, completes discovery trigger registration, sequences follow-up actions after dismissal and removes duplicate headers in the manual and cache manager. See [release notes and verification](docs/release-1.4.13-2026-10-21.md).
-
-**1.4.12 / 235** fixes paper transition stalls and modal open/close ordering with hardware mesh rendering, on-demand snapshots and one physical lifecycle. Native free corner curls and slow partial-page returns are restored; calibrated distance applies only to fast complete flips, with opposite previous/next guides and diagonal calibration. In-place touch editing, shared liquid sliders and the source fixes from 1.4.11 remain included. See [release notes and verification](docs/release-1.4.12-2026-10-21.md).
-
-**1.4.10 / 233** adds **书阁 (Shuge, `xbookcn`)**, an account-free Chinese novel source with search, details, a full table of contents, online text and whole-book EPUB download. The site ships no whole-book file, so the app fetches chapters and packages the EPUB locally, comparing the table of contents before and after and discarding the whole book if any chapter differs. It also fixes normal pages being misread as verification pages because of injected Cloudflare scripts, and retries once when the site drops a TLS handshake. Other sources and existing download paths are unchanged. See the [release notes and download](docs/release-1.4.10-2026-10-19.md).
-
-**1.4.9 / 232** repairs EPUB illustrations from Wenku8 and Z-Library, including already imported books, and prevents isolated missing characters in valid Novelia translations from blocking a whole novel. Z-Library excludes hidden query-reflecting decoy cards and recovers failed downloads across available nodes. A visible download entry shows progress, file details and retry controls. See the [release notes and download](docs/release-1.4.9-2026-10-19.md).
-
-**1.4.8 / 231** adds three sources that require no account: **全本小说网 (Quanben)**, **话本小说 (Huaben)** and **SF轻小说 (SFACG)**. Download complete EPUBs with inline illustrations for offline reading. Existing source labels become **Novelia** and **Wenku8 Library**. Integrity checks reject detected chapter gaps, invalid text, missing images and known placeholder content before import. This release also includes favorite cover and fractional manga episode label fixes. See the [release notes and download](docs/release-1.4.8-2026-10-19.md).
-
-The three new sources were checked through search, whole-book download, import and the production reader using public sample books. They provide offline EPUB reading; locked chapters prevent whole-book export. Generated EPUB downloads restart after a pause. All 31 executed Android tests and 22 JVM regression tests passed; two experimental source tests remain explicitly ignored. These samples do not establish coverage of every title, source-text completeness or updates matching every original platform. See the [verification report](docs/novel-guest-sources-verification-2026-10-19.md).
-
-1.4.7 added anonymous Xipi and 19 Manga sources with native categories, status filters, sorting and pagination, plus the transfer merge fixes. Previous chapter checks are recorded in the [1.4.7 release notes](docs/release-1.4.7-2026-10-18.md).
-
-Enable **嬉皮漫画 (Xipi)** for Money-First Hero and choose the original chapter title **鹰身女妖&天使** for episode 180.5. Use **19漫画 (19 Manga)** for the other three titles. Native category labels and routes are read from the sites, then mapped to the app's shared taxonomy. Verification reflects availability on 2026-10-18; see the [source audit](docs/latest-comic-source-verification-2026-10-18.md) for episode identity, page counts and scope.
-
-Also repairs legacy Android API compatibility, glass effect cleanup, EPUB path handling and Compose state subscriptions found during release checks.
-
-
-
-## Screenshots
-
-### Device transfer and backups
-
-<img src="./docs/screenshots/shot-transfer144-glass.jpg" width="360" alt="Device transfer using the shared frosted-glass interface"/>
-
-This is an Android emulator screenshot with a test background. Wireless transfers between physical devices still need validation.
-
-### Reading settings and layouts
-
-The screenshots below are from Android emulator builds. Reading text and comic pages are generated sample content. See the [v1.2.5 refinement notes and four screen-size examples](docs/comic-feature-polish-1.2.5-2026-10-07.md).
+## Discovery and shelf
 
 <table>
 <tr>
-<td align="center"><img src="./docs/screenshots/shot-reader125-comic-polish-tablet.jpg" width="760" alt="Manga reader settings categories on a tablet"/></td>
+<td width="50%"><img src="docs/readme-media/discover.webp" alt="Discovery rankings and cross-source search"><br><sub>Rankings and cross-source search</sub></td>
+<td width="50%"><img src="docs/readme-media/detail.webp" alt="Title details with a resume reading button"><br><sub>Title details and resume reading</sub></td>
 </tr>
 <tr>
-<td align="center"><strong>Novel settings · phone</strong><br><img src="./docs/screenshots/shot-reader125-novel-phone.jpg" width="280" alt="Android ebook reader controls for font, line spacing, brightness, and page layout"/></td>
-<td align="center"><strong>Novel settings · tablet</strong><br><img src="./docs/screenshots/shot-reader125-novel-tablet.jpg" width="760" alt="Landscape tablet layout for novel reader settings"/></td>
-</tr>
-<tr>
-<td align="center"><strong>Manga settings · tablet</strong><br><img src="./docs/screenshots/shot-reader125-comic-tablet.jpg" width="760" alt="Landscape tablet sidebar for manga settings"/></td>
-<td align="center"><strong>Manga settings · phone</strong><br><img src="./docs/screenshots/shot-reader125-comic-polish-phone.jpg" width="280" alt="Android manga reader controls for page turns, display, image processing, and translation"/></td>
+<td><img src="docs/readme-media/offline.webp" alt="Completed download and offline reader"><br><sub>Download center and offline reading</sub></td>
+<td><img src="docs/readme-media/shelf.webp" alt="Ebook import and 3D bookshelf"><br><sub>Local import and 3D bookshelf</sub></td>
 </tr>
 </table>
 
-### More app screens
+- Search novels and manga across sources, filter by provider, and use multilingual keywords. Browse recommendations, updates, rankings, shared categories, and source categories.
+- Favorite online titles and resume from your saved position. Organize the shelf with categories, search, sorting, a list, and a 3D view with book-opening transitions.
+- Download whole novels or selected manga chapters and volumes where the source supports it. Pause, resume, or retry downloads in the download center. Finished titles open offline from the shelf.
 
-These 12 earlier screenshots show source management, library search, the bookshelf, reading, comic details, reading statistics, and settings.
+## Novels and ebooks
 
 <table>
-<tr><td align="center"><strong>Source management</strong><br><img src="./promo/readme-screenshots/01-source-management.jpg" width="180" alt="Book source management"/></td><td align="center"><strong>Library search</strong><br><img src="./promo/readme-screenshots/02-library-search.jpg" width="180" alt="Online library search"/></td><td align="center"><strong>Themes and orientation</strong><br><img src="./promo/readme-screenshots/03-theme-and-display.jpg" width="180" alt="Theme and screen orientation settings"/></td></tr>
-<tr><td align="center"><strong>Reading calendar and trends</strong><br><img src="./promo/readme-screenshots/04-reading-calendar.jpg" width="180" alt="Reading calendar and trends"/></td><td align="center"><strong>Reading insights and rankings</strong><br><img src="./promo/readme-screenshots/05-reading-insights.jpg" width="180" alt="Reading insights and rankings"/></td><td align="center"><strong>Bookshelf and continue reading</strong><br><img src="./promo/readme-screenshots/06-bookshelf.jpg" width="180" alt="Bookshelf with continue-reading section"/></td></tr>
-<tr><td align="center"><strong>Manga page turn</strong><br><img src="./promo/readme-screenshots/07-comic-page-turn.jpg" width="180" alt="Manga page-turn effect"/></td><td align="center"><strong>Novel page turn</strong><br><img src="./promo/readme-screenshots/08-novel-page-turn.jpg" width="180" alt="Novel page-turn effect"/></td><td align="center"><strong>Manga details and tags</strong><br><img src="./promo/readme-screenshots/09-comic-details.jpg" width="180" alt="Manga details and tags"/></td></tr>
-<tr><td align="center"><strong>Chapters, highlights, and bookmarks</strong><br><img src="./promo/readme-screenshots/10-chapters-bookmarks.jpg" width="180" alt="Chapters, highlights, and bookmarks"/></td><td align="center"><strong>Highlight ranking</strong><br><img src="./promo/readme-screenshots/11-god-chapter-ranking.jpg" width="180" alt="Saved highlights ranking"/></td><td align="center"><strong>Reader settings</strong><br><img src="./promo/readme-screenshots/12-reader-settings.jpg" width="180" alt="Reader settings"/></td></tr>
+<tr>
+<td width="70%"><img src="docs/readme-media/novel-reader.webp" alt="Novel reader font, bookmark, and chapter panels"><br><sub>Fonts, bookmarks, and chapter list</sub><br><img src="docs/readme-media/page-turns.webp" alt="Page curl, slide, and fade in the novel reader"><br><sub>Page curl, slide, and fade</sub></td>
+<td width="30%" align="center"><img src="docs/readme-media/vertical.webp" width="215" alt="EPUB text in right-to-left vertical columns"><br><sub>Vertical EPUB text</sub></td>
+</tr>
 </table>
 
-> Some older screenshots may differ from the current interface. Reading text and comic pages are sample content.
+- Keep supported headings, bold, italic, underline, strikethrough, superscript, and subscript. EPUB also reads linked in-book CSS, cover art, chapter lists, illustrations, and writing direction. Markdown and HTML open as rendered text.
+- Follow the book’s writing mode or select horizontal or vertical text per book. Vertical reading supports both column directions, illustrations, and saved progress.
+- Set typeface, font size, character and line spacing, margins, brightness, and reader theme. Choose page curl, cover, slide, fade, or scroll. Use adjustable touch zones, break reminders, bookmarks, chapter navigation, and text search.
 
-## Features
-
-### Device transfer and portable backups
-
-- Open Settings → Device transfer and backups to send or receive selected categories: books, favorites, annotations, history, settings, resources, and sources.
-- Implements same-network/hotspot discovery and nearby Wi-Fi Direct, encrypted transfer after code confirmation, progress, cancellation, and resume.
-- Merge keeps local settings and the latest reading position. Full migration requires separate confirmation and keeps one undo snapshot.
-- Share a `.ciallo` file through Android and open it on the receiving device to inspect and import. Legacy ZIP backups remain readable. Protected content is excluded by default; PINs, login sessions, and keys are not transferred.
-- Both devices need a compatible Android version. Cross-brand devices, environments without Google services, wireless links, and WeChat/QQ file reception still need physical-device validation. See [usage and validation scope](docs/device-transfer.md).
-
-### Discover comics
-
-Version 1.3.8 adds Discover and restores Aiman and MYCOMIC reading. Its APK retains the 1.3.6 signing identity; the differently signed 1.3.7 requires a data backup before migrating.
-
-- Browse one source or merge sources with separate update, discussion, ranking, and view dimensions. Missing statistics are shown explicitly.
-- Standard categories coexist with native source categories, with saved filters, three layouts, pagination, Library favorites, ring pull-to-refresh, and bottom-tab double-tap refresh.
-- Version 1.3.8 repairs discovery feeds, metadata, and pagination, and restores Aiman's public reading path through the HTTPS origin declared by its publisher.
-- MYCOMIC reads public pages with the same in-app WebView engine and session used for site verification. Its real Android verification → catalogue → detail → chapter → reader image decoding chain passed: 30 catalogue entries, 16 chapters, 61 pages, and decoded first/last images. See [validation details](docs/release-1.3.8-2026-10-14.md).
-
-### One library for novels, ebooks, and comics
-
-- Import and read TXT, EPUB, MOBI, AZW, AZW3, PRC, DOCX, FB2, CBZ, ZIP, and PDF files.
-- Search enabled online sources in parallel; supported novel results can be opened in the app.
-- Download full novels or comic chapters for offline reading, with resumable downloads.
-- Import Legado JSON sources and custom CSS/JSON rules.
-- Keep reading progress, chapter bookmarks, favorites, and reading statistics in your library. Supported reading records can be migrated when changing sources.
-
-### Personalize the reading experience
-
-- Novel reader with page curl, cover, slide, fade, and scroll modes; adjustable fonts, text size, line spacing, margins, themes, and text-to-speech.
-- Manga reader with single-page, two-page, webtoon, and continuous-scroll modes, plus reading-direction controls, zoom, crop, and page splitting.
-- Presets for different reading styles, night themes, and a Minimal graphics option for lower-performance devices.
-- Layouts adapt to phones, tablets, and landscape screens.
-
-### Manga image enhancement and translation
-
-- Image sharpening, line enhancement, JaNai Quick processing, and the optional MangaJaNai Full model.
-- MangaJaNai Full can run offline after its model is downloaded. The first download is about 76 MB; lightweight processing options remain available.
-- OCR and speech-bubble detection run on device. Translated text is generated by the selected online translation service or custom AI API.
-
-## Supported formats
-
-| Format | Reading support |
+| Formats | Reading support |
 | --- | --- |
-| TXT | Chunked loading, chapter detection, and multiple encodings |
-| EPUB | Table of contents, cover, metadata, and embedded images |
-| MOBI, AZW, AZW3, PRC | Kindle/PDB/KF8 file parsing |
-| DOCX, FB2 | Text extraction and chapter splitting |
-| CBZ, ZIP | Comic image ordering and reading |
-| PDF | Page-by-page viewing; PDF text-layer extraction is not supported yet |
+| TXT | Common encodings and chapter recognition |
+| EPUB | Text and images, contents, common CSS, and horizontal or vertical text |
+| MOBI, AZW, AZW3, PRC | Readable Kindle, PDB, and KF8 files with supported styling |
+| DOCX, FB2 | Formatted text and chapter recognition |
+| Markdown, HTML, XHTML | Rendered text |
+| CBZ, ZIP | Ordered comic images |
+| PDF | Original page display |
 
-## Install
-
-- **Android:** 7.0 (API 24) or newer.
-- **Architecture:** Current release 1.6.1 (version code 260) targets arm64-v8a, supported by most Android phones and tablets. The release APK does not include an x86_64 emulator build.
-- **Download:** Visit [Latest Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) and verify `SHA256SUMS.txt` from the same release.
-- Open the downloaded APK and follow Android's prompt to allow installation from that source.
-
-## Get started
-
-**Import a local ebook or comic:** Open the bookshelf, choose Import Book, and select a supported file.
-
-**Search online sources:** Open Library and choose novels, comics, or aggregate search. Enable, manage, or import sources under Settings → Source Management. Online sources are provided by third parties, so search results and availability may change.
-
-**Read offline:** Download a full novel or comic chapters from a supported source, then open the downloaded item from your bookshelf. Online search, streaming, and translation require a network connection.
-
-## FAQ
-
-**Why is search returning no results?**  
-Check your connection and source settings, try aggregate search, or change the query. Some sources require sign-in, verification, or a specific network environment. Changes on a source website may temporarily affect results.
-
-**Can I read downloaded books offline?**  
-Yes. Open completed downloads from your local bookshelf. Online search, online reading, and network translation still require their respective services.
-
-**What is sent online during manga translation?**  
-OCR and speech-bubble detection run on device. To generate translations, recognized text is sent to the online translation service or custom API you selected. Review that service's privacy terms.
-
-**Why does MangaJaNai Full download a model?**  
-The full enhancement model is large, so it is downloaded on demand. After the download completes, it can be used offline. Other image-processing options do not require this model.
-
-## Build and feedback
-
-The project uses **Kotlin, Jetpack Compose, Material 3, Room, and WorkManager**. Local builds require JDK 17, Android SDK 35, NDK 29.0.14206865, and CMake 3.22.1:
-
-~~~bash
-git clone https://github.com/roxycon-dev/Ciallo-Reader.git
-cd Ciallo-Reader
-./gradlew :app:assembleDebug
-~~~
-
-On Windows, use gradlew.bat :app:assembleDebug. For bugs and feature requests, open a [GitHub Issue](https://github.com/roxycon-dev/Ciallo-Reader/issues) with the app version, device model, and reproduction steps.
-
-- [Changelog](CHANGELOG.md)
-- [UI motion and interaction guide (Chinese)](docs/UI_MOTION_INTERACTION_GUIDE.md)
-- [v1.3.6 release notes and verification](docs/release-1.3.6-2026-10-12.md)
-- [Third-party component and model licenses](docs/vendor-licenses/README.md)
-
-## Contributors and thanks
-
-Thanks to [mikufoxxx and the Wenku8 Flutter contributors](https://github.com/mikufoxxx/Wenku8_Flutter) for sharing their UI, interaction design, and motion work. Their editorial layouts, glass overlays, and coordinated transitions guided this redesign. Thanks to [qianyunli114514](https://github.com/qianyunli114514) for requesting tablet support and configurable manga image preloading in [Issue #7](https://github.com/roxycon-dev/Ciallo-Reader/issues/7).
-
-Many changes in this project come from issues: bug reports, new sources, and reports about layout or compatibility problems. Below are the people who filed them, with their issue numbers.
+## Listening, dictionaries, and annotations
 
 <table>
-  <tr>
-    <td align="center" width="112">
-      <a href="https://github.com/mahaix"><img src="https://github.com/mahaix.png" width="64" height="64" alt="mahaix avatar" /><br /><sub><b>mahaix</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/1">#1</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/metahuman1016"><img src="https://github.com/metahuman1016.png" width="64" height="64" alt="metahuman1016 avatar" /><br /><sub><b>metahuman1016</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/2">#2</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/Wyingzik"><img src="https://github.com/Wyingzik.png" width="64" height="64" alt="Wyingzik avatar" /><br /><sub><b>Wyingzik</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/3">#3</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/Lancher2048"><img src="https://github.com/Lancher2048.png" width="64" height="64" alt="Lancher2048 avatar" /><br /><sub><b>Lancher2048</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/4">#4</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/Yang-p-c"><img src="https://github.com/Yang-p-c.png" width="64" height="64" alt="Yang-p-c avatar" /><br /><sub><b>Yang-p-c</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/5">#5</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/jesonab"><img src="https://github.com/jesonab.png" width="64" height="64" alt="jesonab avatar" /><br /><sub><b>jesonab</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/6">#6</a></sub>
-    </td>
-    <td align="center" width="112">
-      <a href="https://github.com/qianyunli114514"><img src="https://github.com/qianyunli114514.png" width="64" height="64" alt="qianyunli114514 avatar" /><br /><sub><b>qianyunli114514</b></sub></a><br /><sub><a href="https://github.com/roxycon-dev/Ciallo-Reader/issues/7">#7</a></sub>
-    </td>
-  </tr>
+<tr>
+<td width="25%"><img src="docs/readme-media/listening.webp" alt="Playback controls over a novel"><br><sub>Listening player</sub></td>
+<td width="25%"><img src="docs/readme-media/speech-settings.webp" alt="Listening speed and pitch sliders"><br><sub>Playback settings</sub></td>
+<td width="25%"><img src="docs/readme-media/dictionary.webp" alt="Dictionary panel opened from a text selection"><br><sub>Look up selected text</sub></td>
+<td width="25%"><img src="docs/readme-media/selection.webp" alt="Passage selection with options to share or save a Reading Moment"><br><sub>Selection and Reading Moment</sub></td>
+</tr>
 </table>
 
-## Content sources and license
+- Start listening at your reading position or a selected paragraph with Android system voices, online Edge voices, or a custom speech endpoint. Adjust speed, pitch, pauses, and the sleep timer.
+- Skip 15 seconds backward or forward with Edge and custom voices. Keep listening in the background, use media controls on the lock screen or in notifications, and continue into the next chapter.
+- Long-press text to look up the selection, or enter a word in the dictionary panel. Import StarDict, common MDX v1/v2 files, and MOBI/PRC dictionaries with readable entries for offline use. A browser lookup is also available.
+- Select a passage to copy, highlight, underline, or annotate it. Save or share a Reading Moment PNG with the selected text, title, and chapter.
 
-Ciallo Reader is a reading and library-management app. Online sources and translation services are provided by third parties; their content, availability, and terms are controlled by those providers. Please follow local laws, source-site rules, and copyright requirements.
+## Manga
 
-Original source code written for this project is released under the [MIT License](LICENSE). Third-party source code, model weights, datasets, fonts, images, audio, and other materials with separate license or attribution terms are excluded and remain under their respective terms. See the [third-party license and source records](docs/vendor-licenses/README.md). In particular, the MangaJaNai models are CC BY-NC 4.0 and the multilingual search keyword database is CC BY-NC-SA 3.0 China Mainland; the MIT license does not remove those restrictions.
+<table>
+<tr>
+<td width="50%"><img src="docs/readme-media/landscape.webp" alt="Manga in a landscape two-page spread"><br><sub>Landscape and two-page spreads</sub></td>
+<td width="50%"><img src="docs/readme-media/comic-modes.webp" alt="Single page, seamless scrolling, and page snapping"><br><sub>Single page, continuous scrolling, and snapping</sub></td>
+</tr>
+<tr>
+<td><img src="docs/readme-media/comic-quality.webp" alt="Matched crops before and after MangaJaNai processing"><br><sub>Before and after MangaJaNai</sub></td>
+<td><img src="docs/readme-media/comic-translation.webp" alt="Chinese translation placed in the original comic speech bubbles"><br><sub>Translated speech bubbles</sub></td>
+</tr>
+</table>
 
+- Read in single-page, two-page, webtoon, or seamless scrolling mode. Set reading direction, page snapping, double-tap zoom, trimming, spread splitting, background, and preloading.
+- Use built-in sharpening, line enhancement, or JaNai fast processing. The full MangaJaNai model runs offline after download.
+- Detect speech bubbles and recognize text on device. Translate pages using the selected online service or custom AI endpoint, and switch back to the original image.
+- Configure manga reading presets, touch zones, and ambient sound.
+
+## Stats and appearance
+
+<table>
+<tr>
+<td width="50%"><img src="docs/readme-media/statistics.webp" alt="Reading stats and favorite chapter rankings"><br><sub>Reading calendar, trends, and chapter rankings</sub></td>
+<td width="50%"><img src="docs/readme-media/appearance.webp" alt="Theme, accent color, and layout settings"><br><sub>Themes, accent colors, and layout</sub></td>
+</tr>
+</table>
+
+- View reading time, history, calendar, and trends. Rate favorite chapters and see them in the chapter rankings.
+- Customize accent colors, light or dark themes, backgrounds, graphics quality, haptics, and orientation lock. Switch between Chinese and English.
+- Use phone, tablet, and landscape layouts with minimal graphics and reduced-motion options.
+- Use a PIN to protect selected shelf categories and favorites. Settings also provides cache management, automatic backups, and update checks.
+
+## Sources and backups
+
+<table>
+<tr>
+<td width="50%"><img src="docs/readme-media/sources-backup.webp" alt="Source management and backup restore"><br><sub>Source management and backup restore</sub></td>
+<td width="50%"><img src="docs/readme-media/device-transfer.webp" alt="Sending and receiving books in device transfer"><br><sub>Sending and receiving books</sub></td>
+</tr>
+</table>
+
+- Manage built-in novel and manga sources or import custom Legado JSON sources with CSS and JSON selection rules. Availability, sign-in, and verification depend on the provider.
+- Export books, progress, favorites, annotations, history, settings, and sources as a portable `.ciallo` backup. Preview imports, merge or migrate the whole device, and undo the last migration.
+- Transfer files over the same Wi-Fi network, a hotspot, or Wi-Fi Direct. Confirm the pairing code for encrypted transfers with progress, cancellation, and resume. [Device transfer and backup guide](docs/device-transfer.md)
+
+## Getting started
+
+1. Download the ARM64 APK from [GitHub Releases](https://github.com/roxycon-dev/Ciallo-Reader/releases/latest) and follow Android’s install prompt. Each release includes `SHA256SUMS.txt`.
+2. Open **Shelf → Import books** for local files, or search for titles in **Library**. Enable your preferred providers in **Settings → Source management**.
+3. Tap the novel reader to show its controls. Select the headphones to start listening. Long-press text to look up a word, mark a passage, or export a Reading Moment.
+
+## Film chapters
+
+<details>
+<summary>Show timestamps</summary>
+
+| Time | Feature |
+| --- | --- |
+| 00:03 | Recommendations, rankings, categories, and title search |
+| 00:11 | Title details, favorites, and online reading |
+| 00:16 | Book and volume downloads, then offline reading |
+| 00:22 | Local import and 3D bookshelf |
+| 00:29 | Novel typography, chapters, bookmarks, and reading aloud |
+| 00:37 | Novel page turns |
+| 00:45 | Landscape spreads and zoom |
+| 00:52 | Manga modes and page snapping |
+| 00:58 | MangaJaNai, OCR, and translation |
+| 01:07 | Reading calendar, trends, and chapter rankings |
+| 01:14 | Themes, graphics, landscape layout, and language |
+| 01:21 | Sources, backup restore, and device transfer |
+
+The film was recorded on 1.6.4 and illustrates features available in 1.6.5.
+
+</details>
+
+## Development, feedback, and licenses
+
+Built with Kotlin, Jetpack Compose, Material 3, Room, and WorkManager. Use JDK 17+, Android SDK 35, Build Tools 36.1.0, NDK 29.0.14206865, and CMake 3.22.1. Run `./gradlew :app:assembleDebug` or `gradlew.bat :app:assembleDebug` on Windows. [Release signing](docs/app-signing.md)
+
+Thanks to the readers and contributors who reported issues, and to the Wenku8 Flutter contributors for sharing reader UI and interaction references. [GitHub Issues](https://github.com/roxycon-dev/Ciallo-Reader/issues) · [Contributors](https://github.com/roxycon-dev/Ciallo-Reader/graphs/contributors) · [Wenku8 Flutter](https://github.com/mikufoxxx/Wenku8_Flutter)
+
+Original project code is MIT licensed. Third-party components and content follow their respective terms. The translation demo uses a cropped and enlarged portion of page 2 from episode 1 of David Revoy’s *Pepper&Carrot*. [MIT license](LICENSE) · [Third-party licenses](docs/vendor-licenses/README.md) · [Original comic](https://www.peppercarrot.com/en/webcomic/ep01_Potion-of-Flight.html) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)

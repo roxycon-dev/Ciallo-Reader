@@ -89,8 +89,8 @@ android {
     applicationId = "com.aistudio.novelreader.kxmpzq"
     minSdk = 24
     targetSdk = 35
-    versionCode = 264
-    versionName = "1.6.4"
+    versionCode = 265
+    versionName = "1.6.5"
     externalNativeBuild {
       cmake { arguments += "-DANDROID_STL=c++_static" }
     }
@@ -265,6 +265,10 @@ dependencies {
   implementation(libs.androidx.room.runtime)
   implementation(libs.coil.compose)
   implementation(libs.jsoup)
+  implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+  implementation("org.commonmark:commonmark:0.24.0")
+  implementation("org.commonmark:commonmark-ext-gfm-tables:0.24.0")
+  implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.24.0")
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
   // 第十一轮瘦身：moshi-kotlin（连带 kotlin-reflect）已移除——仅有的两个序列化点

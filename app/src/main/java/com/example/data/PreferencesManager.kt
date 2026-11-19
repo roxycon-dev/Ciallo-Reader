@@ -25,6 +25,13 @@ class PreferencesManager(context: Context) {
         get() = prefs.getInt("margin_horizontal", 16)
         set(value) = prefs.edit().putInt("margin_horizontal", value).apply()
 
+    fun novelWritingMode(bookId: Int): String =
+        prefs.getString("novel_writing_mode_$bookId", "auto") ?: "auto"
+
+    fun setNovelWritingMode(bookId: Int, mode: String) {
+        prefs.edit().putString("novel_writing_mode_$bookId", mode).apply()
+    }
+
     var firstLineIndent: Boolean
         get() = prefs.getBoolean("first_line_indent", true)
         set(value) = prefs.edit().putBoolean("first_line_indent", value).apply()
