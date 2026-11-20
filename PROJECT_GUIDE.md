@@ -5280,3 +5280,29 @@ Commit `8d6e3847b1a8fd53df9adbee0ded4f89701bdc4e`；Release 413307957：https://
 
 - 真机过盾一次的实际结果需用户在设备上点「验证」确认；若 CF 后续再升级策略，`CfWebViewSolver` 可能需同步更新。
 - 未改版本号、未发版。
+
+## 100. 第一百零六轮执行（2026-11-20：书阁改为全自动过盾 + 根目录清理）
+
+### 书阁：用户要求「不用站点验证」，改为全自动
+
+第 99 轮的做法是让用户手动点「验证」，用户明确否决：要求不依赖手动站点验证。本轮把默认路径改成**全自动**，用户完全无感：
+
+- `XbookcnSource.fetchHtmlOnce`：遇到 Cloudflare 挑战时**自动**起无头 WebView 过盾（不再要求先有 clearance），`timeoutMs=45_000`（真机 managed challenge 通常 5–20s）。首次过盾用 `WebSettings.getDefaultUserAgent`（与 WebView 真实指纹一致），成功后 `saveVerifiedUserAgent` 固化给 OkHttp。
+- `CfWebViewSolver` 补关键 WebView 配置（此前缺失，是挑战卡住的常见原因）：`setAcceptThirdPartyCookies(wv, true)`（挑战脚本来自 `challenges.cloudflare.com` 第三方域）、`databaseEnabled`、`javaScriptCanOpenWindowsAutomatically`、`mediaPlaybackRequiresUserGesture=false`。
+- 合并 App 内 `CookieManager` 的 Cookie：任何界面（内置浏览器/验证入口）访问过本站并过盾后，`cf_clearance` 直接复用（`JsCookieJar.mergeHeaders(jar, webView)`）。
+- `buildRequest` 移除硬编码 `Sec-Ch-Ua` 桌面值，改随 UA 动态匹配（移动 UA 发 `?1`/`Android`，避免 UA 与客户端提示头矛盾被 CF 拒收）。
+- 失败兜底：solver 仍失败时提示「站点验证未自动通过，检查网络后重试」，保留手动验证入口但不再强制；书源管理标签对书阁显示「需验证/已验证」（非「需登录」）。
+- 冷却策略：solver 自带 5 分钟失败冷却，冷却期内不反复白等。
+
+### 根目录清理（用户要求）
+
+`git rm` 删除 5 个过时/临时文件并在 `.gitignore` 忽略：`AGENTS.md`（迁移目标已在 PROJECT_GUIDE）、`HANDOFF_PERF.md`（0.99.19 时代交接说明）、`lits2/3/4.txt`（i18n 扫描产物）。README/README_EN/CHANGELOG/PROJECT_GUIDE/docs 全部保留。
+
+### 验证
+
+- `:app:compileDebugKotlin` BUILD SUCCESSFUL；`grep -al` 在 `XbookcnSource$fetchHtmlOnce$2.class` 中确认新文案已编入（Gradle 增量偶发误报 up-to-date，需删 class 强制重编）。
+
+### 未做
+
+- 真机网络下自动过盾的首次成功率需设备验证（本机出口为数据中心 IP，CF 始终挑战，无法证明；真机真实 IP 是 solver 生效的前提）。
+- 未改版本号、未发版。
