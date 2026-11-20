@@ -360,7 +360,7 @@ python novel-reader/.workbuddy/stale_check.py
 | `JsonBookSource.kt`（665 行） | 自定义 JSON 书源（原生 + Legado 兼容） | 模板 `{keyword}` / `{keyword_b64}`；URL 模板 `{{$.id}}` 取值；`insecureTls` 时 trust-all SSLContext；**漫画源判定** `isComicLike`（配置优先，否则看 imageSelector 是否含 `@src`/`data-src`/`img`）；`extractImageUrls` 支持纯 URL 列表与 `<img>` 片段（`data-src`/`data-original`/`data-lazy-src`/`src` 优先级）；`searchHtml` / `searchHtmlJson` 双通道 |
 | `MangaDexSource.kt`（950 行） | MangaDex 源 | `searchOfficialApi` + `searchMirror` 双路（镜像 ↔ 官方 UUID 与 slug 互查缓存）、`officialChapterImages` / `mirrorFallbackImages`、`parseJsonLdAuthor` 补作者、`languageLabel` |
 | `MockBookSource.kt`（93 行） | 测试用假源 | 样例书（生产构建会被过滤隐藏） |
-| `XbookcnSource.kt`（410 行） | 书阁（xbookcn.app）成人小说源 | 搜索 `/search?q=` 取 `#search-books li`；详情与目录同页解析，只保存 12 位 hex 作品 id（slug 变化由站点重定向兜底）；正文 `article.reading-text p`；整本下载返回 `#ciallo-xbookcn-epub-v1` 标记，由 `XbookcnEpub` 逐章打包；有界重试 + `CfWebViewSolver` 过盾（403/503 先读 body 交 `statusProblem` 判定再过盾，Cookie 持久携带） |
+| `XbookcnSource.kt`（472 行） | 书阁（xbookcn.app）成人小说源 | 搜索 `/search?q=` 取 `#search-books li`；详情与目录同页解析，只保存 12 位 hex 作品 id；正文 `article.reading-text p`；整本下载返回 `#ciallo-xbookcn-epub-v1` 标记由 `XbookcnEpub` 打包；有界重试 + CF 过盾（403/503 先读 body 判挑战再 `CfWebViewSolver`）；`login` 支持内置 WebView 真人过盾或粘贴 `cf_clearance`，`currentUserAgent()` 保证过盾/请求 UA 一致，`isLoggedIn` 查 JsCookieJar 的 `cf_clearance` |
 
 #### 4.6.4 `source/importer/`（1 文件 / 639 行）
 
@@ -5245,3 +5245,37 @@ Commit `8d6e3847b1a8fd53df9adbee0ded4f89701bdc4e`；Release 413307957：https://
 ### 未做
 
 - 未上真机端到端验收（站点策略与 CF 自动过盾仍需设备确认）。
+
+## 99. 第一百零五轮执行（2026-11-20：书阁 Cloudflare 验证入口修复）
+
+### 背景与根因
+
+用户反馈「书阁还是不能用」。上一版只让 403 分支能触发 `CfWebViewSolver`，但实测（puppeteer 驱动真实 Chrome，headless 与 headful 各跑 90 tick）确认：**该站的 CF managed challenge 在自动化环境下拿到的 `cf_clearance` 无效**——即使 cookie 已生成，重导页面仍 403、curl 带同一 cookie 也 403。原因是 clearance 与浏览器指纹/IP 强绑定，自动化退出 IP 被 CF 判为数据中心。故「无头 solver 30s 自动过盾」对该站不可靠，必须由用户在应用内 WebView 真人过一次盾。
+
+另发现两处真实缺口：
+1. `XbookcnSource.login()` 是空实现（直接 `Success(true)`）、`isLoggedIn()` 恒 true、`getAuthenticationState()` 恒 `NotRequired`——即使点了验证也不保存任何凭据。
+2. 书源管理里书阁**没有「验证」入口**（`onOpenLogin` 条件只含 js_mycomic/js_bilimanga），用户无从过盾。
+3. 过盾 WebView 的 UA（`WebSettings.getDefaultUserAgent`）与 OkHttp 请求 UA（硬编码 Chrome/120 桌面）不一致，cf_clearance 会被 CF 拒收（Mihon issue #511 同款坑）。
+
+### 已落地（纯增量，不动其它源）
+
+- `JsUiDialogs.awaitWebsiteVerification`：host 白名单加 `xbookcn.app`；成功判定 selector 增 `xbookcn.app -> a[href*="/book/"],article.reading-text,#search-books`。
+- `XbookcnSource`：
+  - `login(credential)`：cookie 非空→`JsCookieJar.saveCookiePairs` 保存并 `fetchHtml("/search?q=ciallo")` 实测校验；cookie 空→`awaitWebsiteVerification("$baseUrl/search?q=ciallo")` 打开内置 WebView 真人过盾，成功后 `saveVerifiedUserAgent(ua)` 固化 UA。
+  - `logout()`：清 `ck_xbookcn.app` 与页面缓存。
+  - `isLoggedIn()`：改查 `JsCookieJar` 是否含 `cf_clearance=`；`getAuthenticationState()` 随之为 Authenticated/Required。
+  - `currentUserAgent()`：优先用验证时固化的 UA，否则回退 `USER_AGENT`；`fetchHtmlOnce` 与 `solveAndSync` 均改用它，保证 clearance 的 UA 一致性。
+- `CfWebViewSolver.resetCooldown(host)`：新增，用户验证/粘贴新 Cookie 后清失败冷却，立即重试。
+- `SourceManagementScreen`：`onOpenLogin` 条件、`needsAuth`、「验证」chip 文案三处均加入 `xbookcn`。
+- `ZLibraryLoginDialog`：`siteVerification` 加入 `xbookcn`；书阁专属「内置验证 / 粘贴 Cookie」双模式 UI（`fitKeyboard` 对书阁开放，避免粘贴长 Cookie 被键盘遮挡）；`canSubmit` 对粘贴模式要求非空；动作按钮文案区分「打开站点验证 / 校验 Cookie」。
+
+### 验证
+
+- `:app:compileDebugKotlin` BUILD SUCCESSFUL；`--tests "*Xbookcn*"` 通过（`XbookcnSourceTest` / `XbookcnSnapshotTest`）。
+- 解析规则用 WebFetch 取到的书阁真实页面结构核对：搜索页 `#search-books` + `li` + `h3 a[href^=/book/]` + `p`（作者/简介）；详情页 `main > header` 的 `h1`、`a[href^=/author/]`、`7 章`/`6.2 万字`/`2019-11-28 更新` 均存在——`XbookcnParser` 规则与当前站点一致。
+- **无法在本机验证的部分（环境限制，非代码缺陷）**：本机所有出网经代理数据中心 IP，CF 判定为自动化，headless/headful 均解不开该 managed challenge（clearance 无效）。真机在家庭/移动网络下用应用内 WebView 真人过盾是可靠路径；粘贴手机浏览器导出的 `cf_clearance` 为备选。
+
+### 未做
+
+- 真机过盾一次的实际结果需用户在设备上点「验证」确认；若 CF 后续再升级策略，`CfWebViewSolver` 可能需同步更新。
+- 未改版本号、未发版。

@@ -64,6 +64,11 @@ object CfWebViewSolver {
             server.contains("cloudflare", ignoreCase = true)
     }
 
+    /** 用户已通过交互式验证/粘贴拿到新 Cookie 时清掉失败冷却，让后续请求立即重试。 */
+    fun resetCooldown(host: String) {
+        synchronized(lastFailAt) { lastFailAt.remove(host.lowercase()) }
+    }
+
     /**
      * 无头求解并把 Cookie 同步进 JS 源共享存储。阻塞调用线程，最多 [timeoutMs]。
      * @return true 表示拿到了新的 cf_clearance（或本次求解期间已由并发调用完成）。

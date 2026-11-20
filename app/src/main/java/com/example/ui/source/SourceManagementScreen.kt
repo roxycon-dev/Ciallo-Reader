@@ -1082,7 +1082,7 @@ private fun SourceGroupCard(
                         isCustom = group.kind == SourceGroupKind.CUSTOM,
                         onToggleEnable = { onToggleEnable(source, it) },
                         onOpenLogin = if (
-                            (source.capabilities.requiresLogin || source.id in setOf("js_mycomic", "js_bilimanga")) && source.id != "zlibrary"
+                            (source.capabilities.requiresLogin || source.id in setOf("js_mycomic", "js_bilimanga", "xbookcn")) && source.id != "zlibrary"
                         ) {
                             { onOpenLogin(source) }
                         } else null,
@@ -1262,7 +1262,7 @@ private fun SourceRow(
     if (showSourceInfo) SourceInfoDialog(source = source, enabled = isEnabled, onDismiss = { showSourceInfo = false })
     // “需登录/已登录”必须反映真实登录态，而非构造期的静态能力位：
     // 登录成功后 capabilities.requiresLogin 不变，旧实现因此永远显示“需登录”。
-    val needsAuth = source.capabilities.requiresLogin || source.id in setOf("js_mycomic", "js_bilimanga")
+    val needsAuth = source.capabilities.requiresLogin || source.id in setOf("js_mycomic", "js_bilimanga", "xbookcn")
     var authed by remember(source.id) { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(source.id, sourceAuthEpoch.intValue) {
         if (needsAuth) authed = runCatching { source.isLoggedIn() }.getOrDefault(false)
@@ -1330,7 +1330,7 @@ private fun SourceRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             if (onOpenLogin != null) {
-                SourceMiniActionChip(text = if (source.id in setOf("js_mycomic", "js_bilimanga")) tr("验证") else tr("登录"), onClick = onOpenLogin)
+                SourceMiniActionChip(text = if (source.id in setOf("js_mycomic", "js_bilimanga", "xbookcn")) tr("验证") else tr("登录"), onClick = onOpenLogin)
             }
             if (onOpenNodeManager != null) {
                 SourceMiniActionChip(text = tr("节点"), onClick = onOpenNodeManager)

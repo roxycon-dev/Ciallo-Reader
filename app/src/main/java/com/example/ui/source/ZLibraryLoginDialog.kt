@@ -54,7 +54,7 @@ fun ZLibraryLoginDialog(
         value = withTimeoutOrNull(5_000) { source.getRegistrationUrl() }
     }
     val isJsSource = source.id.startsWith("js_")
-    val siteVerification = source.id in setOf("js_mycomic", "js_bilimanga")
+    val siteVerification = source.id in setOf("js_mycomic", "js_bilimanga", "xbookcn")
     var loginMode by remember(source.id) { mutableIntStateOf(0) }
     var username by remember(source.id) { mutableStateOf("") }
     var password by remember(source.id) { mutableStateOf("") }
@@ -63,11 +63,16 @@ fun ZLibraryLoginDialog(
     var error by remember(source.id) { mutableStateOf<String?>(null) }
     val title = if (siteVerification) "验证 ${source.name}" else "登录 ${source.name}"
 
-    WenkuActionSheet(title, onDismiss, fitKeyboard = !siteVerification) {
+    WenkuActionSheet(title, onDismiss, fitKeyboard = !siteVerification || source.id == "xbookcn") {
         val keyboard = LocalSoftwareKeyboardController.current
         val closeAfterSuccess = paperDismiss(onSuccess)
-        val canSubmit = !loading && (siteVerification ||
-            if (loginMode == 0) username.isNotBlank() && password.isNotBlank() else cookie.isNotBlank())
+        val xbookcnCookieMode = source.id == "xbookcn" && loginMode == 1
+        val canSubmit = !loading && when {
+            xbookcnCookieMode -> cookie.isNotBlank()
+            siteVerification -> true
+            loginMode == 0 -> username.isNotBlank() && password.isNotBlank()
+            else -> cookie.isNotBlank()
+        }
         val submit: () -> Unit = {
             if (canSubmit) {
                 keyboard?.hide()
@@ -100,7 +105,7 @@ fun ZLibraryLoginDialog(
             }
         }
 
-        if (!isJsSource) {
+        if (!isJsSource && !siteVerification) {
             SegmentedPillSelector(
                 options = listOf(0 to tr("账号密码"), 1 to tr("粘贴 Cookie")),
                 selected = loginMode,
@@ -108,7 +113,42 @@ fun ZLibraryLoginDialog(
                 fontSp = 14f,
             )
         }
-        if (siteVerification) {
+        if (siteVerification && source.id == "xbookcn") {
+            // 书阁 CF managed challenge：内置 WebView 真人过盾，或粘贴已过盾的 Cookie。
+            val xbookcnReduceMotion = LocalReduceMotion.current
+            SegmentedPillSelector(
+                options = listOf(0 to tr("内置验证"), 1 to tr("粘贴 Cookie")),
+                selected = loginMode,
+                onSelect = { if (!loading) { loginMode = it; error = null } },
+                fontSp = 14f,
+            )
+            AnimatedContent(
+                targetState = loginMode,
+                transitionSpec = {
+                    if (xbookcnReduceMotion) EnterTransition.None togetherWith ExitTransition.None
+                    else fadeIn(tween(WenkuMotion.ENTER_MS)) togetherWith fadeOut(tween(WenkuMotion.EXIT_MS))
+                },
+                label = "xbookcnVerifyMethod",
+            ) { mode ->
+                if (mode == 0) {
+                    Text(
+                        "点击「打开站点验证」，在内置浏览器中完成 Cloudflare 验证后会自动返回，验证凭据由应用保存。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    OutlinedTextField(
+                        value = cookie,
+                        onValueChange = { cookie = it },
+                        label = { Text("cf_clearance Cookie") },
+                        placeholder = { Text("cf_clearance=…; cf_chl_rc_ni=…") },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 112.dp),
+                        enabled = !loading,
+                        shape = RoundedCornerShape(16.dp),
+                    )
+                }
+            }
+        } else if (siteVerification) {
             Text(
                 "在应用内完成站点验证后会自动返回，浏览凭据由应用保存。",
                 style = MaterialTheme.typography.bodyMedium,
@@ -150,6 +190,7 @@ fun ZLibraryLoginDialog(
         }
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         val action = when {
+            xbookcnCookieMode -> tr("校验 Cookie")
             siteVerification && loading -> tr("等待站点验证")
             siteVerification -> tr("打开站点验证")
             loading -> tr("登录中")

@@ -124,15 +124,66 @@ class XbookcnSource(
         )
     }
 
+    /**
+     * 书阁受 Cloudflare managed challenge 保护。自动无头过盾拿到的 cf_clearance
+     * 与指纹绑定、无法复用，必须由用户在应用内 WebView 真人过一次盾；过盾后
+     * [com.example.source.js.awaitWebsiteVerification] 会把 Cookie 同步进
+     * [com.example.source.js.JsCookieJar]，之后的请求（含 fetchHtmlOnce）自动携带。
+     * 也支持直接粘贴已在浏览器过盾得到的 cf_clearance Cookie。
+     */
     override suspend fun login(credential: LoginCredential): SourceResult<Boolean> =
-        SourceResult.Success(true)
+        withContext(Dispatchers.IO) {
+            try {
+                val pasted = credential.cookie?.trim().orEmpty()
+                if (pasted.isNotBlank()) {
+                    val pairs = pasted.split(';').map { it.trim() }.filter { it.contains('=') }
+                    if (pairs.isEmpty()) return@withContext SourceResult.Error(
+                        SourceException.Unknown(tr("Cookie 格式无效，请粘贴完整的 cf_clearance Cookie"))
+                    )
+                    com.example.source.js.JsCookieJar.saveCookiePairs(appContext, SOURCE_HOST, pairs)
+                    // 清掉失败冷却与缓存，立刻用新 Cookie 验证一次
+                    com.example.source.js.CfWebViewSolver.resetCooldown(SOURCE_HOST)
+                    pageCache.evictAll()
+                    val ok = runCatching { fetchHtml("/search?q=ciallo") }.getOrNull()?.let {
+                        !it.contains("Just a moment", true) && !it.contains("challenge-platform", true)
+                    } == true
+                    if (ok) SourceResult.Success(true) else SourceResult.Error(
+                        SourceException.Unknown(tr("Cookie 校验失败，请确认是从本设备浏览器过盾后复制的 cf_clearance"))
+                    )
+                } else {
+                    // 无 Cookie：打开内置浏览器让用户真人过盾（成功即同步 Cookie）
+                    val ua = android.webkit.WebSettings.getDefaultUserAgent(appContext)
+                    val verified = com.example.source.js.awaitWebsiteVerification(
+                        "$baseUrl/search?q=ciallo", ua
+                    )
+                    if (!verified) SourceResult.Error(SourceException.Unknown(tr("站点验证未完成")))
+                    else {
+                        // 记住验证 WebView 的 UA，后续 OkHttp 请求沿用，保证 cf_clearance 有效
+                        saveVerifiedUserAgent(ua)
+                        com.example.source.js.CfWebViewSolver.resetCooldown(SOURCE_HOST)
+                        pageCache.evictAll()
+                        SourceResult.Success(true)
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                SourceResult.Error(SourceException.Unknown(e.message ?: tr("站点验证失败"), e))
+            }
+        }
 
-    override suspend fun logout() = Unit
+    override suspend fun logout() {
+        com.example.source.js.JsCookieJar.clear(appContext, SOURCE_HOST)
+        pageCache.evictAll()
+    }
 
-    override suspend fun isLoggedIn(): Boolean = true
+    override suspend fun isLoggedIn(): Boolean {
+        val cookie = com.example.source.js.JsCookieJar.cookieHeader(appContext, baseUrl.toString())
+        return cookie.contains("cf_clearance=")
+    }
 
     override suspend fun getAuthenticationState(): AuthenticationState =
-        AuthenticationState.NotRequired
+        if (isLoggedIn()) AuthenticationState.Authenticated else AuthenticationState.Required
 
     private suspend fun fetchBook(bookId: String): String {
         requireBookId(bookId)
@@ -173,7 +224,7 @@ class XbookcnSource(
         val url = (baseUrl + path).toHttpUrl()
 
         fun buildRequest(cookie: String?): Request = Request.Builder().url(url)
-            .header("User-Agent", USER_AGENT)
+            .header("User-Agent", currentUserAgent())
             .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
             .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
             .header("Sec-Ch-Ua", "\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"")
@@ -214,7 +265,7 @@ class XbookcnSource(
         if (problem != null) {
             // 真正的 Cloudflare 挑战/广告门：用真实 Chromium WebView 过一次盾，再把 Cookie 带回 OkHttp。
             val solved = runCatching {
-                com.example.source.js.CfWebViewSolver.solveAndSync(appContext, url.toString(), USER_AGENT)
+                com.example.source.js.CfWebViewSolver.solveAndSync(appContext, url.toString(), currentUserAgent())
             }.getOrDefault(false)
             if (solved) {
                 val cookie = com.example.source.js.JsCookieJar.cookieHeader(appContext, url.toString())
@@ -264,10 +315,21 @@ class XbookcnSource(
         return "$baseUrl/book/$bookId"
     }
 
+    /** 过盾用的 UA 必须与验证 WebView 一致，否则 cf_clearance 会被 CF 拒收。 */
+    private fun currentUserAgent(): String =
+        appContext.getSharedPreferences("js_source_website_verification", android.content.Context.MODE_PRIVATE)
+            .getString("xbookcn_user_agent", null)?.takeIf { it.isNotBlank() } ?: USER_AGENT
+
+    private fun saveVerifiedUserAgent(ua: String) {
+        appContext.getSharedPreferences("js_source_website_verification", android.content.Context.MODE_PRIVATE)
+            .edit().putString("xbookcn_user_agent", ua).apply()
+    }
+
     companion object {
         const val SOURCE_ID = "xbookcn"
         const val EPUB_MARKER = "ciallo-xbookcn-epub-v1"
         private const val BASE_URL = "https://xbookcn.app"
+        private const val SOURCE_HOST = "xbookcn.app"
         private const val USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
