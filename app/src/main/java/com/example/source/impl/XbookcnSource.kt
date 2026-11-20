@@ -144,7 +144,7 @@ class XbookcnSource(
                     // 清掉失败冷却与缓存，立刻用新 Cookie 验证一次
                     com.example.source.js.CfWebViewSolver.resetCooldown(SOURCE_HOST)
                     pageCache.evictAll()
-                    val ok = runCatching { fetchHtml("/search?q=ciallo") }.getOrNull()?.let {
+                    val ok = runCatching { fetchHtml("/search?q=%E7%9A%84") }.getOrNull()?.let {
                         !it.contains("Just a moment", true) && !it.contains("challenge-platform", true)
                     } == true
                     if (ok) SourceResult.Success(true) else SourceResult.Error(
@@ -154,7 +154,7 @@ class XbookcnSource(
                     // 无 Cookie：打开内置浏览器让用户真人过盾（成功即同步 Cookie）
                     val ua = android.webkit.WebSettings.getDefaultUserAgent(appContext)
                     val verified = com.example.source.js.awaitWebsiteVerification(
-                        "$baseUrl/search?q=ciallo", ua
+                        "$baseUrl/search?q=%E7%9A%84", ua
                     )
                     if (!verified) SourceResult.Error(SourceException.Unknown(tr("站点验证未完成")))
                     else {
@@ -263,7 +263,13 @@ class XbookcnSource(
         var (code, html) = readBody(http.newCall(buildRequest(storedCookie.ifBlank { null })).executeCancellable())
         var problem = statusProblem(code, html)
         if (problem != null) {
-            // 真正的 Cloudflare 挑战/广告门：用真实 Chromium WebView 过一次盾，再把 Cookie 带回 OkHttp。
+            // 该站的 CF managed challenge 在无头环境解不开（2026-11-20 实测：headless/headful
+            // 拿到的 cf_clearance 重导仍 403）。没有 clearance 时不要白等 30s，直接引导用户
+            // 去书源管理点「验证」真人过盾一次。
+            if (!storedCookie.contains("cf_clearance=")) {
+                throw SourceException.ParseError(tr("书阁需要先完成 Cloudflare 验证：请在书源管理找到「书阁」，点「验证」→「打开站点验证」，通过后即可使用"))
+            }
+            // 已有 clearance 但仍被拦（多半过期）：试一次无头刷新，失败则提示重新验证。
             val solved = runCatching {
                 com.example.source.js.CfWebViewSolver.solveAndSync(appContext, url.toString(), currentUserAgent())
             }.getOrDefault(false)
@@ -277,7 +283,12 @@ class XbookcnSource(
                 }
             }
         }
-        problem?.let { throw SourceException.ParseError(it) }
+        problem?.let {
+            throw SourceException.ParseError(
+                if (storedCookie.contains("cf_clearance=")) tr("书阁的 Cloudflare 验证已过期，请在书源管理重新点「验证」")
+                else it
+            )
+        }
         html
     }
 
