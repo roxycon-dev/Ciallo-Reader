@@ -138,8 +138,14 @@ object CfWebViewSolver {
                     wv.settings.apply {
                         javaScriptEnabled = true
                         domStorageEnabled = true
+                        databaseEnabled = true
+                        javaScriptCanOpenWindowsAutomatically = true
+                        mediaPlaybackRequiresUserGesture = false
                         userAgentString = userAgent
                     }
+                    // CF 挑战脚本来自 challenges.cloudflare.com（第三方域）：不接受第三方
+                    // Cookie 时挑战往往永远停在「请稍候」。Mihon CloudflareSolver 同款配置。
+                    runCatching { cookieManager.setAcceptThirdPartyCookies(wv, true) }
                     wv.addJavascriptInterface(object {
                         @JavascriptInterface
                         fun interactiveDetected() = finish()

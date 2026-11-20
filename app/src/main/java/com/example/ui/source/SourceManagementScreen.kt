@@ -1304,7 +1304,15 @@ private fun SourceRow(
                 }
                 if (needsAuth) {
                     Spacer(modifier = Modifier.width(6.dp))
-                    SourceMiniLabel(text = if (authed == true) tr("已登录") else tr("需登录"), success = authed == true)
+                    // 书阁是 Cloudflare 站点验证而非账号登录，标签用「需验证/已验证」更准确。
+                    val verifySource = source.id == "xbookcn"
+                    SourceMiniLabel(
+                        text = when {
+                            authed == true -> if (verifySource) tr("已验证") else tr("已登录")
+                            else -> if (verifySource) tr("需验证") else tr("需登录")
+                        },
+                        success = authed == true
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(2.dp))

@@ -223,20 +223,25 @@ class XbookcnSource(
         require(path.startsWith("/")) { tr("书源内部路径无效") }
         val url = (baseUrl + path).toHttpUrl()
 
-        fun buildRequest(cookie: String?): Request = Request.Builder().url(url)
-            .header("User-Agent", currentUserAgent())
-            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-            .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-            .header("Sec-Ch-Ua", "\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"")
-            .header("Sec-Ch-Ua-Mobile", "?0")
-            .header("Sec-Ch-Ua-Platform", "\"Windows\"")
-            .header("Sec-Fetch-Dest", "document")
-            .header("Sec-Fetch-Mode", "navigate")
-            .header("Sec-Fetch-Site", "same-origin")
-            .header("Upgrade-Insecure-Requests", "1")
-            .header("Referer", "$baseUrl/")
-            .apply { if (!cookie.isNullOrBlank()) header("Cookie", cookie) }
-            .build()
+        fun buildRequest(cookie: String?): Request {
+            // 客户端提示头必须与 UA 一致：WebView 过盾用的是移动 UA，若这里仍报桌面
+            // Windows，Cloudflare 会因 UA/头矛盾拒收 cf_clearance。
+            val ua = currentUserAgent()
+            val mobile = ua.contains("Mobile", ignoreCase = true)
+            return Request.Builder().url(url)
+                .header("User-Agent", ua)
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+                .header("Sec-Ch-Ua-Mobile", if (mobile) "?1" else "?0")
+                .header("Sec-Ch-Ua-Platform", if (mobile) "\"Android\"" else "\"Windows\"")
+                .header("Sec-Fetch-Dest", "document")
+                .header("Sec-Fetch-Mode", "navigate")
+                .header("Sec-Fetch-Site", "same-origin")
+                .header("Upgrade-Insecure-Requests", "1")
+                .header("Referer", "$baseUrl/")
+                .apply { if (!cookie.isNullOrBlank()) header("Cookie", cookie) }
+                .build()
+        }
 
         // 403/503 也可能是 Cloudflare 挑战页：必须先拿到响应体交给 blockedReason 判定，
         // 不能像旧实现那样非 2xx 直接抛错（那样 WebView 过盾永远没机会触发）。
@@ -259,21 +264,31 @@ class XbookcnSource(
         }
 
         // 已过盾的 Cookie 持久携带，避免每个请求都重新触发挑战。
-        val storedCookie = com.example.source.js.JsCookieJar.cookieHeader(appContext, url.toString())
+        // 同时合并 App 内 WebView 的 CookieManager：只要任何界面（含验证入口/内置浏览器）
+        // 访问过本站并过盾，cf_clearance 就能直接复用。
+        val jarCookie = com.example.source.js.JsCookieJar.cookieHeader(appContext, url.toString())
+        val webViewCookie = runCatching {
+            android.webkit.CookieManager.getInstance().getCookie(url.toString())
+        }.getOrNull().orEmpty()
+        val storedCookie = com.example.source.js.JsCookieJar.mergeHeaders(jarCookie, webViewCookie)
         var (code, html) = readBody(http.newCall(buildRequest(storedCookie.ifBlank { null })).executeCancellable())
         var problem = statusProblem(code, html)
         if (problem != null) {
-            // 该站的 CF managed challenge 在无头环境解不开（2026-11-20 实测：headless/headful
-            // 拿到的 cf_clearance 重导仍 403）。没有 clearance 时不要白等 30s，直接引导用户
-            // 去书源管理点「验证」真人过盾一次。
-            if (!storedCookie.contains("cf_clearance=")) {
-                throw SourceException.ParseError(tr("书阁需要先完成 Cloudflare 验证：请在书源管理找到「书阁」，点「验证」→「打开站点验证」，通过后即可使用"))
-            }
-            // 已有 clearance 但仍被拦（多半过期）：试一次无头刷新，失败则提示重新验证。
+            // 遇 Cloudflare 挑战：自动用无头 WebView 过一次盾，用户无感。
+            // 真机上 WebView 用真实设备 IP + 真实 Chromium 指纹，managed challenge 通常
+            // 5–20 秒自动通过（本机因出口为数据中心 IP 无法验证，属环境差异）。
+            // UA 必须与后续请求一致，否则 cf_clearance 会被拒收：首次过盾用 WebView
+            // 默认 UA，成功后固化给 OkHttp。
+            val hasClearance = storedCookie.contains("cf_clearance=")
+            val solveUa = if (hasClearance) currentUserAgent()
+            else android.webkit.WebSettings.getDefaultUserAgent(appContext)
             val solved = runCatching {
-                com.example.source.js.CfWebViewSolver.solveAndSync(appContext, url.toString(), currentUserAgent())
+                com.example.source.js.CfWebViewSolver.solveAndSync(
+                    appContext, url.toString(), solveUa, timeoutMs = 45_000
+                )
             }.getOrDefault(false)
             if (solved) {
+                if (!hasClearance && currentUserAgent() != solveUa) saveVerifiedUserAgent(solveUa)
                 val cookie = com.example.source.js.JsCookieJar.cookieHeader(appContext, url.toString())
                 if (cookie.isNotBlank()) {
                     val retry = readBody(http.newCall(buildRequest(cookie)).executeCancellable())
@@ -284,9 +299,10 @@ class XbookcnSource(
             }
         }
         problem?.let {
+            // 自动过盾仍失败：给出可执行提示（不强制手动验证）。solver 自带 5 分钟冷却，
+            // 冷却期内不会反复白等，用户稍后重试或检查网络即可。
             throw SourceException.ParseError(
-                if (storedCookie.contains("cf_clearance=")) tr("书阁的 Cloudflare 验证已过期，请在书源管理重新点「验证」")
-                else it
+                tr("书阁站点验证未自动通过，请检查网络后重试；若持续失败，可在书源管理打开「书阁」的验证入口手动完成一次")
             )
         }
         html
