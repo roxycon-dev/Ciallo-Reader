@@ -64,3 +64,5 @@ app/replay_pid*.log
 AGENTS.md
 lits*.txt
 HANDOFF_PERF.md
+.audit_prefs.py
+verify_perf.ps1
