@@ -5266,6 +5266,7 @@ Commit `8d6e3847b1a8fd53df9adbee0ded4f89701bdc4e`；Release 413307957：https://
   - `isLoggedIn()`：改查 `JsCookieJar` 是否含 `cf_clearance=`；`getAuthenticationState()` 随之为 Authenticated/Required。
   - `currentUserAgent()`：优先用验证时固化的 UA，否则回退 `USER_AGENT`；`fetchHtmlOnce` 与 `solveAndSync` 均改用它，保证 clearance 的 UA 一致性。
 - `CfWebViewSolver.resetCooldown(host)`：新增，用户验证/粘贴新 Cookie 后清失败冷却，立即重试。
+- 失败路径优化：无 `cf_clearance` 时不再调用无头 solver 白等 30s，直接抛「请在书源管理点验证→打开站点验证」；已有 clearance 但仍被拦视为过期，提示重新验证。验证 URL 关键词改高频字「的」（URL 编码 `%E7%9A%84`），保证搜索页有结果以便 `#search-books` 命中。
 - `SourceManagementScreen`：`onOpenLogin` 条件、`needsAuth`、「验证」chip 文案三处均加入 `xbookcn`。
 - `ZLibraryLoginDialog`：`siteVerification` 加入 `xbookcn`；书阁专属「内置验证 / 粘贴 Cookie」双模式 UI（`fitKeyboard` 对书阁开放，避免粘贴长 Cookie 被键盘遮挡）；`canSubmit` 对粘贴模式要求非空；动作按钮文案区分「打开站点验证 / 校验 Cookie」。
 
