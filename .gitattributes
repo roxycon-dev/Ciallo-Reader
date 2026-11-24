@@ -2,6 +2,10 @@
 # Preserve exact model bytes and prevent text/whitespace diffs and newline conversion.
 *.onnx binary
 *.so binary
+# 发布密钥必须逐字节保留：autocrlf 或文本 diff 会把 PKCS#12 弄坏，编出来的包就换了签名。
+*.p12 binary
+*.jks binary
+*.keystore binary
 # Preserve upstream generated-header EOF spacing.
 app/src/main/cpp/vendor/ncnn/** whitespace=-blank-at-eof
 # Package assets verbatim from Git, including upstream scripts and dictionaries.
