@@ -78,9 +78,82 @@ class FanqieGatewayTest {
             try { gateway.parseChapters(JSONObject(bad)); fail("Invalid directory was accepted") }
             catch (_: IllegalArgumentException) { }
         }
-        for (bad in listOf("", "<p>内容加载失败</p>", "<p>中文\uE012</p>", "<p>请登录后阅读</p>", "<p>中文\uFFFD</p>")) {
-            try { gateway.parseParts(JSONObject().put("code", 0).put("content", bad)); fail("Broken body was accepted") }
+        // Damaged or non-public text still aborts the chapter: mojibake, font-obfuscated glyphs,
+        // an upstream "content failed" placeholder and a login/purchase stub.
+        val broken = listOf(
+            JSONObject().put("code", 0).put("content", "<p>内容加载失败</p>"),
+            JSONObject().put("code", 0).put("content", "<p>中文\uE012</p>"),
+            JSONObject().put("code", 0).put("content", "<p>请登录后阅读</p>"),
+            JSONObject().put("code", 0).put("content", "<p>中文\uFFFD</p>"),
+            JSONObject().put("code", 0).put("content", "<p>购买本章后可阅读</p>"),
+            JSONObject().put("code", 0).put("content", "<canvas id=\"font\"></canvas>"),
+            JSONObject().put("code", 0).put("content", "   ")
+        )
+        for (bad in broken) {
+            try { gateway.parseParts(bad); fail("Broken body was accepted: $bad") }
+            catch (_: SourceException) { }
             catch (_: IllegalArgumentException) { }
         }
+    }
+    @Test fun missingBodyIsAnUpstreamErrorInsteadOfAFormatComplaint() {
+        val gateway = FanqieGateway(OkHttpClient())
+        // No content field at all: the caller's bounded retry policy must see a retryable error,
+        // not "unsupported body format".
+        for (bad in listOf(
+            JSONObject().put("code", 0),
+            JSONObject().put("code", 0).put("content", ""),
+            JSONObject().put("code", 0).put("data", JSONObject().put("message", "busy"))
+        )) {
+            val error = try { gateway.parseParts(bad); null } catch (e: Exception) { e }
+            assertTrue("Expected a retryable upstream error for $bad, got $error", error is SourceException.NetworkError)
+            assertFalse(error!!.message.orEmpty().contains("不支持的正文格式"))
+        }
+    }
+    @Test fun illustrationsAndInlineMarkupAreParsedInsteadOfRejected() {
+        val gateway = FanqieGateway(OkHttpClient())
+        val html = """<div><p>第一段<strong>加粗</strong>正文。</p>
+            <p><img src="//p3-novel.byteimg.com/origin/abc~tplv-resize:720:0.webp" alt="插图"></p>
+            <p>插图之后的正文<br>换行继续。</p>
+            <img data-src="https://p6-novel.byteimg.com/illustration.png">
+            <p>末尾段落。</p></div>"""
+        val parts = gateway.parseParts(JSONObject().put("code", 0).put("content", html))
+        val text = parts.filterIsInstance<NovelPart.Text>().joinToString("\n") { it.value }
+        val images = parts.filterIsInstance<NovelPart.Image>().map { it.url }
+        assertEquals(2, images.size)
+        assertTrue(images[0].startsWith("https://p3-novel.byteimg.com/origin/abc"))
+        assertEquals("https://p6-novel.byteimg.com/illustration.png", images[1])
+        assertTrue(text.contains("第一段加粗正文。"))
+        assertTrue(text.contains("插图之后的正文"))
+        assertTrue(text.contains("换行继续。"))
+        assertTrue(text.contains("末尾段落。"))
+        assertFalse("Illustrations must not be dropped mid-chapter", text.contains("[插图]"))
+    }
+    @Test fun lazyPlaceholdersAreDroppedWithoutFailingTheChapter() {
+        val gateway = FanqieGateway(OkHttpClient())
+        val parts = gateway.parseParts(JSONObject().put("code", 0)
+            .put("content", """<p><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></p><p>只有正文。</p>"""))
+        assertEquals(listOf("只有正文。"), parts.filterIsInstance<NovelPart.Text>().map { it.value })
+        assertTrue(parts.none { it is NovelPart.Image })
+    }
+    @Test fun nestedDataEnvelopeAndPlainTextPayloadAreAccepted() {
+        val gateway = FanqieGateway(OkHttpClient())
+        val nested = gateway.parseParts(JSONObject().put("code", 200)
+            .put("data", JSONObject().put("content", "<p>嵌套结构正文。</p>")))
+        assertEquals("嵌套结构正文。", nested.filterIsInstance<NovelPart.Text>().single().value)
+        val plain = gateway.parseParts(JSONObject().put("code", 0).put("txt", "<p>纯文本字段正文。</p>"))
+        assertEquals("纯文本字段正文。", plain.filterIsInstance<NovelPart.Text>().single().value)
+    }
+    @Test fun doubleEscapedMarkupIsDecodedInsteadOfShippedAsLiteralTags() {
+        val gateway = FanqieGateway(OkHttpClient())
+        val parts = gateway.parseParts(JSONObject().put("code", 0)
+            .put("content", "&lt;p&gt;转义正文第一段。&lt;/p&gt;&lt;p&gt;转义正文第二段。&lt;/p&gt;"))
+        assertEquals(listOf("转义正文第一段。", "转义正文第二段。"),
+            parts.filterIsInstance<NovelPart.Text>().map { it.value })
+    }
+    @Test fun brAndDivLayoutWithoutParagraphsStillSplitsParagraphs() {
+        val gateway = FanqieGateway(OkHttpClient())
+        val parts = gateway.parseParts(JSONObject().put("code", 0)
+            .put("content", "第一行<br>第二行<br/><div>第三行</div>"))
+        assertEquals(listOf("第一行", "第二行", "第三行"), parts.filterIsInstance<NovelPart.Text>().map { it.value })
     }
 }

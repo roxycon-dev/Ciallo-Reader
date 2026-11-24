@@ -24,8 +24,22 @@ internal class GuestNovelCheckpoint(target: File, sourceId: String, downloadUrl:
         }
     }
 
+    /**
+     * Length of the contiguous verified prefix, not the number of files on disk.
+     *
+     * Chapters are now fetched by a small worker pool, so a paused or failed run can leave a
+     * verified chapter *after* a hole. Reporting the file count would then claim progress that a
+     * resume cannot honour; the writer only ever restores 0..n contiguously.
+     */
     val completedChapters: Int
-        get() = directory.listFiles()?.count { it.name.matches(Regex("chapter[0-9]+\\.json")) } ?: 0
+        get() {
+            var index = 0
+            while (File(directory, "chapter$index.json").isFile) index++
+            return index
+        }
+
+    /** Every chapter index that already has a checkpoint record, holes included. */
+    fun hasChapter(index: Int): Boolean = File(directory, "chapter$index.json").isFile
 
     fun chapter(index: Int): List<NovelPart>? = runCatching {
         val file = File(directory, "chapter$index.json")

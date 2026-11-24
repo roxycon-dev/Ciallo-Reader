@@ -18,6 +18,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.ZipFile
 
 @RunWith(RobolectricTestRunner::class)
@@ -26,11 +27,11 @@ class GuestNovelResumeTest {
     private val bookId = "7600000000000000001"
     private val ids = listOf("7600000000000000002", "7600000000000000003")
     private val url = "https://fanqienovel.com/page/$bookId#ciallo-public-epub-v1"
-    private val requests = mutableMapOf<String, Int>()
+    private val requests = ConcurrentHashMap<String, Int>()
     private var failChapter: String? = null
     private var reversed = false
     private var failFinalDirectory = false
-    private var directoryRequests = 0
+    private val directoryRequests = java.util.concurrent.atomic.AtomicInteger()
     private val context get() = ApplicationProvider.getApplicationContext<Context>()
 
     private fun source(): PublicNovelSource {
@@ -39,7 +40,7 @@ class GuestNovelResumeTest {
             val endpoint = request.url
             val body = when {
                 endpoint.encodedPath.contains("directory") -> {
-                    if (++directoryRequests >= 3 && failFinalDirectory) throw IOException("network switched during final check")
+                    if (directoryRequests.incrementAndGet() >= 3 && failFinalDirectory) throw IOException("network switched during final check")
                     val chapters = if (reversed) ids.reversed() else ids
                     val rows = chapters.joinToString(",") { """{"itemId":"$it","title":"章节$it","needPay":0}""" }
                     """{"data":{"allItemIds":[${chapters.joinToString(",") { "\"$it\"" }}],"chapterListWithVolume":[[$rows]]}}"""
@@ -48,7 +49,7 @@ class GuestNovelResumeTest {
                     """{"code":0,"data":{"book_infos":[{"book_id":"$bookId","book_name":"断点测试","author":"作者"}]}}"""
                 else -> {
                     val id = endpoint.queryParameter("item_id") ?: error("Unexpected request: $endpoint")
-                    requests[id] = requests.getOrDefault(id, 0) + 1
+                    requests.merge(id, 1, Int::plus)
                     if (id == failChapter) throw IOException("network switched")
                     """{"code":0,"content":"<p>章节$id 的完整中文正文。</p>"}"""
                 }
@@ -70,14 +71,15 @@ class GuestNovelResumeTest {
             try { GuestNovelEpub.write(source(), url, target) { _, _ -> }; fail("Expected network failure") }
             catch (_: IOException) { }
             assertFalse("An incomplete EPUB must never remain importable", target.exists())
-            assertEquals(1, requests[ids[0]])
+            // Every chapter is requested at most once per run, no matter how many workers are up.
+            assertEquals(1, requests.getOrDefault(ids[0], 0))
             failChapter = null
             val progress = mutableListOf<Int>()
             GuestNovelEpub.write(source(), url, target) { completed, _ -> progress += completed }
-            assertEquals(1, progress.first())
+            assertEquals("Resume must restore the saved prefix", 1, progress.first())
             assertEquals(2, progress.last())
-            assertTrue(progress.zipWithNext().all { (a, b) -> b >= a })
-            assertEquals("Already completed chapters must not hit the source again", 1, requests[ids[0]])
+            assertTrue("Progress is reported in table-of-contents order", progress.zipWithNext().all { (a, b) -> b >= a })
+            assertEquals("Already completed chapters must not hit the source again", 1, requests.getValue(ids[0]))
             assertEquals(2, GuestNovelIntegrity.epub(target).titles.size)
             ZipFile(target).use { zip ->
                 ids.forEachIndexed { index, id ->
@@ -94,10 +96,11 @@ class GuestNovelResumeTest {
                 fail("Expected pause")
             } catch (_: CancellationException) { }
             assertFalse(target.exists())
+            val firstPass = requests.toMap()
             reversed = true
             GuestNovelEpub.write(source(), url, target) { _, _ -> }
-            assertEquals(2, requests[ids[0]])
-            assertEquals(1, requests[ids[1]])
+            // A different TOC identity must throw the checkpoint away and refetch everything once.
+            ids.forEach { id -> assertEquals("reversed TOC refetches $id once", firstPass.getOrDefault(id, 0) + 1, requests.getOrDefault(id, 0)) }
             ZipFile(target).use { zip ->
                 assertTrue(zip.getInputStream(zip.getEntry("OEBPS/chapter0.xhtml")).bufferedReader().readText().contains(ids[1]))
             }
@@ -111,8 +114,10 @@ class GuestNovelResumeTest {
                 fail("Expected pause")
             } catch (_: CancellationException) { }
             GuestNovelEpub.write(source(), url, target) { _, _ -> }
-            assertEquals(1, requests[ids[0]])
-            assertEquals(1, requests[ids[1]])
+            // Look-ahead may already have fetched chapter 1 during the paused run; the resume must
+            // still not request either chapter a second time.
+            assertEquals(1, requests.getValue(ids[0]))
+            assertEquals(1, requests.getValue(ids[1]))
         }
     }
 
@@ -138,8 +143,8 @@ class GuestNovelResumeTest {
             GuestNovelEpub.write(source(), url, target) { _, _ -> }
             File(target.parentFile, "${target.nameWithoutExtension}.chapters/chapter0.json").writeText("broken checkpoint")
             GuestNovelEpub.write(source(), url, target) { _, _ -> }
-            assertEquals(2, requests[ids[0]])
-            assertEquals(1, requests[ids[1]])
+            assertEquals(2, requests.getValue(ids[0]))
+            assertEquals(1, requests.getValue(ids[1]))
             assertEquals(2, GuestNovelIntegrity.epub(target).titles.size)
         }
     }
@@ -154,8 +159,8 @@ class GuestNovelResumeTest {
             assertFalse(target.exists())
             failFinalDirectory = false
             GuestNovelEpub.write(source(), url, target) { _, _ -> }
-            assertEquals(1, requests[ids[0]])
-            assertEquals(1, requests[ids[1]])
+            assertEquals(1, requests.getValue(ids[0]))
+            assertEquals(1, requests.getValue(ids[1]))
         }
     }
 

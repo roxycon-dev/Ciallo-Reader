@@ -11,10 +11,15 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import org.jsoup.Jsoup
+import org.jsoup.parser.Parser
 
 /** Anonymous public catalogues; chapter text is supplied by the named third-party API. */
 internal class FanqieGateway(private val http: OkHttpClient) {
     private val notice = "搜索与目录来自番茄公开接口，书荒殿补充检索；正文由张老师API提供。接口可能缺章或停止服务，更新与覆盖以实际返回为准。"
+    private companion object {
+        /** Illustrations inside chapter bodies are relative paths; resolve them here. */
+        const val BASE_URL = "https://fanqienovel.com/"
+    }
     private fun id(value: String) = value.also { require(it.matches(Regex("[0-9]{18,20}"))) { tr("番茄小说标识无效") } }
     private suspend fun json(url: HttpUrl): JSONObject = guestNovelIoRetry {
         val request = Request.Builder().url(url).header("Accept", "application/json")
@@ -137,19 +142,90 @@ internal class FanqieGateway(private val http: OkHttpClient) {
         val data = json(api("content", "item_id", id(url.pathSegments.last())))
         return parseParts(data)
     }
+
+    /**
+     * Tolerant chapter-body parsing for the third-party gateway.
+     *
+     * The gateway answers in several shapes and the previous version rejected every body that
+     * merely contained an `<img>` (a legal illustration) or an inline `<span>`, which is what
+     * "番茄返回了不支持的正文格式" reported in issue #11. Now:
+     *  - legitimate HTML is parsed (paragraphs, `<br>` line breaks, inline spans, illustrations);
+     *  - illustrations become [NovelPart.Image] so the EPUB keeps them instead of dropping the
+     *    chapter;
+     *  - only genuinely unsupported or non-public content (font-obfuscated `<canvas>`/glyph
+     *    private-use characters, script/iframe payloads, login/purchase stubs, broken encoding)
+     *    aborts the chapter;
+     *  - an abnormal API answer (missing `content`, error text, HTML error page, empty payload)
+     *    raises a network/parse error that the download retry policy understands, instead of
+     *    being misreported as a format problem.
+     */
     internal fun parseParts(data: JSONObject): List<NovelPart> {
-        require(data.optInt("code", -1) in setOf(0, 200)) { tr("番茄正文接口暂时不可用") }
-        val html = data.opt("content") as? String ?: (data.optJSONObject("data")?.opt("content") as? String).orEmpty()
-        val doc = Jsoup.parseBodyFragment(html)
-        require(doc.select("script,style,iframe,canvas,img").isEmpty()) { tr("番茄返回了不支持的正文格式") }
-        val paragraphs = if (doc.select("p").isNotEmpty()) doc.select("p").map { it.wholeText().trim() }
-            else doc.body().wholeText().lineSequence().map(String::trim).toList()
-        val lines = paragraphs.filter(String::isNotBlank)
-        val text = lines.joinToString("\n\n")
-        require(text.isNotBlank() && !hasMissingNovelContent(text) && !text.contains('\uFFFD') &&
-            text.none { it in '\uE000'..'\uF8FF' } && listOf("获取内容失败", "请登录后阅读", "本章未完", "购买本章").none(text::contains)) {
-            "番茄章节为空、缺失或未完整公开，未保存不完整正文"
+        val nested = data.optJSONObject("data")
+        val code = data.optInt("code", nested?.optInt("code", 0) ?: 0)
+        require(code in setOf(0, 200)) { tr("番茄正文接口暂时不可用") }
+        val payload = nested?.takeIf { it.has("content") } ?: data
+        val html = when (val raw = payload.opt("content")) {
+            is String -> raw
+            is JSONObject -> raw.optString("content")
+            null -> ""
+            else -> ""
+        }.ifBlank { payload.optString("txt", "") }
+        if (html.isBlank()) {
+            // Missing body is an upstream failure, not an unsupported format: let the caller's
+            // bounded retry policy handle it with the gateway's own message when it has one.
+            val message = listOf("message", "msg", "error").firstNotNullOfOrNull {
+                (payload.opt(it) ?: data.opt(it)) as? String
+            }?.takeIf { it.isNotBlank() && !it.contains("失败") } ?: tr("番茄正文接口暂时无法提供此内容，请稍后重试或换源")
+            throw SourceException.NetworkError(message)
         }
-        return lines.map { NovelPart.Text(it) }
+        // Some gateway builds HTML-escape the body once more (`&lt;p&gt;正文&lt;/p&gt;`). Detect it
+        // instead of shipping a chapter whose text is literal markup.
+        val decoded = if (html.indexOf('<') < 0 && html.contains("&lt;")) Parser.unescapeEntities(html, false) else html
+        // A base URI is required: every illustration is resolved against it, and a bare
+        // parseBodyFragment() would make absUrl() return "" for otherwise valid URLs.
+        val doc = Jsoup.parseBodyFragment(decoded, BASE_URL)
+        // Presentation-only nodes never carry chapter text; canvas/svg/video/audio are font
+        // obfuscation or media this reader cannot render offline, so they stay explicit failures.
+        doc.select("script, style, noscript, ins, iframe, canvas, svg, video, audio").remove()
+        doc.select("img").forEach { img ->
+            val resolved = listOf("data-original", "data-src", "src").firstNotNullOfOrNull { attribute ->
+                img.absUrl(attribute).takeIf { it.startsWith("https://") || it.startsWith("http://") }
+            }
+            // A lazy-load placeholder, tracking pixel or data: URI is not an illustration; drop it
+            // rather than failing a chapter that still has readable text.
+            if (resolved == null) img.remove()
+            else {
+                img.removeAttr("data-original"); img.removeAttr("data-src")
+                img.attr("src", resolved.replaceFirst("http://", "https://"))
+            }
+        }
+        // Empty wrappers and spacer paragraphs carry no text and would otherwise become blank
+        // lines in the EPUB.
+        doc.select("p").filter { it.text().isBlank() && it.select("img").isEmpty() }.forEach { it.remove() }
+        val legit = Regex("https?://[^\\s\"'<>]{4,}")
+        val parts = extractParts(doc.body()).mapNotNull { part ->
+            when (part) {
+                is NovelPart.Image -> part.takeIf { legit.matches(it.url) }
+                is NovelPart.Text -> part.takeIf { it.value.isNotBlank() }
+            }
+        }
+        if (parts.isEmpty()) {
+            // A body that survives cleanup with nothing usable is usually an interstitial page.
+            val text = doc.text()
+            throw com.example.source.SourceException.ParseError(
+                if (looksLikeGate(text)) tr("番茄章节暂时需要登录或购买，未保存不完整正文")
+                else tr("番茄章节为空、缺失或未完整公开，未保存不完整正文"))
+        }
+        validateParts(parts)
+        val text = parts.filterIsInstance<NovelPart.Text>().joinToString("\n") { it.value }
+        require(!hasMissingNovelContent(text) && !text.contains('\uFFFD') &&
+            text.none { it in '\uE000'..'\uF8FF' } && listOf("获取内容失败", "请登录后阅读", "本章未完", "购买本章").none(text::contains)) {
+            tr("番茄章节为空、缺失或未完整公开，未保存不完整正文")
+        }
+        return parts
     }
+
+    private fun looksLikeGate(text: String): Boolean = listOf(
+        "请登录后阅读", "登录后阅读", "购买本章", "订阅本章", "本章未公开", "章节不存在", "内容不存在", "404"
+    ).any(text::contains)
 }

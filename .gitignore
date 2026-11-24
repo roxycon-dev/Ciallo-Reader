@@ -17,6 +17,9 @@ debug.keystore
 *.pk8
 *.dpapi
 !app/src/test/resources/tls/localhost-test-only.p12
+# 官方发布密钥随仓库公开（见 signing/release-keystore/README.md）：
+# 用户需要自行编译同签名的更高版本以覆盖安装，签名材料因此必须可获取。
+!signing/release-keystore/ciallo-reader-release.p12
 __pycache__/
 /.signing/
 /release-signing.properties

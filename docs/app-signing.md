@@ -1,59 +1,99 @@
-# 发布签名与旧密钥迁移
+# 发布签名与密钥分发
 
-正式版应用标识保持 `com.aistudio.novelreader.kxmpzq`，最低支持 Android 7（API 24）。1.5.6 完全退休暴露的旧发布密钥，使用新的固定发布证书，不携带旧证书轮换链。**首次从旧密钥版本迁移不能覆盖安装：先导出备份，确认备份文件已保存到应用目录外，再卸载旧版、安装新版并导入。后续相同新密钥版本可正常覆盖升级。**
+正式版应用标识保持 `com.aistudio.novelreader.kxmpzq`，最低支持 Android 7（API 24）。
 
-旧证书为 `d2115e3cc5880b210a120558aaab03eb30ee5de2952a80f3376dda7e45501146`。同证书的私钥条目曾存在于公开历史提交的 `debug.keystore` 中，不能继续把它视为仅开发者持有的发布材料。这里记录的是材料暴露，不声称发现恶意签署或证明这就是报毒根因。[公开历史提交](https://github.com/roxycon-dev/Ciallo-Reader/commit/6ecd4ef2e55cf49de810ad156b45cb745f33d313)。
+> **自 1.6.7 起，官方发布私钥随仓库公开**：`signing/release-keystore/ciallo-reader-release.p12`
+> 与明文口令见 [`signing/release-keystore/README.md`](../signing/release-keystore/README.md)。
+> 目的是让用户能自行编译同签名的更高 `versionCode`，直接覆盖安装而不丢书架、阅读记录与设置
+> （issue #11 的请求）。下面是这份材料的含义、边界与构建方法。
 
-新证书 SHA-256：`3ee5fb4018a00457eb24cbbfc43e78967d24069b760a5d386d6c9454b3770794`。仓库只保存公开证书和固定指纹；新私钥和密码不得入库。后续版本必须沿用新密钥并递增 `versionCode`。
+## 固定发布证书
 
-测试过保留旧历史的 v3 轮换方案：系统可以保留数据覆盖安装，但腾讯检测仍把它列为风险软件。因此最终发布不使用这条链，不继续信任旧证书的签名权限、共享 UID 或回退能力；测试用轮换材料不作为发布输入。对照检测及限制见 [安全修复记录](security-remediation-2026-10-26.md)。
+```
+SHA-256 3ee5fb4018a00457eb24cbbfc43e78967d24069b760a5d386d6c9454b3770794
+SHA-1   02864a02d528cef1311f375775eeac152774ed23
+DN      CN=Ciallo Reader Release
+别名    ciallo-reader-release
+```
 
-1.5.5 的内置更新器会拒绝不同签名的 APK，这是正常安全校验；不能为迁移关闭此校验。第一次迁移请从官方 Release 下载完整安装包，按备份流程处理。不同包名的 probe 版本同样需导出、导入备份。卸载会删除旧应用的私有数据，不能跳过备份确认。
+指纹固定写在 `signing/release-cert.sha256`。`./gradlew :app:verifyReleaseSigning` 会比对
+keystore 里实际证书的 SHA-256 与该文件，不一致直接终止构建——这是防止「签了个不能覆盖安装
+的包」的唯一有效门禁，不要为了绕开它去改这个文件。
 
-导出时检查所需类别；受保护内容需主动解锁并加入。书源登录凭据、API 密钥及本机隐私 PIN 不随便携备份迁移，导入后按需重新配置。具体操作见 [1.5.6 迁移步骤](release-1.5.6-2026-10-26.md)。
+v1.5.6 起的全部发布包（含最新的 `releases/v1.6.6/Ciallo-Reader-v1.6.6.apk`）都是这张证书，
+彼此可覆盖升级。
 
-## 本地构建
+## 构建同签名版本
 
-使用 `release-signing.properties.example` 创建本地配置，或设置 `KEYSTORE_PATH`、`STORE_PASSWORD`、`KEY_ALIAS`、`KEY_PASSWORD` 环境变量（环境变量优先）。密钥必须与新的固定指纹一致。旧本地配置不会自动获得新密钥，不能绕过证书门禁。
-
-本机新私钥独立存放在工作树外，密码使用当前 Windows 用户的 DPAPI 保护。可使用下面的辅助脚本；两个路径参数均指向私有文件，不应放进仓库。DPAPI 文件只能由所属 Windows 账号解密，跨机器恢复还需由维护者安全备份密钥和密码。
+环境变量优先，`release-signing.properties` 次之：
 
 ```powershell
-./tools/build-secure-release.ps1 -SigningKeyPath PRIVATE_KEY.p12 -ProtectedPasswordPath PRIVATE_PASSWORD.dpapi
+$env:JAVA_HOME      = "C:\path\to\jdk17-or-21"
+$env:KEYSTORE_PATH  = "signing\release-keystore\ciallo-reader-release.p12"
+$env:KEY_ALIAS      = "ciallo-reader-release"
+$env:STORE_PASSWORD = 'Hf7cEa1iS4R8CCRo+E4/qCD3G0rKZ426jyPdOSuEzSE='
+$env:KEY_PASSWORD   = $env:STORE_PASSWORD
+./gradlew.bat :app:verifyReleaseSigning :app:assembleRelease
 ```
 
-```shell
-./gradlew :app:verifyReleaseSigning :app:assembleRelease
+口令含 `+` `/` `=`，PowerShell 用单引号、bash 用单引号或直接 export，避免被当作运算/路径解析。
+
+`versionCode` 必须比目标设备上已装的版本大，否则系统拒绝覆盖。`versionName` 随意，但建议同步
+递增以免用户困惑。
+
+## 覆盖升级自检
+
+```powershell
+python tools/verify-apk-upgrade.py `
+  --new-apk      app/build/outputs/apk/release/app-release.apk `
+  --previous-apk releases/v1.6.6/Ciallo-Reader-v1.6.6.apk `
+  --build-tools  "$env:ANDROID_HOME\build-tools\36.1.0"
 ```
 
-缺少配置、密钥不匹配或密码错误会使发布构建失败。使用新密钥生成 v2/v3 签名，不生成旧密钥回退；发布后必须使用官方 apksigner 对最终 APK 验签。`signing/release-cert.sha256` 的固定指纹门禁仍生效。
+四项：包名、证书指纹、`versionCode` 递增、`debuggable=false`。之后 `adb install -r` 验证
+真实设备上的数据保留——静态检查通过不等于安装成功。
 
-日常 `assembleDebug` 使用独立包名 `com.aistudio.novelreader.kxmpzq.debug`，名称为「Ciallo Reader · 调试版」，可与正式版并存；其设置和数据独立，不能作为正式版升级包发布。
+## 公开私钥的取舍
 
-## 发布检查
+把发布私钥公开是刻意的产品决定，不是事故：
 
-首次 1.5.6 迁移先验证包名、新固定证书和关闭调试：
+- **要解决的问题**：用户要自己修 bug 并覆盖安装。签名不等于包名，没有私钥就无法产出可覆盖
+  的包，任何「自己改自己签名」的路线都会让用户丢数据。
+- **代价**：任何人都能签出与官方同身份、可互相覆盖的 APK。这不是新增风险——签名身份本来
+  就绑定在固定证书指纹上，而指纹早已公开在仓库里。
+- **不变的部分**：官方性仍由 GitHub Release 与 `SHA256SUMS.txt` 体现，而不是由「只有维护者
+  持有私钥」体现。要防篡改只能换包名换签名另起发行渠道，那条路线放弃覆盖升级。
 
-```shell
-python tools/verify-apk-upgrade.py --new-apk app/build/outputs/apk/release/app-release.apk --build-tools PATH_TO_ANDROID_SDK/build-tools/36.1.0
-```
+如果将来要收回这条决定，正确做法是换包名 + 新证书发新应用，而不是把已公开的私钥再藏回去
+（藏回去不改变任何已泄露事实，只会让用户重新丢失数据）。
 
-给这个命令提供旧密钥的 1.5.5 作为 `--previous-apk` 应明确失败，不能把这次迁移记为覆盖升级通过。1.5.6 之后沿用新密钥的发布，应递增版本编号并提供上一版新密钥 APK 作为 `--previous-apk`。除静态检查外，还需实际验证更新安装和数据保留。
+## 旧密钥（已退休）
 
-自动发布环境必须从私有 Secrets 恢复同一份新密钥并提供上述四个环境变量，然后执行完整构建及相应检查。公开指纹不提供签名能力。以下是历史记录，不应作为继续使用旧密钥的构建指引。
+1.5.6 之前的证书是 `CN=Android Debug`，指纹
+`d2115e3cc5880b210a120558aaab03eb30ee5de2952a80f3376dda7e45501146`。其私钥条目曾出现在
+公开历史提交的 `debug.keystore` 中，已彻底退休；用旧密钥打包不能覆盖当前版本。当时测试过
+保留旧历史的 v3 轮换链，系统可保留数据覆盖安装，但检测仍列为风险软件，因此最终没有采用。
+[旧证书公开历史提交](https://github.com/roxycon-dev/Ciallo-Reader/commit/6ecd4ef2e55cf49de810ad156b45cb745f33d313)。
 
-## 历史验证：1.3.7（2026-10-13）
+从旧密钥迁移到新密钥仍然**不能**覆盖安装：先导出备份并确认文件已存到应用目录外，再卸载旧版、
+安装新版、导入备份。1.5.6 及以后的版本之间可以正常覆盖。
 
-- 正确发布密钥通过 Gradle 校验；缺失密钥和另一份测试密钥均按预期被拒绝。
-- `assembleDebug` 和 `assembleRelease` 均成功；实际调试包已确认使用 `.debug` 包名和独立应用名。
-- 正式 APK 通过 apksigner 验签及升级检查脚本，证书与固定指纹一致，正式包名正确，未开启调试。
-- 升级检查脚本的 5 项回归测试通过，涵盖同签名升级、不同签名、不同包名、版本不递增、调试包及缺失信息。
-- 从 GitHub 获取的 v1.3.6 使用另一份历史证书；与本轮 APK 比较时被正确拒绝，没有声称历史包可覆盖。未进行手机安装或数据保留实测。
+## 调试包
 
-Android 的覆盖更新要求参见 [官方签名说明](https://developer.android.com/studio/publish/app-signing)。
+`assembleDebug` 使用独立包名 `com.aistudio.novelreader.kxmpzq.debug` 与名称「Ciallo Reader ·
+调试版」，可与正式版并存，签名是仓库里的 `debug.keystore`。它**不能**作为正式版升级包发布。
 
-## 1.3.8 签名选择（2026-10-14）
+## 历史验证
 
-用户确认原 1.3.7 私钥无法找到后，要求按原方式打包；因此沿用已有 1.3.6 密钥，并保留正式构建的缺失/错误密钥拦截与独立调试包名。现有 1.3.7 Release、标签和附件保持不变，不用新包覆盖旧附件。
+- 1.3.7（2026-10-13）：正确发布密钥通过 Gradle 校验；缺失密钥和另一份测试密钥均被拒绝；
+  `assembleDebug` / `assembleRelease` 成功；正式包通过 apksigner 验签与升级检查脚本的 5 项
+  回归（同签名升级、不同签名、不同包名、版本不递增、调试包）。未做真机数据保留实测。
+- 1.3.8（2026-10-14）：用户确认原 1.3.7 私钥不可找回，沿用 1.3.6 密钥，版本 219，与已发布
+  217 比较包名、证书一致且编号递增。未做真机实测。
+- 1.5.6（2026-10-26）：切换到当前固定证书 `3ee5fb40…`，旧调试证书退休。
+- 1.5.12（2026-11-05）：1.5.6 起的新签名，与官方 1.5.11 覆盖升级条件、ZIP CRC、16 KiB 对齐
+  全部通过；734 个生产构建输入与冻结清单一致。
+- 1.6.7（2026-11-25）：签名材料公开；`verifyReleaseSigning` 与 `verify-apk-upgrade.py`
+  对 v1.6.6 → v1.6.7 通过（见 `docs/release-1.6.7-2026-11-25.md`）。
 
-1.3.8 正式构建和验签通过，版本编号 219；与 GitHub 已发布 1.3.6 的 APK（217）比较，包名、证书一致且编号递增，覆盖升级检查通过。新 APK SHA256 `e3e16473285d6393c4372f7f6f6cdb247e4120165d03070a5dc33dc8a46ab7d6`。未进行手机覆盖安装或数据保留实测。
+Android 的覆盖更新要求见 [官方签名说明](https://developer.android.com/studio/publish/app-signing)。
