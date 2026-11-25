@@ -295,6 +295,8 @@ fun SourceManagementScreen(
     val activeSource by viewModel.activeSource.collectAsStateWithLifecycle()
     val enabledStates by viewModel.enabledStates.collectAsStateWithLifecycle()
     val importStatus by viewModel.importStatus.collectAsStateWithLifecycle()
+    val ordering by viewModel.ordering.collectAsStateWithLifecycle()
+    var showSourceOrder by rememberSaveable { mutableStateOf(false) }
 
     var showPasteDialog by remember { mutableStateOf(false) }
     var showNetworkDialog by remember { mutableStateOf(false) }
@@ -465,6 +467,10 @@ fun SourceManagementScreen(
                         )
                     }
 
+                    item(key = "source_order", span = { GridItemSpan(maxLineSpan) }) {
+                        SourceOrderEntry(ordering.mode, onClick = { showSourceOrder = true })
+                    }
+
                     // ── B / C（+ 自定义）分组：每张卡 = 头部 + 行列表 ──
                     groups.forEachIndexed { index, group ->
                         item(key = "body_${group.title}") {
@@ -513,6 +519,13 @@ fun SourceManagementScreen(
                 }
             }
         }
+    }
+
+    if (showSourceOrder) {
+        SourceOrderSheet(
+            ordering, allSources, { showSourceOrder = false },
+            { viewModel.setSortMode(it) }, { viewModel.saveCustomOrder(it) },
+        )
     }
 
     if (showDebugLog) {
@@ -1075,22 +1088,24 @@ private fun SourceGroupCard(
                     group.sources.take(previewLimit)
                 }
                 visibleSources.forEachIndexed { index, source ->
-                    SourceRow(
-                        source = source,
-                        isActive = activeSourceId == source.id,
-                        isEnabled = enabledStates[source.id] ?: true,
-                        isCustom = group.kind == SourceGroupKind.CUSTOM,
-                        onToggleEnable = { onToggleEnable(source, it) },
-                        onOpenLogin = if (
-                            (source.capabilities.requiresLogin || source.id in setOf("js_mycomic", "js_bilimanga", "xbookcn")) && source.id != "zlibrary"
-                        ) {
-                            { onOpenLogin(source) }
-                        } else null,
-                        onOpenNodeManager = if (source.id == "zlibrary") {
-                            onOpenNodeManager
-                        } else null,
-                        onDelete = { onDelete(source) }
-                    )
+                    androidx.compose.runtime.key(source.id) {
+                        SourceRow(
+                            source = source,
+                            isActive = activeSourceId == source.id,
+                            isEnabled = enabledStates[source.id] ?: true,
+                            isCustom = group.kind == SourceGroupKind.CUSTOM,
+                            onToggleEnable = { onToggleEnable(source, it) },
+                            onOpenLogin = if (
+                                (source.capabilities.requiresLogin || source.id in setOf("js_mycomic", "js_bilimanga", "xbookcn")) && source.id != "zlibrary"
+                            ) {
+                                { onOpenLogin(source) }
+                            } else null,
+                            onOpenNodeManager = if (source.id == "zlibrary") {
+                                onOpenNodeManager
+                            } else null,
+                            onDelete = { onDelete(source) }
+                        )
+                    }
                     // 行分割线：左侧从文字起点开始（缩进 64），右侧到卡片边缘；最后一行不画
                     if (index < visibleSources.lastIndex) {
                         SourceLine(modifier = Modifier.padding(start = SourceRowDividerIndent))

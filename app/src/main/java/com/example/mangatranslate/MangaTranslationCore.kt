@@ -13,6 +13,12 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.coroutineScope
@@ -427,6 +433,8 @@ class MangaPageTranslator(
     private val llmTranslator: LlmBubbleTranslator,
 ) {
     private val appContext = context.applicationContext
+    private val systemTranslation = SystemTextTranslation(appContext)
+    private val aiRequests = kotlinx.coroutines.sync.Mutex()
     private val engineLock = Any()
     private var detRef: PaddleDetector? = null
     private var detLen: Long = 0L
@@ -550,39 +558,43 @@ class MangaPageTranslator(
             if (result.textLines.isEmpty() && result.bubbles.isEmpty()) {
                 return@withContext emptyList()
             }
-            // 气泡区域携带自己的文字行（lineBelongsToRegion，原仓库语义）；
-            // 游离行用 TextBlockMerger 的块（原仓库 buildRegions 等价物）
             val regions = ArrayList<BubblePipeline.Region>(result.bubbles.size + result.textBlocks.size)
-            for (bubble in result.bubbles) {
-                val own = result.textLines.filter {
-                    PageRegionTiling.lineBelongsToRegion(it, bubble.rect)
+            val owned = List(result.bubbles.size) { mutableListOf<RectF>() }
+            val assigned = hashSetOf<RectF>()
+            for (line in result.textLines) {
+                val owner = result.bubbles.indices
+                    .filter { index ->
+                        val bounds = result.bubbles[index].rect
+                        bounds.contains(line.centerX(), line.centerY()) &&
+                            PageRegionTiling.lineBelongsToRegion(line, bounds)
+                    }
+                    .minByOrNull { index -> result.bubbles[index].rect.run { width() * height() } }
+                if (owner != null) {
+                    owned[owner].add(line)
+                    assigned.add(line)
                 }
-                val vertical = own.isNotEmpty() &&
-                    own.count { it.height() > it.width() * 1.5f } > own.size / 2
-                regions.add(
-                    BubblePipeline.Region(
-                        bubble.rect, bubble.maskContour, own, vertical,
-                    )
-                )
             }
-            // 游离行：不被任何气泡抑制的行 → 已合并的 TextBlock。
-            // merge 的输入已经过气泡抑制过滤，块的 lines 直接全部保留
-            // （注意 RectF 未重写 equals，严禁再做实例级求交过滤）。
-            val freeLines = result.textLines.filter { line ->
-                result.bubbles.none { PageRegionTiling.shouldFilterTextRectByBubble(line, it.rect, 0.2f) }
+            result.bubbles.forEachIndexed { index, bubble ->
+                val lines = owned[index]
+                if (lines.isNotEmpty()) {
+                    val vertical = lines.count { it.height() > it.width() * 1.5f } > lines.size / 2
+                    regions.add(BubblePipeline.Region(bubble.rect, bubble.maskContour, lines, vertical))
+                }
             }
+            val grouped = hashSetOf<RectF>()
             for (block in result.textBlocks) {
-                if (block.lines.isEmpty()) continue
+                val lines = block.lines.filterNot(assigned::contains)
+                if (lines.isEmpty()) continue
+                grouped.addAll(lines)
+                val bounds = RectF(lines.first())
+                lines.drop(1).forEach { bounds.union(it) }
                 val vertical = block.orientation == TextLineOrientation.VERTICAL
-                regions.add(
-                    BubblePipeline.Region(block.rect, null, block.lines, vertical)
-                )
+                regions.add(BubblePipeline.Region(bounds, null, lines, vertical))
             }
-            // 兜底：有游离行但没有任何块覆盖到（合并失败等）→ 直接逐行成块
-            if (regions.none { it.maskContour == null && it.lines.isNotEmpty() } && freeLines.isNotEmpty()) {
-                for (line in freeLines) {
-                    regions.add(BubblePipeline.Region(RectF(line), null, listOf(RectF(line)), false))
-                }
+            val unassigned = result.textLines.filterNot { it in assigned || it in grouped }
+            val useful = PageRegionTiling.filterTinyTextRects(unassigned, bitmap.width, bitmap.height)
+            for (line in useful) {
+                regions.add(BubblePipeline.Region(RectF(line), null, listOf(line), line.height() > line.width() * 1.5f))
             }
             regions
         }
@@ -603,7 +615,9 @@ class MangaPageTranslator(
             val rec = recognizer() ?: throw (if (ocrReady) TranslationFailure.OcrEngine else TranslationFailure.Models).exception()
             val out = ArrayList<TranslatedRegion>(regions.size)
             for (region in regions) {
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
                 val sb = StringBuilder()
+                val recognizedLines = mutableListOf<RectF>()
                 val orderedLines = if (region.vertical)
                     region.lines.sortedWith(compareByDescending<RectF> { it.centerX() }.thenBy { it.top })
                     else region.lines.sortedWith(compareBy<RectF> { it.top }.thenBy { it.left })
@@ -620,6 +634,7 @@ class MangaPageTranslator(
                     if (piece.isNotEmpty() && result.score >= 0.45f) {
                         if (sb.isNotEmpty() && !region.vertical) sb.append(' ')
                         sb.append(piece)
+                        recognizedLines.add(line)
                     }
                 }
                 val text = sb.toString().trim()
@@ -633,7 +648,7 @@ class MangaPageTranslator(
                         lang = lang ?: "",
                         vertical = region.vertical,
                         contour = region.maskContour,
-                        lineRects = region.lines,
+                        lineRects = recognizedLines,
                     )
                 )
             }
@@ -666,24 +681,34 @@ class MangaPageTranslator(
     internal suspend fun translateRecognized(bitmap: Bitmap, ocr: List<TranslatedRegion>, engine: String, onStage: (String) -> Unit): PageTranslation =
         withContext(Dispatchers.IO) {
             if (ocr.isEmpty()) return@withContext PageTranslation(bitmap.width, bitmap.height, emptyList())
-            if (engine != "ai") {
-                onStage(tr("在线翻译对白…"))
-                return@withContext PageTranslation(bitmap.width, bitmap.height, translateRegionsOnline(ocr))
+            val auto = engine == "auto"
+            val ai = engine == "ai" || (auto && llmTranslator.loadConfig().isValid())
+            if (!ai) {
+                return@withContext PageTranslation(bitmap.width, bitmap.height,
+                    translateRegionsOnline(ocr, preferSystem = auto, onStage = onStage))
             }
             onStage(tr("大模型翻译对白…"))
-            val llmOut: Map<Int, String>? = llmTranslator.translateBuckets(ocr)
-            val fallback = if (llmOut == null) llmTranslator.lastFailure ?: TranslationFailure.Empty else null
-            val translated: List<TranslatedRegion> = if (llmOut != null) {
-                ocr.mapIndexed { i, region ->
-                    val t = llmOut[i]
-                    if (t.isNullOrBlank()) region else region.copy(translated = t.trim())
+            val (llmOut, fallback) = aiRequests.withLock {
+                if (auto) {
+                    withTimeoutOrNull(8_000L) {
+                        val result = llmTranslator.translateBuckets(ocr)
+                        result to (llmTranslator.lastFailure ?: TranslationFailure.Empty)
+                    } ?: (null to TranslationFailure.Timeout)
+                } else {
+                    val result = llmTranslator.translateBuckets(ocr)
+                    result to (llmTranslator.lastFailure ?: TranslationFailure.Empty)
                 }
-            } else {
-                if (fallback?.retryable != true) throw fallback!!.exception()
-                onStage(tr("大模型暂不可用 · 正在用免 Key 机翻…"))
-                translateRegionsOnline(ocr)
             }
-            PageTranslation(bitmap.width, bitmap.height, translated, fallback)
+            if (llmOut != null) {
+                val translated = ocr.mapIndexed { index, region ->
+                    val text = llmOut[index]?.trim().orEmpty()
+                    if (text.isBlank()) region else region.copy(translated = text)
+                }
+                return@withContext PageTranslation(bitmap.width, bitmap.height, translated)
+            }
+            if (!auto && !fallback.retryable) throw fallback.exception()
+            if (fallback.code == TranslationFailure.Privacy.code) throw fallback.exception()
+            PageTranslation(bitmap.width, bitmap.height, translateRegionsOnline(ocr, preferSystem = auto, onStage = onStage), fallback)
         }
 
     /** 在线兜底专用（用户显式选择 online 引擎）：跳过 AI，直接腾讯批量。 */
@@ -710,22 +735,39 @@ class MangaPageTranslator(
             .filter { it.lang.isNotBlank() && it.lang != "zh" }
     }
 
-    /** 按语言分组批量在线翻译（腾讯一次请求保持顺序）。 */
-    private suspend fun translateRegionsOnline(ocr: List<TranslatedRegion>): List<TranslatedRegion> {
-        val out = ocr.toMutableList()
-        val byLang = LinkedHashMap<String, MutableList<Int>>()
-        ocr.forEachIndexed { index, region ->
-            byLang.getOrPut(region.lang) { mutableListOf() }.add(index)
+    private suspend fun translateRegionsOnline(
+        ocr: List<TranslatedRegion>,
+        preferSystem: Boolean,
+        onStage: (String) -> Unit,
+    ): List<TranslatedRegion> {
+        val byLanguage = ocr.indices.groupBy { ocr[it].lang }
+        val translated = coroutineScope {
+            byLanguage.map { (language, indices) ->
+                async {
+                    val texts = indices.map { ocr[it].original }
+                    val system = if (preferSystem) {
+                        onStage(tr("系统翻译对白…"))
+                        systemTranslation.translate(texts, language)
+                    } else null
+                    val pending = texts.indices.filter { system?.getOrNull(it).isNullOrBlank() }
+                    val remote = if (pending.isEmpty()) emptyList() else {
+                        onStage(tr("在线翻译对白…"))
+                        val batch = pending.map(texts::get)
+                        if (textTranslator is OnlineFallbackTranslator) {
+                            textTranslator.translateBatch(batch, language).orEmpty()
+                        } else batch.map { textTranslator.translate(it, language).orEmpty() }
+                    }
+                    val recovered = pending.zip(remote).toMap()
+                    indices.mapIndexed { position, index ->
+                        index to (system?.getOrNull(position)?.takeIf(String::isNotBlank)
+                            ?: recovered[position].orEmpty())
+                    }
+                }
+            }.awaitAll().flatten().toMap()
         }
-        for ((lang, idxs) in byLang) {
-            val batch = idxs.map { ocr[it].original }
-            val results = if (textTranslator is OnlineFallbackTranslator)
-                textTranslator.translateBatch(batch, lang) ?: List(batch.size) { "" }
-                else batch.map { textTranslator.translate(it, lang) }
-            idxs.forEachIndexed { j, regionIdx ->
-                val t = results.getOrNull(j)
-                if (!t.isNullOrBlank()) out[regionIdx] = out[regionIdx].copy(translated = t.trim())
-            }
+        val out = ocr.mapIndexed { index, region ->
+            val text = translated[index]?.trim().orEmpty()
+            if (text.isBlank()) region else region.copy(translated = text)
         }
         if (out.none { it.translated.isNotBlank() })
             throw ((textTranslator as? OnlineFallbackTranslator)?.lastFailure ?: TranslationFailure.Empty).exception()
@@ -765,12 +807,13 @@ class TranslationCoordinator(
 
     /** 用户显式选择的引擎（第十八轮二级导航）；调用方随配置更新。 */
     @Volatile
-    var selectedEngine: String = "online"
+    var selectedEngine: String = "auto"
 
     /** 当前引擎标识（进缓存 key）：换引擎后同页自动重译，不读旧引擎结果。 */
     fun engineTag(): String = selectedEngine
     private val jobs = ConcurrentHashMap<String, Job>()
-    private val translateMutex = PageMemoryBudget.gate
+    private val inferenceGate = PageMemoryBudget.gate
+    private val translationRequests = Semaphore(2)
     private val bakedKeys = ConcurrentHashMap.newKeySet<String>()
     @Volatile private var clearing = false
 
@@ -808,8 +851,12 @@ class TranslationCoordinator(
         releasePending = false // 新任务到达：翻译重新启用，作废挂起的会话关闭
         // 第十七轮：缓存 key 带引擎+源语言标识——切换引擎或"页面文字"语言后同页自动重译
         val engine = selectedEngine
-        val modelTag = if(engine == "ai") llmTranslator.cacheFingerprint() else "transmart-v3"
-        val enginePrefix = "$translationKey@$engine-${forcedLang ?: "auto"}-$modelTag-v2"
+        val modelTag = when {
+            engine == "ai" || (engine == "auto" && llmTranslator.loadConfig().isValid()) -> llmTranslator.cacheFingerprint()
+            engine == "auto" -> "system-transmart-v4"
+            else -> "transmart-v4"
+        }
+        val enginePrefix = "$translationKey@$engine-${forcedLang ?: "auto"}-$modelTag-v3"
         val job = scope.launch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
             val t0 = android.os.SystemClock.elapsedRealtime()
             try {
@@ -819,21 +866,26 @@ class TranslationCoordinator(
                 val base = loadBase() ?: throw TranslationFailure.Ocr.exception()
                 if (bakedKeys.contains(cacheKey)) return@launch
                 PageMemoryBudget.check(base)
-                val engineKey = "$enginePrefix@${PageMemoryBudget.fingerprint(base)}"
                 val t1 = android.os.SystemClock.elapsedRealtime()
+                val fingerprint = PageMemoryBudget.fingerprint(base)
+                val engineKey = "$enginePrefix@$fingerprint"
                 val cached = TranslationCache.read(appContext, engineKey, base.width, base.height)
-                val translation = cached ?: translateMutex.withLock {
-                    progress.update { it + (cacheKey to tr("识别漫画文字…")) }
-                    val cachedAgain = TranslationCache.read(appContext, engineKey, base.width, base.height)
-                    if (cachedAgain != null) cachedAgain else {
-                        // Recognition is independent of translation service and persists after a network failure.
-                        val ocrKey = "$translationKey@ocr-v4-${forcedLang ?: "auto"}@${PageMemoryBudget.fingerprint(base)}"
-                        val recognized = TranslationCache.read(appContext, ocrKey, base.width, base.height)
-                            ?: PageTranslation(base.width, base.height, translator.recognizeForTranslation(base, forcedLang)).also {
-                                kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                                TranslationCache.write(appContext, ocrKey, it)
+                val translation = cached ?: run {
+                    val ocrKey = "$translationKey@ocr-v5-${forcedLang ?: "auto"}@$fingerprint"
+                    val recognized = TranslationCache.read(appContext, ocrKey, base.width, base.height)
+                        ?: inferenceGate.withLock {
+                            TranslationCache.read(appContext, ocrKey, base.width, base.height) ?: run {
+                                progress.update { it + (cacheKey to tr("识别漫画文字…")) }
+                                PageTranslation(base.width, base.height, translator.recognizeForTranslation(base, forcedLang)).also {
+                                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                                    TranslationCache.write(appContext, ocrKey, it)
+                                }
                             }
-                        translator.translateRecognized(base, recognized.regions, engine) { stage -> progress.update { it + (cacheKey to stage) } }.also {
+                        }
+                    translationRequests.withPermit {
+                        translator.translateRecognized(base, recognized.regions, engine) { stage ->
+                            progress.update { it + (cacheKey to stage) }
+                        }.also {
                             kotlinx.coroutines.currentCoroutineContext().ensureActive()
                             if (it.fallbackReason == null && it.hasUsableText && it.regions.all { region -> region.translated.isNotBlank() })
                                 TranslationCache.write(appContext, engineKey, it)
@@ -848,20 +900,22 @@ class TranslationCoordinator(
                     return@launch
                 }
                 progress.update { it + (cacheKey to tr("排版译文…")) }
-                val baked = BubblePipeline.bake(
-                    base,
-                    translation.regions.map { r ->
-                        BubblePipeline.Region(r.rect, r.contour, r.lineRects, r.vertical) to r.translated
-                    },
-                    textScale,
-                )
+                val baked = inferenceGate.withLock {
+                    BubblePipeline.bake(
+                        base,
+                        translation.regions.map { region ->
+                            BubblePipeline.Region(region.rect, region.contour, region.lineRects, region.vertical) to region.translated
+                        },
+                        textScale,
+                    )
+                }
                 val t3 = android.os.SystemClock.elapsedRealtime()
                 kotlinx.coroutines.currentCoroutineContext().ensureActive()
                 if (translation.regions.any { it.translated.isBlank() }) {
                     failedKeys.update { it + cacheKey }
                     failures.update { it + (cacheKey to TranslationFailure("partial", com.example.i18n.tr("部分对白未获得译文"), true)) }
                 }
-                translation.fallbackReason?.let { reason -> notices.update { it + (cacheKey to "已用免 Key 机翻 · ${reason.description}") } }
+                translation.fallbackReason?.let { reason -> notices.update { it + (cacheKey to "${tr("已切换备用翻译")} · ${reason.description}") } }
                 publishBaked(baked)
                 kotlinx.coroutines.currentCoroutineContext().ensureActive()
                 bakedKeys.add(cacheKey)

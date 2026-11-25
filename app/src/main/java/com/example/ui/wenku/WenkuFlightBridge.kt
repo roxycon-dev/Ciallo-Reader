@@ -54,6 +54,7 @@ object WenkuFlightBridge {
         returnBounds: Rect? = null,
         seamless: Boolean = false
     ) {
+        WenkuVolumeFlightBridge.cancel()
         last = null
         request = if (bounds.width > 0f && bounds.height > 0f) {
             WenkuFlightRequest(

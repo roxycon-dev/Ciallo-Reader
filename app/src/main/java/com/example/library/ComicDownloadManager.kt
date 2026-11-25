@@ -87,12 +87,11 @@ object ComicDownloadManager {
     }
     private fun persist() {
         val context = app ?: return
-        val a = JSONArray()
-        _tasks.value.values.forEach { t ->
-            a.put(JSONObject().put("book",JSONObject().put("id",t.book.id).put("sourceId",t.book.sourceId).put("title",t.book.title)
+        val descriptors = _tasks.value.mapValues { (_, t) ->
+            JSONObject().put("book",JSONObject().put("id",t.book.id).put("sourceId",t.book.sourceId).put("title",t.book.title)
                 .put("author",t.book.author).put("cover",t.book.cover ?: "").put("format",t.book.format))
                 .put("chapter",JSONObject().put("id",t.chapter.id).put("title",t.chapter.title).put("volume",t.chapter.volume ?: "").put("order",t.chapter.order))
-                .put("status",t.status.name).put("progress",t.progress).put("error",t.error ?: ""))
+                .put("status",t.status.name).put("progress",t.progress).put("error",t.error ?: "").toString()
         }
         // All callers run on IO. The write commits before a worker reports success.
         runBlocking(Dispatchers.IO) {
@@ -109,7 +108,7 @@ object ComicDownloadManager {
                         ComicDownloadStatus.FAILED -> DownloadStatus.FAILED
                         ComicDownloadStatus.SUCCESS -> DownloadStatus.COMPLETED
                     }
-                    val descriptor = a.getJSONObject(_tasks.value.keys.indexOf(id)).toString()
+                    val descriptor = descriptors.getValue(id)
                     val row=DownloadTaskEntity(id, t.book.sourceId, t.book.title, t.book.author,
                         t.book.cover, descriptor, "comic", status, 0, 0,
                         directory(context,id).absolutePath, t.error, progress=t.progress)
@@ -168,12 +167,25 @@ object ComicDownloadManager {
     fun cancel(chapterId:String,book:SearchBook?=null) { scope.launch { operations.withLock {
         val id=resolve(chapterId,book) ?: return@withLock
         val context=app ?: return@withLock
-        pauseState(id)
-        WorkManager.getInstance(context).cancelUniqueWork(workName(id)).result.get()
+        val task = _tasks.value[id] ?: return@withLock
+        if (task.status != ComicDownloadStatus.SUCCESS) {
+            if (task.status == ComicDownloadStatus.DOWNLOADING) pauseState(id)
+            WorkManager.getInstance(context).cancelUniqueWork(workName(id)).result.get()
+        }
         DownloadWorker.withTaskLock(id) {
             val owned=directory(context,id)
             val registered=AppDatabase.getDatabase(context).bookDao().getBookByFilePath(owned.absolutePath)
-            synchronized(stateLock) { _tasks.value=_tasks.value-id; persist() }
+            synchronized(stateLock) {
+                val previous = _tasks.value
+                _tasks.value = previous - id
+                try {
+                    persist()
+                    lastSave.remove(id)
+                } catch (failure: Exception) {
+                    _tasks.value = previous
+                    throw failure
+                }
+            }
             if (registered==null) owned.deleteRecursively()
         }
     } } }

@@ -6,9 +6,40 @@ import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+import com.example.source.SourceOrdering
+import com.example.source.SourceSortMode
+import org.json.JSONArray
+import org.json.JSONObject
+
 class SharedPreferencesSourceStorage(context: Context) : SourceStorage {
     private val directory = java.io.File(context.filesDir, "source_configs").apply { mkdirs() }
     private val prefs = context.getSharedPreferences("book_sources_config", Context.MODE_PRIVATE)
+
+    override suspend fun getSourceOrdering(): SourceOrdering = withContext(Dispatchers.IO) {
+        fun readOrder(key: String): List<String> = runCatching {
+            val array = JSONArray(prefs.getString(key, "[]"))
+            List(array.length()) { array.getString(it) }.distinct()
+        }.getOrDefault(emptyList())
+        val speed = runCatching {
+            val values = JSONObject(prefs.getString("sort_speed", "{}").orEmpty())
+            values.keys().asSequence().associateWith { values.getLong(it) }.filterValues { it >= 0 }
+        }.getOrDefault(emptyMap())
+        SourceOrdering(
+            SourceSortMode.entries.firstOrNull { it.name == prefs.getString("sort_mode", null) }
+                ?: SourceSortMode.DEFAULT,
+            readOrder("sort_custom").ifEmpty { readOrder("sort_default") },
+            speed,
+        )
+    }
+
+    override suspend fun saveSourceOrdering(ordering: SourceOrdering) = withContext(Dispatchers.IO) {
+        check(prefs.edit()
+            .putString("sort_mode", ordering.mode.name)
+            .remove("sort_default")
+            .putString("sort_custom", JSONArray(ordering.customIds).toString())
+            .putString("sort_speed", JSONObject(ordering.speedMillis).toString())
+            .commit())
+    }
 
     override suspend fun saveSourceState(sourceId: String, enabled: Boolean) = withContext(Dispatchers.IO) {
         prefs.edit().putBoolean("source_enabled_$sourceId", enabled).commit()

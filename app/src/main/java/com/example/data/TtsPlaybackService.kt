@@ -64,7 +64,7 @@ class TtsPlaybackService : Service() {
         if (requestedOwner.serviceStarted(id)) {
             updates?.cancel()
             updates = scope.launch {
-                requestedOwner.state.map { Triple(it.chapter, it.playing, it.preparing) }.distinctUntilChanged().collect { (chapter, playing, preparing) ->
+                requestedOwner.state.map { Triple(it.chapter, it.playing, it.preparing || it.buffering != null) }.distinctUntilChanged().collect { (chapter, playing, preparing) ->
                     if (session == id && requestedOwner.ownsService(id)) {
                         publishMediaState(chapter, playing, preparing)
                         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(id, chapter))

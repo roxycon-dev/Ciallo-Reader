@@ -393,6 +393,9 @@ class MainActivity : ComponentActivity() {
                         // 效果异常（疑似该机型快照管线不应用链式 RenderEffect / 背景图异步加载竞态），
                         // 已回退实时模糊路径；相关代码保留在 backdrop 库中但不再接线。
                         val bgBackdrop = rememberLayerBackdrop()
+                        val pageWallpaper = if (bgActive) com.example.ui.components.PaperPageWallpaper(
+                            rememberAsyncImagePainter(bgConfig.uri), (bgConfig.dim / 100f).coerceIn(0f, 1f)
+                        ) else null
                         // ── A2 底部避让唯一事实来源 ──────────────────────────
                         // 悬浮 Tab 栏总高 = 12dp 上边距 + 68dp 栏体 + 12dp 下边距 = 92dp，
                         // 再叠上真实系统导航栏高度（手势导航 ≈0、三键导航 ≈48dp）。
@@ -412,9 +415,9 @@ class MainActivity : ComponentActivity() {
                                         if (wallpaperGlass) Modifier.layerBackdrop(bgBackdrop) else Modifier
                                     )
                             ) {
-                                if (bgActive) {
+                                if (pageWallpaper != null) {
                                     Image(
-                                        painter = rememberAsyncImagePainter(bgConfig.uri),
+                                        painter = pageWallpaper.painter,
                                         contentDescription = null,
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier.fillMaxSize()
@@ -435,6 +438,7 @@ class MainActivity : ComponentActivity() {
                             }
                             CompositionLocalProvider(
                                 LocalAppBackgroundActive provides bgActive,
+                                com.example.ui.components.LocalPaperPageWallpaper provides pageWallpaper,
                                 LocalAppBottomInset provides (navBarBottom + 92.dp + 8.dp),
                                 // 底栏被隐藏时（书架多选 / 拖拽）只让开系统导航栏：
                                 // 否则操作栏与放置坞会在底部凭空空出 92dp。
@@ -936,7 +940,13 @@ class MainActivity : ComponentActivity() {
                                                     if (book.isComic) {
                                                         navController.navigate("comic_reader")
                                                     } else {
+                                                        val volumeOpening = com.example.ui.wenku.WenkuVolumeFlightBridge
+                                                            .isOpening(book.id.toString())
                                                         navController.navigate("reader")
+                                                        if (volumeOpening) {
+                                                            navController.currentBackStackEntry?.savedStateHandle
+                                                                ?.set("volumeShelfEntry", true)
+                                                        }
                                                     }
                                                 },
                                                 onImportClick = { category ->
@@ -1412,9 +1422,10 @@ class MainActivity : ComponentActivity() {
                                     val key = selectedBook?.id?.toString()
                                     // 3D 书架：先让那本书的封面从阅读器这一侧淡入、盖住整屏，
                                     // 再切路由（横向转场已关掉），所以退出时看到的是"书被放回书架"。
-                                    val volumeFlight = key != null &&
+                                    val volumeFlight = key != null && viewModel.prefs.shelfUses3dView &&
+                                        readerEntry.savedStateHandle.get<Boolean>("volumeShelfEntry") == true &&
                                         com.example.ui.wenku.WenkuVolumeFlightBridge.reverse(key)
-                                    key?.let { com.example.ui.wenku.WenkuFlightBridge.reverse(it) }
+                                    if (!volumeFlight) key?.let { com.example.ui.wenku.WenkuFlightBridge.reverse(it) }
                                     if (volumeFlight) {
                                         closingReader = true
                                         readerScope.launch {
@@ -1532,14 +1543,7 @@ class MainActivity : ComponentActivity() {
                             }
                             val sessionId = entry.arguments?.getString(LIBRARY_SESSION_ARGUMENT)
                             val favoriteKeys by viewModel.favoriteKeys.collectAsStateWithLifecycle()
-                            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                                val wallpaper = AppBackgroundController.config.collectAsStateWithLifecycle().value
-                                if (wallpaper.mode != 0 && wallpaper.uri != null) {
-                                    Image(rememberAsyncImagePainter(wallpaper.uri), null,
-                                        modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = wallpaper.dim / 100f)))
-                                }
-                                com.example.library.LibraryScreen(
+                            com.example.library.LibraryScreen(
                                                         onOpenDownloads = { navController.openPaperPage("downloads") },
                                     viewModel = searchViewModel,
                                     onBookImported = { selectedTab = 2 },
@@ -1558,7 +1562,6 @@ class MainActivity : ComponentActivity() {
                                     extraBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
                                     onBack = { navController.dismissPaperPage() },
                                 )
-                            }
                         } }
 
                         paperComposable("comic_chapters?$LIBRARY_SESSION_ARGUMENT={$LIBRARY_SESSION_ARGUMENT}", navController, arguments = librarySessionArguments(), revealContent = true) { entry -> CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null) {

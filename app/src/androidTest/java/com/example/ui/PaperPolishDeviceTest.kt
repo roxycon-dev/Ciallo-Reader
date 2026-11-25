@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
@@ -300,6 +301,62 @@ class PaperPolishDeviceTest {
         compose.waitUntil(5000) { compose.onAllNodesWithText("完整管理页").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithText("选择入口").assertIsDisplayed()
         assertEquals(tabs, compose.onNodeWithTag("stationary-tabs").fetchSemanticsNode().boundsInRoot)
+    }
+
+    @Test fun enteringPaperPageOccludesThePreviousRouteAtEveryCoveredPixel() {
+        compose.setContent { MaterialTheme(colorScheme = androidx.compose.material3.lightColorScheme(background = Color.White)) {
+            val nav = rememberNavController()
+            NavHost(
+                nav, startDestination = "library",
+                enterTransition = { paperPageEnter(false) }, exitTransition = { paperPageExit(false) },
+            ) {
+                composable("library") {
+                    Box(Modifier.fillMaxSize().background(Color.Red)) {
+                        PullOutButton({ nav.openPaperPage("downloads") }) { Text("打开下载") }
+                    }
+                }
+                paperComposable("downloads", nav, revealContent = true) {
+                    Box(Modifier.fillMaxSize().testTag("incoming-page"))
+                }
+            }
+        } }
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onNodeWithText("打开下载").performClick()
+            for (delay in listOf(96L, 64L, 64L)) {
+                compose.mainClock.advanceTimeBy(delay)
+                val pixels = compose.onNodeWithTag("incoming-page").captureToImage().toPixelMap()
+                assertEquals(Color.White, pixels[pixels.width / 2, pixels.height / 2])
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+    }
+
+    @Test fun onlyCustomSourceOrderCanOpenTheAnimatedEditor() {
+        var ordering by mutableStateOf(com.example.source.SourceOrdering())
+        var saved = emptyList<String>()
+        val sources = listOf("A", "B", "C").map { name ->
+            com.example.source.impl.JsonBookSource(com.example.source.SourceConfig(
+                id = name, name = name, baseUrl = "https://example.com",
+                search = com.example.source.SearchRule(url = "https://example.com/search?q={keyword}", listPath = "items"),
+            ))
+        }
+        compose.setContent { MyApplicationTheme {
+            com.example.ui.source.SourceOrderSheet(ordering, sources, {}, { ordering = ordering.copy(mode = it) }) {
+                saved = it
+            }
+        } }
+        compose.onNodeWithText("调整顺序").assertDoesNotExist()
+        compose.onNodeWithText("按加载速度").performClick()
+        compose.onNodeWithText("按实际搜索的成功响应耗时排序，未测量的书源排在后面。").assertIsDisplayed()
+        compose.onNodeWithText("调整顺序").assertDoesNotExist()
+        compose.onNodeWithText("自定义排序").performClick()
+        compose.onNodeWithText("调整顺序").performClick()
+        compose.onNodeWithContentDescription("向上移动 B").assertIsDisplayed().performClick()
+        shot("source-custom-order")
+        compose.onNodeWithText("保存顺序").performClick()
+        compose.waitUntil { saved == listOf("B", "A", "C") }
     }
 
     @Test fun realManagementUsesItsOwnGlassBackgroundAndDeduplicatesNavigation() {

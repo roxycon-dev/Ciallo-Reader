@@ -79,6 +79,12 @@ class LibraryViewModel private constructor(
     private val _sourcesReady: MutableStateFlow<Boolean> = sharedLibrary?._sourcesReady ?: MutableStateFlow(false)
     val sourcesReady = _sourcesReady.asStateFlow()
     val downloadManager: DownloadManager = sharedLibrary?.downloadManager ?: DownloadManager(application)
+    internal val downloadedCovers = AppDatabase.getDatabase(application).bookDao().getAllBooks()
+        .map { books ->
+            books.mapNotNull { book ->
+                book.coverUri?.let { book.filePath.removePrefix("file://") to it }
+            }.toMap()
+        }
     val downloadedNovelKeys = AppDatabase.getDatabase(application).bookDao().getAllBooks().map { books ->
         books.filter { !it.isComic && it.sourceId != null && it.comicId != null }
             .map { DownloadManager.taskId(it.sourceId.orEmpty(), it.comicId.orEmpty()) }.toSet()
@@ -110,7 +116,11 @@ class LibraryViewModel private constructor(
     private val _formatLoading = MutableStateFlow(false)
     val formatLoading: StateFlow<Boolean> = _formatLoading.asStateFlow()
 
-    private val sourceSearches: SourceSearchCoordinator = sharedLibrary?.sourceSearches ?: SourceSearchCoordinator()
+    private val sourceSearches: SourceSearchCoordinator = sharedLibrary?.sourceSearches ?: SourceSearchCoordinator(
+        onLoaded = { source, elapsed ->
+            viewModelScope.launch { sourceManager.recordSourceLoad(source, elapsed) }
+        },
+    )
     private val recordResolver = ReadingRecordResolver(sourceSearches)
     private var recordResolveJob: Job? = null
     private val _recordCoverHeaders = MutableStateFlow<Map<Int, Map<String, String>>>(emptyMap())
@@ -1263,7 +1273,14 @@ class LibraryViewModel private constructor(
                         novelSnapshot = snapshot.takeIf { WholeBookNovelSources.contains(it.sourceId) },
                         replaceExistingNovel = replaceNovel
                     )
-                    downloadManager.enqueueDownload(request, result.data.referer, result.data.headers).join()
+                    val enqueue = downloadManager.enqueueDownload(request, result.data.referer, result.data.headers)
+                    try {
+                        enqueue.join()
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        enqueue.cancel()
+                        withContext(kotlinx.coroutines.NonCancellable) { enqueue.join() }
+                        throw cancelled
+                    }
                     preparations.update { it - key }
                 }
                 is SourceResult.Error -> {
@@ -1374,8 +1391,15 @@ class LibraryViewModel private constructor(
     }
 
     fun cancelDownload(bookId: String) {
-        downloadJobs.remove(bookId)?.cancel()
-        preparations.update { it - bookId }
-        downloadManager.cancelDownload(bookId)
+        val task = allDownloadTasks.value.firstOrNull { it.id == bookId }
+        val key = task?.let { DownloadManager.taskId(it.sourceId, DownloadManager.originalBookId(it.id, it.sourceId)) }
+            ?: bookId
+        val removing = downloadJobs.remove(key)
+        removing?.cancel()
+        preparations.update { it - key }
+        downloadScope.launch {
+            removing?.join()
+            downloadManager.cancelDownload(bookId)
+        }
     }
 }

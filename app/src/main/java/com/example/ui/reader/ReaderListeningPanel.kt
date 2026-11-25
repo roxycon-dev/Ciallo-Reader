@@ -158,7 +158,7 @@ internal fun ReaderListeningPanel(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(if (count > 0) "${selected + 1} / $count ${tr("段")}" else tr("本章没有可朗读的正文"),
                             style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
-                        Text(if (state.preparing) tr("正在准备语音") else if (state.playing) tr("朗读中") else if (state.finished && state.chapter != null) tr("本章已播完") else
+                        Text(if (state.buffering != null) tr(state.buffering) else if (state.preparing) tr("正在准备语音") else if (state.playing) tr("朗读中") else if (state.finished && state.chapter != null) tr("本章已播完") else
                             if (state.chapter != null || chapter?.let(manager::savedParagraph) != null) tr("可续听") else "",
                             style = MaterialTheme.typography.labelMedium, color = colors.primary)
                     }
@@ -183,7 +183,7 @@ internal fun ReaderListeningPanel(
             if (state.error != null) {
                 Text(tr(state.error), color = colors.error, style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 8.dp).semantics { liveRegion = LiveRegionMode.Polite })
-                PullOutTextButton(onClick = {
+                if (provider == SpeechSource.System) PullOutTextButton(onClick = {
                     val install = Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA)
                     if (runCatching { context.startActivity(install) }.isFailure) {
                         runCatching { context.startActivity(Intent("com.android.settings.TTS_SETTINGS")) }

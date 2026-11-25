@@ -3,8 +3,6 @@ package com.example.library
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Badge
 import androidx.compose.material3.MaterialTheme
@@ -13,13 +11,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -36,8 +32,6 @@ import com.example.ui.components.PullOutIconButton
 import com.example.ui.feedback.AppMotion
 import com.example.ui.feedback.LocalReduceMotion
 import kotlinx.coroutines.delay
-import kotlin.math.PI
-import kotlin.math.sin
 
 
 @Composable
@@ -73,82 +67,22 @@ internal fun DownloadCenterButton(state: DownloadIndicatorState, onClick: () -> 
     }
     val showingCompletion = acknowledging && state.status == DownloadIndicatorStatus.Idle
     val running = state.status == DownloadIndicatorStatus.Running
-    val morphSpec: FiniteAnimationSpec<Float> = if (reduceMotion) snap() else AppMotion.icon()
-    val activity = animateFloatAsState(if (running || showingCompletion) 1f else 0f, morphSpec, label = "downloadActivity")
-    val success = animateFloatAsState(if (showingCompletion) 1f else 0f, morphSpec, label = "downloadSuccess")
-    val progress = remember { Animatable(state.progress ?: 0f) }
-    var wasDeterminate by remember { mutableStateOf(false) }
-    LaunchedEffect(state.progress, running, showingCompletion) {
-        when {
-            showingCompletion -> progress.animateTo(1f, morphSpec)
-            running && state.progress != null -> {
-                if (wasDeterminate) progress.animateTo(state.progress, morphSpec)
-                else progress.snapTo(state.progress)
-            }
-        }
-        wasDeterminate = running && state.progress != null
-    }
-    val phase = rememberProgressPhase(running && !reduceMotion)
     val colors = MaterialTheme.colorScheme
-    val density = LocalDensity.current
-    val ringStroke = remember(density) { Stroke(with(density) { 1.8.dp.toPx() }, cap = StrokeCap.Round) }
-    val glyphStroke = remember(density) { Stroke(with(density) { 2.1.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round) }
-    val chevron = remember { Path() }
-    val tray = remember { Path() }
-
     Box(Modifier.size(48.dp)) {
-    PullOutIconButton(onClick, modifier = Modifier.fillMaxSize().testTag("download_tasks_entry")
-        .semantics(mergeDescendants = true) {
-            contentDescription = "下载任务"
-            stateDescription = if (showingCompletion) "下载完成" else state.description
-            if (running) progressBarRangeInfo = state.progress?.let { ProgressBarRangeInfo(it, 0f..1f) }
-                ?: ProgressBarRangeInfo.Indeterminate
-        }) {
-        Box(Modifier.size(32.dp)) {
-            Canvas(Modifier.fillMaxSize()) {
-                val unit = size.minDimension / 24f
-                val center = Offset(size.width / 2f, size.height / 2f)
-                val active = activity.value.coerceIn(0f, 1f)
-                val checked = success.value.coerceIn(0f, 1f)
-                val cycle = phase.value
-                val ringRadius = 10.5f * unit
-                if (active > 0f) {
-                    drawAppProgressRing(if (running && state.progress == null) null else progress.value,
-                        cycle, colors.primary.copy(alpha = active), colors.primary.copy(alpha = .13f * active),
-                        center, ringRadius, ringStroke)
-                }
-                withTransform({
-                    translate(center.x - 12f * unit, center.y - 12f * unit)
-                    scale(1f - .24f * active, 1f - .24f * active, Offset(12f * unit, 12f * unit))
-                    if (running) translate(top = sin(cycle * 2f * PI.toFloat()) * .6f * unit)
-                }) {
-                    fun point(x: Float, y: Float) = Offset(x * unit, y * unit)
-                    if (checked < 1f) {
-                        drawLine(colors.primary.copy(alpha = 1f - checked), point(12f, 4f), point(12f, 15f), glyphStroke.width, StrokeCap.Round)
-                    }
-                    fun mix(a: Float, b: Float) = a + (b - a) * checked
-                    chevron.reset()
-                    chevron.moveTo(mix(7f, 6.5f) * unit, mix(10f, 12f) * unit)
-                    chevron.lineTo(mix(12f, 10f) * unit, mix(15f, 15.5f) * unit)
-                    chevron.lineTo(mix(17f, 17.5f) * unit, mix(10f, 8f) * unit)
-                    drawPath(chevron, colors.primary, style = glyphStroke)
-                    val trayAlpha = (1f - active) * (1f - checked)
-                    if (trayAlpha > 0f) {
-                        tray.reset()
-                        tray.moveTo(5f * unit, 16.5f * unit)
-                        tray.lineTo(5f * unit, 20f * unit)
-                        tray.lineTo(19f * unit, 20f * unit)
-                        tray.lineTo(19f * unit, 16.5f * unit)
-                        drawPath(tray, colors.primary.copy(alpha = trayAlpha), style = glyphStroke)
-                    }
-                }
-            }
-        }
-    }
-            // Keep badges outside IconButton's circular state-layer clip, inside its 48dp hit area.
-            Box(Modifier.align(Alignment.TopEnd).size(40.dp, 20.dp).clearAndSetSemantics {
-                this[androidx.compose.ui.semantics.SemanticsProperties.TestTag] = "download_count_badge"
+        PullOutIconButton(onClick, modifier = Modifier.fillMaxSize().testTag("download_tasks_entry")
+            .semantics(mergeDescendants = true) {
+                contentDescription = "下载任务"
+                stateDescription = if (showingCompletion) "下载完成" else state.description
+                if (running) progressBarRangeInfo = state.progress?.let { ProgressBarRangeInfo(it, 0f..1f) }
+                    ?: ProgressBarRangeInfo.Indeterminate
             }) {
+            DownloadGlyph(running, showingCompletion, state.progress, Modifier.size(34.dp))
+        }
+
+        // Keep the badge inside the tap target and outside the icon's circular clip.
+        Box(Modifier.align(Alignment.TopEnd).size(40.dp, 20.dp).clearAndSetSemantics {
+            this[androidx.compose.ui.semantics.SemanticsProperties.TestTag] = "download_count_badge"
+        }) {
             AnimatedContent(state.activeCount, Modifier.fillMaxSize(), contentAlignment = Alignment.TopEnd,
                 transitionSpec = {
                     val motion = if (reduceMotion) EnterTransition.None togetherWith ExitTransition.None
@@ -156,17 +90,94 @@ internal fun DownloadCenterButton(state: DownloadIndicatorState, onClick: () -> 
                         (fadeOut(tween(120)) + scaleOut(tween(160), targetScale = .7f))
                     motion.using(null)
                 }, label = "downloadCount") { count ->
-                if (count > 0) Badge(modifier = Modifier.wrapContentSize(Alignment.TopEnd), containerColor = colors.primary, contentColor = colors.onPrimary) {
+                if (count > 0) Badge(
+                    modifier = Modifier.wrapContentSize(Alignment.TopEnd),
+                    containerColor = colors.primary, contentColor = colors.onPrimary,
+                ) {
                     Text(if (count > 99) "99+" else count.toString(), maxLines = 1, softWrap = false)
                 }
             }
+        }
+        AnimatedVisibility(!running && !showingCompletion && (state.failedCount > 0 || state.pausedCount > 0),
+            Modifier.align(Alignment.TopEnd).clearAndSetSemantics { },
+            enter = if (reduceMotion) EnterTransition.None else fadeIn(tween(160)) + scaleIn(tween(220), initialScale = .7f),
+            exit = if (reduceMotion) ExitTransition.None else fadeOut(tween(120)) + scaleOut(tween(160), targetScale = .7f)) {
+            AttentionMarker(state.failedCount > 0, reduceMotion)
+        }
+    }
+}
+
+@Composable
+internal fun DownloadGlyph(
+    running: Boolean,
+    completed: Boolean,
+    fraction: Float?,
+    modifier: Modifier,
+    tint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
+) {
+    val reduceMotion = LocalReduceMotion.current
+    val morphSpec: FiniteAnimationSpec<Float> = if (reduceMotion) snap() else AppMotion.icon()
+    val activity = animateFloatAsState(if (running || completed) 1f else 0f, morphSpec, label = "downloadActivity")
+    val success = animateFloatAsState(if (completed) 1f else 0f, morphSpec, label = "downloadSuccess")
+    val progress = remember { Animatable(fraction ?: 0f) }
+    var wasDeterminate by remember { mutableStateOf(false) }
+    LaunchedEffect(fraction, running, completed) {
+        when {
+            completed -> progress.animateTo(1f, morphSpec)
+            running && fraction != null -> {
+                if (wasDeterminate) progress.animateTo(fraction, morphSpec)
+                else progress.snapTo(fraction)
             }
-            AnimatedVisibility(!running && !showingCompletion && (state.failedCount > 0 || state.pausedCount > 0),
-                Modifier.align(Alignment.TopEnd).clearAndSetSemantics { },
-                enter = if (reduceMotion) EnterTransition.None else fadeIn(tween(160)) + scaleIn(tween(220), initialScale = .7f),
-                exit = if (reduceMotion) ExitTransition.None else fadeOut(tween(120)) + scaleOut(tween(160), targetScale = .7f)) {
-                AttentionMarker(state.failedCount > 0, reduceMotion)
+        }
+        wasDeterminate = running && fraction != null
+    }
+    val phase = rememberProgressPhase(running && !reduceMotion)
+    val density = LocalDensity.current
+    val ringStroke = remember(density) { Stroke(with(density) { 1.8.dp.toPx() }, cap = StrokeCap.Round) }
+    val glyphStroke = remember(density) { Stroke(with(density) { 2.1.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round) }
+    val chevron = remember { Path() }
+    val tray = remember { Path() }
+
+    Box(modifier) {
+        Canvas(Modifier.fillMaxSize()) {
+            val unit = size.minDimension / 24f
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val active = activity.value.coerceIn(0f, 1f)
+            val checked = success.value.coerceIn(0f, 1f)
+            val cycle = phase.value
+            val ringRadius = 10.5f * unit
+            if (active > 0f) {
+                drawAppProgressRing(if (running && fraction == null && active > .85f) null else progress.value,
+                    cycle, tint.copy(alpha = active), tint.copy(alpha = .13f * active),
+                    center, ringRadius, ringStroke)
             }
+            withTransform({
+                translate(center.x - 12f * unit, center.y - 12f * unit)
+                scale(1f - .24f * active, 1f - .24f * active, Offset(12f * unit, 12f * unit))
+                // Center the active arrow on its visual bounds.
+                translate(top = 2.5f * active * (1f - checked) * unit)
+            }) {
+                fun point(x: Float, y: Float) = Offset(x * unit, y * unit)
+                if (checked < 1f) {
+                    drawLine(tint.copy(alpha = 1f - checked), point(12f, 4f), point(12f, 15f), glyphStroke.width, StrokeCap.Round)
+                }
+                fun mix(a: Float, b: Float) = a + (b - a) * checked
+                chevron.reset()
+                chevron.moveTo(mix(7f, 6.5f) * unit, mix(10f, 12f) * unit)
+                chevron.lineTo(mix(12f, 10f) * unit, mix(15f, 15.5f) * unit)
+                chevron.lineTo(mix(17f, 17.5f) * unit, mix(10f, 8f) * unit)
+                drawPath(chevron, tint, style = glyphStroke)
+                val trayAlpha = (1f - active) * (1f - checked)
+                if (trayAlpha > 0f) {
+                    tray.reset()
+                    tray.moveTo(5f * unit, 16.5f * unit)
+                    tray.lineTo(5f * unit, 20f * unit)
+                    tray.lineTo(19f * unit, 20f * unit)
+                    tray.lineTo(19f * unit, 16.5f * unit)
+                    drawPath(tray, tint.copy(alpha = trayAlpha), style = glyphStroke)
+                }
+            }
+        }
     }
 }
 

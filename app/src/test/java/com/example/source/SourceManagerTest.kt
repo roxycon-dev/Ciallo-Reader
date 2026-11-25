@@ -45,6 +45,30 @@ class SourceManagerTest {
     }
 
     @Test
+    fun sourceOrdersRestoreAndDefaultAlwaysFollowsRegistry() = runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val storage = SharedPreferencesSourceStorage(context)
+        val sources = (1..3).map { createSampleCustomSource("order-$it", "Source $it") }
+        suspend fun manager() = SourceManager(storage).apply {
+            initialize()
+            sources.forEach { registerSource(it) }
+        }
+
+        val first = manager()
+        first.saveCustomOrder(listOf("order-2", "order-3", "order-1"))
+        first.recordSourceLoad(sources[0], 700)
+        first.recordSourceLoad(sources[1], 200)
+        first.setSortMode(SourceSortMode.SPEED)
+
+        val restored = manager()
+        assertEquals(listOf("order-2", "order-1", "order-3"), restored.allSources.value.map { it.id })
+        restored.setSortMode(SourceSortMode.CUSTOM)
+        assertEquals(listOf("order-2", "order-3", "order-1"), restored.availableSources.value.map { it.id })
+        restored.setSortMode(SourceSortMode.DEFAULT)
+        assertEquals(listOf("order-1", "order-2", "order-3"), restored.allSources.value.map { it.id })
+    }
+
+    @Test
     fun testRegisterAndUnregisterCustomSource() = runTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val storage = SharedPreferencesSourceStorage(context)

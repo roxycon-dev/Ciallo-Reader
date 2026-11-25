@@ -66,6 +66,10 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -80,7 +84,7 @@ import com.example.source.ComicChapter
 import com.example.source.SearchBook
 import com.example.source.isKnownComicAuthor
 import com.example.ui.components.AppIconButton
-import com.example.ui.components.PlayPauseMorphButton
+import com.example.library.DownloadGlyph
 import com.example.ui.favorite.BookmarkRibbon
 import com.example.ui.favorite.FavoriteHeartIcon
 import com.example.ui.favorite.SourceUnavailableBanner
@@ -602,6 +606,10 @@ fun ComicChaptersScreen(
                                 isNew = chapter.id in newIds,
                                 downloaded = chapter.id in downloadedChapterIds,
                                 downloading = chapter.id in downloadingChapters,
+                                paused = chapter.id in pausedChapters,
+                                onPause = { onPauseDownload(chapter) },
+                                onResume = { onResumeDownload(chapter) },
+                                onCancel = { onCancelDownload(chapter) },
                                 downloadProgress = downloadProgress[chapter.id] ?: 0f,
                                 external = chapter.external,
                                 highlighted = highlightId == chapter.id,
@@ -652,19 +660,6 @@ fun ComicChaptersScreen(
             }
             }
 
-            // 下载进度悬浮窗
-            val activeDownloadChapter = chapters.firstOrNull { it.id in downloadingChapters }
-            if (activeDownloadChapter != null) {
-                DownloadProgressOverlay(
-                    chapter = activeDownloadChapter,
-                    progress = downloadProgress[activeDownloadChapter.id] ?: 0f,
-                    paused = pausedChapters.contains(activeDownloadChapter.id),
-                    onPause = { onPauseDownload(activeDownloadChapter) },
-                    onResume = { onResumeDownload(activeDownloadChapter) },
-                    onCancel = { onCancelDownload(activeDownloadChapter) }
-                )
-            }
-
             // ⚠️ 神回编辑窗必须在这个**带底栏内边距**的 Box 里：放外面的话
             // 窗体 92% 高度会铺到 Scaffold 底栏后面 —— 取消/保存按钮被
             // 「继续阅读」底栏盖住（用户实测）。
@@ -708,6 +703,10 @@ private fun ChapterCardSpec(
     isNew: Boolean,
     downloaded: Boolean,
     downloading: Boolean,
+    paused: Boolean,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onCancel: () -> Unit,
     downloadProgress: Float,
     external: Boolean,
     highlighted: Boolean,
@@ -905,29 +904,45 @@ private fun ChapterCardSpec(
             ) {
                 when {
                     selecting -> if (canSelect) CheckCircleSpec(checked = checked)
-                    downloading -> CircularProgressIndicator(
-                        progress = { downloadProgress.coerceIn(0f, 1f) },
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.5.dp,
-                        color = MintPrimary,
-                        trackColor = MintPrimary.copy(alpha = 0.18f),
-                    )
-                    downloaded -> WenkuIcon(
-                        WenkuSymbol.Check,
-                        modifier = Modifier.semantics { contentDescription = tr("已下载") },
-                        size = 20.dp,
-                        tint = MintPrimary,
-                    )
                     external || textMode -> WenkuIcon(WenkuSymbol.Forward, size = 18.dp, tint = textMuted)
-                    else -> AppIconButton(
-                        icon = Icons.Filled.Download,
-                        contentDescription = tr("下载"),
-                        onClick = onDownload,
-                        modifier = Modifier.size(40.dp),
-                        tint = textMuted,
-                        glyphSize = 20.dp,
-                        wenkuSymbol = WenkuSymbol.Download,
-                    )
+                    else -> {
+                        val running = downloading && !paused && !downloaded
+                        val label = when {
+                            downloaded -> tr("已下载")
+                            paused -> tr("继续")
+                            running -> tr("暂停")
+                            else -> tr("下载")
+                        }
+                        val action = when {
+                            downloaded -> null
+                            paused -> onResume
+                            running -> onPause
+                            else -> onDownload
+                        }
+                        val progress = downloadProgress.takeIf { it.isFinite() && it > 0f }?.coerceAtMost(1f)
+                        Box(
+                            Modifier.fillMaxSize()
+                                .semantics {
+                                    contentDescription = label
+                                    if (running) {
+                                        progressBarRangeInfo = progress?.let { ProgressBarRangeInfo(it, 0f..1f) }
+                                            ?: ProgressBarRangeInfo.Indeterminate
+                                    }
+                                    if (running || paused) customActions = listOf(
+                                        CustomAccessibilityAction(tr("取消下载")) { onCancel(); true }
+                                    )
+                                }
+                                .then(if (action != null) Modifier.clip(CircleShape)
+                                    .pullOutClickable(onClick = action) else Modifier),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            AnimatedContent(paused && !downloaded, label = "chapterDownloadAction") { isPaused ->
+                                if (isPaused) WenkuIcon(WenkuSymbol.Play, size = 26.dp, tint = MintPrimary)
+                                else DownloadGlyph(running, downloaded, progress, Modifier.size(26.dp),
+                                    tint = if (running || downloaded) MintPrimary else textMuted)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1309,86 +1324,6 @@ private fun ComicHeroHeader(
         } else if (!textMode) {
             Text(tr("源站暂未提供简介"), modifier = Modifier.padding(top = 12.dp),
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-private fun DownloadProgressOverlay(
-    chapter: ComicChapter,
-    progress: Float,
-    paused: Boolean,
-    onPause: () -> Unit,
-    onResume: () -> Unit,
-    onCancel: () -> Unit
-) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        Card(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .consistentShadow(10.dp, RoundedCornerShape(18.dp)),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-        )
-        {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                com.example.ui.components.AppProgressIndicator(
-                    progress = { progress.coerceIn(0f, 1f) },
-                    modifier = Modifier.size(26.dp),
-                    strokeWidth = 3.dp,
-                    color = MintPrimary
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (paused) "已暂停：${chapter.title}" else "正在下载：${chapter.title}",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    LinearProgressIndicator(
-                        progress = { progress.coerceIn(0f, 1f) },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = MintPrimary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                if (!paused) {
-                    Text(
-                        text = "${(progress.coerceIn(0f, 1f) * 100).toInt()}%",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MintPrimary
-                    )
-                }
-                Spacer(modifier = Modifier.width(6.dp))
-                PlayPauseMorphButton(
-                    isPlaying = !paused,
-                    onClick = if (paused) onResume else onPause,
-                    sizeDp = 36
-                )
-                AppIconButton(
-                    icon = Icons.Default.Close,
-                    contentDescription = tr("取消下载"),
-                    tint = MaterialTheme.colorScheme.error,
-                    glyphSize = 20.dp,
-                    onClick = onCancel, modifier = Modifier.size(36.dp)
-                )
-            }
         }
     }
 }

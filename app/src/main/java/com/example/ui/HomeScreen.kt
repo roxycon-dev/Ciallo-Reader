@@ -1007,8 +1007,6 @@ fun HomeScreen(
                                         if (heroCoverData == null) null else {
                                             coil.request.ImageRequest.Builder(context)
                                                 .data(heroCoverData)
-                                                .memoryCacheKey(currentlyReading.coverUri)
-                                                .diskCacheKey(currentlyReading.coverUri)
                                                 .crossfade(true)
                                                 .build()
                                         }
@@ -1185,6 +1183,7 @@ fun HomeScreen(
                                             ShelfViewControl(use3dShelf) {
                                                 use3dShelf = !use3dShelf
                                                 shelfPrefs.shelfUses3dView = use3dShelf
+                                                com.example.ui.wenku.WenkuVolumeFlightBridge.cancel()
                                             }
                                         }
                                         FlowRow(
@@ -1402,8 +1401,6 @@ fun HomeScreen(
                                             if (coverData == null) null else {
                                                 coil.request.ImageRequest.Builder(context)
                                                     .data(coverData)
-                                                    .memoryCacheKey(book.coverUri)
-                                                    .diskCacheKey(book.coverUri)
                                                     // 封面飞行的贴图要把这张 drawable 光栅化成
                                                     // 软件位图；硬件位图画不进软件 Canvas，这里直接要软件位图。
                                                     .allowHardware(false)

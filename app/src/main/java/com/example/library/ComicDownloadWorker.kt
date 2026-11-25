@@ -44,6 +44,7 @@ class ComicDownloadWorker(context:Context,params:WorkerParameters):CoroutineWork
                         ComicLocalImporter.importChapter(applicationContext,dao,task.book,task.chapter,images,
                             headers=source.getChapterImageHeaders(task.chapter.id,images),targetDir=dir,
                             resolveImage={ source.resolveChapterImage(it) },resolveHeaders={ source.getResolvedHeaders(it) },concurrency=3,
+                            coverHeaders={ source.getCoverHeaders(it) },
                             onProgress={ progress -> ComicDownloadManager.update(key,false) { it.copy(progress=progress) } }).getOrThrow()
                     }
                     withContext(NonCancellable) {

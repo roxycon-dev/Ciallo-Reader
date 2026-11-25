@@ -36,7 +36,10 @@ class LlmBubbleTranslator(private val context: Context, private val clientOverri
         val modelName: String,
         val geminiFormat: Boolean,
     ) {
-        fun isValid(): Boolean = apiUrl.trim().toHttpUrlOrNull() != null && modelName.isNotBlank()
+        fun isValid(): Boolean {
+            val url = apiUrl.trim().toHttpUrlOrNull() ?: return false
+            return modelName.isNotBlank() && (!isDashScope(url.host) || apiKey.isNotBlank())
+        }
     }
 
     data class Item(val id: Int, val text: String)
@@ -63,6 +66,11 @@ class LlmBubbleTranslator(private val context: Context, private val clientOverri
             .writeTimeout(15, TimeUnit.SECONDS)
             .callTimeout(22, TimeUnit.SECONDS)
             .build()
+    }
+
+    private val pagePrompt by lazy {
+        runCatching { context.assets.open("mt/llm_prompt.txt").bufferedReader().use { it.readText() } }
+            .getOrDefault(PROMPT_FALLBACK)
     }
 
     private val secrets = com.example.data.EncryptedSecretStore(context)
@@ -96,7 +104,7 @@ class LlmBubbleTranslator(private val context: Context, private val clientOverri
 
     fun cacheFingerprint():String {
         val cfg=loadConfig()
-        val data="${cfg.apiUrl}|${cfg.modelName}|${cfg.geminiFormat}|$glossaryKey|prompt-v3"
+        val data="${cfg.apiUrl}|${cfg.modelName}|${cfg.geminiFormat}|$glossaryKey|prompt-v4"
         return java.security.MessageDigest.getInstance("SHA-256").digest(data.toByteArray()).joinToString("") { "%02x".format(it) }
     }
     fun glossarySnapshot(): Map<String, String> =
@@ -136,11 +144,7 @@ class LlmBubbleTranslator(private val context: Context, private val clientOverri
             if(!TranslationPrivacy.allowed(context)) { lastFailure = TranslationFailure.Privacy; return@withContext null }
             val cfg = loadConfig()
             if (!cfg.isValid()) { lastFailure = TranslationFailure.Config; return@withContext null }
-            val prompt = runCatching {
-                context.assets.open("mt/llm_prompt.txt").bufferedReader(Charsets.UTF_8).readText()
-            }.getOrElse {
-                PROMPT_FALLBACK
-            }
+            val prompt = pagePrompt
             try {
                 // Keep the whole page ordered and in context; bound input/output size per request.
                 kotlinx.coroutines.withTimeout(28_000L) {
@@ -221,6 +225,11 @@ class LlmBubbleTranslator(private val context: Context, private val clientOverri
             .put("temperature", 0.2)
             .put("stream", false)
             .put("max_tokens", (itemsOutputBudget(userPayload)).coerceIn(1024, 8192))
+        val host = cfg.apiUrl.toHttpUrlOrNull()?.host.orEmpty()
+        if (isDashScope(host) && cfg.modelName == DEFAULT_MODEL) {
+            body.put("enable_thinking", false)
+            body.put("response_format", JSONObject().put("type", "json_object"))
+        }
         return compatibleEndpoint(cfg.apiUrl) to body.toString()
     }
 
@@ -325,6 +334,11 @@ class LlmBubbleTranslator(private val context: Context, private val clientOverri
     }
 
     companion object {
+        const val DEFAULT_ENDPOINT = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        const val DEFAULT_MODEL = "qwen-flash"
+
+        private fun isDashScope(host: String): Boolean =
+            host == "dashscope.aliyuncs.com" || host.endsWith(".cn-beijing.maas.aliyuncs.com")
 
         /** 离线兜底精简版提示词（与原仓库协议兼容；assets 缺失时用）。 */
         val PROMPT_FALLBACK = """你是漫画翻译机。把外语漫画文字翻译成简体中文。只输出合法 JSON，禁止任何解释或 markdown 代码块。

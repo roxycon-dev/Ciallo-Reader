@@ -22,7 +22,7 @@ internal object BackupArchive {
         "reading_records", "reading_sessions", "favorites", "comic_progress", "comic_chapter_read",
         "favorite_categories", "god_moments")
     private val ownedNames = setOf("imports", "epub_images", "docx_images", "fb2_images", "mobi_images",
-        "epub_covers", "fb2_covers", "mobi_covers", "comic_covers", "god_covers", "sample_comic", "chapter_catalogs")
+        "epub_covers", "fb2_covers", "mobi_covers", "comic_covers", "download_covers", "god_covers", "sample_comic", "chapter_catalogs")
     private fun owned(name: String) = name in ownedNames || name.startsWith("comics_") || name.startsWith("restored_") || name.startsWith("custom_poster_") || name.startsWith("custom_background_") || name.startsWith("custom_app_bg_") || name.startsWith("custom_font_")
     internal fun safeSetting(key: String): Boolean = !Regex("(?i)(cookie|token|password|credential|secret|api.?key|pin_|salt|auth)").containsMatchIn(key)
     private val settingTypes = buildMap<String, String> {

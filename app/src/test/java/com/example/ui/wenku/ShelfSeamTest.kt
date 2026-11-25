@@ -111,6 +111,27 @@ class ShelfSeamTest {
     }
 
     @Test
+    fun completedVolumeFlightCannotReturnTwiceOrLeakIntoFlatShelf() {
+        val volume = art()
+        val bridge = WenkuVolumeFlightBridge
+        try {
+            assertTrue(bridge.begin("1005", 1005, volume, restOx, restOy))
+            bridge.finished(requireNotNull(bridge.request))
+            assertTrue(bridge.reverse("1005"))
+            bridge.finished(requireNotNull(bridge.request))
+            assertTrue(!bridge.reverse("1005"))
+            assertTrue(bridge.begin("1005", 1005, volume, restOx, restOy))
+            bridge.finished(requireNotNull(bridge.request))
+            WenkuFlightBridge.begin("1005", Rect(0f, 0f, 120f, 190f), null)
+            assertTrue(!bridge.reverse("1005"))
+            assertTrue(!bridge.suppressRouteMotion)
+        } finally {
+            bridge.cancel()
+            WenkuFlightBridge.cancel()
+        }
+    }
+
+    @Test
     fun flightFirstFrameIsPixelIdenticalToShelfRestingFrame() {
         // 书架静止帧 = 静止姿态；飞行第 0 帧 = poseAt(0)。两者必须逐像素相同。
         val shelfPose = RESTING_VOLUME_POSE.copy(ox = restOx, oy = restOy)

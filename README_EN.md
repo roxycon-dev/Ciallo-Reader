@@ -12,7 +12,13 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 </div>
 
-[1.6.6 release notes](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.6.6)
+## QQ feedback group
+
+**Group number `1131953681`** · Join to report bugs and suggest features. Search for the group number in QQ or open the QR code below to scan it.
+
+<a href="docs/readme-media/qq-feedback.jpg"><img src="docs/readme-media/qq-feedback.jpg" width="220" alt="QR code for the Ciallo Reader QQ feedback group, 1131953681"></a>
+
+[1.6.8 release notes](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.6.8)
 
 [Discovery and shelf](#discovery-and-shelf) · [Novels and ebooks](#novels-and-ebooks) · [Listening and annotations](#listening-dictionaries-and-annotations) · [Manga](#manga) · [Stats and appearance](#stats-and-appearance) · [Built-in sources](#built-in-sources) · [Backups and transfers](#backups-and-device-transfer) · [Getting started](#getting-started)
 
@@ -33,7 +39,7 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 - Search novels and manga across sources, filter by provider, and use Chinese, Japanese, or English title aliases. Reuse search history. Browse recommendations, updates, rankings, shared categories, and source categories.
 - Favorite online titles and resume from your saved position. Organize the shelf with categories, search, sorting, a list, and a 3D view with book-opening transitions. Import in batches, organize local and downloaded books, and mark them as finished.
-- Download whole novels or selected manga chapters and volumes where the source supports it. Pause, resume, or retry downloads in the download center. Finished titles open offline from the shelf. Clear download records independently from shelf files.
+- Download whole novels or selected manga chapters and volumes where the source supports it. Pause, resume, or retry downloads in the download center. Finished titles open offline from the shelf. Long-press a task to select individual or all download records for removal. Files already on the shelf remain available.
 
 ## Novels and ebooks
 
@@ -91,7 +97,7 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 - Read in single-page, two-page, webtoon, or seamless scrolling mode. Set reading direction, page snapping, double-tap zoom, automatic or manual trimming, spread splitting, auto page turns, background, and preloading.
 - Use built-in sharpening, line enhancement, lightweight upscaling, or fast JaNai. Adjust brightness, contrast, saturation, hue, gamma, shadows, or grayscale. The full MangaJaNai model runs offline after the initial download of about 76 MB.
-- Detect speech bubbles and recognize text on device. Translate pages using the selected online service or custom AI endpoint, place the translation in the speech bubbles, and switch back to the original image. Manage cached translations from the reader.
+- Detect speech bubbles and recognize text on device. Translate pages using a ready Android system translator, an online service, or a custom AI endpoint, place the translation in the speech bubbles, and switch back to the original image. Manage cached translations from the reader.
 - Save presets or settings per title. Customize touch zones, ambient sound, and effects.
 - Choose slide, fade, or simulated page turns. Turn pages with the volume keys, scrub thumbnails, or hide system bars. Align spreads, show the cover on its own, and adjust spacing or auto-scroll speed in webtoon mode.
 
@@ -144,7 +150,7 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 ### Source management and extensions
 
-- Enable, disable, or verify providers in **Settings → Source management**. Cross-source search can query multiple providers. Switch when a title has another available source.
+- Enable, disable, or verify providers in **Settings → Source management**. Use the default order, sort by load speed, or set a custom order. Cross-source search can query multiple providers. Switch when a title has another available source.
 - Import **Legado JSON** with CSS, JSONPath, and supported discovery rules. **Venera-compatible manga sources** can sync from a script repository. The catalog varies with the repository version. Examples include MYCOMIC with site verification and optionally synced sources such as WNACG, E-Hentai, and JMComic.
 - Discovery remembers separate sources and filters for novels and manga. Browse aggregated and single-source lists, updates, rankings, and multiple categories. Inspect participating sources and errors. See results in a list, grid, or large-cover view.
 - Third-party availability, sign-in, regional access, and downloadable chapters depend on each service. [Novel source checks](docs/source-repair-2026-10-20.md) · [Whole-book EPUB verification](docs/novel-guest-sources-verification-2026-10-19.md) · [Manga source checks](docs/latest-comic-source-verification-2026-10-18.md)

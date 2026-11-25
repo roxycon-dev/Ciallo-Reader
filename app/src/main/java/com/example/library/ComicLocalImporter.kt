@@ -81,7 +81,8 @@ object ComicLocalImporter {
         targetDir: File? = null,
         resolveImage: (suspend (String) -> String?)? = null,
         resolveHeaders: (suspend (String) -> Map<String, String>)? = null,
-        concurrency: Int = 3
+        concurrency: Int = 3,
+        coverHeaders: (suspend (String) -> Map<String, String>)? = null,
     ): Result<Book> = withContext(Dispatchers.IO) {
         var comicDir: File? = null
         var pendingCover: File? = null
@@ -277,7 +278,10 @@ object ComicLocalImporter {
             if (!coverDir.exists()) coverDir.mkdirs()
             val coverFile = File(coverDir, "cover_${java.util.UUID.randomUUID()}.jpg")
             pendingCover = coverFile
-            pageFiles.first().copyTo(coverFile, overwrite = true)
+            val firstPage = pageFiles.first()
+            val sourceCover = DownloadedCover.betterImage(context, book.cover, firstPage, book.sourceId, coverHeaders)
+            if (sourceCover == null) firstPage.copyTo(coverFile, overwrite = true)
+            else coverFile.writeBytes(sourceCover)
 
             val cleanTitle = "${book.title} · ${chapter.title}"
                 .replace(Regex("[\\\\/:*?\"<>|]"), "_")

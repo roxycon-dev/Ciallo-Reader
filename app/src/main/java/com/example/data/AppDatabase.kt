@@ -38,6 +38,9 @@ interface BookDao {
     @Update
     suspend fun updateBook(book: Book)
 
+    @Query("UPDATE books SET coverUri = :cover WHERE id = :id AND filePath = :filePath")
+    suspend fun updateDownloadedCover(id: Int, filePath: String, cover: String): Int
+
     @Query("UPDATE books SET currentChapterIndex=:chapter,scrollOffset=:offset,isFinished=isFinished OR :finished,lastReadTime=:time WHERE id=:bookId")
     suspend fun updateProgress(bookId:Int,chapter:Int,offset:Int,finished:Boolean,time:Long)
 

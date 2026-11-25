@@ -27,6 +27,16 @@ class SourceViewModel(
     val activeSource: StateFlow<BookSource?> = sourceManager.activeSource
     val enabledStates: StateFlow<Map<String, Boolean>> = sourceManager.enabledStates
 
+    val ordering = sourceManager.ordering
+
+    fun setSortMode(mode: SourceSortMode) = viewModelScope.launch {
+        sourceManager.setSortMode(mode)
+    }
+
+    fun saveCustomOrder(ids: List<String>) = viewModelScope.launch {
+        sourceManager.saveCustomOrder(ids)
+    }
+
     init {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             sourceManager.initialize()

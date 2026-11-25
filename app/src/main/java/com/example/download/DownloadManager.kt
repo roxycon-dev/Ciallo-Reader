@@ -256,19 +256,24 @@ class DownloadManager(private val context: Context) {
         scope.launch {
             taskMutex.withLock {
                 val bookId = resolveTaskId(requestedId)
-                workManager.cancelUniqueWork("download_$bookId").result.get()
+                val existing = taskDao.getTaskById(bookId)
+                if (existing != null && existing.status != DownloadStatus.COMPLETED) {
+                    workManager.cancelUniqueWork("download_$bookId").result.get()
+                }
                 DownloadWorker.withTaskLock(bookId) {
+                    NovelDownloadStore(context).discard(bookId)
+                    DownloadProgressBroadcaster.removeState(bookId)
                     val task = taskDao.getTaskById(bookId) ?: return@withTaskLock
                     val completed = task.status == DownloadStatus.COMPLETED
                     val finalFile = File(task.filePath)
                     val downloadsDir = File(context.filesDir, "downloads")
-                    File(downloadsDir, "${finalFile.nameWithoutExtension}.tmp").delete()
+                    val temporary = File(downloadsDir, "${finalFile.nameWithoutExtension}.tmp")
+                    temporary.delete()
                     File(downloadsDir, "${finalFile.nameWithoutExtension}.resume").delete()
-                    GuestNovelCheckpoint.clear(finalFile)
+                    GuestNovelCheckpoint.clear(temporary)
                     if (!completed && !bookExistsForTask(task)) finalFile.delete()
                     taskDao.deleteTaskById(bookId)
                     secrets.remove("download:$bookId")
-                    DownloadProgressBroadcaster.removeState(bookId)
                 }
             }
         }

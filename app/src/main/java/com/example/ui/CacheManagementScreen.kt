@@ -83,7 +83,7 @@ import com.example.ui.wenku.WenkuTextButton
 import com.example.ui.wenku.wenkuPagePart
 
 /** 四类书籍封面目录（漫画/EPUB/FB2/MOBI 解析产物）。 */
-private val COVER_DIRS = listOf("comic_covers", "epub_covers", "fb2_covers", "mobi_covers")
+private val COVER_DIRS = listOf("comic_covers", "epub_covers", "fb2_covers", "mobi_covers", "download_covers")
 
 /**
  * 存储行数据。zone 划分即安全模型：

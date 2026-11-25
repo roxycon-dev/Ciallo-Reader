@@ -15,6 +15,16 @@ import org.junit.Test
 
 /** Real ONNX inference on dimensions that previously aliased/recycled the source bitmap. */
 class TranslationRecoveryDeviceTest {
+    @Test fun androidSystemTranslationUsesInstalledCapabilitiesOrReturnsPromptly() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val start = android.os.SystemClock.elapsedRealtime()
+        val result = SystemTextTranslation(context).translate(listOf("Good morning.", "Thank you."), "en")
+        val elapsed = android.os.SystemClock.elapsedRealtime() - start
+        assertTrue("System translation exceeded the fallback budget", elapsed < 4_000L)
+        if (result != null) assertEquals(2, result.size)
+        println("System translation result available=" + (result != null) + ", elapsedMillis=" + elapsed)
+    }
+
     @Test fun squareDetectorInputsRemainAliveAndProduceTranslatedRegions() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         OrtSessions.ensureCacheRoot(context)

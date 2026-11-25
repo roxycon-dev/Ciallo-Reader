@@ -1918,7 +1918,8 @@ fun ReaderScreen(
                 ReaderListeningPanel(
                     manager = ttsManager,
                     state = if (ownsListening) listening else listening.copy(
-                        chapter = null, paragraph = 0, playing = false, preparing = false
+                        chapter = null, paragraph = 0, playing = false, preparing = false,
+                        buffering = null, error = null, finished = false,
                     ),
                     chapter = listeningChapter,
                     prefs = prefs,

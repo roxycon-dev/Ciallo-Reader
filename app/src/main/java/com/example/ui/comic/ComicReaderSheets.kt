@@ -444,8 +444,9 @@ private fun TranslationTab(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceCompact)) {
                 PullOutTextButton(onClick = { useProvider("https://api.siliconflow.cn/v1", "Qwen/Qwen2.5-7B-Instruct") }) { Text(tr("硅基流动"), color = MintPrimary) }
                 PullOutTextButton(onClick = { useProvider("https://api.deepseek.com/v1", "deepseek-chat") }) { Text("DeepSeek", color = MintPrimary) }
-                PullOutTextButton(onClick = { useProvider("https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus") }) { Text(tr("阿里百炼"), color = MintPrimary) }
+                PullOutTextButton(onClick = { useProvider(LlmBubbleTranslator.DEFAULT_ENDPOINT, LlmBubbleTranslator.DEFAULT_MODEL) }) { Text(tr("阿里百炼"), color = MintPrimary) }
             }
+            PanelHint(tr("阿里百炼 Qwen Flash 需要中国内地地区的 API Key"))
             PanelTextField(tr("API 地址（支持完整 chat/completions 地址）"), llmUrl) {
                 saveLlm(it, llmKey, llmModel, llmGemini)
             }
@@ -511,7 +512,14 @@ private fun TranslationTab(
     } else {
         /* ── 一级页：引擎选择卡片 ── */
         PanelSectionCard(tr("翻译引擎（点击选择）"), Icons.Filled.Bolt) {
-            val aiConfigured = llmUrl.isNotBlank() && llmModel.isNotBlank()
+            val aiConfigured = LlmBubbleTranslator.LlmConfig(llmUrl, llmKey, llmModel, llmGemini).isValid()
+            EngineCard(
+                title = tr("自动选择"),
+                desc = tr("优先使用已配置的 AI，其次系统翻译与免 Key 在线翻译"),
+                state = if (config.translationEngine == "auto") tr("当前使用") else tr("点击选用"),
+                selected = config.translationEngine == "auto",
+            ) { update { it.copy(translationEngine = "auto") } }
+            Spacer(Modifier.height(DesignTokens.SpaceSm))
             EngineCard(
                 title = tr("自定义 AI 接口"),
                 desc = tr("上下文翻译"),

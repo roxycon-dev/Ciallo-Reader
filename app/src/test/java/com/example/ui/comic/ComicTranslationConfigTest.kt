@@ -25,6 +25,15 @@ class ComicTranslationConfigTest {
     }
 
     @Test
+    fun `old online default migrates but a new explicit selection round trips`() {
+        val old = JSONObject("""{"translationEngine":"online"}""")
+        assertEquals("auto", ComicReaderConfig.fromJson(old).translationEngine)
+        val explicit = ComicReaderConfig(translationEngine = "online").toJson()
+        assertEquals("online", ComicReaderConfig.fromJson(explicit).translationEngine)
+        assertEquals("ai", ComicReaderConfig.fromJson(JSONObject("""{"translationEngine":"ai"}""")).translationEngine)
+    }
+
+    @Test
     fun `translation fields round trip`() {
         val config = ComicReaderConfig(
             translationEnabled = true,

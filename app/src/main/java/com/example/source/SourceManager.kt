@@ -28,6 +28,9 @@ class SourceManager(private val storage: SourceStorage? = null) {
     private val _activeSource = MutableStateFlow<BookSource?>(null)
     val activeSource: StateFlow<BookSource?> = _activeSource.asStateFlow()
 
+    private val _ordering = MutableStateFlow(SourceOrdering())
+    val ordering = _ordering.asStateFlow()
+
     private val initialized = AtomicBoolean(false)
     private val mutex = Mutex()
 
@@ -49,6 +52,7 @@ class SourceManager(private val storage: SourceStorage? = null) {
 
     private suspend fun loadPersistedDataInternal() {
         storage?.let { store ->
+            _ordering.value = store.getSourceOrdering()
             val savedStates = store.getSourceStates()
             enabledStatesMap.putAll(savedStates)
             _enabledStates.value = enabledStatesMap.toMap()
@@ -168,8 +172,32 @@ class SourceManager(private val storage: SourceStorage? = null) {
         return (src is JsonBookSource && src.config.isCustom) || customJsonsMap.containsKey(sourceId)
     }
 
+    suspend fun setSortMode(mode: SourceSortMode) = mutex.withLock {
+        updateOrdering(_ordering.value.copy(mode = mode))
+    }
+
+    suspend fun saveCustomOrder(ids: List<String>) = mutex.withLock {
+        val ordered = ids.distinct().filter(sourcesMap::containsKey)
+        updateOrdering(_ordering.value.copy(customIds = ordered))
+    }
+
+    suspend fun recordSourceLoad(source: BookSource, elapsedMillis: Long) = mutex.withLock {
+        if (sourcesMap[source.id] !== source) return@withLock
+        val current = _ordering.value
+        val sample = elapsedMillis.coerceIn(1, 120_000)
+        val estimate = current.speedMillis[source.id]?.let { (it * 3 + sample) / 4 } ?: sample
+        updateOrdering(current.copy(speedMillis = current.speedMillis + (source.id to estimate)))
+    }
+
+    private suspend fun updateOrdering(next: SourceOrdering) {
+        if (next == _ordering.value) return
+        storage?.saveSourceOrdering(next)
+        _ordering.value = next
+        updateFlowsInternal()
+    }
+
     private fun updateFlowsInternal() {
-        val allList = sourcesMap.values.toList()
+        val allList = _ordering.value.applyTo(sourcesMap.values.toList())
         _allSources.update { allList }
         val availableList = allList.filter { isSourceEnabledInternal(it.id) }
         _availableSources.update { availableList }

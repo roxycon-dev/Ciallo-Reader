@@ -88,6 +88,8 @@ internal object WenkuVolumeFlightBridge {
         onArrive: (() -> Unit)? = null
     ): Boolean {
         if (art.cover == null) return false
+        last = null
+        WenkuFlightBridge.cancel()
         progress = 0f
         suppressRouteMotion = true
         request = WenkuVolumeFlightRequest(
@@ -102,10 +104,14 @@ internal object WenkuVolumeFlightBridge {
         return true
     }
 
+    internal fun isOpening(bookKey: String): Boolean =
+        request?.let { !it.returning && it.bookKey == bookKey } == true
+
     /** 归位：`last` 里存着起飞时的同一份素材与静止姿态，所以回程是去程的反向。 */
     internal fun reverse(bookKey: String): Boolean {
         val previous = request ?: last ?: return false
-        if (previous.bookKey != bookKey) return false
+        if (previous.returning || previous.bookKey != bookKey) return false
+        last = null
         progress = 1f
         suppressRouteMotion = true
         request = previous.copy(returning = true, onArrive = null)

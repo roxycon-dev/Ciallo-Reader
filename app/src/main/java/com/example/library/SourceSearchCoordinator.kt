@@ -12,7 +12,8 @@ import java.util.concurrent.ConcurrentHashMap
 internal class SourceSearchCoordinator(
     private val spacingMs: Long = 1_100,
     private val cacheMs: Long = 60_000,
-    private val now: () -> Long = { System.nanoTime() / 1_000_000 }
+    private val now: () -> Long = { System.nanoTime() / 1_000_000 },
+    private val onLoaded: suspend (BookSource, Long) -> Unit = { _, _ -> },
 ) {
     private data class Cached(val source: BookSource, val at: Long, val books: List<SearchBook>)
     private class Site {
@@ -35,8 +36,11 @@ internal class SourceSearchCoordinator(
         return site.gate.withLock {
             cached()?.let { return@withLock it }
             site.finishedAt?.let { delay((spacingMs - (now() - it)).coerceAtLeast(0)) }
+            val start = now()
             try {
                 (request?.invoke() ?: source.search(query)).also { result ->
+                    val elapsed = now() - start
+                    if (result is SourceResult.Success) onLoaded(source, elapsed)
                     // Empty results and failures may be temporary throttling responses.
                     if (result is SourceResult.Success && result.data.isNotEmpty()) {
                         site.cache = (site.cache.filter { now() - it.value.at < cacheMs } +

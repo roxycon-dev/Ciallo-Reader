@@ -106,7 +106,7 @@ data class ComicReaderConfig(
     /** 译文字号缩放（0.8..1.4） */
     val translationTextScale: Float = 1.0f,
     /** 翻译引擎（第十八轮二级导航显式选择）：ai=自定义接口 / online=在线翻译 */
-    val translationEngine: String = "online",
+    val translationEngine: String = "auto",
 ) {
     /** Repair imported/old settings before they reach layout or native rendering. */
     fun normalized(): ComicReaderConfig {
@@ -142,7 +142,7 @@ data class ComicReaderConfig(
             autoScrollSpeedDp = autoScrollSpeedDp.bounded(5f, 400f, 40f),
             translationTextScale = translationTextScale.bounded(0.8f, 1.4f, 1f),
             translationLang = translationLang.takeIf { it in setOf("auto", "ja", "en", "ko") } ?: "auto",
-            translationEngine = translationEngine.takeIf { it in setOf("ai", "online") } ?: "online",
+            translationEngine = translationEngine.takeIf { it in setOf("ai", "online", "auto") } ?: "auto",
         )
     }
 
@@ -203,6 +203,7 @@ data class ComicReaderConfig(
         put("translationLang", translationLang)
         put("translationTextScale", translationTextScale)
         put("translationEngine", translationEngine)
+        put("translationEngineVersion", 2)
     }
 
     /** 滤镜/增强/裁边相关的指纹，用于位图处理缓存键。 */
@@ -284,8 +285,9 @@ data class ComicReaderConfig(
                 translationLang = json.optString("translationLang", "auto")
                     .takeIf { it in setOf("auto", "ja", "en", "ko") } ?: "auto",
                 translationTextScale = json.optDouble("translationTextScale", 1.0).toFloat().coerceIn(0.8f, 1.4f),
-                translationEngine = json.optString("translationEngine", "online")
-                    .takeIf { it in setOf("ai", "online") } ?: "online",
+                translationEngine = json.optString("translationEngine", "auto").let { saved ->
+                    if (saved == "online" && json.optInt("translationEngineVersion") < 2) "auto" else saved
+                },
             ).normalized()
         }
     }

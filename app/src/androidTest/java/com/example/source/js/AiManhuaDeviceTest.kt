@@ -75,6 +75,33 @@ class AiManhuaDeviceTest {
         assertEquals("条目274", result.getJSONObject("data").getString("last"))
     }
 
+    @Test fun anUnavailableMirrorDoesNotMarkAnAvailableTitleAsRemoved() = runBlocking {
+        val engine = engine()
+        val result = JSONObject(engine.call("""
+            (async()=>{
+                Network.get = async url => url.includes('iqtao')
+                    ? {status: 200,url:'https://mh.iqtao.cn/err/comic',body:'fixture'}
+                    : {status: 200,url,body:'<script>Mcpath={};</script>'};
+                return src.page('https://www.alipaypay.com/42.html');
+            })()
+        """.trimIndent())!!)
+        assertTrue(result.toString(), result.getBoolean("ok"))
+    }
+
+    @Test fun liveActiveListingsLoadTheirChapterCatalogs() = runBlocking {
+        if (InstrumentationRegistry.getArguments().getString("liveAiManhua") != "true") return@runBlocking
+        val source = JsSourceRepo.loadCached(context, false).single { it.sourceKey == "aimanhua" }
+        withTimeout(60_000) {
+            for (title in listOf("全职剑修", "这个勇者是金钱至上主义者")) {
+                val books = source.search(title)
+                assertTrue(books.toString(), books is SourceResult.Success)
+                val book = (books as SourceResult.Success).data.first { it.title == title }
+                val chapters = source.getChapters(book.id)
+                assertTrue(chapters.toString(), chapters is SourceResult.Success && chapters.data.isNotEmpty())
+            }
+        }
+    }
+
     /** Opt-in live audit: actual production search, reader, WorkManager, Room and offline decoder. */
     @Test fun liveChapter180DownloadsEveryPageAndReadsOffline() = runBlocking {
         if (InstrumentationRegistry.getArguments().getString("liveAiManhua") != "true") return@runBlocking

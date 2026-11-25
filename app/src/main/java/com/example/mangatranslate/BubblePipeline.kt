@@ -13,7 +13,6 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import kotlin.math.abs
-import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 
@@ -103,7 +102,8 @@ object BubblePipeline {
         PageMemoryBudget.check(base)
         val out = base.copy(Bitmap.Config.ARGB_8888, true)
         // 背景采样用未污染快照（重叠气泡不采样到先前填充）
-        val sampling = base.copy(Bitmap.Config.ARGB_8888, false)
+        val sampling = if (android.os.Build.VERSION.SDK_INT >= 26 && base.config == Bitmap.Config.HARDWARE)
+            base.copy(Bitmap.Config.ARGB_8888, false) else base
         val canvas = Canvas(out)
         try {
             for ((region, translated) in regions) {
@@ -120,32 +120,54 @@ object BubblePipeline {
                 }
             }
         } finally {
-            sampling.recycle()
+            if (sampling !== base) sampling.recycle()
         }
         return out
     }
 
     /** A coarse segmentation mask must never repaint a frame or the balloon outline. */
     private fun drawAnchoredLines(canvas: Canvas, sampling: Bitmap, region: Region, text: String, textScale: Float) {
-        var background: Int? = null
         val imageBounds = RectF(0f, 0f, sampling.width.toFloat(), sampling.height.toFloat())
-        for (line in region.lines) {
-            val erase = RectF(line)
-            val padding = (min(line.width(), line.height()) * 0.06f).coerceIn(1f, 4f)
-            erase.inset(-padding, -padding)
-            if (!erase.intersect(imageBounds)) continue
-            val local = sampleBackgroundColor(sampling, erase) ?: Color.WHITE
-            if (background == null) background = local
-            canvas.drawRect(erase, Paint().apply { color = local })
-        }
         val safe = RectF(region.rect)
         if (!safe.intersect(imageBounds)) return
-        // A coarse region must not expand the translation past the original text.
         val anchor = RectF(region.lines.first())
-        for (line in region.lines.drop(1)) anchor.union(line)
-        if (!anchor.intersect(safe)) return
-        drawTextHorizontal(canvas, text, anchor, textScale,
-            contrastingTextColor(background ?: Color.WHITE), medianLineHeight(region.lines))
+        region.lines.drop(1).forEach { anchor.union(it) }
+        if (!anchor.intersect(imageBounds)) return
+        val lineHeight = medianLineHeight(region.lines)
+        val contour = region.maskContour?.takeIf { it.size >= 6 }?.let {
+            contourToPath(it, sampling.width.toFloat(), sampling.height.toFloat())
+        }
+        val balloonBounds = contour?.let { path ->
+            val pathBounds = RectF().also { path.computeBounds(it, true) }
+            if (area(pathBounds) > area(imageBounds) * .6f) null
+            else insetTextBounds(path, pathBounds).takeIf {
+                it.intersect(safe) && interArea(it, anchor) >= area(anchor) * .6f
+            }
+        }
+        val padding = (lineHeight * .08f).coerceIn(1f, if (balloonBounds != null) 5f else 2f)
+        val bounds = RectF(anchor).apply { inset(-padding, -padding); intersect(imageBounds) }
+        if (balloonBounds != null && !bounds.intersect(balloonBounds)) return
+        val reference = balloonBounds ?: bounds
+        val background = sampleBackgroundColor(sampling, reference) ?: Color.WHITE
+        val color = contrastingTextColor(background)
+        val minimum = (lineHeight * textScale.coerceIn(.5f, 2f) * .48f).coerceIn(4f, 15f)
+        val plan = textPlan(text, bounds, textScale, color, lineHeight, region.vertical, minimum)
+            ?: balloonBounds?.let { textPlan(text, it, textScale, color, lineHeight, region.vertical, minimum) }
+            ?: return
+
+        canvas.save()
+        if (balloonBounds != null) canvas.clipPath(contour)
+        val erasePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        for (line in region.lines) {
+            val erase = RectF(line)
+            val margin = (min(line.width(), line.height()) * .06f).coerceIn(1f, 4f)
+            erase.inset(-margin, -margin)
+            if (!erase.intersect(imageBounds)) continue
+            erasePaint.color = sampleBackgroundColor(sampling, erase) ?: background
+            canvas.drawRoundRect(erase, margin, margin, erasePaint)
+        }
+        plan(canvas)
+        canvas.restore()
     }
 
     /**
@@ -169,13 +191,17 @@ object BubblePipeline {
 
         val bg = sampleBackgroundColor(sampling, bounds) ?: Color.WHITE
         val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bg; style = Paint.Style.FILL }
-        canvas.drawPath(path, fill)
 
         val textRect = insetTextBounds(path, bounds)
         if (textRect.width() <= 2f || textRect.height() <= 2f) return
         val anchor = anchorRect(textRect, region.lines)
-        val textColor = contrastingTextColor(bg)
-        drawTextHorizontal(canvas, text, anchor, textScale, textColor, medianLineHeight(region.lines))
+        val plan = textPlan(text, anchor, textScale, contrastingTextColor(bg),
+            medianLineHeight(region.lines), region.vertical, MIN_TEXT_SIZE_PX) ?: return
+        canvas.drawPath(path, fill)
+        canvas.save()
+        canvas.clipPath(path)
+        plan(canvas)
+        canvas.restore()
     }
 
     /** 排版锚定：原文行包围盒与安全区求交；交集过小（<40%）时退回安全区居中。 */
@@ -381,89 +407,107 @@ object BubblePipeline {
         /** 原文行高（第十九轮）：译文字号上限锚定原文——否则长文本译文会撑满整页盖掉排版。 */
         refLineHeight: Float = 0f,
     ) {
-        val maxW = rect.width().toInt().coerceAtLeast(1)
-        val maxH = rect.height()
-        if (rect.height() > rect.width() * 1.6f) {
-            drawTextVertical(canvas, text, rect, textScale, textColor)
-            return
-        }
-        val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = textColor; typeface = Typeface.DEFAULT_BOLD }
-        fun layoutAt(size: Float): StaticLayout {
-            paint.textSize = size
-            return StaticLayout.Builder.obtain(text, 0, text.length, paint, maxW)
-                .setAlignment(Layout.Alignment.ALIGN_CENTER)
-                .setIncludePad(false)
-                .setLineSpacing(0f, 1f)
-                .build()
-        }
-        fun fits(size: Float): Boolean {
-            val l = layoutAt(size)
-            if (l.height > maxH) return false
-            for (i in 0 until l.lineCount) if (l.getLineWidth(i) > maxW + 0.5f) return false
-            return true
-        }
-        var low = MIN_TEXT_SIZE_PX
-        // 字号锚定原文（第十九轮核心修复）：上限 = 原文中位行高 × 1.15，
-        // 译文与原文视觉重量一致、位置一致；放不下才按二分缩到可读下限。
-        var high = max(maxW.toFloat(), maxH) * textScale.coerceIn(0.5f, 2f)
-        if (refLineHeight > 4f) {
-            high = (refLineHeight * 1.15f * textScale).coerceIn(MIN_ANCHORED_SIZE_PX, high)
-        }
-        if (!fits(low)) return
-        var bestSize = low
-        while (high - low > TEXT_SIZE_PRECISION_PX) {
-            val mid = (low + high) / 2f
-            if (fits(mid)) { bestSize = mid; low = mid } else high = mid
-        }
-        val layout = layoutAt(bestSize)
-        canvas.save()
-        canvas.clipRect(rect)
-        canvas.translate(rect.left + (rect.width() - layout.width) / 2f,
-            rect.top + (rect.height() - layout.height) / 2f)
-        layout.draw(canvas)
-        canvas.restore()
+        textPlan(text, rect, textScale, textColor, refLineHeight, rect.height() > rect.width() * 1.6f, MIN_TEXT_SIZE_PX)
+            ?.invoke(canvas)
     }
 
-    /** 锚定模式下的字号下限（原文行高很小时译文仍需可读）。 */
-    private const val MIN_ANCHORED_SIZE_PX = 10f
-
-    /** 竖排（细高区域）：字上到下、列右到左（第十五轮实现迁移）。 */
-    private fun drawTextVertical(canvas: Canvas, text: String, rect: RectF, textScale: Float, textColor: Int) {
-        val chars = text.replace(Regex("\\s+"), "").toCharArray()
-        if (chars.isEmpty()) return
-        val maxW = rect.width(); val maxH = rect.height()
-        var size = (maxW * 0.9f * textScale.coerceIn(0.5f, 2f)).coerceAtMost(maxH * 0.5f)
-        val minSize = 7f
-        var chosenSize = 0f; var perCol = 1; var step = 0f
-        while (size >= minSize) {
-            step = size * 1.18f
-            perCol = max(1, (maxH / step).toInt())
-            val cols = ceil(chars.size / perCol.toDouble()).toInt()
-            if (cols * step <= maxW) { chosenSize = size; break }
-            size -= max(1f, size * 0.08f)
-        }
-        if (chosenSize <= 0f) return
+    private fun textPlan(
+        text: String,
+        rect: RectF,
+        textScale: Float,
+        color: Int,
+        referenceSize: Float,
+        vertical: Boolean,
+        minimum: Float,
+    ): ((Canvas) -> Unit)? {
+        if (text.isBlank() || rect.width() < 2f || rect.height() < 2f) return null
+        val scale = textScale.coerceIn(.5f, 2f)
+        val maxWidth = rect.width().toInt()
+        val maxHeight = rect.height()
+        val limit = (referenceSize.takeIf { it > 4f }?.times(1.15f) ?: max(rect.width(), maxHeight)) * scale
+        val upper = limit.coerceAtMost(max(rect.width(), maxHeight))
+        if (upper < minimum) return null
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            textSize = chosenSize; color = textColor
-            typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER
+            this.color = color
+            typeface = Typeface.DEFAULT
         }
-        val startX = rect.right - step / 2f
-        canvas.save()
-        canvas.clipRect(rect)
-        var idx = 0; var col = 0
-        while (idx < chars.size) {
-            val x = startX - col * step
-            val fm = paint.fontMetrics
-            val totalHeight = min(perCol, chars.size - idx) * step
-            var y = rect.top + (maxH - totalHeight) / 2f + (step - (fm.descent - fm.ascent)) / 2f - fm.ascent
-            var inCol = 0
-            while (idx < chars.size && inCol < perCol) {
-                canvas.drawText(chars, idx, 1, x, y, paint)
-                y += step; idx++; inCol++
+        if (vertical) return verticalPlan(text, rect, paint, upper, max(minimum, MIN_TEXT_SIZE_PX))
+        fun layoutAt(size: Float): StaticLayout {
+            paint.textSize = size
+            return StaticLayout.Builder.obtain(text, 0, text.length, paint, maxWidth)
+                .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                .setIncludePad(false)
+                .build()
+        }
+        fun fits(layout: StaticLayout): Boolean = layout.height <= maxHeight &&
+            (0 until layout.lineCount).all { layout.getLineWidth(it) <= maxWidth + .5f }
+        var low = minimum
+        var high = upper
+        if (!fits(layoutAt(low))) return null
+        if (fits(layoutAt(high))) low = high
+        else while (high - low > TEXT_SIZE_PRECISION_PX) {
+            val middle = (low + high) / 2f
+            if (fits(layoutAt(middle))) low = middle else high = middle
+        }
+        val layout = layoutAt(low)
+        return { canvas ->
+            canvas.save()
+            canvas.clipRect(rect)
+            canvas.translate(rect.left + (rect.width() - layout.width) / 2f,
+                rect.top + (rect.height() - layout.height) / 2f)
+            layout.draw(canvas)
+            canvas.restore()
+        }
+    }
+
+    private fun verticalPlan(
+        text: String,
+        rect: RectF,
+        paint: TextPaint,
+        upper: Float,
+        minimum: Float,
+    ): ((Canvas) -> Unit)? {
+        val glyphs = text.codePoints().filter { !Character.isWhitespace(it) }.toArray()
+        if (glyphs.isEmpty()) return null
+        fun step(size: Float): Float {
+            paint.textSize = size
+            val metrics = paint.fontMetrics
+            return max(size * 1.15f, metrics.descent - metrics.ascent)
+        }
+        fun columns(size: Float): Int {
+            val spacing = step(size)
+            val perColumn = (rect.height() / spacing).toInt()
+            if (perColumn == 0) return 0
+            val needed = (glyphs.size + perColumn - 1) / perColumn
+            return needed.takeIf { needed * spacing <= rect.width() } ?: 0
+        }
+        var low = minimum
+        var high = upper
+        if (columns(low) == 0) return null
+        if (columns(high) != 0) low = high
+        else while (high - low > TEXT_SIZE_PRECISION_PX) {
+            val middle = (low + high) / 2f
+            if (columns(middle) != 0) low = middle else high = middle
+        }
+        val count = columns(low)
+        val spacing = step(low)
+        val perColumn = (rect.height() / spacing).toInt()
+        val firstX = rect.centerX() + (count - 1) * spacing / 2f
+        paint.textAlign = Paint.Align.CENTER
+        val metrics = paint.fontMetrics
+        val baseline = (spacing - metrics.descent - metrics.ascent) / 2f
+        return { canvas ->
+            canvas.save()
+            canvas.clipRect(rect)
+            glyphs.toList().chunked(perColumn).forEachIndexed { col, column ->
+                val x = firstX - col * spacing
+                val top = rect.centerY() - column.size * spacing / 2f
+                column.forEachIndexed { row, glyph ->
+                    canvas.drawText(String(Character.toChars(glyph)), x, top + row * spacing + baseline, paint)
+                }
             }
-            col++
+            canvas.restore()
         }
-        canvas.restore()
     }
 
     /* ── 几何工具 ── */

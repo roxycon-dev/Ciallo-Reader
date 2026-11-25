@@ -6,7 +6,7 @@
 class AiManhua extends ComicSource {
     name = "爱漫画";
     key = "aimanhua";
-    version = "1.0.7";
+    version = "1.0.8";
     minAppVersion = "1.6.0";
     url = "https://www.alipaypay.com";
     baseUrl = "https://www.alipaypay.com";
@@ -36,15 +36,20 @@ class AiManhua extends ComicSource {
         if (!url.startsWith(this.baseUrl + "/")) throw new Error("爱漫画请求地址无效");
         const path = url.substring(this.baseUrl.length);
         const allOrigins = [...new Set([this.readOrigin, "https://mh.iqtao.cn", this.baseUrl])];
-        if (!this.failedOrigins) this.failedOrigins = {};
+        this.failedOrigins ??= {};
         const origins = allOrigins.filter(origin => !this.failedOrigins[origin] || Date.now() - this.failedOrigins[origin] > 60000);
-        if (!origins.length) origins.push(this.readOrigin);
-        let lastError;
+        if (!origins.length) origins.push(...allOrigins);
+        let lastError, unavailable = 0;
+        const workRoute = /^\/\d+(?:\/\d+)?\.html$/.test(path);
         for (const origin of origins) {
             try {
-                const r = await Network.get(origin + path, this.headers);
+                const r = await Network.get(origin + path, {...this.headers, "Referer": origin + "/"});
                 if (r.status === 401 || r.status === 403) throw new Error("爱漫画站点访问受限：" + r.status);
-                if ((r.url || "").includes("/err/")) throw new Error("爱漫画作品已下架");
+                const finalPath = String(r.url || "").replace(/^https?:\/\/[^/]+/, "");
+                if (workRoute && (r.status === 404 || /^\/err\/(?:comic|chapter)(?:[/?#]|$)/.test(finalPath))) {
+                    unavailable++;
+                    continue;
+                }
                 if (r.status !== 200 || !r.body || !String(r.body).trim()) throw new Error("爱漫画页面请求失败：" + r.status);
                 const body = String(r.body);
                 if (path.startsWith("/index.php/api/")) JSON.parse(body);
@@ -54,24 +59,33 @@ class AiManhua extends ComicSource {
                 delete this.failedOrigins[origin];
                 return body;
             } catch (error) {
-                if (/作品已下架|访问受限/.test(String(error))) throw error;
-                this.failedOrigins[origin] = Date.now();
+                if (/访问受限/.test(String(error))) throw error;
+                // A missing title or malformed response is specific to this route, not the entire host.
+                if (!workRoute && !path.startsWith("/index.php/api/")) this.failedOrigins[origin] = Date.now();
                 lastError = error;
             }
         }
-        throw new Error("爱漫画线路暂时不可用：" + String(lastError));
+        if (unavailable === origins.length && origins.length === allOrigins.length) {
+            throw new Error(path.split("/").length === 2 ? "爱漫画源站已移除此作品" : "爱漫画源站已移除此章节");
+        }
+        throw new Error("爱漫画线路暂时不可用" + (lastError ? "：" + String(lastError) : "，请稍后重试"));
     }
 
     async catalog(id) {
         const cached = this.catalogs[id];
         if (cached && Date.now() - cached.at < 5 * 60 * 1000) return cached.rows;
-        const json = JSON.parse(await this.page(this.baseUrl + "/index.php/api/comic/chapter?mid=" + id));
-        if (json.code !== 1 || !Array.isArray(json.data) || !json.data.length) throw new Error("爱漫画未返回完整章节目录");
-        const rows = json.data.map(item => {
+        const parse = body => {
+            const json = JSON.parse(body);
+            if (json.code !== 1 || !Array.isArray(json.data) || !json.data.length) throw new Error("爱漫画未返回完整章节目录");
+            return json.data.map(item => {
             const path = String(item.link || "");
             if (!new RegExp("^/" + id + "/[0-9]+\\.html$").test(path) || !item.name) throw new Error("爱漫画章节数据不完整");
             return {path, title: String(item.name), pages: Number(item.pnum), locked: Number(item.price) > 0 || Number(item.vip) > 0 || Number(item.cion) > 0};
-        });
+            });
+        };
+        let rows;
+        const body = await this.page(this.baseUrl + "/index.php/api/comic/chapter?mid=" + id, value => { rows = parse(value); });
+        rows ??= parse(body);
         this.catalogs[id] = {at: Date.now(), rows};
         return rows;
     }
@@ -172,7 +186,11 @@ class AiManhua extends ComicSource {
     }
 
     // One detail HTML request, without loading the chapter API, for progressive metadata.
-    async discoverMetadata(book) { return this.parseMetadata(await this.page(book), book); }
+    async discoverMetadata(book) {
+        let metadata;
+        await this.page(book, body => { metadata = this.parseMetadata(body, book); });
+        return metadata;
+    }
 
     parseImages(html, expected) {
         const doc = new HtmlDocument(html);
@@ -203,7 +221,8 @@ class AiManhua extends ComicSource {
     comic = {
         loadInfo: async (book) => {
             const id = this.bookId(book);
-            const html = await this.page(this.baseUrl + "/" + id + ".html");
+            let metadata;
+            const html = await this.page(this.baseUrl + "/" + id + ".html", body => { metadata = this.parseMetadata(body, book); });
             const rows = await this.catalog(id);
             const doc = new HtmlDocument(html);
             try {
@@ -216,7 +235,6 @@ class AiManhua extends ComicSource {
                 const description = doc.querySelector(".info p.content");
                 const authorEl = doc.querySelector(".info > p > span.l");
                 const author = authorEl ? authorEl.text.replace(/^作\s*者\s*[:：]\s*/, "").trim() : "";
-                const metadata = this.parseMetadata(html, book);
                 return new ComicDetails({...metadata, title: title.text.trim(), cover: cover ? this.imageUrl(cover.attributes.src) : "", description: description ? description.text.split("\\n")[0].trim() : "", tags: {"作者": author ? [author] : [], "状态": metadata.status ? [metadata.status] : [], "更新": metadata.updateTime ? [metadata.updateTime] : [], "题材": metadata.tags}, chapters, url: this.baseUrl + "/" + id + ".html"});
             } finally { doc.dispose(); }
         },

@@ -21,7 +21,14 @@ object GenericCoverLoader {
         }
     }
 
-    private fun buildLoader(context: Context): ImageLoader {
+    @Volatile
+    private var cachedClient: OkHttpClient? = null
+
+    internal fun client(context: Context): OkHttpClient = cachedClient ?: synchronized(this) {
+        cachedClient ?: buildClient(context.applicationContext).also { cachedClient = it }
+    }
+
+    private fun buildClient(context: Context): OkHttpClient {
         val clientBuilder = com.example.source.SharedHttpTransport.builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
@@ -41,9 +48,12 @@ object GenericCoverLoader {
                 }
                 chain.proceed(builder.build())
             }
-        return ImageLoader.Builder(context)
-            .okHttpClient(com.example.source.js.JsSourceProxy.failoverClient(context, clientBuilder.build()))
+        return com.example.source.js.JsSourceProxy.failoverClient(context, clientBuilder.build())
+    }
+
+    private fun buildLoader(context: Context): ImageLoader =
+        ImageLoader.Builder(context)
+            .okHttpClient(client(context))
             .crossfade(true)
             .build()
-    }
 }

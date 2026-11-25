@@ -307,7 +307,7 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                         it.book.id == DownloadManager.originalBookId(task.id, task.sourceId)
                 }
                 val repository = BookRepository(context, db.bookDao(), db)
-                if (novel != null) {
+                val imported = if (novel != null) {
                     val baseline = novelStore.baseline(novel.book.sourceId, novel.book.id)?.novelInfo
                     val old = db.bookDao().getBookBySourceResource(novel.book.sourceId, novel.book.id)
                     if (novel.replace && old != null && baseline?.hasRevision == true &&
@@ -329,8 +329,20 @@ class DownloadWorker(private val context: Context, params: WorkerParameters) : C
                 }
                 else repository.importBookFromUri(Uri.fromFile(file), "${task.title}.${latest.format}", task.sourceId,
                     DownloadManager.originalBookId(task.id, task.sourceId)).getOrThrow()
+                val currentCover = imported.coverUri?.takeUnless { it.startsWith("http") }
+                    ?.let { File(it.removePrefix("file://")) }
+                val remoteCover = novel?.book?.cover ?: latest.coverUrl
                 // Once import commits, finish bookkeeping even if pause arrives at that boundary.
                 withContext(NonCancellable) {
+                    val betterCover = com.example.library.DownloadedCover.betterImage(context, remoteCover, currentCover, latest.sourceId)
+                    if (betterCover != null) {
+                        val folder = File(context.filesDir, "download_covers").apply { mkdirs() }
+                        val cover = File(folder, "${java.util.UUID.randomUUID()}.img")
+                        runCatching {
+                            cover.writeBytes(betterCover)
+                            check(db.bookDao().updateDownloadedCover(imported.id, imported.filePath, cover.absolutePath) == 1)
+                        }.onFailure { cover.delete() }
+                    }
                     if (novel != null) novelStore.imported(taskId)
                     db.withTransaction {
                         dao.insertOrUpdate(latest.copy(status = DownloadStatus.COMPLETED, errorMessage = null,

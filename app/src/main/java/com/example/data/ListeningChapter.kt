@@ -19,7 +19,8 @@ data class ListeningState(
     val error: String? = null,
     val completion: Long = 0,
     val finished: Boolean = false,
-    val timer: Int = 0
+    val timer: Int = 0,
+    val buffering: String? = null
 )
 
 private val inlineImage = Regex("\\[IMG:[^\\]]*]")

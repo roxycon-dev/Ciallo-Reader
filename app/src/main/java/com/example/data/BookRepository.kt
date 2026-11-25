@@ -745,6 +745,10 @@ class BookRepository(
             File(if(uri.scheme=="file") uri.path ?: raw else raw).canonicalPath
         }.getOrDefault(raw)
         val owned=books.map { path(it.filePath) }.toSet()
+        val ownedCovers = books.mapNotNull { it.coverUri?.let(::path) }.toSet()
+        File(root, "download_covers").listFiles().orEmpty()
+            .filter { it.isFile && it.lastModified() < cutoff && it.canonicalPath !in ownedCovers }
+            .forEach { it.delete() }
         com.example.library.ComicDownloadManager.awaitInitialized(context)
         val comicDirs=com.example.library.ComicDownloadManager.tasks.value.keys.map {
             com.example.library.ComicDownloadManager.directory(context,it).canonicalPath

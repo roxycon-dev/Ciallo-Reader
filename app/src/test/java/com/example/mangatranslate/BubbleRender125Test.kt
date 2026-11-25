@@ -40,6 +40,17 @@ class BubbleRender125Test {
         base.recycle(); result.recycle()
     }
 
+    @Test fun overflowingTranslationLeavesTheSourceTextIntact() {
+        val source = Bitmap.createBitmap(80, 80, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.WHITE) }
+        val label = RectF(20f, 20f, 39f, 29f)
+        Canvas(source).drawRect(RectF(22f, 22f, 36f, 27f), Paint().apply { color = Color.BLACK })
+        val region = BubblePipeline.Region(label, null, listOf(label), false)
+        val result = BubblePipeline.bake(source, listOf(region to "超长译文".repeat(35)), 1f)
+        assertTrue(source.sameAs(result))
+        source.recycle()
+        result.recycle()
+    }
+
     @Test fun darkVerticalTextStaysClippedAndKeepsItsBackground() {
         val base = Bitmap.createBitmap(160, 240, Bitmap.Config.ARGB_8888)
         Canvas(base).drawColor(Color.rgb(28, 30, 36))

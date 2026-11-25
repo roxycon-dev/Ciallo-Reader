@@ -9,6 +9,7 @@ import androidx.navigation.compose.dialog
 import androidx.navigation.compose.composable
 import com.example.ui.design.DesignTokens
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -149,7 +150,7 @@ fun NavController.dismissPaperPage() {
     popBackStack()
 }
 /** Cupertino push/pop timing from app_ui.dart; the covered page moves one third. */
-private val pageEase = androidx.compose.animation.core.CubicBezierEasing(.18f, 1f, .04f, 1f)
+private val pageEase = androidx.compose.animation.core.CubicBezierEasing(.22f, .8f, .2f, 1f)
 internal fun paperPageEnter(reduce: Boolean) =
     if (reduce) androidx.compose.animation.EnterTransition.None
     else androidx.compose.animation.slideInHorizontally(
@@ -174,6 +175,25 @@ internal fun paperPagePopExit(reduce: Boolean) =
         animationSpec = androidx.compose.animation.core.tween(320, easing = pageEase)
     ) { it }
 
+internal data class PaperPageWallpaper(val painter: androidx.compose.ui.graphics.painter.Painter, val dim: Float)
+internal val LocalPaperPageWallpaper = staticCompositionLocalOf<PaperPageWallpaper?> { null }
+
+/** Owns all destination pixels so a sliding glass page cannot reveal the previous route. */
+@Composable
+private fun PaperPageSurface(showWallpaper: Boolean, content: @Composable () -> Unit) {
+    val wallpaper = LocalPaperPageWallpaper.current.takeIf { showWallpaper }
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        if (wallpaper != null) {
+            Image(wallpaper.painter, contentDescription = null, modifier = Modifier.matchParentSize(),
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+            if (wallpaper.dim > 0f) {
+                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = wallpaper.dim)))
+            }
+        }
+        content()
+    }
+}
+
 @Suppress("UNUSED_PARAMETER")
 fun NavGraphBuilder.paperComposable(
     route: String, navController: NavController,
@@ -182,8 +202,10 @@ fun NavGraphBuilder.paperComposable(
     content: @Composable androidx.compose.animation.AnimatedContentScope.(androidx.navigation.NavBackStackEntry) -> Unit,
 ) {
     composable(route = route, arguments = arguments) { entry ->
-        if (revealContent) com.example.ui.wenku.WenkuPageEntrance(transition) { content(entry) }
-        else content(entry)
+        PaperPageSurface(showWallpaper = revealContent) {
+            if (revealContent) com.example.ui.wenku.WenkuPageEntrance(transition) { content(entry) }
+            else content(entry)
+        }
     }
 }
 

@@ -5,6 +5,7 @@ import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.data.ListeningChapter
 import com.example.data.ReaderDictionaryStore
+import com.example.data.SpeechSource
 import com.example.data.TtsManager
 import com.example.data.paragraphAt
 import com.example.data.speechChunkEnd
@@ -16,6 +17,7 @@ import java.util.zip.GZIPOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -104,6 +106,56 @@ class ReaderListeningDataDeviceTest {
             assertEquals(2, manager.state.value.paragraph)
         } finally {
             activity.scenario.onActivity { manager.release() }
+        }
+    }
+
+    @Test fun zeroGapStartsThePreparedParagraphAndPreloadsTheNextChapter() {
+        val app = InstrumentationRegistry.getInstrumentation().targetContext
+        val manager = TtsManager(app)
+        val originalSource = manager.source
+        val originalGap = manager.gapMillis
+        val nonce = System.nanoTime()
+        val first = ListeningChapter("seamless-$nonce", "one", "Ciallo", "One", spokenParagraphs(
+            "The quiet library remained open through the evening, and readers continued to arrive.\n" +
+                "A reader settled into the comfortable chair to finish the chapter before going home."
+        ))
+        val second = first.copy(chapterKey = "two", title = "Two", paragraphs = spokenParagraphs("The journey continues."))
+        val requestedBeforeCompletion = java.util.concurrent.atomic.AtomicBoolean()
+        val bufferingAfterFirst = java.util.concurrent.atomic.AtomicBoolean()
+        val observer = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+        val collect = observer.launch {
+            manager.state.collect { state ->
+                if (state.chapter == first && state.paragraph == 1 && state.buffering != null && !state.finished) {
+                    bufferingAfterFirst.set(true)
+                }
+            }
+        }
+        try {
+            activity.scenario.onActivity {
+                manager.selectSource(SpeechSource.System)
+                manager.gapMillis = 0
+                manager.play(first, 0, 1.1f, 1f) { current ->
+                    if (current == first) {
+                        requestedBeforeCompletion.set(!manager.state.value.finished)
+                        second
+                    } else null
+                }
+            }
+            val deadline = android.os.SystemClock.elapsedRealtime() + 25_000L
+            while (manager.state.value.chapter != second && manager.state.value.error == null &&
+                android.os.SystemClock.elapsedRealtime() < deadline) {
+                android.os.SystemClock.sleep(25)
+            }
+            assertEquals(manager.state.value.error, second, manager.state.value.chapter)
+            assertTrue("The next chapter should load while the last paragraph is playing", requestedBeforeCompletion.get())
+            assertFalse("The second paragraph should reuse audio prepared during the first", bufferingAfterFirst.get())
+        } finally {
+            collect.cancel()
+            activity.scenario.onActivity {
+                manager.gapMillis = originalGap
+                manager.selectSource(originalSource)
+                manager.release()
+            }
         }
     }
 

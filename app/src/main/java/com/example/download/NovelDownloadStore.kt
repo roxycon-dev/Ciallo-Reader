@@ -17,6 +17,10 @@ class NovelDownloadStore(context: Context) {
         require(WholeBookNovelSources.contains(book.sourceId))
         check(prefs.edit().putString("pending:$taskId", encode(book).put("replace", replace).toString()).commit())
     }
+    fun discard(taskId: String) {
+        prefs.edit().remove("pending:$taskId").apply()
+    }
+
     fun pending(taskId: String): Pending? = prefs.getString("pending:$taskId", null)?.let {
         runCatching { val json = JSONObject(it); Pending(decode(json), json.optBoolean("replace")) }.getOrNull()
     }

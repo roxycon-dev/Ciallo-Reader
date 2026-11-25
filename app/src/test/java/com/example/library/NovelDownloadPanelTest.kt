@@ -48,7 +48,7 @@ class NovelDownloadPanelTest {
         compose.setContent { MaterialTheme {
             NovelDownloadPanel(listOf(task),emptyMap(),emptyMap(),{},{},{deleted++},{},{})
         } }
-        compose.onNodeWithText("已完成 · 已存入书架").assertIsDisplayed()
+        compose.onNodeWithText("已完成").assertIsDisplayed()
         compose.onNodeWithContentDescription("删除记录").performClick()
         assertEquals(0,deleted)
         compose.onNodeWithText("保留").performClick()
@@ -61,6 +61,27 @@ class NovelDownloadPanelTest {
         compose.onNodeWithContentDescription("删除记录").performClick()
         compose.onNodeWithText("删除下载记录？").assertIsDisplayed()
         assertEquals(1,deleted)
+    }
+
+    @Test fun longPressSelectAllDeletesEveryRecordOnce() {
+        val first = DownloadTaskEntity("one", "fixture", "第一本", "", null, "", "epub", DownloadStatus.COMPLETED, filePath = "/one.epub")
+        val second = first.copy(id = "two", title = "第二本", filePath = "/two.epub")
+        val remaining = androidx.compose.runtime.mutableStateOf(listOf(first, second))
+        val deleted = mutableListOf<String>()
+        compose.setContent { MaterialTheme {
+            NovelDownloadPanel(remaining.value, emptyMap(), emptyMap(), {}, {}, { id ->
+                deleted += id
+                remaining.value = remaining.value.filterNot { it.id == id }
+            }, {}, {})
+        } }
+
+        compose.onNodeWithText(first.title).performTouchInput { longClick() }
+        compose.onNodeWithText("全选").performClick()
+        compose.onNodeWithText("已选择 2 / 2").assertIsDisplayed()
+        compose.onNodeWithText("删除所选").performClick()
+        compose.onNodeWithText("删除", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("暂无下载任务").assertIsDisplayed()
+        assertEquals(listOf(first.id, second.id), deleted)
     }
 
     @Test fun chapterProgressRestoresWithoutAnInMemoryBroadcaster() {
