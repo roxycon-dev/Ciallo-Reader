@@ -14,7 +14,7 @@ Android 7.0+ · ARM64 · [更新记录](CHANGELOG.md)
 
 ## QQ 反馈群
 
-**群号 `1131953681`** · 遇到 Bug 或有功能建议，欢迎进群反馈。可以搜索群号，或点击下方二维码查看原图。
+**群号 `1131953681`** · 遇到 Bug 或有功能建议，欢迎进群反馈。
 
 <a href="docs/readme-media/qq-feedback.jpg"><img src="docs/readme-media/qq-feedback.jpg" width="220" alt="Ciallo Reader QQ 反馈群二维码，群号 1131953681"></a>
 
