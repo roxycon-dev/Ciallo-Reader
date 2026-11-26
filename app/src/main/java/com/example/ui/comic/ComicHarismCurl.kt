@@ -4,6 +4,7 @@ import com.example.i18n.tr
 
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.reader.TouchZone
+import com.example.ui.reader.allowsNativeSwipe
 import com.example.ui.reader.TouchAction
 import com.example.ui.reader.SwipeAction
 
@@ -122,7 +123,6 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
     var longPressPanelEnabled = false
 
     /** 滑动翻页开关（false = 只响应点按，拖拽不产生卷页） */
-    var isRightToLeftZones = false
     var touchZones: List<TouchZone>? = null
     var onZoneAction: (TouchAction) -> Unit = {}
     var swipeEnabled = true
@@ -380,16 +380,16 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                     onZoomMotion?.invoke(me)
                     return true
                 }
-                val customPageDrag = touchZones?.let {
-                    TouchZone.hit(it, downX / width.coerceAtLeast(1), downY / height.coerceAtLeast(1))?.swipe == SwipeAction.PAGE
-                } == true
-                if (touchZones != null && !customPageDrag) {
+                val zone = touchZones?.let {
+                    TouchZone.hit(it, downX / width.coerceAtLeast(1), downY / height.coerceAtLeast(1))
+                }
+                if (!syntheticDrag && !zone.allowsNativeSwipe()) {
                     if (touchTravel > slopPx) view.removeCallbacks(longPressRunnable)
                     return true
                 }
                 val edgePx = 24f * resources.displayMetrics.density
                 val inward = if (downX <= edgePx) me.x - downX else downX - me.x
-                if (touchZones == null && edgeSwipeEnabled && !dragForwarded &&
+                if (!syntheticDrag && edgeSwipeEnabled && !dragForwarded &&
                     (downX <= edgePx || downX >= width - edgePx) && inward > slopPx &&
                     inward > abs(me.y - downY) * 1.5f) {
                     edgeClosing = true
@@ -407,24 +407,25 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                     view.removeCallbacks(longPressRunnable)
                     val dx = me.x - downX
                     val dy = me.y - downY
-                    if (!customPageDrag && (abs(dx) <= slopPx || abs(dx) < abs(dy) * 1.2f)) return true
+                    if (zone?.distanceDp == null && (abs(dx) <= slopPx || abs(dx) < abs(dy) * 1.2f)) return true
+                    if (!swipeEnabled && !syntheticDrag) return true
+                    if (!prepareForDrag()) return true
                     val forward = dx * forwardSign
-                    if ((swipeEnabled || customPageDrag) && onChapterEdge != null && abs(dx) >= abs(dy) &&
+                    if (!syntheticDrag && swipeEnabled && onChapterEdge != null && abs(dx) >= abs(dy) &&
                         (startedAtForwardEdge && forward > 0f || startedAtBackwardEdge && forward < 0f)
                     ) {
                         chapterEdgeActive = true
                         return true
                     }
                     // 禁用滑动翻页只拦真实手势；自动翻页的合成拖拽是显式用户选项，放行
-                    if (!swipeEnabled && !customPageDrag && !syntheticDrag) return true
                     if (com.example.BuildConfig.DEBUG) {
                         android.util.Log.d("CURLDBG", "drag start -> forward to harism (moved=$moved anim=${isAnimating()} idx=${currentIndex})")
                     }
                     // Direction follows the swipe, regardless of which side was touched.
                     dragFromLeft = if (abs(dx) > slopPx) dx > 0f else downX < width / 2f
                     curlStartX = bookX(if (dragFromLeft) 0.03f else 0.97f)
-                    dispatchSynthetic(MotionEvent.ACTION_DOWN, curlStartX, downY, downTime)
-                    dragForwarded = true
+                    dragForwarded = dispatchSynthetic(MotionEvent.ACTION_DOWN, curlStartX, downY, downTime)
+                    if (!dragForwarded) return true
                 }
                 dispatchSynthetic(MotionEvent.ACTION_MOVE, curlStartX + (me.x - downX),
                     downY + (me.y - downY), downTime)
@@ -440,14 +441,12 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
                 velocityTracker?.recycle()
                 velocityTracker = null
                 view.removeCallbacks(longPressRunnable)
-                if (touchZones != null && releaseZone?.swipe != SwipeAction.PAGE && touchTravel > slopPx && !longPressFired && !doubleTapActive) {
+                if (!syntheticDrag && !releaseZone.allowsNativeSwipe() && touchTravel > slopPx && !longPressFired && !doubleTapActive && !multiTouch) {
                     if (me.actionMasked == MotionEvent.ACTION_UP) {
-                        val zone = TouchZone.hit(touchZones.orEmpty(), downX / width.coerceAtLeast(1), downY / height.coerceAtLeast(1))
                         val dx = me.x - downX; val dy = me.y - downY
-                        val threshold = zone?.distanceDp?.times(resources.displayMetrics.density) ?: comicTurnTravel(width.toFloat(), resources.displayMetrics.density)
+                        val threshold = comicTurnTravel(width.toFloat(), resources.displayMetrics.density)
                         if (hypot(dx, dy) >= threshold) {
-                            when (zone?.swipe) {
-                                SwipeAction.PAGE -> onZoneAction(if ((dx < 0).xor(isRightToLeftZones)) TouchAction.NEXT else TouchAction.PREVIOUS)
+                            when (releaseZone?.swipe) {
                                 SwipeAction.CONTROLS -> onZoneAction(TouchAction.CONTROLS)
                                 SwipeAction.SETTINGS -> onZoneAction(TouchAction.SETTINGS)
                                 else -> Unit
@@ -519,10 +518,9 @@ class ComicCurlView(context: Context, translucent: Boolean = false) : CurlView(c
     }
 
     /** 合成事件透传（补投的 DOWN / 自动翻页步进流共用） */
-    private fun dispatchSynthetic(action: Int, x: Float, y: Float, downT: Long) {
+    private fun dispatchSynthetic(action: Int, x: Float, y: Float, downT: Long): Boolean {
         val ev = MotionEvent.obtain(downT, SystemClock.uptimeMillis(), action, x, y, 0)
-        super.onTouch(this, ev)
-        ev.recycle()
+        return try { super.onTouch(this, ev) } finally { ev.recycle() }
     }
 
     /**
@@ -1702,7 +1700,6 @@ internal fun ComicHarismCurlReader(
             },
             update = { v ->
                 v.touchZones = latestConfig.touchZones
-                v.isRightToLeftZones = latestConfig.direction == ComicDirection.RTL
                 v.onZoneAction = latestCallbacks.onZoneAction
                 v.swipeEnabled = latestConfig.gestureSwipe
                 v.doubleTapZoomEnabled = latestConfig.doubleTapZoom

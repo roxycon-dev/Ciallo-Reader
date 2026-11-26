@@ -2,11 +2,13 @@ package com.example.ui.pageturn
 
 import com.example.i18n.tr
 
-import com.example.ui.reader.TouchZone
 import com.example.ui.reader.TouchAction
-import com.example.ui.reader.SwipeAction
 import com.example.ui.reader.ReaderTouchBinding
 import com.example.ui.reader.touchZoneGestures
+import com.example.ui.reader.allowsNativeSwipe
+import com.example.ui.reader.zoneAt
+import com.example.ui.reader.fastPageCommit
+import com.example.ui.reader.novelPageTap
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -123,7 +125,8 @@ fun PageTurnContainer(
     var touchOrigin by remember { mutableStateOf(Offset.Zero) }
     val zoneModifier = Modifier.onGloballyPositioned { touchOrigin = it.positionInWindow(); touchBinding.onViewport(androidx.compose.ui.geometry.Rect(touchOrigin, androidx.compose.ui.geometry.Size(it.size.width.toFloat(), it.size.height.toFloat()))) }.touchZoneGestures(touchBinding.zones, { if (minimalMode) minimalDistance else it * .15f }, touchBinding.onAction,
         enabled = pageTurnMode != PageTurnType.SCROLL.id,
-        menuVisible = menuVisible, imageTap = { onImageTapAt?.invoke(it + touchOrigin) == true }, onLongPress = onLongPressCenter)
+        menuVisible = menuVisible, imageTap = { onImageTapAt?.invoke(it + touchOrigin) == true }, onLongPress = onLongPressCenter,
+        defaultTap = { point, width -> novelPageTap(point.x, width, 1f / 3f) })
     if (com.example.ui.components.LocalRenderQuality.current.minimal) {
         var origin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
         val next by rememberUpdatedState(onNextPage)
@@ -189,7 +192,8 @@ fun PageTurnContainer(
                     } finally { withContext(NonCancellable) { dragOffset.snapTo(0f); dragOffsetY.snapTo(0f) } }
                 }
             } else touchBinding.onAction(action)
-        }, enabled = pageTurnMode != PageTurnType.SCROLL.id, menuVisible = menuVisible, imageTap = { onImageTapAt?.invoke(it + touchOrigin) == true }, onLongPress = onLongPressCenter, nativePageDrag = true)
+        }, enabled = pageTurnMode != PageTurnType.SCROLL.id, menuVisible = menuVisible, imageTap = { onImageTapAt?.invoke(it + touchOrigin) == true }, onLongPress = onLongPressCenter, nativePageDrag = true,
+            defaultTap = { point, width -> novelPageTap(point.x, width, .28f) })
 
     // Reset offsets when pageKey changes (page turned)
     LaunchedEffect(pageKey) {
@@ -220,8 +224,8 @@ fun PageTurnContainer(
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val customZones = touchBinding.zones
-                    val zone = customZones?.let { com.example.ui.reader.TouchZone.hit(it, down.position.x / size.width, down.position.y / size.height) }
-                    if (customZones != null && (zone?.swipe != com.example.ui.reader.SwipeAction.PAGE || latestMenuVisible)) return@awaitEachGesture
+                    val zone = customZones.zoneAt(down.position, size)
+                    if (!zone.allowsNativeSwipe() || latestMenuVisible && customZones != null) return@awaitEachGesture
                     val velocity = androidx.compose.ui.input.pointer.util.VelocityTracker().apply { addPosition(down.uptimeMillis, down.position) }
                     var releasePosition = down.position
                     var cancelled = false
@@ -285,9 +289,7 @@ fun PageTurnContainer(
                         if (!isDrag) {
                             if (abs(totalX) > touchSlop || abs(totalY) > touchSlop) {
                                 isDrag = true
-                                if (customZones != null) {
-                                    activeMode = 1 // Free 2D motion; keep the native surface following the finger.
-                                } else if (totalY > touchSlop && totalY > abs(totalX) * 1.1f) {
+                                if (totalY > touchSlop && totalY > abs(totalX) * 1.1f) {
                                     activeMode = 2 // Pull-Down Bookmark
                                 } else if (abs(totalX) > touchSlop) {
                                     if (mode != PageTurnType.SCROLL) {
@@ -327,25 +329,27 @@ fun PageTurnContainer(
                                 )
                             }
                         } else if (activeMode == 1 && mode != PageTurnType.SCROLL) {
-                            val currentVal = dragOffset.value
-
                             coroutineScope.launch {
                                 dragOffsetY.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
                             }
 
                             val releaseVelocity = velocity.calculateVelocity()
-                            val commit = !cancelled && com.example.ui.wenku.WenkuReaderPhysics.commit(
+                            val delta = releasePosition - down.position
+                            val release = Offset(releaseVelocity.x, releaseVelocity.y)
+                            val nativeCommit = com.example.ui.wenku.WenkuReaderPhysics.commit(
                                 viewportPx = screenWidth,
-                                deltaPx = releasePosition - down.position,
-                                velocityPx = Offset(releaseVelocity.x, releaseVelocity.y),
+                                deltaPx = delta,
+                                velocityPx = release,
                                 density = touchDensity
                             )
+                            val commit = !cancelled && fastPageCommit(zone?.distanceDp, delta, release, touchDensity, nativeCommit)
                             if (commit) {
+                                val forward = delta.x < 0f
                                 turnJob = coroutineScope.launch {
                                     try {
-                                        val target = if (currentVal < 0) -screenWidth else screenWidth
+                                        val target = if (forward) -screenWidth else screenWidth
                                         dragOffset.animateTo(target, tween(turnDurationMs))
-                                        if (currentVal < 0) {
+                                        if (forward) {
                                             latestOnNextPage()
                                         } else {
                                             latestOnPrevPage()

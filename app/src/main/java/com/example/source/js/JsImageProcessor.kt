@@ -15,26 +15,28 @@ object JsImageProcessor {
         val code: String
     )
 
-    private val entries = ConcurrentHashMap<String, Entry>()
+    private data class ImageKey(val url: String, val sourceScope: String?)
+    private val entries = ConcurrentHashMap<ImageKey, Entry>()
 
-    fun register(url: String, engine: JsSourceEngine, code: String?) {
+    fun register(url: String, engine: JsSourceEngine, code: String?, sourceScope: String? = null) {
+        val key = ImageKey(url, sourceScope)
         if (code.isNullOrBlank()) {
-            entries.remove(url)
+            entries.remove(key)
         } else {
-            entries[url] = Entry(engine, code)
+            entries[key] = Entry(engine, code)
         }
     }
 
-    fun unregister(url: String) {
-        entries.remove(url)
+    fun unregister(url: String, sourceScope: String? = null) {
+        entries.remove(ImageKey(url, sourceScope))
     }
 
     /** Scrambled pages must never be displayed before their complete-image transform. */
-    fun hasTransform(url: String): Boolean = entries.containsKey(url)
+    fun hasTransform(url: String, sourceScope: String? = null): Boolean = entries.containsKey(ImageKey(url, sourceScope))
 
     /** 同步执行（拦截器/下载器都在 IO 线程），失败时返回 null 表示保持原图。 */
-    fun transform(url: String, bytes: ByteArray): ByteArray? {
-        val entry = entries[url] ?: return null
+    fun transform(url: String, bytes: ByteArray, sourceScope: String? = null): ByteArray? {
+        val entry = entries[ImageKey(url, sourceScope)] ?: return null
         Log.i("JsImageProcessor", "transform found for ${url.take(80)}")
         return try {
             entry.engine.transformImageBlocking(entry.code, bytes)

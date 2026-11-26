@@ -83,6 +83,7 @@ class SourceManager(private val storage: SourceStorage? = null) {
     suspend fun registerSource(source: BookSource, defaultEnabled: Boolean = true, rawJson: String? = null) {
         mutex.withLock {
             sourcesMap[source.id] = source
+            if (_activeSource.value?.id == source.id) _activeSource.value = source
             if (!enabledStatesMap.containsKey(source.id)) {
                 enabledStatesMap[source.id] = defaultEnabled
                 _enabledStates.value = enabledStatesMap.toMap()
@@ -169,7 +170,8 @@ class SourceManager(private val storage: SourceStorage? = null) {
 
     fun isCustomSource(sourceId: String): Boolean {
         val src = sourcesMap[sourceId]
-        return (src is JsonBookSource && src.config.isCustom) || customJsonsMap.containsKey(sourceId)
+        return (src is JsonBookSource && src.config.isCustom) ||
+            (src is com.example.source.js.JsComicSource && src.isUserImported) || customJsonsMap.containsKey(sourceId)
     }
 
     suspend fun setSortMode(mode: SourceSortMode) = mutex.withLock {

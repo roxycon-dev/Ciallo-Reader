@@ -23,10 +23,11 @@ class JsSourceEngine(
     private val sourceJs: String,
     private val sourceKey: String,
     context: Context,
-    insecureTls: Boolean = false
+    insecureTls: Boolean = false,
+    private val importedClassName: String? = null,
 ) {
     private val app = context.applicationContext
-    private val handler = JsMessageHandler(app, sourceKey, insecureTls)
+    private val handler = JsMessageHandler(app, sourceKey, insecureTls, importedClassName != null)
     @Volatile private var executionDeadline = 0L
     @Volatile private var executionJob: kotlinx.coroutines.Job? = null
     private var initializing = false
@@ -254,7 +255,7 @@ class JsSourceEngine(
         // Venera App 在引擎初始化时注入的模型类（ComicDetails/Chapter 等）
         quickJs.evaluate<Any?>(PREAMBLE, filename = "models.js")
         quickJs.evaluate<Any?>(instrument(sourceJs), filename = "source.js")
-        className = Regex("""class\s+([A-Za-z_$][\w$]*)\s+extends\s+ComicSource""")
+        className = importedClassName ?: Regex("""class\s+([A-Za-z_$][\w$]*)\s+extends\s+ComicSource""")
             .find(sourceJs)
             ?.groupValues
             ?.get(1)

@@ -1,5 +1,9 @@
 package com.example.ui.comic
 
+import com.example.ui.reader.TouchZone
+import com.example.ui.reader.allowsNativeSwipe
+import com.example.ui.reader.zoneAt
+
 import com.example.ui.reader.TouchAction
 import com.example.ui.reader.touchZoneGestures
 import androidx.compose.animation.core.Animatable
@@ -404,7 +408,9 @@ fun Modifier.comicZoomable(
     }
     this.touchZoneGestures(config.touchZones, { span -> comicTurnTravel(span, resourcesDensity) }, callbacks.onZoneAction,
         vertical = config.direction == ComicDirection.TTB && config.mode != ComicMode.DOUBLE,
-        reverse = config.direction == ComicDirection.RTL, taps = false, zoomed = { state.isZoomed })
+        reverse = config.direction == ComicDirection.RTL, taps = false, zoomed = { state.isZoomed },
+        nativePageDrag = config.mode == ComicMode.MAGNETIC, nativeSwipeAvailable = true,
+        pageSwipeEnabled = config.gestureSwipe)
         .onSizeChanged { state.containerSize = Size(it.width.toFloat(), it.height.toFloat()) }
         .pointerInput(state) {
             val slop = viewConfiguration.touchSlop
@@ -742,16 +748,19 @@ fun Modifier.comicZoomable(
  * 侧边滑动快速关闭：从屏幕左/右边缘向内滑动。挂在阅读器根部（Initial pass 抢先消费）。
  * [zoomed]：放大状态信号——放大平移时从屏幕边缘起手不应退出阅读器（手势归属缩放）。
  */
-fun Modifier.comicEdgeSwipe(enabled: Boolean, zoomed: () -> Boolean = { false }, onTrigger: () -> Unit): Modifier =
+fun Modifier.comicEdgeSwipe(enabled: Boolean, zoomed: () -> Boolean = { false },
+                            zones: List<TouchZone>? = null, onTrigger: () -> Unit): Modifier =
     if (!enabled) this else composed {
         val latestZoomed by rememberUpdatedState(zoomed)
         val latestTrigger by rememberUpdatedState(onTrigger)
+        val latestZones by rememberUpdatedState(zones)
         pointerInput(Unit) {
             val edge = 24.dp.toPx()
             val slop = viewConfiguration.touchSlop
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                 if (latestZoomed() || down.isConsumed) return@awaitEachGesture
+                if (!latestZones.zoneAt(down.position, size).allowsNativeSwipe()) return@awaitEachGesture
                 if (down.position.x > edge && down.position.x < size.width - edge) return@awaitEachGesture
                 val fromLeft = down.position.x <= edge
                 var dx = 0f

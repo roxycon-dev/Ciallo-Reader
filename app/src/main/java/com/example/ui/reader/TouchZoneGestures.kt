@@ -35,6 +35,11 @@ fun Modifier.touchZoneGestures(
     onLongPress: (() -> Unit)? = null,
     legacyPageCurl: Boolean = false,
     nativePageDrag: Boolean = legacyPageCurl,
+    nativeSwipeAvailable: Boolean = nativePageDrag,
+    pageSwipeEnabled: Boolean = true,
+    defaultTap: (Offset, Int) -> TouchAction = { _, _ -> TouchAction.NONE },
+    prioritizeChildTap: Boolean = false,
+    swipesWithChrome: Boolean = false,
 ): Modifier = composed {
     var windowOrigin by remember { mutableStateOf(Offset.Zero) }
     val currentAction by rememberUpdatedState(onAction)
@@ -42,16 +47,21 @@ fun Modifier.touchZoneGestures(
     val currentMenu by rememberUpdatedState(menuVisible)
     val currentImage by rememberUpdatedState(imageTap)
     val currentHold by rememberUpdatedState(onLongPress)
+    val currentDefaultTap by rememberUpdatedState(defaultTap)
+    val currentDistance by rememberUpdatedState(defaultDistance)
     val scope = rememberCoroutineScope()
-    if (zones == null || !enabled) this else this.onGloballyPositioned { windowOrigin = it.positionInWindow() }.pointerInput(zones, vertical, reverse, taps) {
+    if (zones == null || !enabled) this else this.onGloballyPositioned { windowOrigin = it.positionInWindow() }
+        .pointerInput(zones, vertical, reverse, taps, nativePageDrag, nativeSwipeAvailable, pageSwipeEnabled,
+            prioritizeChildTap, swipesWithChrome) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
             if (currentZoom() || down.isConsumed) return@awaitEachGesture
-            val zone = TouchZone.hit(zones, down.position.x / size.width.coerceAtLeast(1), down.position.y / size.height.coerceAtLeast(1))
-            val threshold = zone?.distanceDp?.dp?.toPx() ?: if (legacyPageCurl)
-                kotlin.math.abs(down.position.x - size.width / 2f).coerceAtLeast(viewConfiguration.touchSlop)
-                else defaultDistance(if (vertical) size.height.toFloat() else size.width.toFloat())
-            val handToNative = nativePageDrag && zone?.swipe == SwipeAction.PAGE && !currentMenu
+            val zone = zones.zoneAt(down.position, size)
+            val defaultThreshold = currentDistance((if (vertical) size.height else size.width).toFloat())
+            val threshold = zone?.distanceDp?.dp?.toPx() ?: defaultThreshold
+            val swipe = zone?.swipe ?: SwipeAction.PAGE
+            val handToNative = swipe == SwipeAction.PAGE &&
+                (nativePageDrag || nativeSwipeAvailable && zone?.distanceDp == null)
             val decision = TouchGestureDecision(viewConfiguration.touchSlop, threshold)
             var up = down
             var owned = false
@@ -71,13 +81,20 @@ fun Modifier.touchZoneGestures(
                 val delta = change.position - down.position
                 decision.update(delta.x, delta.y, event.changes.count { it.pressed }.coerceAtLeast(1), change.isConsumed && !owned)
                 if (decision.cancelled || currentZoom()) break
-                if (decision.moved && !handToNative) {
-                    // Consume even short/disabled swipes: underlying pager must not bypass the configured threshold.
-                    if (taps || if (vertical) kotlin.math.abs(delta.y) > kotlin.math.abs(delta.x) else kotlin.math.abs(delta.x) > kotlin.math.abs(delta.y)) {
-                        change.consume(); owned = true
-                    }
+                val onPagingAxis = if (vertical) kotlin.math.abs(delta.y) > kotlin.math.abs(delta.x)
+                    else kotlin.math.abs(delta.x) > kotlin.math.abs(delta.y)
+                if (decision.moved && !handToNative && (swipe != SwipeAction.PAGE || onPagingAxis)) {
+                    change.consume()
+                    owned = true
                 }
-                if (!change.pressed) { up = change; break }
+                if (!change.pressed) {
+                    if (prioritizeChildTap && decision.isTap()) {
+                        val final = awaitPointerEvent(PointerEventPass.Final)
+                        if (final.changes.any { it.id == down.id && it.isConsumed }) return@awaitEachGesture
+                    }
+                    up = change
+                    break
+                }
             }
             } finally { holdJob?.cancel() }
             if (decision.cancelled || currentZoom() || up.pressed) return@awaitEachGesture
@@ -87,18 +104,22 @@ fun Modifier.touchZoneGestures(
                 if (holdFired) Unit
                 else if (up.uptimeMillis - down.uptimeMillis >= 1000 && currentHold != null) currentHold?.invoke()
                 else if (currentMenu) currentAction(TouchAction.CONTROLS)
-                else if (currentImage?.invoke(down.position) != true) currentAction(zone?.tap ?: TouchAction.NONE)
-            } else if (decision.moved && !currentMenu && when (zone?.swipe) {
-                SwipeAction.PAGE -> {
+                else if (currentImage?.invoke(down.position) != true) currentAction(zone?.tap ?: currentDefaultTap(down.position, size.width))
+            } else if (decision.moved && (!currentMenu || swipesWithChrome) && !handToNative && when (swipe) {
+                SwipeAction.PAGE -> if (!pageSwipeEnabled || !owned) false else {
                     val velocity = velocityTracker.calculateVelocity()
-                    fastPageCommit(zone.distanceDp, Offset(decision.dx, decision.dy), Offset(velocity.x, velocity.y), density,
-                        Offset(decision.dx, decision.dy).getDistance() >= defaultDistance(if (vertical) size.height.toFloat() else size.width.toFloat()))
+                    val delta = if (vertical) decision.dy else decision.dx
+                    val axisVelocity = if (vertical) velocity.y else velocity.x
+                    val cross = if (vertical) decision.dx else decision.dy
+                    kotlin.math.abs(delta) > kotlin.math.abs(cross) && kotlin.math.abs(delta) >= threshold &&
+                        delta * axisVelocity >= -850f * density * kotlin.math.abs(delta)
                 }
-                else -> decision.isSwipe(vertical)
+                SwipeAction.CONTROLS, SwipeAction.SETTINGS -> decision.isSwipe(vertical)
+                SwipeAction.NONE -> false
             }) {
                 com.example.ui.components.recordPaperTouch(down.position + windowOrigin, density)
-                when (zone?.swipe) {
-                    SwipeAction.PAGE -> if (!handToNative) {
+                when (swipe) {
+                    SwipeAction.PAGE -> {
                         val negative = (if (vertical) decision.dy else decision.dx) < 0
                         currentAction(if (negative.xor(reverse)) TouchAction.NEXT else TouchAction.PREVIOUS)
                     }

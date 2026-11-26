@@ -92,18 +92,43 @@ class TouchZoneSystemTest {
     @Test fun novelSettingsSurviveAStoreRecreationAndRestoreRemovesTheOverride() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val zones = listOf(TouchZone(distanceDp = 123f))
-        NovelTouchZoneStore(context).save(zones)
-        assertEquals(zones, NovelTouchZoneStore(context).load())
-        NovelTouchZoneStore(context).save(null)
-        assertNull(NovelTouchZoneStore(context).load())
+        NovelTouchZoneStore(context).save("novel_page_0", zones)
+        assertEquals(zones, NovelTouchZoneStore(context).load("novel_page_0"))
+        assertNull(NovelTouchZoneStore(context).load("novel_page_4"))
+        NovelTouchZoneStore(context).save("novel_page_4", listOf(TouchZone(tap = TouchAction.SETTINGS)))
+        NovelTouchZoneStore(context).save("novel_page_0", null)
+        assertNull(NovelTouchZoneStore(context).load("novel_page_0"))
+        assertEquals(TouchAction.SETTINGS, NovelTouchZoneStore(context).load("novel_page_4")!!.single().tap)
+    }
+    @Test fun legacyNovelScrollDefaultDoesNotDisableNativeScrolling() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val legacy = TouchZone(id = "scroll", swipe = SwipeAction.NONE)
+        context.getSharedPreferences("reader_touch_zones_v1", Context.MODE_PRIVATE).edit()
+            .putString("novel", TouchZone.encode(listOf(legacy))).commit()
+        val store = NovelTouchZoneStore(context)
+        assertTrue(store.load("novel_page_4")!!.single().allowsNativeSwipe())
+        assertNull(store.load("novel_page_1"))
     }
     @Test fun comicZonesRoundTripThroughPresetsAndPerBookConfig() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val store = ComicSettingsStore(context)
         val config = ComicReaderConfig(touchZones = listOf(TouchZone(distanceDp = 64f)))
         store.saveBookConfig("test-zone", config)
-        assertEquals(config.touchZones, store.effectiveConfig("test-zone").config.touchZones)
-        assertEquals(config.touchZones, ComicReaderConfig.fromJson(config.toJson()).touchZones)
+        assertEquals(config.touchZones, store.effectiveConfig("test-zone").config.zonesForCurrentMode())
+        assertEquals(config.touchZones, ComicReaderConfig.fromJson(config.toJson()).zonesForCurrentMode())
+    }
+    @Test fun comicModeDirectionAndAnimationKeepIndependentProfiles() {
+        val original = ComicReaderConfig(direction = ComicDirection.RTL, pageAnim = ComicPageAnim.CURL)
+        val zones = listOf(TouchZone(id = "curl"))
+        val old = original.toJson().put("touchZones", org.json.JSONArray(TouchZone.encode(zones)))
+        val restored = ComicReaderConfig.fromJson(old)
+        assertEquals(zones, restored.zonesForCurrentMode())
+        assertNull(restored.copy(direction = ComicDirection.LTR).zonesForCurrentMode())
+        assertNull(restored.copy(pageAnim = ComicPageAnim.SLIDE).zonesForCurrentMode())
+        val webtoon = restored.copy(mode = ComicMode.WEBTOON).withTouchZones(listOf(TouchZone(id = "webtoon")))
+        val again = ComicReaderConfig.fromJson(webtoon.toJson())
+        assertEquals("webtoon", again.zonesForCurrentMode()!!.single().id)
+        assertEquals("curl", again.copy(mode = ComicMode.SINGLE).zonesForCurrentMode()!!.single().id)
     }
     @Test fun legacyComicJsonDoesNotGainANewDefaultLayout() {
         val old = ComicReaderConfig.fromJson(JSONObject("{\"gestureTapLeft\":\"TOC\",\"gestureSwipe\":false}"))
@@ -121,7 +146,8 @@ class TouchZoneSystemTest {
         for (direction in ComicDirection.entries) {
             val config = ComicReaderConfig(direction = direction, touchZones = listOf(zone))
             assertEquals(ComicGestureAction.TOGGLE_CONTROLS, resolveTapAction(Offset(10f, 500f), Size(900f, 1600f), config))
-            assertEquals(ComicGestureAction.NONE, resolveTapAction(Offset(850f, 500f), Size(900f, 1600f), config))
+            val uncovered = resolveTapAction(Offset(850f, 500f), Size(900f, 1600f), config.copy(touchZones = null))
+            assertEquals(uncovered, resolveTapAction(Offset(850f, 500f), Size(900f, 1600f), config))
         }
     }
     @Test fun webtoonSwipeTurnsAViewportWithoutSkippingTheRestOfATallImage() {

@@ -8,6 +8,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -18,6 +19,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.data.BookTextSpan
 import com.example.data.BookTextStyle
@@ -51,6 +57,9 @@ internal fun VerticalNovelBody(
     onToggleChrome: () -> Unit,
     onSelect: (ReaderTextSelection) -> Unit,
     onImage: (String) -> Unit,
+    touchBinding: ReaderTouchBinding = ReaderTouchBinding(),
+    menuVisible: Boolean = false,
+    onTurnAtEdge: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val document = remember(title, text, spans, marks, mode, fontSize, lineHeight, foreground, background) {
@@ -58,11 +67,30 @@ internal fun VerticalNovelBody(
     }
     AndroidView(
         factory = { VerticalTextView(it) },
-        modifier = modifier,
+        modifier = modifier.onGloballyPositioned {
+            touchBinding.onViewport(androidx.compose.ui.geometry.Rect(it.positionInWindow(), Size(it.size.width.toFloat(), it.size.height.toFloat())))
+        },
         update = { view ->
             view.setBackgroundColor(background.toArgb())
             view.onOffset = onOffset
             view.onToggleChrome = onToggleChrome
+            view.touchZones = touchBinding.zones
+            view.onSwipeAction = touchBinding.onAction
+            view.onTap = { point, size ->
+                val action = if (menuVisible) TouchAction.CONTROLS else
+                    touchBinding.zones.zoneAt(point, size)?.tap ?: TouchAction.CONTROLS
+                when (action) {
+                    TouchAction.NEXT, TouchAction.PREVIOUS -> {
+                        val next = action == TouchAction.NEXT
+                        val direction = if (next.xor(mode == "vertical-rl")) 1 else -1
+                        if (view.canScrollHorizontally(direction)) {
+                            view.evaluateJavascript("window.scrollBy({left: innerWidth * 0.9 * $direction, behavior: 'smooth'})", null)
+                        } else onTurnAtEdge(next)
+                    }
+                    TouchAction.CONTROLS -> onToggleChrome()
+                    else -> touchBinding.onAction(action)
+                }
+            }
             view.onSelect = onSelect
             view.onImage = onImage
             view.updateDocument(document, offset, highlight)
@@ -74,6 +102,9 @@ internal fun VerticalNovelBody(
 private class VerticalTextView(context: Context) : WebView(context) {
     var onOffset: (Int) -> Unit = {}
     var onToggleChrome: () -> Unit = {}
+    var onTap: ((Offset, IntSize) -> Unit)? = null
+    var touchZones: List<TouchZone>? = null
+    var onSwipeAction: (TouchAction) -> Unit = {}
     var onSelect: (ReaderTextSelection) -> Unit = {}
     var onImage: (String) -> Unit = {}
     @Volatile private var document: VerticalDocument? = null
@@ -82,12 +113,18 @@ private class VerticalTextView(context: Context) : WebView(context) {
     private var loaded = false
     private var offset = 0
     private var highlight: Int? = null
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private var downPoint = Offset.Zero
+    private var downZone: TouchZone? = null
+    private var zoneOwnsSwipe = false
     private val gestures = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
         override fun onDown(event: MotionEvent) = true
 
         override fun onSingleTapConfirmed(event: MotionEvent): Boolean {
+            if (hitTestResult?.type in setOf(HitTestResult.IMAGE_TYPE, HitTestResult.SRC_IMAGE_ANCHOR_TYPE)) return false
+            val point = Offset(event.x, event.y)
             evaluateJavascript("window.getSelection().isCollapsed") { collapsed ->
-                if (collapsed == "true") onToggleChrome()
+                if (collapsed == "true") onTap?.invoke(point, IntSize(width, height)) ?: onToggleChrome()
             }
             return true
         }
@@ -147,6 +184,45 @@ private class VerticalTextView(context: Context) : WebView(context) {
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        val point = Offset(event.x, event.y)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downPoint = point
+                downZone = touchZones.zoneAt(point, IntSize(width, height))
+                zoneOwnsSwipe = false
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> downZone = null
+            MotionEvent.ACTION_MOVE -> {
+                val zone = downZone
+                if (!zoneOwnsSwipe && !zone.allowsNativeSwipe() && event.pointerCount == 1 &&
+                    event.eventTime - event.downTime < ViewConfiguration.getLongPressTimeout() &&
+                    (point - downPoint).getDistance() > touchSlop) {
+                    zoneOwnsSwipe = true
+                    val cancel = MotionEvent.obtain(event)
+                    try {
+                        cancel.action = MotionEvent.ACTION_CANCEL
+                        gestures.onTouchEvent(cancel)
+                        super.dispatchTouchEvent(cancel)
+                    } finally { cancel.recycle() }
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (zoneOwnsSwipe) {
+                zoneOwnsSwipe = false
+                val zone = downZone
+                downZone = null
+                val density = resources.displayMetrics.density
+                val threshold = zone?.distanceDp?.times(density) ?: width * .15f
+                if (event.actionMasked == MotionEvent.ACTION_UP && (point - downPoint).getDistance() >= threshold) {
+                    when (zone?.swipe) {
+                        SwipeAction.CONTROLS -> onSwipeAction(TouchAction.CONTROLS)
+                        SwipeAction.SETTINGS -> onSwipeAction(TouchAction.SETTINGS)
+                        else -> Unit
+                    }
+                }
+                return true
+            }
+        }
+        if (zoneOwnsSwipe) return true
         gestures.onTouchEvent(event)
         return super.dispatchTouchEvent(event)
     }

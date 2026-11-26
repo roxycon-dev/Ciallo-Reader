@@ -14,6 +14,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import com.example.ui.reader.TouchZone
+import com.example.ui.reader.allowsNativeSwipe
+import com.example.ui.reader.zoneAt
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -32,6 +35,8 @@ internal fun Modifier.comicChapterEdgeSwipe(
     atEnd: () -> Boolean,
     zoomed: () -> Boolean = { false },
     bounce: Boolean = false,
+    zones: List<TouchZone>? = null,
+    nativeOnlyWithoutDistance: Boolean = false,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
 ): Modifier = if (!enabled) this else composed {
@@ -40,6 +45,7 @@ internal fun Modifier.comicChapterEdgeSwipe(
     val latestZoomed by rememberUpdatedState(zoomed)
     val latestPrevious by rememberUpdatedState(onPrevious)
     val latestNext by rememberUpdatedState(onNext)
+    val latestZones by rememberUpdatedState(zones)
     val offset = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     val vertical = direction == ComicDirection.TTB
@@ -51,6 +57,8 @@ internal fun Modifier.comicChapterEdgeSwipe(
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
             if (down.isConsumed || latestZoomed()) return@awaitEachGesture
+            val zone = latestZones.zoneAt(down.position, size)
+            if (!zone.allowsNativeSwipe() || nativeOnlyWithoutDistance && zone?.distanceDp != null) return@awaitEachGesture
             val start = latestStart()
             val end = latestEnd()
             if (!start && !end) return@awaitEachGesture

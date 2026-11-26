@@ -1,10 +1,12 @@
 package com.example.ui.reader
 
 import android.content.Context
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.IntSize
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
-import kotlin.math.abs
 
 /** 展示文案在读取时翻译（枚举在类加载期初始化，构造期翻译会把语言冻住）。 */
 enum class TouchAction(private val raw: String) {
@@ -15,7 +17,7 @@ enum class TouchAction(private val raw: String) {
 }
 
 enum class SwipeAction(private val raw: String) {
-    NONE("不执行操作"), PAGE("滑动翻页"), CONTROLS("呼出状态栏"), SETTINGS("打开设置");
+    NONE("禁用此区滑动"), PAGE("跟随阅读模式"), CONTROLS("呼出状态栏"), SETTINGS("打开设置");
 
     val label: String get() = com.example.i18n.tr(raw)
 }
@@ -51,7 +53,7 @@ data class TouchZone(
                     left = o.getDouble("l").toFloat(), top = o.getDouble("t").toFloat(),
                     right = o.getDouble("r").toFloat(), bottom = o.getDouble("b").toFloat(),
                     tap = TouchAction.entries.firstOrNull { it.name == o.optString("tap") } ?: TouchAction.NONE,
-                    swipe = SwipeAction.entries.firstOrNull { it.name == o.optString("swipe") } ?: SwipeAction.NONE,
+                    swipe = SwipeAction.entries.firstOrNull { it.name == o.optString("swipe") } ?: SwipeAction.PAGE,
                     distanceDp = if (o.has("distance")) o.getDouble("distance").toFloat() else null).normalized()
             }.distinctBy { it.id }
         }.getOrNull() }
@@ -61,11 +63,67 @@ data class TouchZone(
     }
 }
 
+internal fun List<TouchZone>?.zoneAt(point: Offset, size: IntSize): TouchZone? =
+    this?.let { TouchZone.hit(it, point.x / size.width.coerceAtLeast(1), point.y / size.height.coerceAtLeast(1)) }
+
+internal fun TouchZone?.allowsNativeSwipe() = this == null || swipe == SwipeAction.PAGE
+
+internal enum class ZoneHandle(val x: Int, val y: Int) {
+    TOP_LEFT(-1, -1), TOP(0, -1), TOP_RIGHT(1, -1), RIGHT(1, 0),
+    BOTTOM_RIGHT(1, 1), BOTTOM(0, 1), BOTTOM_LEFT(-1, 1), LEFT(-1, 0);
+
+    fun point(zone: TouchZone, size: Size, inset: Float): Offset {
+        fun position(direction: Int, low: Float, high: Float, span: Float): Float {
+            val edge = inset.coerceAtMost(span / 2f)
+            val value = when (direction) { -1 -> low; 1 -> high; else -> (low + high) / 2f }
+            return (value * span).coerceIn(edge, span - edge)
+        }
+        return Offset(position(x, zone.left, zone.right, size.width), position(y, zone.top, zone.bottom, size.height))
+    }
+}
+
+internal fun dragTouchZone(zone: TouchZone, handle: ZoneHandle?, delta: Offset, snap: Offset): TouchZone {
+    val minimum = .08f
+    fun nearStart(value: Float, threshold: Float) = if (value <= threshold) 0f else value
+    fun nearEnd(value: Float, threshold: Float) = if (value >= 1f - threshold) 1f else value
+    if (handle == null) {
+        val dx = delta.x.coerceIn(-zone.left, 1f - zone.right)
+        val dy = delta.y.coerceIn(-zone.top, 1f - zone.bottom)
+        return zone.copy(left = zone.left + dx, right = zone.right + dx, top = zone.top + dy, bottom = zone.bottom + dy)
+    }
+    return zone.copy(
+        left = if (handle.x < 0) nearStart((zone.left + delta.x).coerceIn(0f, (zone.right - minimum).coerceAtLeast(0f)), snap.x) else zone.left,
+        top = if (handle.y < 0) nearStart((zone.top + delta.y).coerceIn(0f, (zone.bottom - minimum).coerceAtLeast(0f)), snap.y) else zone.top,
+        right = if (handle.x > 0) nearEnd((zone.right + delta.x).coerceIn((zone.left + minimum).coerceAtMost(1f), 1f), snap.x) else zone.right,
+        bottom = if (handle.y > 0) nearEnd((zone.bottom + delta.y).coerceIn((zone.top + minimum).coerceAtMost(1f), 1f), snap.y) else zone.bottom,
+    )
+}
+
+internal fun novelPageTap(x: Float, width: Int, edge: Float): TouchAction = when {
+    x < width * edge -> TouchAction.PREVIOUS
+    x > width * (1f - edge) -> TouchAction.NEXT
+    else -> TouchAction.CONTROLS
+}
+
+internal fun List<TouchZone>.migrateLegacyTouchZones(): List<TouchZone> =
+    map { if (it.id == "scroll" && it.swipe == SwipeAction.NONE) it.copy(swipe = SwipeAction.PAGE) else it }
+
 class NovelTouchZoneStore(context: Context) {
     private val prefs = context.getSharedPreferences("reader_touch_zones_v1", Context.MODE_PRIVATE)
-    fun load() = TouchZone.decode(prefs.getString("novel", null))
-    fun save(zones: List<TouchZone>?) {
-        prefs.edit().apply { if (zones == null) remove("novel") else putString("novel", TouchZone.encode(zones)) }.apply()
+    fun load(profile: String): List<TouchZone>? {
+        val legacy = prefs.getString("novel", null)
+        if (legacy != null) {
+            val editor = prefs.edit().remove("novel")
+            if (!prefs.contains(profile)) TouchZone.decode(legacy)?.migrateLegacyTouchZones()?.let {
+                editor.putString(profile, TouchZone.encode(it))
+            }
+            editor.apply()
+        }
+        return TouchZone.decode(prefs.getString(profile, null))
+    }
+
+    fun save(profile: String, zones: List<TouchZone>?) {
+        prefs.edit().apply { if (zones.isNullOrEmpty()) remove(profile) else putString(profile, TouchZone.encode(zones)) }.apply()
     }
 }
 

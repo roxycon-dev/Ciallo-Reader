@@ -295,6 +295,7 @@ fun SourceManagementScreen(
     val activeSource by viewModel.activeSource.collectAsStateWithLifecycle()
     val enabledStates by viewModel.enabledStates.collectAsStateWithLifecycle()
     val importStatus by viewModel.importStatus.collectAsStateWithLifecycle()
+    val comicImport by viewModel.comicImport.collectAsStateWithLifecycle()
     val ordering by viewModel.ordering.collectAsStateWithLifecycle()
     var showSourceOrder by rememberSaveable { mutableStateOf(false) }
 
@@ -330,6 +331,9 @@ fun SourceManagementScreen(
             viewModel.importSourceFromUri(it)
         }
     }
+    val comicFileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) {
+        viewModel.previewComicSources(it)
+    }
 
     val snackbarHostState = remember { SnackbarHostState() }
     // 登记为全局提示宿主（本页 Toast 已迁移到 AppToast；宿主离开组合时自动解绑回退到系统 Toast）
@@ -364,9 +368,10 @@ fun SourceManagementScreen(
             if (novels.isNotEmpty()) add(SourceGroup(com.example.i18n.tr("小说"), SourceGroupKind.NOVEL, novels))
             if (comics.isNotEmpty()) add(SourceGroup(com.example.i18n.tr("漫画"), SourceGroupKind.COMIC, comics))
             if (others.isNotEmpty()) add(SourceGroup(com.example.i18n.tr("其他"), SourceGroupKind.OTHER, others))
-            if (customSources.isNotEmpty()) {
-                add(SourceGroup(com.example.i18n.tr("自定义"), SourceGroupKind.CUSTOM, customSources))
-            }
+            val customComics = customSources.filter { it.isComicSource }
+            val customNovels = customSources.filterNot { it.isComicSource }
+            if (customComics.isNotEmpty()) add(SourceGroup(tr("自定义漫画源"), SourceGroupKind.CUSTOM, customComics))
+            if (customNovels.isNotEmpty()) add(SourceGroup(tr("自定义小说源"), SourceGroupKind.CUSTOM, customNovels))
         }
     }
 
@@ -471,6 +476,10 @@ fun SourceManagementScreen(
                         SourceOrderEntry(ordering.mode, onClick = { showSourceOrder = true })
                     }
 
+                    item(key = "import_row", span = { GridItemSpan(maxLineSpan) }) {
+                        SourceImportEntryRow(onClick = { showImportPicker = true })
+                    }
+
                     // ── B / C（+ 自定义）分组：每张卡 = 头部 + 行列表 ──
                     groups.forEachIndexed { index, group ->
                         item(key = "body_${group.title}") {
@@ -508,13 +517,6 @@ fun SourceManagementScreen(
                         }
                     }
 
-                    // ── D 导入行：虚线胶囊「＋ 导入 JSON 书源」 ──
-                    item(key = "import_row", span = { GridItemSpan(maxLineSpan) }) {
-                        SourceImportEntryRow(
-                            onClick = { showImportPicker = true },
-                            modifier = Modifier.wenkuPagePart(groups.size + 2)
-                        )
-                    }
                 }
                 }
             }
@@ -563,9 +565,15 @@ fun SourceManagementScreen(
 
     if (showImportPicker) {
         WenkuActionSheet(tr("导入书源"), onDismiss = { showImportPicker = false }) {
-            Text(tr("支持「阅读」书源 JSON 文件、粘贴配置和社区合集。"), color = MaterialTheme.colorScheme.onSurfaceVariant)
             WenkuTextButton(
-                com.example.i18n.tr("从本地文件导入"), onClick = paperDismiss { fileLauncher.launch("*/*") },
+                tr("导入漫画源 JS 文件"), onClick = paperDismiss {
+                    showImportPicker = false
+                    comicFileLauncher.launch(arrayOf("*/*"))
+                },
+                modifier = Modifier.fillMaxWidth(), selected = true, wenkuSymbol = WenkuSymbol.FolderOpen
+            )
+            WenkuTextButton(
+                tr("导入小说书源 JSON 文件"), onClick = paperDismiss { fileLauncher.launch("*/*") },
                 modifier = Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.FolderOpen
             )
             WenkuTextButton(
@@ -577,6 +585,15 @@ fun SourceManagementScreen(
                 modifier = Modifier.fillMaxWidth(), wenkuSymbol = WenkuSymbol.Link
             )
         }
+    }
+
+    comicImport?.let { preview ->
+        ComicSourceImportSheet(
+            preview = preview,
+            existing = allSources.associateBy { it.id },
+            onDismiss = viewModel::dismissComicImport,
+            onInstall = viewModel::installComicSources,
+        )
     }
 
     if (showPasteDialog) {
@@ -1096,7 +1113,9 @@ private fun SourceGroupCard(
                             isCustom = group.kind == SourceGroupKind.CUSTOM,
                             onToggleEnable = { onToggleEnable(source, it) },
                             onOpenLogin = if (
-                                (source.capabilities.requiresLogin || source.id in setOf("js_mycomic", "js_bilimanga", "xbookcn")) && source.id != "zlibrary"
+                                (source.capabilities.requiresLogin ||
+                                    (source as? com.example.source.js.JsComicSource)?.supportsImportedLogin == true ||
+                                    source.id in setOf("js_mycomic", "js_bilimanga", "xbookcn")) && source.id != "zlibrary"
                             ) {
                                 { onOpenLogin(source) }
                             } else null,
@@ -1277,7 +1296,9 @@ private fun SourceRow(
     if (showSourceInfo) SourceInfoDialog(source = source, enabled = isEnabled, onDismiss = { showSourceInfo = false })
     // “需登录/已登录”必须反映真实登录态，而非构造期的静态能力位：
     // 登录成功后 capabilities.requiresLogin 不变，旧实现因此永远显示“需登录”。
-    val needsAuth = source.capabilities.requiresLogin || source.id in setOf("js_mycomic", "js_bilimanga", "xbookcn")
+    val needsAuth = source.capabilities.requiresLogin ||
+        (source as? com.example.source.js.JsComicSource)?.supportsImportedLogin == true ||
+        source.id in setOf("js_mycomic", "js_bilimanga", "xbookcn")
     var authed by remember(source.id) { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(source.id, sourceAuthEpoch.intValue) {
         if (needsAuth) authed = runCatching { source.isLoggedIn() }.getOrDefault(false)
@@ -1470,7 +1491,7 @@ private fun SourceImportEntryRow(
         WenkuIcon(WenkuSymbol.Add, size = 18.dp, tint = accentText(), entrance = false)
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = tr("导入 JSON 书源"),
+            text = tr("导入书源"),
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             color = accentText()

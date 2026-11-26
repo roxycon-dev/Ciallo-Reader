@@ -291,6 +291,9 @@ class LibraryViewModel private constructor(
                 }
 
                 // Venera 兼容 JS 源：优先本地缓存，无缓存时从远程仓库安装
+                com.example.source.js.ImportedComicSources.load(application).forEach { source ->
+                    if (sourceManager.getSource(source.id) == null) sourceManager.registerSource(source)
+                }
                 val cachedJsSources = JsSourceRepo.loadCached(application, prefs.showAdultSources)
                 val refreshedJsSources = if (cachedJsSources.isEmpty() ||
                     JsSourceRepo.needsRepair(application, prefs.showAdultSources)

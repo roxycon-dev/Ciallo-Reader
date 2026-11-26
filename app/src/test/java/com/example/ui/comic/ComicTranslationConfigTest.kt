@@ -20,14 +20,17 @@ class ComicTranslationConfigTest {
         val legacy = JSONObject("""{"mode":"SINGLE","direction":"RTL","pageAnim":"SLIDE"}""")
         val config = ComicReaderConfig.fromJson(legacy)
         assertFalse(config.translationEnabled)
+        assertEquals("online", config.translationEngine)
         assertEquals("auto", config.translationLang)
         assertEquals(1.0f, config.translationTextScale, 0.0001f)
     }
 
     @Test
-    fun `old online default migrates but a new explicit selection round trips`() {
+    fun `default selects key-free translation and explicit AI survives migration`() {
         val old = JSONObject("""{"translationEngine":"online"}""")
-        assertEquals("auto", ComicReaderConfig.fromJson(old).translationEngine)
+        assertEquals("online", ComicReaderConfig.fromJson(old).translationEngine)
+        val oldAuto = JSONObject("""{"translationEngine":"auto","translationEngineVersion":2}""")
+        assertEquals("online", ComicReaderConfig.fromJson(oldAuto).translationEngine)
         val explicit = ComicReaderConfig(translationEngine = "online").toJson()
         assertEquals("online", ComicReaderConfig.fromJson(explicit).translationEngine)
         assertEquals("ai", ComicReaderConfig.fromJson(JSONObject("""{"translationEngine":"ai"}""")).translationEngine)

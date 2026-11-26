@@ -73,16 +73,21 @@ class JsComicSource(
     val version: String,
     private val script: String,
     private val insecureTls: Boolean = false,
-    private val loginRequired: Boolean = false
+    private val loginRequired: Boolean = false,
+    private val importedClassName: String? = null,
+    private val importedAccount: Boolean = false,
+    private val importedSearch: Boolean = true,
 ) : ComicSource {
 
     override val id: String get() = "js_$sourceKey"
+    val isUserImported: Boolean get() = importedClassName != null
+    val supportsImportedLogin: Boolean get() = isUserImported && importedAccount
     override val supportsDiscoverMetadata: Boolean get() = sourceKey != "hitomi"
     override suspend fun getDiscoverMetadata(bookId: String): SourceResult<SearchBook> = withContext(Dispatchers.IO) {
         try {
             val result = callJsWithRetry("typeof src.discoverMetadata === 'function' ? src.discoverMetadata(${q(bookId)}) : src.comic?.loadInfo(${q(bookId)})")
             if (result?.optBoolean("ok") != true) SourceResult.Error(SourceException.ParseError(tr("轻量元数据暂时不可用")))
-            else SourceResult.Success(JsComicMetadata.book(result.optJSONObject("data") ?: JSONObject(), id, bookId))
+            else SourceResult.Success(sourceBook(result.optJSONObject("data") ?: JSONObject(), bookId))
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { SourceResult.Error(SourceException.Unknown(tr("轻量元数据加载失败"), e)) }
     }
@@ -165,7 +170,7 @@ class JsComicSource(
           catch (_: Exception) { null }
     }
     override val capabilities: SourceCapabilities = SourceCapabilities(
-        supportSearch = true,
+        supportSearch = importedSearch,
         supportDownload = true,
         supportComic = true,
         searchRequiresLogin = loginRequired && sourceKey !in setOf("ikmmh", "vomic"),
@@ -232,7 +237,8 @@ class JsComicSource(
                 sourceJs = script,
                 sourceKey = sourceKey,
                 context = context,
-                insecureTls = insecureTls
+                insecureTls = insecureTls,
+                importedClassName = importedClassName,
             ).also { engine = it }
             if (!engineInitialized) {
                 runtime.call("null")
@@ -322,7 +328,7 @@ class JsComicSource(
                         sourceId = this@JsComicSource.id,
                         title = title,
                         author = metadata.author,
-                        cover = c.optString("cover", "").ifBlank { null },
+                        cover = coverUrl(c.optString("cover")),
                         description = c.optString("description", "").ifBlank { null },
                         language = c.optString("language", "").ifBlank { null },
                         comicId = extractComicId(c),
@@ -370,7 +376,7 @@ class JsComicSource(
                 sourceId = id,
                 title = title,
                 author = JsComicMetadata.book(data, id, numericId).author,
-                cover = data.optString("cover").ifBlank { null },
+                cover = coverUrl(data.optString("cover")),
                 description = data.optString("description").ifBlank { null },
                 comicId = numericId,
                 format = "漫画",
@@ -446,7 +452,7 @@ class JsComicSource(
                 rememberShareUrl(bookId, data)
                 synchronized(chapterCacheMonitor) {
                     if (detailEpoch == chapterCacheEpoch) {
-                        detailCache[bookId] = android.os.SystemClock.elapsedRealtime() to JsComicMetadata.book(data, id, bookId)
+                        detailCache[bookId] = android.os.SystemClock.elapsedRealtime() to sourceBook(data, bookId)
                         while (detailCache.size > 8) detailCache.remove(detailCache.keys.first())
                     }
                 }
@@ -487,7 +493,8 @@ class JsComicSource(
                         jsSourceFailure(err)
                     )
                 }
-                val rawUrls = JsSourcePayload.images(obj.optJSONObject("data"))
+                val urls = JsSourcePayload.images(obj.optJSONObject("data"))
+                val rawUrls = if (isUserImported) urls.mapNotNull(ImportedComicSources::mediaUrl) else urls
                 if (rawUrls.isEmpty()) {
                     SourceResult.Error(SourceException.ParseError(tr("该章节没有可读取的图片")))
                 } else if (sourceKey == "hitomi") {
@@ -505,7 +512,8 @@ class JsComicSource(
                     var prevNl: String? = null
                     rawUrls.forEach { rawUrl ->
                         val config = resolveImageConfig(chapterId, rawUrl, prevNl)
-                        resolved.add(config.finalUrl)
+                        val finalUrl = if (isUserImported) ImportedComicSources.mediaUrl(config.finalUrl) else config.finalUrl
+                        if (finalUrl != null) resolved.add(finalUrl)
                         prevNl = config.nl
                     }
                     val pages = if (sourceKey == "mxs") stripLeadingMxsSpacers(resolved) { url ->
@@ -569,7 +577,7 @@ class JsComicSource(
             val config = synchronized(imageConfigCache) {
                 imageConfigCache.values.firstOrNull { it.finalUrl == url }
             }
-            val headers = config?.headers ?: resolveImageConfig(chapterId, url).headers
+            val headers = mediaHeaders(url, config?.headers ?: resolveImageConfig(chapterId, url).headers)
             if (headers.isNotEmpty()) result[url] = headers
         }
         return result
@@ -668,11 +676,13 @@ class JsComicSource(
             fallback
         }
         synchronized(imageConfigCache) { imageConfigCache[url] = config }
-        if (config.modifyCode != null) {
+        val imageScope = sourceKey.takeIf { isUserImported }
+        val canonicalUrl = if (isUserImported) ImportedComicSources.mediaUrl(config.finalUrl) else config.finalUrl
+        if (config.modifyCode != null && canonicalUrl != null) {
             Log.i("JsImageProcessor", "register ${config.finalUrl.take(80)} code=${config.modifyCode.take(40).replace('\n', ' ')}")
-            JsImageProcessor.register(config.finalUrl, getEngine(), config.modifyCode)
-        } else {
-            JsImageProcessor.unregister(config.finalUrl)
+            JsImageProcessor.register(canonicalUrl, getEngine(), config.modifyCode, imageScope)
+        } else if (canonicalUrl != null) {
+            JsImageProcessor.unregister(canonicalUrl, imageScope)
         }
         return config
     }
@@ -830,19 +840,19 @@ class JsComicSource(
         // Login state is local metadata. Reading it during launch must not load
         // QuickJS/native libraries or execute a source's initialization script.
         runCatching {
-            context.getSharedPreferences("js_source_data", Context.MODE_PRIVATE)
+            context.getSharedPreferences(if (isUserImported) "js_source_data_$sourceKey" else "js_source_data", Context.MODE_PRIVATE)
                 .getBoolean("logged_$sourceKey", false)
         }.getOrDefault(false)
     }
 
     override suspend fun getCoverHeaders(url: String): Map<String, String> =
         withContext(Dispatchers.IO) {
-            try {
+            val headers = try {
                 val obj = callJs(
                     """src.comic && typeof src.comic.onThumbnailLoad === 'function' ? src.comic.onThumbnailLoad.call(src, ${q(url)}) : null"""
                 )
                 if (obj?.optBoolean("ok") == true) {
-                    val data = obj.optJSONObject("data") ?: return@withContext emptyMap()
+                    val data = obj.optJSONObject("data") ?: return@withContext mediaHeaders(url, emptyMap())
                     val merged = LinkedHashMap<String, String>()
                     data.optJSONObject("headers")?.keys()?.forEach { k ->
                         merged[k] = data.optJSONObject("headers")!!.optString(k)
@@ -859,7 +869,22 @@ class JsComicSource(
             } catch (e: Exception) {
                 emptyMap()
             }
+            mediaHeaders(url, headers)
         }
+
+    private fun coverUrl(raw: String): String? =
+        if (isUserImported) ImportedComicSources.mediaUrl(raw) else raw.ifBlank { null }
+
+    private fun sourceBook(data: JSONObject, bookId: String): SearchBook =
+        JsComicMetadata.book(data, id, bookId).let { if (isUserImported) it.copy(cover = coverUrl(it.cover.orEmpty())) else it }
+
+    private fun mediaHeaders(url: String, headers: Map<String, String>): Map<String, String> {
+        if (!isUserImported) return headers
+        val explicit = headers.entries.firstOrNull { it.key.equals("Cookie", true) }?.value
+        val cookie = JsCookieJar.mergeHeaders(explicit, JsCookieJar.cookieHeader(context, url, sourceKey))
+        return headers.filterKeys { !it.equals("Cookie", true) && !it.equals(ImportedComicSources.MEDIA_SCOPE_HEADER, true) } +
+            mapOf("Cookie" to cookie, ImportedComicSources.MEDIA_SCOPE_HEADER to sourceKey)
+    }
 
     private fun splitChapterId(chapterId: String): Pair<String, String>? {
         val sep = chapterId.indexOf('\u0001')

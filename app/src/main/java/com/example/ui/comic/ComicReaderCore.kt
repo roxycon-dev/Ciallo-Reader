@@ -5,8 +5,9 @@ import com.example.i18n.tr
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.reader.TouchZone
 import com.example.ui.reader.TouchAction
-import com.example.ui.reader.SwipeAction
 import com.example.ui.reader.ReaderTouchBinding
+import com.example.ui.reader.allowsNativeSwipe
+import com.example.ui.reader.zoneAt
 import com.example.ui.reader.touchZoneGestures
 import androidx.compose.runtime.derivedStateOf
 
@@ -279,12 +280,19 @@ fun ComicReaderCore(
     // 重算（2800px×数十次）。displayConfig 落后 config 250ms——滑条拖动期间只有
     // 设置面板里的小图预览（loadPreview 540px）实时，松手静止后阅读页才重算一次
     var requestedDisplayConfig by remember(bookKey) { mutableStateOf(config) }
-    val displayConfig = (if (minimal) requestedDisplayConfig.copy(
+    val activeTouchZones = if (previewTouchActive) previewTouchZones else config.zonesForCurrentMode()
+    val gestureConfig = config.copy(touchZones = activeTouchZones, touchZoneProfiles = emptyMap())
+    val currentDisplayConfig = requestedDisplayConfig.copy(
+        mode = config.mode, direction = config.direction, pageAnim = config.pageAnim,
+        webtoonSnap = config.webtoonSnap, touchZones = activeTouchZones,
+        gestureSwipe = config.gestureSwipe, gestureEdgeSwipe = config.gestureEdgeSwipe,
+    )
+    val displayConfig = (if (minimal) currentDisplayConfig.copy(
         pageAnim = ComicPageAnim.NONE, enhanceMode = ComicEnhanceMode.OFF, filterSharpen = 0,
         filterBrightness = 0, filterContrast = 0, filterSaturation = 0, filterHue = 0,
         filterGamma = 1f, filterShadow = 0, filterBW = false, translationEnabled = false,
         sceneEffect = false, bgType = if (requestedDisplayConfig.bgType == ComicBgType.PAPER || requestedDisplayConfig.bgType == ComicBgType.DYNAMIC) ComicBgType.BLACK else requestedDisplayConfig.bgType,
-    ) else requestedDisplayConfig).copy(touchZones = if (previewTouchActive) previewTouchZones else config.touchZones)
+    ) else currentDisplayConfig)
     LaunchedEffect(bookKey) {
         snapshotFlow { config }
             .debounce(250)
@@ -533,21 +541,20 @@ fun ComicReaderCore(
             if (ComicVolumeKeyBridge.handler != null) ComicVolumeKeyBridge.handler = null
         }
     }
+    fun turnZonePage(next: Boolean) {
+        if (verticalMode) {
+            val metrics = scrollMetrics.value ?: return
+            if (if (next) metrics.canScrollForward else metrics.canScrollBackward) {
+                scrollJumpAnimated = true
+                scrollJump = ((scrollJump?.first ?: 0) + 1) to metrics.pageFraction(next)
+            } else navigateChapter(next)
+        } else if (next) goNext() else goPrev()
+    }
     val gestureCallbacks = ComicGestureCallbacks(
         onZoneAction = { action ->
-            fun swipePage(next: Boolean) {
-                if (controlsVisible || !config.gestureSwipe) return
-                if (verticalMode) {
-                    val metrics = scrollMetrics.value ?: return
-                    if (if (next) metrics.canScrollForward else metrics.canScrollBackward) {
-                        scrollJumpAnimated = true
-                        scrollJump = ((scrollJump?.first ?: 0) + 1) to metrics.pageFraction(next)
-                    } else navigateChapter(next)
-                } else if (next) goNext() else goPrev()
-            }
             when (action) {
-                TouchAction.PREVIOUS -> swipePage(false)
-                TouchAction.NEXT -> swipePage(true)
+                TouchAction.PREVIOUS -> if (config.gestureSwipe) turnZonePage(false)
+                TouchAction.NEXT -> if (config.gestureSwipe) turnZonePage(true)
                 TouchAction.CONTROLS -> { controlsVisible = !controlsVisible; if (!controlsVisible) panel = ComicPanel.NONE }
                 TouchAction.SETTINGS -> { controlsVisible = true; panel = ComicPanel.SETTINGS }
                 TouchAction.CONTENTS -> { controlsVisible = true; panel = ComicPanel.TOC }
@@ -557,14 +564,14 @@ fun ComicReaderCore(
         },
         onTapZone = { pos, size ->
             com.example.ui.components.recordPaperTouch(pos + touchWindowOrigin, context.resources.displayMetrics.density)
-            when (resolveTapAction(pos, size, config.copy(touchZones = if (previewTouchActive) previewTouchZones else config.touchZones))) {
+            when (resolveTapAction(pos, size, gestureConfig)) {
                 ComicGestureAction.PREV -> {
                     // 第 23 条：栏可见时点击优先隐藏栏，不直接翻页；
                     // 栏隐藏后点击才正常翻页（TOC/设置/退出等 UI 意图不受影响）
-                    if (controlsVisible) controlsVisible = false else goPrev()
+                    if (controlsVisible) controlsVisible = false else turnZonePage(false)
                 }
                 ComicGestureAction.NEXT -> {
-                    if (controlsVisible) controlsVisible = false else goNext()
+                    if (controlsVisible) controlsVisible = false else turnZonePage(true)
                 }
                 ComicGestureAction.TOGGLE_CONTROLS -> {
                     controlsVisible = !controlsVisible
@@ -697,7 +704,12 @@ fun ComicReaderCore(
         }
         // GL 引擎完全不挂 graphicsLayer（连 alpha=1 的合成层也不给，规避 Surface 异常）
         Box(
-            Modifier.fillMaxSize().onGloballyPositioned { touchWindowOrigin = it.positionInWindow(); touchViewport = androidx.compose.ui.geometry.Rect(touchWindowOrigin, androidx.compose.ui.geometry.Size(it.size.width.toFloat(), it.size.height.toFloat())) }.then(
+            Modifier.fillMaxSize().onGloballyPositioned {
+                if (!verticalMode) {
+                    touchWindowOrigin = it.positionInWindow()
+                    touchViewport = androidx.compose.ui.geometry.Rect(touchWindowOrigin, Size(it.size.width.toFloat(), it.size.height.toFloat()))
+                }
+            }.then(
                 if (engineIsGl || minimal) Modifier
                 else Modifier.graphicsLayer { alpha = engineFade }
             )
@@ -728,6 +740,7 @@ fun ComicReaderCore(
                 tapZoneAction = gestureCallbacks.onTapZone,
                 tapAreaSize = { listTapSize },
                 onAreaSizeChanged = { listTapSize = it },
+                onTouchViewport = { viewport -> touchViewport = viewport; touchWindowOrigin = viewport.topLeft },
                 onBitmapShown = ::feedDynamicBg,
                 autoScrollActive = autoReadingActive,
                 autoScrollSpeedDp = config.autoScrollSpeedDp,
@@ -919,7 +932,8 @@ fun ComicReaderCore(
         onExit = { latestExit() },
     )
     if (showTouchEditor) {
-        val reverse = config.direction == ComicDirection.RTL && !verticalMode
+        val zoneVertical = verticalMode || config.direction == ComicDirection.TTB && config.mode != ComicMode.DOUBLE
+        val reverse = config.direction == ComicDirection.RTL && !zoneVertical
         fun action(old: ComicGestureAction) = when (old) {
             ComicGestureAction.PREV -> TouchAction.PREVIOUS
             ComicGestureAction.NEXT -> TouchAction.NEXT
@@ -931,19 +945,20 @@ fun ComicReaderCore(
         }
         fun defaults(settings: ComicReaderConfig) = (0..2).map { index ->
             val tap = action(listOf(settings.gestureTapLeft, settings.gestureTapCenter, settings.gestureTapRight)[if (reverse) 2 - index else index])
-            val swipe = if (settings.gestureSwipe) com.example.ui.reader.SwipeAction.PAGE else com.example.ui.reader.SwipeAction.NONE
-            if (verticalMode) com.example.ui.reader.TouchZone(id = "default$index", left = 0f, top = index / 3f, right = 1f, bottom = (index + 1) / 3f, tap = tap, swipe = swipe)
-            else com.example.ui.reader.TouchZone(id = "default$index", left = index / 3f, top = 0f, right = (index + 1) / 3f, bottom = 1f, tap = tap, swipe = swipe)
+            if (zoneVertical) TouchZone(id = "default$index", left = 0f, top = index / 3f, right = 1f, bottom = (index + 1) / 3f, tap = tap)
+            else TouchZone(id = "default$index", left = index / 3f, top = 0f, right = (index + 1) / 3f, bottom = 1f, tap = tap)
         }
-        val original = ComicReaderConfig()
-        val axis = (if (verticalMode) touchViewport?.height else touchViewport?.width)?.div(context.resources.displayMetrics.density) ?: 400f
-        com.example.ui.reader.TouchZoneEditor(config.touchZones, defaults(config), comicTurnTravel(axis, 1f), comic = true, vertical = verticalMode, reverse = !verticalMode && config.direction == ComicDirection.RTL,
-            viewportInWindow = touchViewport, resetZones = defaults(original),
+        val axis = (if (zoneVertical) touchViewport?.height else touchViewport?.width)?.div(context.resources.displayMetrics.density) ?: 400f
+        androidx.compose.runtime.key(config.touchProfileKey) {
+        com.example.ui.reader.TouchZoneEditor(config.zonesForCurrentMode(), defaults(config), comicTurnTravel(axis, 1f),
+            comic = true, vertical = zoneVertical, reverse = reverse,
+            modeLabel = if (verticalMode) config.mode.label else "${config.mode.label} · ${config.direction.label} · ${config.pageAnim.label}",
+            allowCalibration = !verticalMode,
+            viewportInWindow = touchViewport,
             onPreview = { draft, active -> previewTouchZones = draft; previewTouchActive = active; controlsVisible = false; panel = ComicPanel.NONE },
-            onSave = { zones -> persistConfig(config.copy(touchZones = zones), immediate = true) },
-            onDismiss = { previewTouchActive = false; showTouchEditor = false; controlsVisible = false; panel = ComicPanel.NONE },
-            onRestoreDefault = { config = config.copy(gestureTapLeft = original.gestureTapLeft, gestureTapCenter = original.gestureTapCenter,
-                gestureTapRight = original.gestureTapRight, gestureSwipe = original.gestureSwipe) })
+            onSave = { zones -> persistConfig(config.withTouchZones(zones), immediate = true) },
+            onDismiss = { previewTouchActive = false; showTouchEditor = false; controlsVisible = false; panel = ComicPanel.NONE })
+        }
     }
     } // reading scene and in-place touch editor
 }
@@ -986,9 +1001,11 @@ private fun <T> kotlinx.coroutines.flow.Flow<T>.produceState0(initial: T): State
  * 垂直模式上下三分。双页+TTB 组合仍按水平解析（双页为横向排版）。
  */
 fun resolveTapAction(pos: Offset, size: Size, config: ComicReaderConfig): ComicGestureAction {
-    config.touchZones?.let { zones ->
-        val action = TouchZone.hit(zones, pos.x / size.width.coerceAtLeast(1f), pos.y / size.height.coerceAtLeast(1f))?.tap
-        return when (action) {
+    val zone = config.zonesForCurrentMode()?.let {
+        TouchZone.hit(it, pos.x / size.width.coerceAtLeast(1f), pos.y / size.height.coerceAtLeast(1f))
+    }
+    if (zone != null) {
+        return when (zone.tap) {
             TouchAction.PREVIOUS -> ComicGestureAction.PREV
             TouchAction.NEXT -> ComicGestureAction.NEXT
             TouchAction.CONTROLS -> ComicGestureAction.TOGGLE_CONTROLS
@@ -1260,7 +1277,8 @@ private fun ComicPagedReader(
     }
 
     val chapterEdgeModifier = Modifier.comicChapterEdgeSwipe(
-        enabled = config.gestureSwipe && config.touchZones == null,
+        enabled = config.gestureSwipe,
+        zones = config.touchZones, nativeOnlyWithoutDistance = true,
         direction = config.direction,
         atStart = { pagerState.settledPage == 0 && !pagerState.isScrollInProgress },
         atEnd = { pagerState.settledPage == layout.spreadCount - 1 && !pagerState.isScrollInProgress },
@@ -1275,7 +1293,7 @@ private fun ComicPagedReader(
             state = pagerState,
             flingBehavior = PagerDefaults.flingBehavior(pagerState,
                 snapPositionalThreshold = comicPagerThreshold(true)),
-            userScrollEnabled = config.gestureSwipe && config.touchZones == null,
+            userScrollEnabled = config.gestureSwipe,
             modifier = Modifier.fillMaxSize().then(chapterEdgeModifier),
         ) { idx -> cell(idx) }
     } else {
@@ -1284,7 +1302,7 @@ private fun ComicPagedReader(
             flingBehavior = PagerDefaults.flingBehavior(pagerState,
                 snapPositionalThreshold = comicPagerThreshold(false)),
             reverseLayout = rtl,
-            userScrollEnabled = config.gestureSwipe && config.touchZones == null,
+            userScrollEnabled = config.gestureSwipe,
             modifier = Modifier.fillMaxSize().then(chapterEdgeModifier),
             beyondViewportPageCount = 1,
         ) { idx -> cell(idx) }
@@ -1389,7 +1407,8 @@ private fun ComicMagneticPager(
         Modifier
             .fillMaxSize()
             .comicChapterEdgeSwipe(
-                enabled = config.gestureSwipe && config.touchZones == null,
+                enabled = config.gestureSwipe,
+                zones = config.touchZones,
                 direction = config.direction,
                 atStart = { latestCurrentSpread == 0 && !magDragActive.value },
                 atEnd = { latestCurrentSpread == layout.spreadCount - 1 && !magDragActive.value },
@@ -1405,6 +1424,8 @@ private fun ComicMagneticPager(
                 val slop = viewConfiguration.touchSlop
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
+                    val zone = latestConfig.touchZones.zoneAt(down.position, size)
+                    if (!zone.allowsNativeSwipe()) return@awaitEachGesture
                     var total = 0f
                     var dragging = false
                     // 回弹动画中途被抓住时的页面既有位移——续拖基准，
@@ -1419,7 +1440,7 @@ private fun ComicMagneticPager(
                         tracker.addPosition(change.uptimeMillis, change.position)
                         val delta = if (ttb) change.positionChange().y else change.positionChange().x
                         total += delta
-                        if (!dragging && abs(total) > slop && latestConfig.gestureSwipe && latestConfig.touchZones == null &&
+                        if (!dragging && abs(total) > slop && latestConfig.gestureSwipe &&
                             !childZoomed.value && !event.changes.any { it.isConsumed }
                         ) {
                             dragging = true
@@ -1447,7 +1468,15 @@ private fun ComicMagneticPager(
                         magDragActive.value = false
                         val v = runCatching { tracker.calculateVelocity() }.getOrNull()
                         val vAxis = if (ttb) (v?.y ?: 0f) else (v?.x ?: 0f)
-                        val targetShift = (-comicTurnIntent(drag.value, vAxis, span, density) * dirSign).toInt()
+                        val nativeIntent = comicTurnIntent(drag.value, vAxis, span, density)
+                        val intent = if (zone?.distanceDp != null && abs(vAxis) >= 850f * density) {
+                            when {
+                                abs(total) < zone.distanceDp * density || total * vAxis <= 0f -> 0
+                                total < 0f -> -1
+                                else -> 1
+                            }
+                        } else nativeIntent
+                        val targetShift = (-intent * dirSign).toInt()
                             // 边界页快速回甩：目标夹到合法页范围（越界 → 回弹到当前页）
                             .coerceIn(-latestCurrentSpread, layout.spreadCount - 1 - latestCurrentSpread)
                         val targetPage = latestCurrentSpread + targetShift
@@ -1524,6 +1553,7 @@ private fun ComicVerticalList(
     tapZoneAction: (Offset, Size) -> Unit,
     tapAreaSize: () -> Size,
     onAreaSizeChanged: (Size) -> Unit,
+    onTouchViewport: (androidx.compose.ui.geometry.Rect) -> Unit,
     onBitmapShown: (Bitmap) -> Unit,
     autoScrollActive: Boolean,
     autoScrollSpeedDp: Float,
@@ -1706,7 +1736,8 @@ private fun ComicVerticalList(
     } else androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior()
 
     val chapterEdge = Modifier.fillMaxSize().comicChapterEdgeSwipe(
-        enabled = config.gestureSwipe && config.touchZones == null,
+        enabled = true,
+        zones = config.touchZones,
         direction = ComicDirection.TTB,
         atStart = { !listState.canScrollBackward && !listState.isScrollInProgress },
         atEnd = { !listState.canScrollForward && !listState.isScrollInProgress },
@@ -1715,18 +1746,22 @@ private fun ComicVerticalList(
         onNext = onNextChapter,
     )
 
-    Box(modifier = chapterEdge.comicEdgeSwipe(config.gestureEdgeSwipe && config.touchZones == null,
-        zoomed = { zoomState.scale > 1.01f }, onTrigger = gestureCallbacks.onEdgeBack)) {
+    Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
-            userScrollEnabled = config.touchZones == null,
             state = listState,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .widthIn(max = 820.dp)
                 .fillMaxSize()
+                .onGloballyPositioned {
+                    onTouchViewport(androidx.compose.ui.geometry.Rect(it.positionInWindow(), Size(it.size.width.toFloat(), it.size.height.toFloat())))
+                }
+                .then(chapterEdge.comicEdgeSwipe(config.gestureEdgeSwipe,
+                    zoomed = { zoomState.scale > 1.01f }, zones = config.touchZones, onTrigger = gestureCallbacks.onEdgeBack))
                 .onSizeChanged { onAreaSizeChanged(Size(it.width.toFloat(), it.height.toFloat())) }
                 .touchZoneGestures(config.touchZones, { comicTurnTravel(it, density.density) }, gestureCallbacks.onZoneAction,
-                    vertical = true, taps = false, zoomed = { zoomState.scale > 1.01f })
+                    vertical = true, taps = false, zoomed = { zoomState.scale > 1.01f },
+                    nativePageDrag = true, swipesWithChrome = true)
                 .comicVerticalGestures(zoomState, config, gestureCallbacks) { verticalTouchActive = it }
                 .zoomableWithScroll(zoomState = zoomState, onTap = onTap,
                     enableOneFingerZoom = config.doubleTapZoom,
@@ -1895,7 +1930,8 @@ fun ComicSpreadCell(
             .graphicsLayer { alpha = fadeAlpha.value }
             .comicZoomable(state = zoomState, config = config, callbacks = physicalCallbacks)
             .comicEdgeSwipe(
-                enabled = config.gestureEdgeSwipe && config.touchZones == null,
+                enabled = config.gestureEdgeSwipe,
+                zones = config.touchZones,
                 zoomed = { zoomState.isZoomed },
                 onTrigger = gestureCallbacks.onEdgeBack,
             ),

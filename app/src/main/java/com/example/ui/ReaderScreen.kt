@@ -48,9 +48,10 @@ import com.example.ui.components.SegmentedPillSelector
 import com.example.ui.components.paperDismiss
 import com.example.ui.reader.TouchZone
 import com.example.ui.reader.TouchAction
-import com.example.ui.reader.SwipeAction
 import com.example.ui.reader.ReaderTouchBinding
 import com.example.ui.reader.touchZoneGestures
+import com.example.ui.reader.allowsNativeSwipe
+import com.example.ui.reader.zoneAt
 import com.example.ui.components.Slider
 import com.example.ui.design.DesignTokens
 import com.example.ui.design.ReadingPalette
@@ -365,11 +366,7 @@ fun ReaderScreen(
 
 
     val touchStore = remember { com.example.ui.reader.NovelTouchZoneStore(context) }
-    var savedTouchZones by remember { mutableStateOf(touchStore.load()) }
-    var previewTouchZones by remember { mutableStateOf<List<TouchZone>?>(null) }
-    var previewTouchActive by remember { mutableStateOf(false) }
     var touchViewport by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
-    val touchZones = if (previewTouchActive) previewTouchZones else savedTouchZones
     var showTouchEditor by remember { mutableStateOf(false) }
     var showTocSheet by remember { mutableStateOf(false) }
 
@@ -464,6 +461,11 @@ fun ReaderScreen(
         else writingPreference
     val isVertical = writingMode == "vertical-rl" || writingMode == "vertical-lr"
     val isScrollMode = !isVertical && pageTurnMode == PageTurnType.SCROLL.id
+    val touchProfile = if (isVertical) "novel_${writingMode}" else "novel_page_$pageTurnMode"
+    var savedTouchZones by remember(touchProfile) { mutableStateOf(touchStore.load(touchProfile)) }
+    var previewTouchZones by remember(touchProfile) { mutableStateOf<List<TouchZone>?>(null) }
+    var previewTouchActive by remember(touchProfile) { mutableStateOf(false) }
+    val touchZones = if (previewTouchActive) previewTouchZones else savedTouchZones
 
 
     var currentCharOffset by remember { mutableIntStateOf(0) }
@@ -2097,7 +2099,10 @@ fun ReaderScreen(
                                                     }
 
                                                     .onGloballyPositioned { touchBinding.onViewport(androidx.compose.ui.geometry.Rect(it.positionInWindow(), androidx.compose.ui.geometry.Size(it.size.width.toFloat(), it.size.height.toFloat()))) }
-                                                    .touchZoneGestures(touchZones, { it * .15f }, touchBinding.onAction, vertical = true, menuVisible = showBars)
+                                                    .touchZoneGestures(touchZones, { it * .15f }, touchBinding.onAction,
+                                                        vertical = true, menuVisible = showBars,
+                                                        defaultTap = { _, _ -> TouchAction.CONTROLS }, prioritizeChildTap = true,
+                                                        nativePageDrag = true, swipesWithChrome = true)
                                                     // 滚动模式统一手势（与 PageTurnContainer 拉下书签手势同款 awaitEachGesture 写法）：
 
                                                     //  - 章节中部拖拽一律不消费，完全交给 verticalScroll，互不干扰；
@@ -2112,10 +2117,10 @@ fun ReaderScreen(
 
                                                     .pointerInput(scrollState, currentChapterIndex, chapters.size, touchZones) {
 
-                                                        if (touchZones != null) return@pointerInput
                                                         awaitEachGesture {
 
                                                             val down = awaitFirstDown(requireUnconsumed = false)
+                                                            if (!touchZones.zoneAt(down.position, size).allowsNativeSwipe()) return@awaitEachGesture
 
                                                             var boundaryPulling = false
 
@@ -2205,7 +2210,7 @@ fun ReaderScreen(
 
                                                     // 标准点击判定（自带 touchSlop 过滤）：只有真正的点按才唤起/关闭菜单
 
-                                                    .pointerInput(Unit) {
+                                                    .pointerInput(touchZones == null) {
 
                                                         if (touchZones == null) detectTapGestures(onTap = { showBars = !showBars })
 
@@ -2688,7 +2693,18 @@ fun ReaderScreen(
                                             foreground = textColor, background = bgColor, offset = currentCharOffset,
                                             highlight = listeningHighlight?.start, onOffset = { currentCharOffset = it },
                                             onToggleChrome = { showBars = !showBars }, onSelect = openSelection,
-                                            onImage = { fullscreenNovelImage = it }, modifier = Modifier.fillMaxSize()
+                                            onImage = { fullscreenNovelImage = it },
+                                            touchBinding = touchBinding, menuVisible = showBars,
+                                            onTurnAtEdge = { next ->
+                                                if (next && currentChapterIndex < chapters.lastIndex) {
+                                                    currentChapterIndex++
+                                                    currentCharOffset = 0
+                                                } else if (!next && currentChapterIndex > 0) {
+                                                    currentChapterIndex--
+                                                    currentCharOffset = Int.MAX_VALUE
+                                                }
+                                            },
+                                            modifier = Modifier.fillMaxSize()
                                         )
                                     } else if (!isScrollMode && pageTurnMode == PageTurnType.SIMULATE.id && !com.example.ui.components.LocalRenderQuality.current.minimal) {
 
@@ -3654,16 +3670,22 @@ Column(modifier = Modifier.widthIn(max = AdaptiveSpec.sheetMaxWidth).fillMaxWidt
 
     if (showTouchEditor) {
         val width = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.toFloat()
-        val split = if (pageTurnMode == PageTurnType.SIMULATE.id || com.example.ui.components.LocalRenderQuality.current.minimal) 1f / 3f else .35f
-        val defaults = if (isScrollMode) listOf(TouchZone(id = "scroll", left = 0f, top = 0f, right = 1f, bottom = 1f, swipe = SwipeAction.NONE))
+        val minimalTouch = com.example.ui.components.LocalRenderQuality.current.minimal
+        val split = if (pageTurnMode == PageTurnType.SIMULATE.id || minimalTouch) 1f / 3f else .28f
+        val defaults = if (isScrollMode || isVertical) listOf(TouchZone(id = "scroll", left = 0f, top = 0f, right = 1f, bottom = 1f))
         else listOf(
             TouchZone(id = "left", left = 0f, top = 0f, right = split, bottom = 1f, tap = TouchAction.PREVIOUS),
             TouchZone(id = "center", left = split, top = 0f, right = 1f - split, bottom = 1f),
             TouchZone(id = "right", left = 1f - split, top = 0f, right = 1f, bottom = 1f, tap = TouchAction.NEXT),
         )
-        com.example.ui.reader.TouchZoneEditor(savedTouchZones, defaults, if (com.example.ui.components.LocalRenderQuality.current.minimal) 48f else (touchViewport?.width?.div(LocalDensity.current.density) ?: width) * .15f,
-            vertical = isScrollMode, onSave = { savedTouchZones = it; touchStore.save(it) }, onDismiss = { previewTouchActive = false; showTouchEditor = false },
-            viewportInWindow = touchViewport, onPreview = { draft, active -> previewTouchZones = draft; previewTouchActive = active; showBars = false })
+        androidx.compose.runtime.key(touchProfile) {
+            com.example.ui.reader.TouchZoneEditor(savedTouchZones, defaults, if (minimalTouch) 48f else (touchViewport?.width?.div(LocalDensity.current.density) ?: width) * .15f,
+                vertical = isScrollMode, onSave = { savedTouchZones = it?.takeIf { zones -> zones.isNotEmpty() }; touchStore.save(touchProfile, it) },
+                onDismiss = { previewTouchActive = false; showTouchEditor = false },
+                modeLabel = if (isVertical) tr("竖排") else PageTurnType.entries.firstOrNull { it.id == pageTurnMode }?.title,
+                allowCalibration = !isScrollMode && !isVertical,
+                viewportInWindow = touchViewport, onPreview = { draft, active -> previewTouchZones = draft; previewTouchActive = active; showBars = false })
+        }
     }
     if (showSettingsSheet) {
         val themeColor = bgColor

@@ -6,6 +6,9 @@ import com.example.ui.design.DesignTokens
 import com.example.ui.components.PullOutTextButton
 import com.example.ui.components.PullOutFilledTonalButton
 import com.example.ui.components.PullOutIconButton
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -13,8 +16,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.*
@@ -47,6 +49,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.text.style.TextAlign
 
 /** In-place editing over the unchanged reader. Geometry always uses the actual engine viewport. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TouchZoneEditor(
     zones: List<TouchZone>?, defaults: List<TouchZone>, defaultDistanceDp: Float,
@@ -56,6 +59,8 @@ fun TouchZoneEditor(
     viewportInWindow: Rect? = null,
     onPreview: (List<TouchZone>?, Boolean) -> Unit = { _, _ -> },
     reverse: Boolean = false,
+    modeLabel: String? = null,
+    allowCalibration: Boolean = true,
 ) {
     var draft by remember { mutableStateOf(zones) }
     var resetRequested by remember { mutableStateOf(false) }
@@ -69,6 +74,9 @@ fun TouchZoneEditor(
     var controlsExpanded by remember { mutableStateOf(false) }
     var toolsAtTop by remember { mutableStateOf(false) }
     var trying by remember { mutableStateOf(false) }
+    var geometryOnly by remember { mutableStateOf(false) }
+    var activeHandle by remember { mutableStateOf<ZoneHandle?>(null) }
+    var moving by remember { mutableStateOf(false) }
     var origin by remember { mutableStateOf(Offset.Zero) }
     val colors = MaterialTheme.colorScheme
     val density = LocalDensity.current
@@ -78,9 +86,15 @@ fun TouchZoneEditor(
     fun edit(zone: TouchZone) { draft = visible.map { if (it.id == zone.id) zone.normalized() else it } }
     fun startCalibration() { trying = false; calibrating = true; completed = false; sample = 0f; controlsExpanded = false }
     val latestPreview by rememberUpdatedState(onPreview)
-    LaunchedEffect(draft, trying, resetRequested) { latestPreview(if (resetRequested && draft == null) resetZones else draft, trying) }
+    LaunchedEffect(draft, trying) { latestPreview(draft?.takeIf { it.isNotEmpty() }, trying) }
     DisposableEffect(Unit) { onDispose { latestPreview(null, false) } }
-    BackHandler { if (trying) trying = false else onDismiss() }
+    BackHandler {
+        when {
+            trying -> trying = false
+            geometryOnly -> geometryOnly = false
+            else -> onDismiss()
+        }
+    }
     val dim by animateFloatAsState(if (trying) 0f else .17f, spring(1f, 500f), label = "readerEditDim")
     BoxWithConstraints(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInWindow() }) {
         // No scale, aspect ratio, padding or re-pagination is applied to the underlying reading scene.
@@ -89,6 +103,8 @@ fun TouchZoneEditor(
         val viewport = requested.intersect(full).takeIf { it.width > 0 && it.height > 0 } ?: full
         val viewportWidth = viewport.width / pixelDensity
         val viewportHeight = viewport.height / pixelDensity
+        val handleInset = with(density) { 15.dp.toPx() }
+        val reduceMotion = com.example.ui.feedback.LocalReduceMotion.current
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = dim)))
         if (!trying) {
             // Sibling shield, never an ancestor gesture interceptor around Android's curl surface.
@@ -102,26 +118,44 @@ fun TouchZoneEditor(
                 visible.forEachIndexed { index, zone -> key(zone.id) {
                     var born by remember { mutableStateOf(false) }
                     LaunchedEffect(Unit) { born = true }
-                    val appearance by animateFloatAsState(if (born) 1f else 0f, spring(.68f, 430f), label = "zoneCreation")
-                    val l by animateFloatAsState(zone.left, spring(1f, 650f), label = "zoneLeft")
-                    val t by animateFloatAsState(zone.top, spring(1f, 650f), label = "zoneTop")
-                    val r by animateFloatAsState(zone.right, spring(1f, 650f), label = "zoneRight")
-                    val b by animateFloatAsState(zone.bottom, spring(1f, 650f), label = "zoneBottom")
-                    val active by animateFloatAsState(if (selectedId == zone.id) 1f else 0f, spring(.8f, 450f), label = "zoneSelection")
+                    val appearance by animateFloatAsState(if (born) 1f else 0f,
+                        if (reduceMotion) snap() else spring(.75f, 430f), label = "zoneCreation")
+                    val (l, t, r, b) = listOf(zone.left, zone.top, zone.right, zone.bottom)
+                    val selectedLayer = selectedId == zone.id
+                    val active by animateFloatAsState(if (selectedLayer) 1f else 0f,
+                        if (reduceMotion) snap() else spring(.8f, 450f), label = "zoneSelection")
+                    val gripScale by animateFloatAsState(if (selectedLayer && moving) 1.18f else 1f,
+                        if (reduceMotion) snap() else spring(.74f, 490f), label = "zoneHandlePress")
                     Canvas(Modifier.fillMaxSize()) {
                         val rect = Rect(l * size.width, t * size.height, r * size.width, b * size.height)
                             .inflate(-(1f - appearance) * min((r-l)*size.width, (b-t)*size.height) * .1f)
                         drawRoundRect(colors.primary.copy(alpha = (.025f + active * .065f) * appearance), rect.topLeft, rect.size, CornerRadius(10f))
                         drawRoundRect(Color.White.copy(alpha = .42f * appearance), rect.topLeft, rect.size, CornerRadius(10f), style = Stroke(DesignTokens.StrokeStrong.toPx()))
                         drawRoundRect(colors.primary.copy(alpha = (.5f + active * .5f) * appearance), rect.topLeft, rect.size, CornerRadius(10f), style = Stroke(DesignTokens.Hairline.toPx()))
-                        if (active > .01f) listOf(rect.topLeft, rect.topRight, rect.bottomLeft, rect.bottomRight).forEach {
-                            drawCircle(colors.surface, (4f + active * 1.5f).dp.toPx(), it)
-                            drawCircle(colors.primary.copy(alpha = active), DesignTokens.StrokeStrong.toPx(), it)
+                        if (active > .01f && !calibrating) {
+                            ZoneHandle.entries.forEach { handle ->
+                                val point = handle.point(zone, size, handleInset)
+                                val scale = if (activeHandle == handle) gripScale else 1f
+                                val outer = 7.dp.toPx() * scale
+                                if (handle.x == 0 || handle.y == 0) {
+                                    val horizontal = handle.x == 0
+                                    val w = if (horizontal) outer * 2.5f else outer * 1.25f
+                                    val h = if (horizontal) outer * 1.25f else outer * 2.5f
+                                    val grip = Size(w, h)
+                                    val anchor = point - Offset(w / 2f, h / 2f)
+                                    drawRoundRect(colors.surface.copy(alpha = active), anchor, grip, CornerRadius(outer))
+                                    drawRoundRect(colors.primary.copy(alpha = active), anchor, grip, CornerRadius(outer),
+                                        style = Stroke(1.5.dp.toPx()))
+                                } else {
+                                    drawCircle(colors.surface.copy(alpha = active), outer, point)
+                                    drawCircle(colors.primary.copy(alpha = active), outer * .63f, point)
+                                }
+                            }
                         }
                     }
                     // Labels are overlays, so even narrow edge regions remain at their true physical size.
                     val labelWidth = max(120f * pixelDensity, min(viewport.width * .8f, (r-l) * viewport.width - 16f * pixelDensity)).coerceAtMost(viewport.width)
-                    Box(Modifier.fillMaxSize()) {
+                    if (selectedLayer && !moving && !geometryOnly && !calibrating) Box(Modifier.fillMaxSize()) {
                         Text("${index + 1} · ${zone.tap.label}\n${zone.swipe.label}",
                             color = Color.White, fontSize = DesignTokens.TypeCaption, textAlign = TextAlign.Center,
                             modifier = Modifier.offset { IntOffset((((l+r)*.5f*viewport.width)-labelWidth*.5f).coerceIn(0f, viewport.width-labelWidth).roundToInt(),
@@ -130,130 +164,137 @@ fun TouchZoneEditor(
                                 .background(colors.scrim.copy(alpha = .5f)).padding(DesignTokens.SpaceCompact))
                     }
                 } }
-                        val currentEdit by rememberUpdatedState<(TouchZone) -> Unit>({ edit(it) })
-                        val currentVisible by rememberUpdatedState(visible)
-                        val currentSelected by rememberUpdatedState(selectedId)
-                        val currentCalibration by rememberUpdatedState(calibrating)
-                        val currentDraft by rememberUpdatedState(draft)
-                        var grab by remember { mutableStateOf<TouchZone?>(null) }
-                        var start by remember { mutableStateOf(Offset.Zero) }
-                        var handle by remember { mutableIntStateOf(-1) }
-                        var dragTotal by remember { mutableStateOf(Offset.Zero) }
-                        var measuring by remember { mutableStateOf(false) }
-                        var rawDown by remember { mutableStateOf(Offset.Zero) }
-                        var multiPointer by remember { mutableStateOf(false) }
-                        Box(Modifier.fillMaxSize().semantics { contentDescription = tr("真实阅读区域：拖动区域移动，四角缩放；校准时在选中区域滑动") }
-                            .pointerInput(Unit) {
-                                awaitEachGesture {
-                                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                                    rawDown = down.position; multiPointer = false
-                                    do { val event = awaitPointerEvent(PointerEventPass.Initial)
-                                        if (event.changes.count { it.pressed } > 1) multiPointer = true
-                                    } while (event.changes.any { it.pressed })
+                val currentVisible by rememberUpdatedState(visible)
+                val currentSelected by rememberUpdatedState(selectedId)
+                val currentCalibration by rememberUpdatedState(calibrating)
+                val currentDraft by rememberUpdatedState(draft)
+                val currentEdit by rememberUpdatedState<(TouchZone) -> Unit>({ edit(it) })
+                Box(Modifier.fillMaxSize()
+                    .semantics { contentDescription = tr("真实阅读区域：拖动区域移动，四角缩放；校准时在选中区域滑动") }
+                    .pointerInput(viewport.width, viewport.height, pixelDensity) {
+                        val dimensions = Size(size.width.toFloat(), size.height.toFloat())
+                        val hitRadius = 25.dp.toPx()
+                        val snapMargin = 9.dp.toPx()
+                        val snapDistance = Offset(snapMargin / dimensions.width, snapMargin / dimensions.height)
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            down.consume()
+                            val draftBeforeDrag = currentDraft
+                            val selectedAtDown = currentVisible.firstOrNull { it.id == currentSelected }
+                            val measuring = currentCalibration
+                            val handle = if (measuring || selectedAtDown == null) null else ZoneHandle.entries
+                                .map { it to (it.point(selectedAtDown, dimensions, handleInset) - down.position).getDistance() }
+                                .minByOrNull { it.second }?.takeIf { it.second <= hitRadius }?.first
+                            val x = down.position.x / dimensions.width
+                            val y = down.position.y / dimensions.height
+                            val target = when {
+                                measuring -> selectedAtDown?.takeIf { it.contains(x, y) }
+                                handle != null -> selectedAtDown
+                                else -> TouchZone.hit(currentVisible, x, y)
+                            } ?: return@awaitEachGesture
+                            var dragged = false
+                            var released = false
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (event.changes.any { it.id != down.id && it.pressed }) break
+                                    val delta = change.position - down.position
+                                    if (!dragged && delta.getDistance() > viewConfiguration.touchSlop) {
+                                        dragged = true
+                                        moving = !measuring
+                                        activeHandle = handle
+                                        selectedId = target.id
+                                        if (!measuring && hapticsEnabled) haptics.performHapticFeedback(
+                                            androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                    }
+                                    if (dragged) {
+                                        if (measuring) sample = delta.getDistance() / pixelDensity
+                                        else currentEdit(dragTouchZone(target, handle,
+                                            Offset(delta.x / dimensions.width, delta.y / dimensions.height), snapDistance))
+                                    }
+                                    change.consume()
+                                    if (!change.pressed) {
+                                        released = true
+                                        break
+                                    }
                                 }
-                            }.pointerInput(vertical, viewportWidth, viewportHeight) {
-                                detectTapGestures { point ->
-                                    val hit = if (currentCalibration) currentVisible.firstOrNull { it.id == currentSelected && it.contains(point.x / size.width, point.y / size.height) } else TouchZone.hit(currentVisible, point.x / size.width, point.y / size.height)
-                                    if (hit != null) { selectedId = hit.id; controlsExpanded = !currentCalibration }
+                                if (released && !dragged && !measuring) {
+                                    selectedId = target.id
+                                } else if (released && measuring && sample >= 12f) {
+                                    currentEdit(target.copy(distanceDp = sample.coerceIn(12f, 360f)))
+                                    calibrating = false
+                                    completed = true
+                                    if (hapticsEnabled) haptics.performHapticFeedback(
+                                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
                                 }
-                            }.pointerInput(vertical, viewportWidth, viewportHeight) {
-                                detectDragGestures(
-                                    onDragStart = { point ->
-                                        start = rawDown; dragTotal = Offset.Zero
-                                        val hit = if (currentCalibration) currentVisible.firstOrNull { it.id == currentSelected && it.contains(point.x / size.width, point.y / size.height) } else TouchZone.hit(currentVisible, point.x / size.width, point.y / size.height)
-                                        grab = hit; if (hit != null) selectedId = hit.id
-                                        measuring = currentCalibration && hit?.id == currentSelected
-                                        handle = -1
-                                        if (!measuring && hit != null) {
-                                            val corners = listOf(Offset(hit.left * size.width, hit.top * size.height), Offset(hit.right * size.width, hit.top * size.height),
-                                                Offset(hit.left * size.width, hit.bottom * size.height), Offset(hit.right * size.width, hit.bottom * size.height))
-                                            handle = corners.indexOfFirst { (it - point).getDistance() < DesignTokens.SpaceXxl.toPx() }
-                                            val barLength = (hit.distanceDp ?: defaultDistanceDp) / (if (vertical) viewportHeight else viewportWidth) * (if (vertical) size.height else size.width)
-                                            val barStart = Offset((hit.left + hit.right) * .5f * size.width - if (vertical) 0f else barLength / 2,
-                                                (hit.top + hit.bottom) * .5f * size.height - if (vertical) barLength / 2 else 0f)
-                                            val end = barStart + if (vertical) Offset(0f, barLength) else Offset(barLength, 0f)
-                                            if (hit.swipe == SwipeAction.PAGE && (point - end).getDistance() < 22.dp.toPx()) handle = 4
-                                        }
-                                    },
-                                    onDrag = { change, delta ->
-                                        if (multiPointer) return@detectDragGestures
-                                        change.consume(); dragTotal = change.position - start
-                                        val old = grab
-                                        if (old != null) {
-                                            val dx = dragTotal.x / size.width; val dy = dragTotal.y / size.height
-                                            if (measuring) {
-                                                sample = dragTotal.getDistance() / pixelDensity
-                                            } else if (handle == 4) {
-                                                val amount = if (vertical) dy * viewportHeight else dx * viewportWidth
-                                                currentEdit(old.copy(distanceDp = ((old.distanceDp ?: defaultDistanceDp) + amount * 2f).coerceIn(12f, 360f)))
-                                            } else {
-                                                val next = when (handle) {
-                                                    0 -> old.copy(left = (old.left + dx).coerceAtMost(old.right - .08f), top = (old.top + dy).coerceAtMost(old.bottom - .08f))
-                                                    1 -> old.copy(right = old.right + dx, top = (old.top + dy).coerceAtMost(old.bottom - .08f))
-                                                    2 -> old.copy(left = (old.left + dx).coerceAtMost(old.right - .08f), bottom = old.bottom + dy)
-                                                    3 -> old.copy(right = old.right + dx, bottom = old.bottom + dy)
-                                                    else -> {
-                                                        val mx = dx.coerceIn(-old.left, 1f - old.right); val my = dy.coerceIn(-old.top, 1f - old.bottom)
-                                                        old.copy(left = old.left + mx, right = old.right + mx, top = old.top + my, bottom = old.bottom + my)
-                                                    }
-                                                }
-                                                currentEdit(next)
-                                            }
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        val old = grab
-                                        if (measuring && !multiPointer && old != null && sample >= 12f) {
-                                            currentEdit(old.copy(distanceDp = sample.coerceIn(12f, 360f)))
-                                            calibrating = false; completed = true
-                                            if (hapticsEnabled) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                        }
-                                        grab = null; measuring = false
-                                    },
-                                    onDragCancel = { grab = null; measuring = false; sample = 0f },
-                                )
-                            })
+                            } finally {
+                                if (dragged && !released && !measuring) draft = draftBeforeDrag
+                                if (measuring && !released) sample = 0f
+                                moving = false
+                                activeHandle = null
+                            }
+                        }
+                    })
 
-                if (selected?.swipe == SwipeAction.PAGE) {
+                if (allowCalibration && selected?.swipe == SwipeAction.PAGE && calibrating) {
                     SwipeCalibrationArt(selected, range, vertical, viewportWidth, viewportHeight, calibrating, completed, sample, reverse)
                 }
             }
         }
-        // Only these compact floating tools occupy space; the reader underneath is never remeasured.
-        Column(Modifier.align(if (toolsAtTop && !trying) Alignment.BottomCenter else Alignment.TopCenter)
+        AnimatedVisibility(visible = geometryOnly || trying,
+            modifier = Modifier.align(Alignment.CenterEnd).safeDrawingPadding().padding(end = DesignTokens.SpaceSm),
+            enter = if (reduceMotion) androidx.compose.animation.EnterTransition.None else fadeIn(tween(150)),
+            exit = if (reduceMotion) androidx.compose.animation.ExitTransition.None else fadeOut(tween(120))) {
+            Column(Modifier.acrylicPanel(RoundedCornerShape(DesignTokens.RadiusLg), surfaceAlpha = .97f)
+                .padding(horizontal = DesignTokens.SpaceCompact), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (trying) Text(tr("正在真实试读"), color = colors.onSurfaceVariant, fontSize = DesignTokens.TypeCaption,
+                    modifier = Modifier.padding(top = DesignTokens.SpaceCompact))
+                PullOutTextButton(onClick = { if (trying) trying = false else geometryOnly = false }) {
+                    Text(tr(if (trying) "返回编辑" else "完成调整"))
+                }
+            }
+        }
+        val toolsAlignment by animateFloatAsState(if (toolsAtTop) -1f else 1f,
+            if (reduceMotion) snap() else spring(.88f, 420f), label = "touchToolsPlacement")
+        AnimatedVisibility(visible = !geometryOnly && !trying && !moving,
+            modifier = Modifier.align(BiasAlignment(0f, toolsAlignment)),
+            enter = if (reduceMotion) androidx.compose.animation.EnterTransition.None else fadeIn(tween(140)),
+            exit = if (reduceMotion) androidx.compose.animation.ExitTransition.None else fadeOut(tween(110))) {
+        Column(Modifier
             .safeDrawingPadding().padding(DesignTokens.SpaceSm).widthIn(max = com.example.ui.adaptive.AdaptiveSpec.sheetMaxWidth).fillMaxWidth()
-            .acrylicPanel(RoundedCornerShape(DesignTokens.RadiusLg), surfaceAlpha = .92f)
+            .acrylicPanel(RoundedCornerShape(DesignTokens.RadiusLg), surfaceAlpha = .97f)
             .padding(horizontal = DesignTokens.SpaceMd), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (!trying) PullOutIconButton(
+                PullOutIconButton(
                     icon = Icons.Default.Close,
                     contentDescription = tr("取消编辑"),
                     onClick = onDismiss
                 )
                 Column(Modifier.weight(1f).padding(vertical = DesignTokens.SpaceSm)) {
-                    Text(if (trying) tr("正在真实试读") else tr("自定义触控分区"), style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
-                    Text(if (trying) tr("使用未保存的分区，可直接翻页") else if (calibrating) tr("试着用自己最舒适的方式滑动一页")
-                        else if (completed) tr("✓ 已记住你的手势 · 可继续微调") else tr("原尺寸阅读画面 · 拖动移动 / 四角缩放"),
+                    Text(tr("自定义触控分区"), style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
+                    Text(if (calibrating) tr("试着用自己最舒适的方式滑动一页")
+                        else if (completed) tr("✓ 已记住你的手势 · 可继续微调") else modeLabel ?: tr("原尺寸阅读画面 · 拖动移动 / 四角缩放"),
                         color = colors.primary, fontSize = DesignTokens.TypeCaption)
                 }
-                PullOutTextButton(onClick = { if (trying) trying = false else { onPreview(null, false); if (resetRequested) onRestoreDefault(); onSave(draft); onDismiss() } }) {
-                    Text(if (trying) tr("返回编辑") else tr("保存"))
+                PullOutTextButton(onClick = { onPreview(null, false); if (resetRequested) onRestoreDefault(); onSave(draft); onDismiss() }) {
+                    Text(tr("保存"))
                 }
             }
-        }
-        if (!trying) Column(Modifier.align(if (toolsAtTop) Alignment.TopCenter else Alignment.BottomCenter)
-            .safeDrawingPadding().padding(DesignTokens.SpaceSm).widthIn(max = com.example.ui.adaptive.AdaptiveSpec.sheetMaxWidth).fillMaxWidth()
-            .acrylicPanel(RoundedCornerShape(DesignTokens.RadiusLg), surfaceAlpha = .94f)
-            .padding(horizontal = DesignTokens.SpaceMd), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                PullOutTextButton(onClick = { val added = TouchZone(); draft = visible + added; selectedId = added.id; startCalibration() }, enabled = visible.size < 64) { Text(tr("添加分区")) }
-                PullOutTextButton(onClick = { controlsExpanded = !controlsExpanded }) { Text(if (controlsExpanded) tr("收起工具") else tr("设置功能")) }
+            FlowRow(horizontalArrangement = Arrangement.Center, verticalArrangement = Arrangement.Center) {
+                PullOutTextButton(onClick = {
+                    val added = TouchZone()
+                    draft = visible + added
+                    selectedId = added.id
+                    calibrating = false
+                    controlsExpanded = true
+                }, enabled = visible.size < 64) { Text(tr("添加分区")) }
+                PullOutTextButton(onClick = { controlsExpanded = !controlsExpanded }) { Text(if (controlsExpanded) tr("收起工具") else tr("分区动作")) }
                 PullOutTextButton(onClick = { calibrating = false; controlsExpanded = false; trying = true }) { Text(tr("试读")) }
-                PullOutIconButton(
-                                    icon = Icons.Default.SwapVert,
-                                    contentDescription = tr("工具移到另一侧"),
-                                    onClick = { toolsAtTop = !toolsAtTop }
-                                )
+                PullOutIconButton(icon = Icons.Default.OpenInFull, contentDescription = tr("全屏调整"),
+                    onClick = { calibrating = false; geometryOnly = true })
+                PullOutIconButton(icon = if (toolsAtTop) Icons.Default.VerticalAlignBottom else Icons.Default.VerticalAlignTop,
+                    contentDescription = tr("工具移到另一侧"), onClick = { toolsAtTop = !toolsAtTop })
             }
             com.example.ui.components.PullOutVisibility(visible = controlsExpanded) {
                 Column(Modifier.fillMaxWidth().heightIn(max = this@BoxWithConstraints.maxHeight * .52f).verticalScroll(rememberScrollState()),
@@ -271,25 +312,38 @@ fun TouchZoneEditor(
                         Text(tr("点击行为"), style = MaterialTheme.typography.labelLarge)
                         ActionChoices(TouchAction.entries.filter { !comic || it != TouchAction.LISTEN }, selected.tap, { it.label }) { edit(selected.copy(tap = it)) }
                         Text(tr("滑动行为"), style = MaterialTheme.typography.labelLarge)
-                        ActionChoices(SwipeAction.entries, selected.swipe, { it.label }) {
-                            edit(selected.copy(swipe = it)); if (it == SwipeAction.PAGE) startCalibration() else calibrating = false
+                        ActionChoices(SwipeAction.entries, selected.swipe, { it.label }) { swipe ->
+                            edit(selected.copy(swipe = swipe, distanceDp = selected.distanceDp.takeIf { swipe == SwipeAction.PAGE }))
+                            calibrating = false
                         }
-                        if (selected.swipe == SwipeAction.PAGE) {
-                            Text(if (selected.distanceDp == null) tr("沿用原有阅读器判定 · 校准快速完成距离") else "触发距离 ${range.roundToInt()} dp", color = colors.primary, fontSize = DesignTokens.TypeCaption)
-                            LiquidSlider(range.coerceIn(12f, 360f), { edit(selected.copy(distanceDp = it)); completed = false }, valueRange = 12f..360f, formatLabel = { "${it.roundToInt()} dp" })
-                            Text(tr("仅调整快速翻页的完成距离；慢速拖角、卷起与回退保持原样，滑动不限方向。"), fontSize = DesignTokens.TypeCaption, color = colors.onSurfaceVariant)
-                            PullOutTextButton(onClick = { startCalibration() }) { Icon(Icons.Default.Gesture, null); Text(tr("重新校准")) }
+                        if (allowCalibration && selected.swipe == SwipeAction.PAGE) {
+                            if (selected.distanceDp != null) {
+                                Text("触发距离 ${range.roundToInt()} dp", color = colors.primary, fontSize = DesignTokens.TypeCaption)
+                                LiquidSlider(range.coerceIn(12f, 360f), { edit(selected.copy(distanceDp = it)); completed = false },
+                                    valueRange = 12f..360f, formatLabel = { "${it.roundToInt()} dp" })
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceSm)) {
+                                PullOutTextButton(onClick = { startCalibration() }) { Icon(Icons.Default.Gesture, null); Text(tr("校准滑动")) }
+                                if (selected.distanceDp != null) PullOutTextButton(onClick = { edit(selected.copy(distanceDp = null)); completed = false }) {
+                                    Text(tr("使用默认距离"))
+                                } else PullOutTextButton(onClick = { edit(selected.copy(distanceDp = range.coerceIn(12f, 360f))) }) {
+                                    Text(tr("手动调整"))
+                                }
+                            }
                         }
                     }
-                    Text(tr("后添加 / 置顶区域优先；空白区域不操作。点击和滑动独立，双指缩放优先。"), fontSize = DesignTokens.TypeCaption, color = colors.onSurfaceVariant)
-                    PullOutTextButton(onClick = { draft = null; resetRequested = true; selectedId = resetZones.firstOrNull()?.id; calibrating = false; completed = false }) { Text(tr("恢复原有默认")) }
+                    Text(tr("拖动分区移动，拉动边或角缩放。空白处沿用当前模式的手势。"),
+                        fontSize = DesignTokens.TypeCaption, color = colors.onSurfaceVariant)
+                    PullOutTextButton(onClick = { draft = null; resetRequested = true; selectedId = resetZones.firstOrNull()?.id; calibrating = false; completed = false }) { Text(tr("重置当前模式")) }
                 }
             }
-            if (!controlsExpanded && selected?.swipe == SwipeAction.PAGE) Row(verticalAlignment = Alignment.CenterVertically) {
+            if (!controlsExpanded && allowCalibration && selected?.swipe == SwipeAction.PAGE &&
+                (calibrating || selected.distanceDp != null)) Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(if (calibrating && sample >= 12f) "本次 ${sample.roundToInt()} dp" else if (selected.distanceDp == null) tr("原有判定 · 可拖动范围条端点") else "触发距离 ${range.roundToInt()} dp",
                     Modifier.weight(1f), color = colors.primary, fontSize = DesignTokens.TypeCaption)
                 PullOutTextButton(onClick = { if (calibrating) calibrating = false else startCalibration() }) { Text(if (calibrating) tr("手动调整") else tr("重新校准")) }
             }
+        }
         }
     }
 }
@@ -297,8 +351,16 @@ fun TouchZoneEditor(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun <T> ActionChoices(items: List<T>, selected: T, label: (T) -> String, choose: (T) -> Unit) {
+    val colors = MaterialTheme.colorScheme
     FlowRow(horizontalArrangement = Arrangement.spacedBy(DesignTokens.SpaceCompact)) {
-        items.forEach { item -> FilterChip(selected = selected == item, onClick = { choose(item) }, label = { Text(label(item), fontSize = DesignTokens.TypeCaption) }) }
+        items.forEach { item ->
+            FilterChip(selected = selected == item, onClick = { choose(item) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = colors.primary.copy(alpha = .14f),
+                    selectedLabelColor = colors.primary,
+                ),
+                label = { Text(label(item), fontSize = DesignTokens.TypeCaption) })
+        }
     }
 }
 

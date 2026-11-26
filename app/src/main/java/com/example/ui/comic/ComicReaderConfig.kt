@@ -1,6 +1,7 @@
 package com.example.ui.comic
 
 import com.example.ui.reader.TouchZone
+import com.example.ui.reader.migrateLegacyTouchZones
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -82,8 +83,9 @@ data class ComicReaderConfig(
     val autoPageIntervalSec: Float = 6f,    // 自动翻页间隔
     val autoScrollSpeedDp: Float = 40f,     // 条漫自动滚动速度 dp/s
 
-    /** null preserves the complete legacy gesture implementation and thresholds. */
+    /** Active rectangles injected by the reader. Profiles are persisted below. */
     val touchZones: List<TouchZone>? = null,
+    val touchZoneProfiles: Map<String, List<TouchZone>> = emptyMap(),
     /* ── 手势 ── */
     val gestureTapLeft: ComicGestureAction = ComicGestureAction.PREV,
     val gestureTapRight: ComicGestureAction = ComicGestureAction.NEXT,
@@ -106,9 +108,20 @@ data class ComicReaderConfig(
     /** 译文字号缩放（0.8..1.4） */
     val translationTextScale: Float = 1.0f,
     /** 翻译引擎（第十八轮二级导航显式选择）：ai=自定义接口 / online=在线翻译 */
-    val translationEngine: String = "auto",
+    val translationEngine: String = "online",
 ) {
     /** Repair imported/old settings before they reach layout or native rendering. */
+    val touchProfileKey: String get() = when (mode) {
+        ComicMode.WEBTOON, ComicMode.CONTINUOUS -> mode.name
+        else -> "${mode.name}_${direction.name}_${pageAnim.name}"
+    }
+
+    fun zonesForCurrentMode(): List<TouchZone>? = touchZones ?: touchZoneProfiles[touchProfileKey]
+
+    fun withTouchZones(zones: List<TouchZone>?): ComicReaderConfig =
+        copy(touchZones = null, touchZoneProfiles = if (zones.isNullOrEmpty()) touchZoneProfiles - touchProfileKey
+            else touchZoneProfiles + (touchProfileKey to zones))
+
     fun normalized(): ComicReaderConfig {
         fun Float.bounded(low: Float, high: Float, fallback: Float): Float =
             if (isFinite()) coerceIn(low, high) else fallback
@@ -122,6 +135,9 @@ data class ComicReaderConfig(
         return copy(
             imagePreloadCount = imagePreloadCount.coerceIn(-1, 12),
             touchZones = touchZones?.take(64)?.map { it.normalized() }?.distinctBy { it.id },
+            touchZoneProfiles = touchZoneProfiles.entries.take(64).associate { (profile, zones) ->
+                profile to zones.take(64).map { it.normalized() }.distinctBy { it.id }
+            }.filterValues { it.isNotEmpty() },
             customFitBase = customFitBase.takeUnless { it == ComicFit.CUSTOM } ?: ComicFit.FIT_PAGE,
             customFitScale = customFitScale.bounded(0.5f, 2.5f, 1f),
             pageSpacingDp = pageSpacingDp.bounded(0f, 40f, 8f),
@@ -142,7 +158,7 @@ data class ComicReaderConfig(
             autoScrollSpeedDp = autoScrollSpeedDp.bounded(5f, 400f, 40f),
             translationTextScale = translationTextScale.bounded(0.8f, 1.4f, 1f),
             translationLang = translationLang.takeIf { it in setOf("auto", "ja", "en", "ko") } ?: "auto",
-            translationEngine = translationEngine.takeIf { it in setOf("ai", "online", "auto") } ?: "auto",
+            translationEngine = if (translationEngine == "ai") "ai" else "online",
         )
     }
 
@@ -188,7 +204,10 @@ data class ComicReaderConfig(
         put("pageAnim", pageAnim.name)
         put("autoPageIntervalSec", autoPageIntervalSec)
         put("autoScrollSpeedDp", autoScrollSpeedDp)
-        touchZones?.let { put("touchZones", JSONArray(TouchZone.encode(it))) }
+        val profiles = touchZones?.let { touchZoneProfiles + (touchProfileKey to it) } ?: touchZoneProfiles
+        if (profiles.isNotEmpty()) put("touchZoneProfiles", JSONObject().apply {
+            profiles.forEach { (profile, zones) -> put(profile, JSONArray(TouchZone.encode(zones))) }
+        })
         put("gestureTapLeft", gestureTapLeft.name)
         put("gestureTapRight", gestureTapRight.name)
         put("gestureTapCenter", gestureTapCenter.name)
@@ -203,7 +222,6 @@ data class ComicReaderConfig(
         put("translationLang", translationLang)
         put("translationTextScale", translationTextScale)
         put("translationEngine", translationEngine)
-        put("translationEngineVersion", 2)
     }
 
     /** 滤镜/增强/裁边相关的指纹，用于位图处理缓存键。 */
@@ -225,7 +243,8 @@ data class ComicReaderConfig(
             fun <E : Enum<E>> safe(name: String, fallback: E, values: Array<E>): E =
                 values.firstOrNull { it.name == json.optString(name, fallback.name) } ?: fallback
 
-            return ComicReaderConfig(
+            val profiles = json.optJSONObject("touchZoneProfiles")
+            val decoded = ComicReaderConfig(
                 mode = safe("mode", ComicMode.SINGLE, ComicMode.entries.toTypedArray()),
                 direction = safe("direction", ComicDirection.RTL, ComicDirection.entries.toTypedArray()),
                 webtoonSnap = json.optBoolean("webtoonSnap", true),
@@ -270,7 +289,9 @@ data class ComicReaderConfig(
                 pageAnim = safe("pageAnim", ComicPageAnim.SLIDE, ComicPageAnim.entries.toTypedArray()),
                 autoPageIntervalSec = json.optDouble("autoPageIntervalSec", 6.0).toFloat().coerceIn(1f, 120f),
                 autoScrollSpeedDp = json.optDouble("autoScrollSpeedDp", 40.0).toFloat().coerceIn(5f, 400f),
-                touchZones = TouchZone.decode(json.optJSONArray("touchZones")?.toString()),
+                touchZoneProfiles = profiles?.keys()?.asSequence()?.take(64)?.mapNotNull { profile ->
+                    TouchZone.decode(profiles.optJSONArray(profile)?.toString())?.let { profile to it }
+                }?.toMap().orEmpty(),
                 gestureTapLeft = safe("gestureTapLeft", ComicGestureAction.PREV, ComicGestureAction.entries.toTypedArray()),
                 gestureTapRight = safe("gestureTapRight", ComicGestureAction.NEXT, ComicGestureAction.entries.toTypedArray()),
                 gestureTapCenter = safe("gestureTapCenter", ComicGestureAction.TOGGLE_CONTROLS, ComicGestureAction.entries.toTypedArray()),
@@ -285,10 +306,10 @@ data class ComicReaderConfig(
                 translationLang = json.optString("translationLang", "auto")
                     .takeIf { it in setOf("auto", "ja", "en", "ko") } ?: "auto",
                 translationTextScale = json.optDouble("translationTextScale", 1.0).toFloat().coerceIn(0.8f, 1.4f),
-                translationEngine = json.optString("translationEngine", "auto").let { saved ->
-                    if (saved == "online" && json.optInt("translationEngineVersion") < 2) "auto" else saved
-                },
+                translationEngine = json.optString("translationEngine", "online"),
             ).normalized()
+            val legacy = if (profiles == null) TouchZone.decode(json.optJSONArray("touchZones")?.toString()) else null
+            return if (legacy == null) decoded else decoded.withTouchZones(legacy.migrateLegacyTouchZones())
         }
     }
 }

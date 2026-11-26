@@ -223,9 +223,13 @@ class ShelfSelectionState {
      * 而且选中不了」就是这条）。所以每次组合都要用上一次布置得到的坐标补登一次。
      */
     fun registerItem(key: String, c: androidx.compose.ui.layout.LayoutCoordinates?) {
-        if (c == null) return
+        if (c == null || !c.isAttached) return
         val p = c.positionInRoot()
         itemRects[key] = Rect(p.x, p.y, p.x + c.size.width, p.y + c.size.height)
+    }
+
+    fun unregisterItem(key: String) {
+        itemRects.remove(key)
     }
 
     fun itemBoundsModifier(key: String): Modifier = Modifier.onGloballyPositioned { c ->

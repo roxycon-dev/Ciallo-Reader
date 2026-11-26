@@ -462,6 +462,23 @@ private fun TranslationTab(
                 subtitle = if (llmGemini) tr("Gemini 接口") else tr("OpenAI 兼容接口"),
                 checked = llmGemini,
             ) { v -> saveLlm(llmUrl, llmKey, llmModel, v) }
+            if (config.translationEngine != "ai") {
+                val aiConfig = LlmBubbleTranslator.LlmConfig(llmUrl, llmKey, llmModel, llmGemini)
+                PullOutTextButton(
+                    enabled = !aiTesting && aiConfig.isValid(),
+                    onClick = {
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) { llmTranslator.saveConfig(aiConfig) }
+                                update { it.copy(translationEngine = "ai") }
+                            } catch (e: Exception) {
+                                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                                aiTestResult = tr("配置未保存：系统安全存储不可用，请重新打开应用后再试")
+                            }
+                        }
+                    },
+                ) { Text(tr("使用自定义 AI 接口"), color = MintPrimary) }
+            }
             PullOutTextButton(enabled = !aiTesting && LlmBubbleTranslator.LlmConfig(llmUrl, llmKey, llmModel, llmGemini).isValid(), onClick = {
                 aiTesting = true
                 scope.launch {
@@ -480,7 +497,7 @@ private fun TranslationTab(
         }
     } else if (engineSubPage == "online") {
         /* ── 二级页：在线翻译设置 ── */
-        PanelSectionCard(tr("免费免 Key 在线机翻"), Icons.Filled.Public) {
+        PanelSectionCard(tr("免 Key 翻译"), Icons.Filled.Public) {
             PanelRow(tr("返回引擎列表"), Icons.AutoMirrored.Filled.ArrowBack) { engineSubPage = null }
             Spacer(Modifier.height(DesignTokens.SpaceCompact))
             val langIdx = when (config.translationLang) { "ja" -> 1; "en" -> 2; "ko" -> 3; else -> 0 }
@@ -493,7 +510,7 @@ private fun TranslationTab(
                 update { it.copy(translationLang = lang) }
             }
             Spacer(Modifier.height(DesignTokens.SpaceSm))
-            Text(tr("手机 OCR · 腾讯机翻 · 免 Key"), color = TextSecondary, fontSize = DesignTokens.TypeCaption, lineHeight = DesignTokens.TypeCaptionLineHeight)
+            PanelHint(tr("仅将识别到的对白发送给在线翻译服务。"))
             PullOutTextButton(enabled = !onlineTesting, onClick = {
                 onlineTesting = true
                 onlineTestResult = null
@@ -501,9 +518,9 @@ private fun TranslationTab(
                     try {
                         val start = android.os.SystemClock.elapsedRealtime()
                         onlineFallback.close() // Connectivity tests must reach the service, not the sentence cache.
-                        val result = onlineFallback.translate("Hello, how are you?", "en")
-                        onlineTestResult = if (result.isNullOrBlank()) onlineFallback.lastFailure?.description ?: "未获得有效译文，请检查网络"
-                            else "连接成功 · ${android.os.SystemClock.elapsedRealtime() - start} ms · $result"
+                        val result = onlineFallback.translateBatchResult(listOf("Hold on.", "I can explain."), "en")
+                        onlineTestResult = result.failure?.description
+                            ?: "连接成功 · ${android.os.SystemClock.elapsedRealtime() - start} ms · ${result.texts.joinToString(" ")}"
                     } finally { onlineTesting = false }
                 }
             }) { Text(if (onlineTesting) tr("正在检查…") else tr("测试在线翻译"), color = MintPrimary) }
@@ -514,11 +531,14 @@ private fun TranslationTab(
         PanelSectionCard(tr("翻译引擎（点击选择）"), Icons.Filled.Bolt) {
             val aiConfigured = LlmBubbleTranslator.LlmConfig(llmUrl, llmKey, llmModel, llmGemini).isValid()
             EngineCard(
-                title = tr("自动选择"),
-                desc = tr("优先使用已配置的 AI，其次系统翻译与免 Key 在线翻译"),
-                state = if (config.translationEngine == "auto") tr("当前使用") else tr("点击选用"),
-                selected = config.translationEngine == "auto",
-            ) { update { it.copy(translationEngine = "auto") } }
+                title = tr("免 Key 翻译"),
+                desc = tr("开启整页自动翻译即可使用"),
+                state = if (config.translationEngine == "online") tr("当前使用") else tr("点击选用"),
+                selected = config.translationEngine == "online",
+            ) {
+                update { it.copy(translationEngine = "online") }
+                engineSubPage = "online"
+            }
             Spacer(Modifier.height(DesignTokens.SpaceSm))
             EngineCard(
                 title = tr("自定义 AI 接口"),
@@ -526,22 +546,12 @@ private fun TranslationTab(
                 state = when {
                     config.translationEngine == "ai" && aiConfigured -> tr("当前使用 · 已配置")
                     aiConfigured -> tr("已配置 · 点击选用并配置")
-                    else -> tr("未配置 · 点击选用并配置")
+                    else -> tr("未配置 · 点击设置")
                 },
                 selected = config.translationEngine == "ai",
             ) {
-                update { it.copy(translationEngine = "ai") }
+                if (aiConfigured) update { it.copy(translationEngine = "ai") }
                 engineSubPage = "ai"
-            }
-            Spacer(Modifier.height(DesignTokens.SpaceSm))
-            EngineCard(
-                title = tr("免费免 Key 在线机翻"),
-                desc = tr("免费免配置"),
-                state = if (config.translationEngine == "online") tr("当前使用") else tr("点击选用"),
-                selected = config.translationEngine == "online",
-            ) {
-                update { it.copy(translationEngine = "online") }
-                engineSubPage = "online"
             }
         }
 

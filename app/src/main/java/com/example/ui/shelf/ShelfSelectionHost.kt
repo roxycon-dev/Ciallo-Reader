@@ -53,6 +53,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
@@ -903,9 +904,10 @@ fun ShelfSelectionHost(
             // 槽位复用时 onGloballyPositioned 不会再回调（位置没变），
             // 这里用上一次布置留下的坐标在**每次组合**补登记一次，
             // 否则切换分类后新书的矩形永远是空的 —— 点不动也选不中。
-            val coords = remember {
+            val coords = remember(key) {
                 mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null)
             }
+            DisposableEffect(state, key) { onDispose { state.unregisterItem(key) } }
             SideEffect { state.registerItem(key, coords.value) }
             Modifier.onGloballyPositioned { c ->
                 coords.value = c

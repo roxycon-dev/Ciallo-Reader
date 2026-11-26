@@ -75,8 +75,8 @@ class TranslationRecoveryTest {
     @Test fun freeServiceReportsRejectionAndCanRecoverOnManualRetry() = runBlocking {
         val calls = AtomicInteger()
         val translator = OnlineFallbackTranslator(clientOverride = client {
-            if (calls.incrementAndGet() == 1) 403 to "{}"
-            else 200 to """{"header":{"ret_code":"succ"},"auto_translation":["你好"]}"""
+            if (calls.incrementAndGet() <= 2) 403 to "{}"
+            else 200 to """{"responseStatus":200,"responseData":{"translatedText":"你好"}}"""
         })
         assertNull(translator.translate("Hello", "en")); assertEquals("auth", translator.lastFailure?.code)
         assertEquals("你好", translator.translate("Hello", "en")); assertNull(translator.lastFailure)

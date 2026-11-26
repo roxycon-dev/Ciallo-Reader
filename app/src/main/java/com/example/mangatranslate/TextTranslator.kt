@@ -5,6 +5,7 @@ import com.example.i18n.tr
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -14,6 +15,7 @@ import com.example.data.readImportBytes
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -61,20 +63,22 @@ object ScriptDetector {
     }
 }
 
-/** Tencent's public web translator. Bounded batches, cancellation and repeated-dialogue caching. */
+/** Anonymous online translation with bounded batches and repeated-dialogue caching. */
 class OnlineFallbackTranslator(
     private val context: android.content.Context? = null,
     private val clientOverride: OkHttpClient? = null,
 ) : TextTranslator {
     private val client by lazy {
         clientOverride ?: com.example.source.SharedHttpTransport.builder()
-            .connectTimeout(4, TimeUnit.SECONDS)
-            .readTimeout(6, TimeUnit.SECONDS)
-            .callTimeout(8, TimeUnit.SECONDS)
+            .connectTimeout(3, TimeUnit.SECONDS)
+            .readTimeout(4, TimeUnit.SECONDS)
+            .callTimeout(5, TimeUnit.SECONDS)
+            .followSslRedirects(false)
             .build()
     }
     private val sentences = android.util.LruCache<String, String>(512)
     private val requests = Semaphore(2)
+    @Volatile private var myMemoryRetryAt = 0L
     @Volatile var lastFailure: TranslationFailure? = null
         private set
 
@@ -82,72 +86,173 @@ class OnlineFallbackTranslator(
     override suspend fun translate(text: String, sourceLang: String): String? =
         translateBatch(listOf(text), sourceLang)?.firstOrNull()?.takeIf { it.isNotBlank() }
 
-    suspend fun translateBatch(texts: List<String>, sourceLang: String): List<String>? = withContext(Dispatchers.IO) {
-        if (texts.isEmpty()) return@withContext emptyList()
-        lastFailure = null
+    suspend fun translateBatch(texts: List<String>, sourceLang: String): List<String>? =
+        translateBatchResult(texts, sourceLang).let {
+            lastFailure = it.failure
+            it.texts.takeIf { lines -> lines.isEmpty() || lines.any(String::isNotBlank) }
+        }
+
+    internal data class BatchResult(val texts: List<String>, val failure: TranslationFailure? = null)
+
+    internal suspend fun translateBatchResult(texts: List<String>, sourceLang: String): BatchResult = withContext(Dispatchers.IO) {
+        if (texts.isEmpty()) return@withContext BatchResult(emptyList())
         if (context != null && !TranslationPrivacy.allowed(context)) {
-            lastFailure = TranslationFailure.Privacy
-            return@withContext null
+            return@withContext BatchResult(List(texts.size) { "" }, TranslationFailure.Privacy)
         }
         require(texts.size <= 500 && texts.sumOf { it.length } <= 128_000) { tr("翻译请求过大") }
-        if (sourceLang == "zh") return@withContext texts
-        val normalized = texts.map { it.trim() }
+        if (sourceLang == "zh") return@withContext BatchResult(texts)
+        val normalized = texts.map { it.trim().replace(lineBreaks, " ") }
         val unique = normalized.filter { it.isNotBlank() }.distinct()
         val missing = unique.filter { sentences.get("$sourceLang|$it") == null }
-        // Chunk by both count and character budget. A failure never fans out into N single requests.
-        val chunks = mutableListOf<MutableList<String>>()
-        for (text in missing) {
-            if (text.length > 6000) continue
-            if (chunks.isEmpty() || chunks.last().size >= 24 || chunks.last().sumOf { it.length } + text.length > 6000)
-                chunks.add(mutableListOf())
-            chunks.last().add(text)
-        }
-        val completed = withTimeoutOrNull(16_000L) {
+        val chunks = batches(missing)
+        val failures = withTimeoutOrNull(12_000L) {
             coroutineScope {
-                chunks.map { batch -> async {
-                    requests.withPermit {
-                        requestBatch(batch, sourceLang)?.forEachIndexed { i, translated ->
-                            sentences.put("$sourceLang|${batch[i]}", translated)
+                chunks.map { batch ->
+                    async {
+                        requests.withPermit {
+                            val result = requestBatch(batch, sourceLang)
+                            result.texts.forEachIndexed { i, translated ->
+                                if (translated.isNotBlank()) sentences.put("$sourceLang|${batch[i]}", translated)
+                            }
+                            result.failure
                         }
                     }
-                } }.awaitAll()
+                }.awaitAll()
             }
         }
-        if (completed == null) lastFailure = TranslationFailure.Timeout
-        val out = normalized.map { if (it.isBlank()) "" else sentences.get("$sourceLang|$it") ?: "" }
-        if (out.all { it.isNotBlank() }) lastFailure = null
-        out.takeIf { it.any(String::isNotBlank) }
+        val output = normalized.map { sentences.get("$sourceLang|$it").orEmpty() }
+        val failure = if (normalized.indices.any { normalized[it].isNotBlank() && output[it].isBlank() }) {
+            if (failures == null) TranslationFailure.FreeTimeout
+            else failures.firstOrNull { it != null } ?: TranslationFailure.FreeEmpty
+        } else null
+        BatchResult(output, failure)
     }
 
-    private suspend fun requestBatch(texts: List<String>, sourceLang: String): List<String>? {
-        val lang = sourceLang.takeIf { it in setOf("ja", "en", "ko", "zh") } ?: "auto"
+    private fun batches(texts: List<String>): List<List<String>> {
+        val batches = mutableListOf<List<String>>()
+        val pending = mutableListOf<String>()
+        var pendingBytes = 0
+        for (text in texts) {
+            val size = text.toByteArray(Charsets.UTF_8).size
+            if (pending.isNotEmpty() && (pending.size == 24 || pendingBytes + numberedLineBytes(pending.size, size) + 1 > 500)) {
+                batches.add(pending.toList())
+                pending.clear()
+                pendingBytes = 0
+            }
+            if (size > 500) {
+                if (text.length <= 6000) batches.add(listOf(text))
+            } else {
+                pendingBytes += numberedLineBytes(pending.size, size) + if (pending.isEmpty()) 0 else 1
+                pending.add(text)
+            }
+        }
+        if (pending.isNotEmpty()) batches.add(pending.toList())
+        return batches
+    }
+
+    private suspend fun requestBatch(texts: List<String>, sourceLang: String): BatchResult {
+        val query = if (texts.size == 1) texts.single() else texts.mapIndexed { index, text ->
+            memoryPrefix(index) + text
+        }.joinToString("\n")
+        val primary = when {
+            android.os.SystemClock.elapsedRealtime() < myMemoryRetryAt ->
+                BatchResult(emptyList(), TranslationFailure.FreeLimited)
+            sourceLang in supportedLanguages && query.toByteArray(Charsets.UTF_8).size <= 500 ->
+                requestMyMemory(query, texts, sourceLang)
+            else -> BatchResult(emptyList())
+        }
+        val remaining = texts.indices.filter { primary.texts.getOrNull(it).isNullOrBlank() }
+        if (remaining.isEmpty() || primary.failure == TranslationFailure.Privacy) return primary
+        val backup = requestTencent(remaining.map(texts::get), sourceLang)
+        val output = MutableList(texts.size) { primary.texts.getOrNull(it).orEmpty() }
+        remaining.zip(backup.texts).forEach { (index, text) -> output[index] = text }
+        val failure = if (output.any(String::isBlank)) backup.failure?.takeIf { it == TranslationFailure.Privacy }
+            ?: primary.failure ?: backup.failure ?: TranslationFailure.FreeEmpty else null
+        return BatchResult(output, failure)
+    }
+
+    private suspend fun requestMyMemory(query: String, texts: List<String>, language: String): BatchResult {
+        val url = "https://api.mymemory.translated.net/get".toHttpUrl().newBuilder()
+            .addQueryParameter("q", query)
+            .addQueryParameter("langpair", "$language|zh-CN")
+            .build()
+        val result = request(Request.Builder().url(url).build()) { raw ->
+            val json = JSONObject(raw)
+            val status = json.optInt("responseStatus")
+            when {
+                json.optBoolean("quotaFinished") || status == 429 -> throw TranslationFailure.FreeLimited.exception()
+                status != 200 -> throw freeHttpFailure(status).exception()
+            }
+            val translated = json.optJSONObject("responseData")?.opt("translatedText") as? String
+                ?: throw TranslationFailure.FreeFormat.exception()
+            if (texts.size == 1) listOf(translated) else parseNumberedLines(translated, texts.size)
+        }
+        if (result.failure == TranslationFailure.FreeLimited) {
+            myMemoryRetryAt = android.os.SystemClock.elapsedRealtime() + 60_000L
+        }
+        return validate(result, texts)
+    }
+
+    private suspend fun requestTencent(texts: List<String>, sourceLang: String): BatchResult {
+        val lang = sourceLang.takeIf { it in supportedLanguages } ?: "auto"
         val body = JSONObject()
             .put("header", JSONObject().put("fn", "auto_translation").put("session", "")
                 .put("client_key", "browser-chromium-131.0.0.0"))
             .put("source", JSONObject().put("text_list", JSONArray(texts)).put("lang", lang))
             .put("target", JSONObject().put("lang", "zh"))
-        val request = Request.Builder().url("https://transmart.qq.com/api/imt")
+        val httpRequest = Request.Builder().url("https://transmart.qq.com/api/imt")
             .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
             .header("Referer", "https://transmart.qq.com/")
             .post(body.toString().toRequestBody("application/json".toMediaType())).build()
-        // Retry a transient failure once, per batch. Never retry rejected credentials or inputs.
-        repeat(2) { attempt ->
-          try {
-            return client.newCall(request).executeCancellable().use { response ->
-                if (!response.isSuccessful) throw TranslationFailure.http(response.code).exception()
-                val raw = response.body?.byteStream()?.use { it.readImportBytes(2 * 1024 * 1024).toString(Charsets.UTF_8) }
-                    ?: throw TranslationFailure.Format.exception()
-                parseTransmart(raw, texts.size) ?: throw TranslationFailure.Format.exception()
-            }
-          } catch (error: Exception) {
-            kotlinx.coroutines.currentCoroutineContext().ensureActive()
-            val failure = TranslationFailure.from(error)
-            lastFailure = if (failure.code == "auth") failure.copy(rawDescription = "免费服务拒绝请求，请切换网络或使用自定义 API") else failure
-            if (attempt == 1 || !failure.retryable || failure.code == "format") return null
-            kotlinx.coroutines.delay(600L)
-          }
+        return validate(request(httpRequest) { parseTransmart(it, texts.size) ?: throw TranslationFailure.FreeFormat.exception() }, texts)
+    }
+
+    private suspend fun request(request: Request, parse: (String) -> List<String>): BatchResult {
+        if (context != null && !TranslationPrivacy.allowed(context)) {
+            return BatchResult(emptyList(), TranslationFailure.Privacy)
         }
-        return null
+        return try {
+            client.newCall(request).executeCancellable().use { response ->
+                if (!response.isSuccessful) throw freeHttpFailure(response.code).exception()
+                val raw = response.body?.byteStream()?.use { it.readImportBytes(2 * 1024 * 1024).toString(Charsets.UTF_8) }
+                    ?: throw TranslationFailure.FreeFormat.exception()
+                BatchResult(parse(raw))
+            }
+        } catch (error: Exception) {
+            currentCoroutineContext().ensureActive()
+            val failure = when (error) {
+                is org.json.JSONException -> TranslationFailure.FreeFormat
+                is java.io.InterruptedIOException -> TranslationFailure.FreeTimeout
+                else -> TranslationFailure.from(error)
+            }
+            BatchResult(emptyList(), failure)
+        }
+    }
+
+    private fun freeHttpFailure(status: Int) = when (status) {
+        402, 429 -> TranslationFailure.FreeLimited
+        401, 403 -> TranslationFailure.FreeRejected
+        else -> TranslationFailure.FreeUnavailable
+    }
+
+    private fun validate(result: BatchResult, originals: List<String>): BatchResult =
+        result.copy(texts = result.texts.mapIndexed { index, value ->
+            value.trim().takeIf {
+                it != originals[index] && it.any { ch -> ch in '\u3400'..'\u9fff' }
+            }.orEmpty()
+        })
+
+    private fun parseNumberedLines(text: String, size: Int): List<String> {
+        val output = MutableList(size) { "" }
+        val seen = mutableSetOf<Int>()
+        for (line in text.lineSequence().filter(String::isNotBlank)) {
+            val match = memoryLabel.matchEntire(line.trim()) ?: throw TranslationFailure.FreeFormat.exception()
+            val index = match.groupValues[1].toIntOrNull()?.minus(1)
+            if (index == null || index !in output.indices || !seen.add(index))
+                throw TranslationFailure.FreeFormat.exception()
+            output[index] = match.groupValues[2].trim()
+        }
+        return output
     }
 
     internal fun parseTransmart(raw: String, expectCount: Int): List<String>? = runCatching {
@@ -173,4 +278,12 @@ class OnlineFallbackTranslator(
     }.getOrNull()
 
     override fun close() { sentences.evictAll() }
+
+    private companion object {
+        val supportedLanguages = setOf("ja", "en", "ko")
+        val lineBreaks = Regex("[\\r\\n]+")
+        val memoryLabel = Regex("⟦([0-9]+)⟧([^⟦⟧]*)")
+        fun memoryPrefix(index: Int) = "⟦${index + 1}⟧ "
+        fun numberedLineBytes(index: Int, textBytes: Int) = memoryPrefix(index).toByteArray(Charsets.UTF_8).size + textBytes
+    }
 }

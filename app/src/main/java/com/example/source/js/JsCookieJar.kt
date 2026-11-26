@@ -12,8 +12,8 @@ import org.json.JSONObject
  */
 object JsCookieJar {
     private val lock = Any()
-    private fun preferences(context: Context) =
-        context.getSharedPreferences("js_source_cookies", Context.MODE_PRIVATE)
+    private fun preferences(context: Context, sourceScope: String?) =
+        context.getSharedPreferences(sourceScope?.let { "js_source_cookies_$it" } ?: "js_source_cookies", Context.MODE_PRIVATE)
 
     private fun pairs(raw: String): LinkedHashMap<String, String> = LinkedHashMap<String, String>().apply {
         raw.split(';').map { it.trim() }.filter { it.contains('=') }.forEach {
@@ -31,10 +31,10 @@ object JsCookieJar {
         return merged.values.joinToString("; ")
     }
 
-    fun cookieHeader(context: Context, url: String): String = synchronized(lock) {
+    fun cookieHeader(context: Context, url: String, sourceScope: String? = null): String = synchronized(lock) {
         val parsed = url.toHttpUrlOrNull() ?: return@synchronized ""
         if (!parsed.isHttps) return@synchronized ""
-        val prefs = preferences(context)
+        val prefs = preferences(context, sourceScope)
         val now = System.currentTimeMillis()
         val baseDomain = parsed.topPrivateDomain() ?: parsed.host
         val cookies = LinkedHashMap<String, String>()
@@ -71,9 +71,9 @@ object JsCookieJar {
         cookies.values.joinToString("; ")
     }
 
-    fun saveSetCookies(context: Context, url: String, headers: List<String>) = synchronized(lock) {
+    fun saveSetCookies(context: Context, url: String, headers: List<String>, sourceScope: String? = null) = synchronized(lock) {
         val parsed = url.toHttpUrlOrNull() ?: return@synchronized
-        val prefs = preferences(context)
+        val prefs = preferences(context, sourceScope)
         val now = System.currentTimeMillis()
         headers.mapNotNull { Cookie.parse(parsed, it) }.groupBy { it.domain }.forEach { (host, updates) ->
             val stored = pairs(prefs.getString("ck_$host", "").orEmpty())
@@ -94,9 +94,9 @@ object JsCookieJar {
     }
 
     /** JS and WebView supply live name/value pairs without Set-Cookie attributes. */
-    fun saveCookiePairs(context: Context, host: String, updates: List<String>) = synchronized(lock) {
+    fun saveCookiePairs(context: Context, host: String, updates: List<String>, sourceScope: String? = null) = synchronized(lock) {
         if (host.isBlank()) return@synchronized
-        val prefs = preferences(context)
+        val prefs = preferences(context, sourceScope)
         val domain = host.trimStart('.').lowercase()
         val stored = pairs(prefs.getString("ck_$domain", "").orEmpty())
         val attributes = metadata(prefs.getString("ck_meta_$domain", null))
@@ -108,7 +108,7 @@ object JsCookieJar {
             .putString("ck_meta_$domain", attributes.toString()).apply()
     }
 
-    fun clear(context: Context, host: String) = synchronized(lock) {
-        preferences(context).edit().remove("ck_$host").remove("ck_meta_$host").apply()
+    fun clear(context: Context, host: String, sourceScope: String? = null) = synchronized(lock) {
+        preferences(context, sourceScope).edit().remove("ck_$host").remove("ck_meta_$host").apply()
     }
 }

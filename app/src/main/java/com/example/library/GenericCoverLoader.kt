@@ -37,7 +37,7 @@ object GenericCoverLoader {
                 val req = chain.request()
                 val cookie = JsCookieJar.cookieHeader(context, req.url.toString())
                 val builder = req.newBuilder()
-                if (cookie.isNotBlank() && req.header("Cookie").isNullOrBlank()) {
+                if (cookie.isNotBlank() && req.header("Cookie") == null) {
                     builder.header("Cookie", cookie)
                 }
                 if (req.header("User-Agent").isNullOrBlank()) {

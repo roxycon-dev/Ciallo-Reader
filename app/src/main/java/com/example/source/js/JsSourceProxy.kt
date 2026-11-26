@@ -91,10 +91,14 @@ object JsSourceProxy {
     fun failoverClient(context: Context, base: OkHttpClient): OkHttpClient {
         val builder = base.newBuilder().proxy(Proxy.NO_PROXY)
         val proxyClient = AtomicReference<Pair<Proxy, OkHttpClient>?>(null)
+        val importedClient by lazy { base.newBuilder().restrictImportedComicNetwork().build() }
         // 图床域名被本地 DNS 解析到坏节点时，用已验证边缘 IP 兜底重连
         builder.dns(SourceDns.dns())
         builder.interceptors().add(0, Interceptor { chain ->
                 val request = chain.request()
+                if (ImportedComicSources.mediaScope(request.header(ImportedComicSources.MEDIA_SCOPE_HEADER)) != null) {
+                    return@Interceptor executeTracked(importedClient.newCall(request), chain.call())
+                }
                 if (request.method != "GET") return@Interceptor chain.proceed(request)
                 val publicImageDirectFirst = request.url.host in setOf("manga.iqtao.cn", "i.motiezw.com") ||
                     request.url.host == "baozi.caiji2029.com" &&
@@ -115,29 +119,9 @@ object JsSourceProxy {
                     val proxy = cachedSystemProxy(context) ?: return null
                     val client = proxyClient.get()?.takeIf { it.first == proxy }?.second
                         ?: base.newBuilder().proxy(proxy).build().also { proxyClient.set(proxy to it) }
-                    val call = client.newCall(request)
-                    if (chain.call().isCanceled()) throw IOException("Canceled")
-                    // The fallback is a separate Call. Keep its socket tied to cancellation of
-                    // the original reader/download Call, including while its body is being read.
-                    val watch = cancellationWatcher.scheduleWithFixedDelay({
-                        if (chain.call().isCanceled()) call.cancel()
-                    }, 0, 100, TimeUnit.MILLISECONDS)
-                    try {
-                        val response = call.execute()
-                        if (response.isSuccessful) rememberProxySuccess(context, request.url.toString())
-                        val body = response.body
-                        if (body == null) { watch.cancel(false); return response }
-                        val source = object : ForwardingSource(body.source()) {
-                            override fun close() {
-                                try { super.close() } finally { watch.cancel(false) }
-                            }
-                        }.buffer()
-                        return response.newBuilder().body(object : ResponseBody() {
-                            override fun contentType() = body.contentType()
-                            override fun contentLength() = body.contentLength()
-                            override fun source() = source
-                        }).build()
-                    } catch (e: Exception) { watch.cancel(false); call.cancel(); throw e }
+                    return executeTracked(client.newCall(request), chain.call()).also {
+                        if (it.isSuccessful) rememberProxySuccess(context, request.url.toString())
+                    }
                 }
                 // Honour an explicitly configured system proxy for image/download requests.
                 // Direct-first could return headers but stall on the body, outside this
@@ -206,6 +190,35 @@ object JsSourceProxy {
                 }
             })
         return builder.build()
+    }
+
+    private fun executeTracked(call: okhttp3.Call, parent: okhttp3.Call): okhttp3.Response {
+        if (parent.isCanceled()) throw IOException("Canceled")
+        val watch = cancellationWatcher.scheduleWithFixedDelay({
+            if (parent.isCanceled()) call.cancel()
+        }, 0, 100, TimeUnit.MILLISECONDS)
+        try {
+            val response = call.execute()
+            val body = response.body
+            if (body == null) {
+                watch.cancel(false)
+                return response
+            }
+            val source = object : ForwardingSource(body.source()) {
+                override fun close() {
+                    try { super.close() } finally { watch.cancel(false) }
+                }
+            }.buffer()
+            return response.newBuilder().body(object : ResponseBody() {
+                override fun contentType() = body.contentType()
+                override fun contentLength() = body.contentLength()
+                override fun source() = source
+            }).build()
+        } catch (e: Exception) {
+            watch.cancel(false)
+            call.cancel()
+            throw e
+        }
     }
 
     /**

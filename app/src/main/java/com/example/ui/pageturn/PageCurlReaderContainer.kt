@@ -4,11 +4,12 @@ package com.example.ui.pageturn
 
 import com.example.i18n.tr
 
-import com.example.ui.reader.TouchZone
 import com.example.ui.reader.TouchAction
-import com.example.ui.reader.SwipeAction
 import com.example.ui.reader.ReaderTouchBinding
 import com.example.ui.reader.touchZoneGestures
+import com.example.ui.reader.allowsNativeSwipe
+import com.example.ui.reader.zoneAt
+import com.example.ui.reader.novelPageTap
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -153,10 +154,10 @@ fun PageCurlReaderContainer(
         tapBackwardEnabled = false,
         tapCustomEnabled = touchBinding.zones == null,
         dragStartAllowed = { point, size ->
-            touchBinding.zones?.let { TouchZone.hit(it, point.x / size.width, point.y / size.height)?.swipe == SwipeAction.PAGE } ?: true
+            touchBinding.zones.zoneAt(point, size).allowsNativeSwipe()
         },
         dragRelease = { start, end, velocity, size, native ->
-            val zone = touchBinding.zones?.let { TouchZone.hit(it, start.x / size.width, start.y / size.height) }
+            val zone = touchBinding.zones.zoneAt(start, size)
             com.example.ui.reader.fastPageCommit(zone?.distanceDp, end - start, velocity, touchDensity, native)
         },
         dragInteraction = PageCurlConfig.StartEndDragInteraction(),
@@ -222,11 +223,14 @@ fun PageCurlReaderContainer(
                         else -> touchBinding.onAction(action)
                     }
                 }, menuVisible = menuVisible, imageTap = { onImageTapAt?.invoke(it + containerOffsetInWindow) == true },
-                    onLongPress = onLongPressCenter, legacyPageCurl = true)
+                    onLongPress = onLongPressCenter, legacyPageCurl = true,
+                    defaultTap = { point, width -> novelPageTap(point.x, width, 1f / 3f) })
                 .pointerInput(touchBinding.zones) {
-                    if (touchBinding.zones != null) return@pointerInput
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        val customZones = touchBinding.zones
+                        if (!customZones.zoneAt(down.position, size).allowsNativeSwipe() ||
+                            customZones != null && latestMenuVisible) return@awaitEachGesture
                         val slop = viewConfiguration.touchSlop
                         var totalX = 0f
                         var totalY = 0f
@@ -236,7 +240,7 @@ fun PageCurlReaderContainer(
                         var longPressFired = false
                         var tapOnImage = false
                         // 长按触发区扩展到整个页面：任意位置静置 1s 均可唤出串珠快速翻页
-                        var longPressArmed = true
+                        var longPressArmed = customZones == null
                         var lastUptime = down.uptimeMillis
                         val longPressDeadline = down.uptimeMillis + 1000L
 
@@ -271,7 +275,7 @@ fun PageCurlReaderContainer(
                             if (!ch.pressed) {
                                 // 纯点按且命中正文插图（屏幕矩形注册表）：Initial pass 消费 up，
                                 // 子 clickable（Main pass）与 pagecurl 都不会再触发 → 不翻页
-                                if (!isDrag && !longPressFired && !latestMenuVisible) {
+                                if (customZones == null && !isDrag && !longPressFired && !latestMenuVisible) {
                                     tapOnImage = latestOnImageTapAt
                                         ?.invoke(down.position + containerOffsetInWindow) == true
                                     if (tapOnImage) ch.consume()
@@ -324,7 +328,7 @@ fun PageCurlReaderContainer(
 
                         // 纯点按（未越过 touchSlop）：命中插图已在 up 时消费（tapOnImage），
                         // 此处只做左右三分之一分区翻页（与 onCustomTap 中间三分之一互补）
-                        if (!isDrag && !longPressFired && !latestMenuVisible && !tapOnImage) {
+                        if (customZones == null && !isDrag && !longPressFired && !latestMenuVisible && !tapOnImage) {
                             val x = down.position.x
                             val w = size.width.toFloat()
                             when {

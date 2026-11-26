@@ -186,8 +186,10 @@ object ComicLocalImporter {
                             try {
                                 val rb = request.newBuilder().url(candidate)
                                     .header("Accept", "image/webp,image/jpeg,image/png,*/*;q=0.8")
-                                val cookie2 = JsCookieJar.cookieHeader(context, candidate)
-                                if (cookie2.isNotBlank()) rb.header("Cookie", cookie2)
+                                if (!com.example.source.js.ImportedComicSources.isImportedId(book.sourceId)) {
+                                    val cookie2 = JsCookieJar.cookieHeader(context, candidate)
+                                    if (cookie2.isNotBlank()) rb.header("Cookie", cookie2)
+                                }
                                 if (!referer.isNullOrBlank()) rb.header("Referer", referer)
                                 client(context).newCall(rb.build()).executeCancellable().use { r2 ->
                                     if (r2.isSuccessful) {
@@ -216,7 +218,9 @@ object ComicLocalImporter {
                     } else {
                         bytes
                     }
-                    bytes = JsImageProcessor.transform(fetchUrl, bytes) ?: bytes
+                    val imageScope = com.example.source.js.ImportedComicSources.mediaScope(
+                        request.header(com.example.source.js.ImportedComicSources.MEDIA_SCOPE_HEADER))
+                    bytes = JsImageProcessor.transform(fetchUrl, bytes, imageScope) ?: bytes
                     if (!hasImageBounds(bytes)) {
                         throw IOException("图片不是可解码的图像 (${fetchUrl.take(80)})")
                     }

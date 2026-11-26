@@ -278,6 +278,8 @@ internal fun buildComicImageLoader(context: android.content.Context): ImageLoade
         .addInterceptor { chain ->
             ComicTransfers.update(chain.request().url.toString(), 0, -1)
             var original = chain.request()
+            val imageScope = com.example.source.js.ImportedComicSources.mediaScope(
+                original.header(com.example.source.js.ImportedComicSources.MEDIA_SCOPE_HEADER))
             val resolveImg = sharedResolveImage?.value
             val resolveHeaders = sharedResolveImageHeaders?.value
             if (resolveImg != null) {
@@ -356,8 +358,8 @@ internal fun buildComicImageLoader(context: android.content.Context): ImageLoade
             val streamPreview = chain.request().tag(ComicStreamPreview::class.java)?.takeIf {
                 !MhttuImageDecryptor.isEncryptedHost(finalResponse.request.url.host) &&
                     !ImageBytes.isIqtaoImageHost(finalResponse.request.url.host) &&
-                    !JsImageProcessor.hasTransform(progressUrl) &&
-                    !JsImageProcessor.hasTransform(finalResponse.request.url.toString())
+                    !JsImageProcessor.hasTransform(progressUrl, imageScope) &&
+                    !JsImageProcessor.hasTransform(finalResponse.request.url.toString(), imageScope)
             }
             body.use {
                 val source = it.source()
@@ -402,7 +404,10 @@ internal fun buildComicImageLoader(context: android.content.Context): ImageLoade
             } else {
                 processed
             }
-            processed = JsImageProcessor.transform(response.request.url.toString(), processed) ?: processed
+            processed = JsImageProcessor.transform(response.request.url.toString(), processed, imageScope)
+                ?: if (imageScope != null && response.request.url != original.url) {
+                    JsImageProcessor.transform(original.url.toString(), processed, imageScope) ?: processed
+                } else processed
             finalResponse.newBuilder()
                 .removeHeader("Content-Encoding")
                 .header("Content-Length", processed.size.toString())

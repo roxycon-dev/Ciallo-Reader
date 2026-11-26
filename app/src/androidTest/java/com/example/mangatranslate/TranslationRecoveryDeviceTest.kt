@@ -4,17 +4,48 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RectF
 import androidx.test.platform.app.InstrumentationRegistry
+import com.example.ui.comic.ComicReaderConfig
 import kotlinx.coroutines.runBlocking
 import okhttp3.*
 import okhttp3.ResponseBody.Companion.toResponseBody
-import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 /** Real ONNX inference on dimensions that previously aliased/recycled the source bitmap. */
 class TranslationRecoveryDeviceTest {
+    @Test fun defaultTranslationRendersRealChineseDialogueWithoutConfiguration() = runBlocking {
+        assumeTrue(InstrumentationRegistry.getArguments().getString("translationLive") == "true")
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val translator = MangaPageTranslator(context, OnlineFallbackTranslator(context), LlmBubbleTranslator(context))
+        val page = Bitmap.createBitmap(400, 400, Bitmap.Config.ARGB_8888)
+        page.eraseColor(Color.WHITE)
+        try {
+            val originals = listOf("本気で言ってるの？", "無理しなくていい。")
+            val recognized = originals.mapIndexed { index, text ->
+                val y = 30f + 100f * index
+                TranslatedRegion(RectF(30f, y, 330f, y + 80f), text, "", "ja", false)
+            }
+            val result = translator.translateRecognized(page, recognized, ComicReaderConfig().translationEngine) {}
+            val dialogue = result.regions.map { it.translated }
+            assertTrue(dialogue[0], dialogue[0].contains("认真"))
+            assertTrue(dialogue[1], dialogue[1].contains("勉强"))
+            val baked = BubblePipeline.bake(page, result.regions.map {
+                BubblePipeline.Region(it.rect, it.contour, it.lineRects, it.vertical) to it.translated
+            }, 1f)
+            assertFalse(page.isRecycled)
+            assertNotSame(page, baked)
+            println("Default key-free dialogue: $dialogue")
+            baked.recycle()
+        } finally {
+            page.recycle()
+            translator.release()
+        }
+    }
+
     @Test fun androidSystemTranslationUsesInstalledCapabilitiesOrReturnsPromptly() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val start = android.os.SystemClock.elapsedRealtime()
@@ -31,11 +62,14 @@ class TranslationRecoveryDeviceTest {
         TranslateModelManager.ensureDownloaded(context) { }
         assertTrue("Native OCR models must be verified", TranslateModelManager.isReady(context))
         val client = OkHttpClient.Builder().addInterceptor { chain ->
-            val buffer = okio.Buffer(); chain.request().body!!.writeTo(buffer)
-            val source = JSONObject(buffer.readUtf8()).getJSONObject("source").getJSONArray("text_list")
-            val output = JSONArray(); repeat(source.length()) { output.put("你好，世界。") }
+            val request = chain.request()
+            assertEquals("api.mymemory.translated.net", request.url.host)
+            val query = request.url.queryParameter("q")!!
+            val output = if ('\n' in query) query.lines().joinToString("\n") { "${it.substringBefore(' ')} 你好，世界。" }
+                else "你好，世界。"
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("fixture")
-                .body(JSONObject().put("header", JSONObject().put("ret_code", "succ")).put("auto_translation", output).toString().toResponseBody()).build()
+                .body(JSONObject().put("responseStatus", 200).put("responseData", JSONObject().put("translatedText", output))
+                    .toString().toResponseBody()).build()
         }.build()
         val translator = MangaPageTranslator(context, OnlineFallbackTranslator(context, client), LlmBubbleTranslator(context))
         try {

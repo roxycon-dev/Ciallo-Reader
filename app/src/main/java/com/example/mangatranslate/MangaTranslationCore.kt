@@ -16,7 +16,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.Job
@@ -681,23 +680,15 @@ class MangaPageTranslator(
     internal suspend fun translateRecognized(bitmap: Bitmap, ocr: List<TranslatedRegion>, engine: String, onStage: (String) -> Unit): PageTranslation =
         withContext(Dispatchers.IO) {
             if (ocr.isEmpty()) return@withContext PageTranslation(bitmap.width, bitmap.height, emptyList())
-            val auto = engine == "auto"
-            val ai = engine == "ai" || (auto && llmTranslator.loadConfig().isValid())
-            if (!ai) {
+            val aiConfig = if (engine == "ai") llmTranslator.loadConfig() else null
+            if (aiConfig?.isValid() != true) {
                 return@withContext PageTranslation(bitmap.width, bitmap.height,
-                    translateRegionsOnline(ocr, preferSystem = auto, onStage = onStage))
+                    translateRegionsOnline(ocr, onStage))
             }
             onStage(tr("大模型翻译对白…"))
             val (llmOut, fallback) = aiRequests.withLock {
-                if (auto) {
-                    withTimeoutOrNull(8_000L) {
-                        val result = llmTranslator.translateBuckets(ocr)
-                        result to (llmTranslator.lastFailure ?: TranslationFailure.Empty)
-                    } ?: (null to TranslationFailure.Timeout)
-                } else {
-                    val result = llmTranslator.translateBuckets(ocr)
-                    result to (llmTranslator.lastFailure ?: TranslationFailure.Empty)
-                }
+                val result = llmTranslator.translateBuckets(ocr)
+                result to (llmTranslator.lastFailure ?: TranslationFailure.Empty)
             }
             if (llmOut != null) {
                 val translated = ocr.mapIndexed { index, region ->
@@ -706,12 +697,12 @@ class MangaPageTranslator(
                 }
                 return@withContext PageTranslation(bitmap.width, bitmap.height, translated)
             }
-            if (!auto && !fallback.retryable) throw fallback.exception()
-            if (fallback.code == TranslationFailure.Privacy.code) throw fallback.exception()
-            PageTranslation(bitmap.width, bitmap.height, translateRegionsOnline(ocr, preferSystem = auto, onStage = onStage), fallback)
+            val anonymousAiRejected = aiConfig.apiKey.isBlank() && fallback.code == "auth"
+            if (!fallback.retryable && !anonymousAiRejected) throw fallback.exception()
+            PageTranslation(bitmap.width, bitmap.height, translateRegionsOnline(ocr, onStage), fallback)
         }
 
-    /** 在线兜底专用（用户显式选择 online 引擎）：跳过 AI，直接腾讯批量。 */
+    /** 免 Key 在线批量翻译。 */
     suspend fun translatePageOnline(bitmap: Bitmap, forcedLang: String? = null, onStage: (String) -> Unit = {}): PageTranslation =
         withContext(Dispatchers.Default) {
             activeInference.incrementAndGet()
@@ -737,40 +728,36 @@ class MangaPageTranslator(
 
     private suspend fun translateRegionsOnline(
         ocr: List<TranslatedRegion>,
-        preferSystem: Boolean,
         onStage: (String) -> Unit,
     ): List<TranslatedRegion> {
         val byLanguage = ocr.indices.groupBy { ocr[it].lang }
-        val translated = coroutineScope {
+        onStage(tr("在线翻译对白…"))
+        val groups = coroutineScope {
             byLanguage.map { (language, indices) ->
                 async {
                     val texts = indices.map { ocr[it].original }
-                    val system = if (preferSystem) {
-                        onStage(tr("系统翻译对白…"))
-                        systemTranslation.translate(texts, language)
-                    } else null
-                    val pending = texts.indices.filter { system?.getOrNull(it).isNullOrBlank() }
-                    val remote = if (pending.isEmpty()) emptyList() else {
-                        onStage(tr("在线翻译对白…"))
-                        val batch = pending.map(texts::get)
-                        if (textTranslator is OnlineFallbackTranslator) {
-                            textTranslator.translateBatch(batch, language).orEmpty()
-                        } else batch.map { textTranslator.translate(it, language).orEmpty() }
+                    val remote = if (textTranslator is OnlineFallbackTranslator) {
+                        textTranslator.translateBatchResult(texts, language)
+                    } else {
+                        OnlineFallbackTranslator.BatchResult(texts.map { textTranslator.translate(it, language).orEmpty() })
                     }
-                    val recovered = pending.zip(remote).toMap()
-                    indices.mapIndexed { position, index ->
-                        index to (system?.getOrNull(position)?.takeIf(String::isNotBlank)
-                            ?: recovered[position].orEmpty())
+                    val output = remote.texts.toMutableList()
+                    val pending = output.indices.filter { output[it].isBlank() }
+                    if (pending.isNotEmpty() && remote.failure != TranslationFailure.Privacy) {
+                        val system = systemTranslation.translate(pending.map(texts::get), language).orEmpty()
+                        pending.zip(system).forEach { (position, text) -> output[position] = text }
                     }
+                    indices.zip(output) to remote.failure
                 }
-            }.awaitAll().flatten().toMap()
+            }.awaitAll()
         }
+        val translated = groups.flatMap { it.first }.toMap()
         val out = ocr.mapIndexed { index, region ->
             val text = translated[index]?.trim().orEmpty()
             if (text.isBlank()) region else region.copy(translated = text)
         }
         if (out.none { it.translated.isNotBlank() })
-            throw ((textTranslator as? OnlineFallbackTranslator)?.lastFailure ?: TranslationFailure.Empty).exception()
+            throw (groups.firstNotNullOfOrNull { it.second } ?: TranslationFailure.FreeEmpty).exception()
         return out
     }
 
@@ -807,7 +794,7 @@ class TranslationCoordinator(
 
     /** 用户显式选择的引擎（第十八轮二级导航）；调用方随配置更新。 */
     @Volatile
-    var selectedEngine: String = "auto"
+    var selectedEngine: String = "online"
 
     /** 当前引擎标识（进缓存 key）：换引擎后同页自动重译，不读旧引擎结果。 */
     fun engineTag(): String = selectedEngine
@@ -851,11 +838,8 @@ class TranslationCoordinator(
         releasePending = false // 新任务到达：翻译重新启用，作废挂起的会话关闭
         // 第十七轮：缓存 key 带引擎+源语言标识——切换引擎或"页面文字"语言后同页自动重译
         val engine = selectedEngine
-        val modelTag = when {
-            engine == "ai" || (engine == "auto" && llmTranslator.loadConfig().isValid()) -> llmTranslator.cacheFingerprint()
-            engine == "auto" -> "system-transmart-v4"
-            else -> "transmart-v4"
-        }
+        val modelTag = if (engine == "ai" && llmTranslator.loadConfig().isValid()) llmTranslator.cacheFingerprint()
+            else "mymemory-transmart-system-v1"
         val enginePrefix = "$translationKey@$engine-${forcedLang ?: "auto"}-$modelTag-v3"
         val job = scope.launch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
             val t0 = android.os.SystemClock.elapsedRealtime()

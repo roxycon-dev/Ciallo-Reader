@@ -669,7 +669,8 @@ fun HomeScreen(
             categories = categories.map { it.name },
             currentCategory = selectedCategory,
             showFavoriteTarget = true,
-            gesturesEnabled = !search.mounted && !(use3dShelf && shelfSelection.phase == com.example.ui.shelf.ShelfPhase.BROWSE),
+            gesturesEnabled = !search.mounted && !(use3dShelf && use3dFavorites &&
+                shelfSelection.phase == com.example.ui.shelf.ShelfPhase.BROWSE),
             onDropToCategory = drop@{ keys, name ->
                 // ⚠️ 最后一道保险：落点矩形可能残留（分类被删了、改名了，矩形还在），
                 // 一旦把书写进一个**不存在的分类名**，它在任何分类下都不显示 ——

@@ -2,11 +2,12 @@ package com.example.ui
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
@@ -21,6 +22,7 @@ import com.example.ui.comic.ComicReaderConfig
 import com.example.ui.comic.ComicSettingsStore
 import com.example.ui.comic.ComicDirection
 import com.example.ui.comic.ComicPageAnim
+import com.example.ui.comic.ComicMode
 import com.example.ui.comic.ComicFit
 import com.example.ui.comic.ComicPageRef
 import com.example.ui.components.*
@@ -76,14 +78,27 @@ class TouchZoneInteractionDeviceTest {
         val reader = compose.onNodeWithTag("native-curl")
         reader.performTouchInput { click(center) }
         compose.waitForIdle(); assertEquals(1, bars); assertEquals(0, pages)
-        val before = reader.captureToImage().asAndroidBitmap()
+        val bounds = reader.fetchSemanticsNode().boundsInWindow
+        fun captureReader(): Bitmap {
+            // Forcing a Compose window redraw while a synthetic pointer is held can time out.
+            val screen = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+            val left = bounds.left.toInt().coerceIn(0, screen.width - 1)
+            val top = bounds.top.toInt().coerceIn(0, screen.height - 1)
+            val right = bounds.right.toInt().coerceIn(left + 1, screen.width)
+            val bottom = bounds.bottom.toInt().coerceIn(top + 1, screen.height)
+            return Bitmap.createBitmap(screen, left, top, right - left, bottom - top).also {
+                if (it !== screen) screen.recycle()
+            }
+        }
+        val before = captureReader()
         reader.performTouchInput {
             down(Offset(width - 8f, height - 8f))
             moveTo(Offset(width - 100f, height - 90f), 900)
         }
         compose.waitForIdle()
-        val folded = reader.captureToImage().asAndroidBitmap()
-        assertFalse("A slow diagonal corner must visibly fold before release", before.sameAs(folded))
+        val folded = captureReader()
+        try { assertFalse("A slow diagonal corner must visibly fold before release", before.sameAs(folded)) }
+        finally { before.recycle(); folded.recycle() }
         reader.performTouchInput { advanceEventTime(300); up() }
         compose.waitForIdle(); assertEquals("A slow partial corner ignores the 12dp fast threshold", 0, pages)
         assertEquals(1, bars)
@@ -128,8 +143,8 @@ class TouchZoneInteractionDeviceTest {
         compose.onNodeWithText("自定义触控分区").assertExists()
         shot("editor-novel")
         compose.onNodeWithText("添加分区").performClick()
-        compose.onNodeWithText("试着用自己最舒适的方式滑动一页").assertExists()
-        shot("calibration-guide")
+        compose.onNodeWithText("跟随阅读模式").assertExists()
+        shot("editor-zone-actions")
         compose.onNodeWithText("保存").performClick()
         compose.waitUntil(5000) { dismissed }
         assertEquals(2, saved!!.size)
@@ -161,7 +176,7 @@ class TouchZoneInteractionDeviceTest {
         compose.onNodeWithText("✓ 已记住你的手势 · 可继续微调").assertExists()
         compose.onNodeWithText("触发距离 ${kotlin.math.round(measured).toInt()} dp").assertExists()
         shot("calibration-complete")
-        compose.onNodeWithText("设置功能").performClick()
+        compose.onNodeWithText("分区动作").performClick()
         compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress))
             .performSemanticsAction(SemanticsActions.SetProgress) { set -> set(96f) }
         compose.onNodeWithText("触发距离 96 dp").assertExists()
@@ -250,7 +265,11 @@ class TouchZoneInteractionDeviceTest {
         shot("sliders-range-and-steps")
     }
 
-    private fun mountComic(config: ComicReaderConfig): java.util.concurrent.atomic.AtomicInteger {
+    private fun mountComic(
+        config: ComicReaderConfig,
+        zones: List<TouchZone> = listOf(TouchZone(left = 0f, top = 0f, right = 1f, bottom = 1f,
+            tap = TouchAction.CONTROLS, distanceDp = 80f)),
+    ): java.util.concurrent.atomic.AtomicInteger {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val key = "touch-device-${System.nanoTime()}"
         val pages = (0..2).map { index ->
@@ -265,7 +284,7 @@ class TouchZoneInteractionDeviceTest {
             ComicPageRef.Local("touch-$index", file.absolutePath)
         }
         ComicSettingsStore(context).saveBookConfig(key, config.copy(fit = ComicFit.FIT_PAGE, doubleTapZoom = false, longPressZoom = false,
-            gesturePinchClose = false, touchZones = listOf(TouchZone(left = 0f, top = 0f, right = 1f, bottom = 1f, tap = TouchAction.CONTROLS, distanceDp = 80f))))
+            gesturePinchClose = false).withTouchZones(zones))
         val current = java.util.concurrent.atomic.AtomicInteger(-1)
         compose.setContent { MyApplicationTheme {
             ComicReaderCore(pages, "触控漫画验收", null, key, 0, modifier = Modifier.testTag("comic"),
@@ -321,6 +340,124 @@ class TouchZoneInteractionDeviceTest {
         compose.onNodeWithTag("comic").performTouchInput { swipe(Offset(width * .8f, center.y), Offset(width * .2f, center.y), 500) }
         compose.waitForIdle(); assertEquals(0, page.get())
         shot("manga-zoom-pan-priority")
+    }
+
+    @Test fun mangaNativePagerRemainsBidirectionalOutsideTheCustomZone() {
+        val page = mountComic(ComicReaderConfig(direction = ComicDirection.LTR, pageAnim = ComicPageAnim.SLIDE),
+            listOf(TouchZone(top = .4f, bottom = .6f, tap = TouchAction.CONTROLS, swipe = SwipeAction.NONE)))
+        compose.onNodeWithTag("comic").performTouchInput {
+            swipe(Offset(width * .8f, center.y), Offset(width * .2f, center.y), 350)
+        }
+        compose.waitForIdle()
+        assertEquals(0, page.get())
+        compose.onNodeWithTag("comic").performTouchInput {
+            swipe(Offset(width * .8f, height * .25f), Offset(width * .2f, height * .25f), 350)
+        }
+        compose.waitUntil(15_000) { page.get() == 1 }
+        compose.onNodeWithTag("comic").performTouchInput {
+            swipe(Offset(width * .2f, height * .25f), Offset(width * .8f, height * .25f), 350)
+        }
+        compose.waitUntil(15_000) { page.get() == 0 }
+    }
+
+    @Test fun novelScrollWithCustomTapZonesStillDragsAndFlingsNatively() {
+        var currentScroll = 0
+        compose.setContent {
+            val scroll = rememberScrollState()
+            val offset = scroll.value
+            SideEffect { currentScroll = offset }
+            Box(Modifier.fillMaxSize().testTag("scroll-with-zone")
+                .touchZoneGestures(listOf(TouchZone(tap = TouchAction.CONTENTS)),
+                    { it * .15f }, {}, vertical = true, menuVisible = true, prioritizeChildTap = true,
+                    nativePageDrag = true, swipesWithChrome = true)
+                .verticalScroll(scroll)) {
+                Spacer(Modifier.height(3000.dp))
+            }
+        }
+        compose.onNodeWithTag("scroll-with-zone").performTouchInput {
+            swipe(Offset(center.x, height * .78f), Offset(center.x, height * .28f), 360)
+        }
+        compose.waitUntil(5000) { currentScroll > 12 }
+        val bottom = currentScroll
+        compose.onNodeWithTag("scroll-with-zone").performTouchInput {
+            swipe(Offset(center.x, height * .28f), Offset(center.x, height * .78f), 360)
+        }
+        compose.waitUntil(5000) { currentScroll < bottom }
+    }
+
+    @Test fun seamlessComicScrollWorksWithCustomZonesAndControlsVisible() {
+        val page = mountComic(ComicReaderConfig(mode = ComicMode.CONTINUOUS, gestureSwipe = false),
+            listOf(TouchZone(left = 0f, top = 0f, right = 1f, bottom = 1f, tap = TouchAction.CONTROLS),
+                TouchZone(left = 0f, top = .12f, right = .32f, bottom = .9f,
+                    tap = TouchAction.CONTROLS, swipe = SwipeAction.CONTROLS)))
+        val reader = compose.onNodeWithTag("comic")
+        reader.performTouchInput { click(center) }
+        compose.onNodeWithText("触控漫画验收").assertExists()
+        repeat(3) {
+            reader.performTouchInput { swipe(Offset(center.x, height * .62f), Offset(center.x, height * .24f), 350) }
+            compose.waitForIdle()
+        }
+        compose.waitUntil(15_000) { page.get() > 0 }
+        compose.onNodeWithText("触控漫画验收").assertExists()
+        val forward = page.get()
+        reader.performTouchInput { swipe(Offset(width * .2f, height * .55f), Offset(width * .2f, height * .30f), 350) }
+        compose.onNodeWithText("触控漫画验收").assertDoesNotExist()
+        repeat(3) {
+            reader.performTouchInput { swipe(Offset(center.x, height * .24f), Offset(center.x, height * .62f), 350) }
+            compose.waitForIdle()
+        }
+        compose.waitUntil(15_000) { page.get() < forward }
+    }
+
+    @Test fun editorEdgeHandlesCanReachBothEndsInFullScreenMode() {
+        var saved: List<TouchZone>? = null
+        compose.setContent { MyApplicationTheme {
+            TouchZoneEditor(listOf(TouchZone(top = .22f, bottom = .74f)), listOf(TouchZone()), 64f,
+                onSave = { saved = it }, onDismiss = {})
+        } }
+        compose.onNodeWithContentDescription("全屏调整").performClick()
+        val viewport = compose.onNodeWithContentDescription("真实阅读区域：拖动区域移动，四角缩放；校准时在选中区域滑动")
+        viewport.performTouchInput {
+            swipe(Offset(center.x, height * .22f - 8f), Offset(center.x, 2f), 500)
+        }
+        viewport.performTouchInput {
+            swipe(Offset(center.x, height * .74f + 8f), Offset(center.x, height - 2f), 500)
+        }
+        compose.onNodeWithText("完成调整").performClick()
+        compose.onNodeWithText("保存").performClick()
+        compose.waitUntil(5000) { saved != null }
+        assertEquals(0f, saved!!.single().top, .0001f)
+        assertEquals(1f, saved!!.single().bottom, .0001f)
+    }
+
+    @OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+    @Test fun favoriteListCardOpensWhileMainShelfUses3d() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val prefs = com.example.data.PreferencesManager(context)
+        val oldShelf = prefs.shelfUses3dView
+        val oldFavorites = prefs.favoritesUse3dView
+        prefs.shelfUses3dView = true
+        prefs.favoritesUse3dView = false
+        val favorite = com.example.data.favorite.FavoriteItem(
+            com.example.data.favorite.FavoriteEntity("source", "title", "列表里的收藏"))
+        val opened = java.util.concurrent.atomic.AtomicInteger()
+        try {
+            compose.setContent { MyApplicationTheme {
+                HomeScreen(books = emptyList(), categories = emptyList(),
+                    onBookClick = {}, onImportClick = {}, onAddCategory = {},
+                    onSettingsClick = {}, onNavigateToShelf = {}, onNavigateToStats = {},
+                    todayReadSecondsFlow = kotlinx.coroutines.flow.MutableStateFlow(0L),
+                    streakDaysFlow = kotlinx.coroutines.flow.MutableStateFlow(0),
+                    onDeleteBook = {}, onMoveBook = { _, _ -> }, favoriteItems = listOf(favorite),
+                    onOpenFavorite = { if (it.key == favorite.key) opened.incrementAndGet() })
+            } }
+            compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(favorite.favorite.title))
+            compose.onNodeWithText(favorite.favorite.title).performTouchInput { click(center) }
+            compose.waitUntil(8000) { opened.get() == 1 }
+        } finally {
+            prefs.shelfUses3dView = oldShelf
+            prefs.favoritesUse3dView = oldFavorites
+        }
     }
 
     @Test fun rtlNativeCurlHonorsTheSameCustomDistanceAndDirection() {

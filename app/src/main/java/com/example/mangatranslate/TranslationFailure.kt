@@ -27,6 +27,12 @@ data class TranslationFailure(
         val Format = TranslationFailure("format", "服务返回的译文格式不正确，请更换模型或重试", true)
         val Timeout = TranslationFailure("timeout", "翻译请求超时，请检查网络或换用更快的模型", true)
         val Network = TranslationFailure("network", "无法连接翻译服务，请检查网络和代理设置", true)
+        val FreeLimited = TranslationFailure("limited", "免 Key 翻译达到服务限额，请稍后重试", true)
+        val FreeRejected = TranslationFailure("auth", "免 Key 翻译服务拒绝了请求，请稍后重试", true)
+        val FreeUnavailable = TranslationFailure("service", "免 Key 翻译服务暂时不可用，请稍后重试", true)
+        val FreeTimeout = TranslationFailure("timeout", "免 Key 翻译请求超时，请检查网络后重试", true)
+        val FreeFormat = TranslationFailure("format", "在线翻译返回的对白格式有误，请重试", true)
+        val FreeEmpty = TranslationFailure("empty", "未获得有效译文，请检查原文语言后重试", true)
         fun http(status: Int) = when (status) {
             401, 403 -> TranslationFailure("auth", "服务拒绝访问（$status），请检查 API Key 或切换引擎")
             402 -> TranslationFailure("quota", "服务额度不足，请检查账户额度或切换引擎")

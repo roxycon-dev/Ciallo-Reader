@@ -51,9 +51,11 @@ class JsMessageHandler(
     private val context: Context,
     private val sourceKey: String,
     // Read old source settings without allowing them to disable peer authentication.
-    @Suppress("UNUSED_PARAMETER") insecureTls: Boolean = false
+    @Suppress("UNUSED_PARAMETER") insecureTls: Boolean = false,
+    private val userImported: Boolean = false,
 ) {
-    private val dataPrefs = context.getSharedPreferences("js_source_data", Context.MODE_PRIVATE)
+    private val cookieScope = sourceKey.takeIf { userImported }
+    private val dataPrefs = context.getSharedPreferences(if (userImported) "js_source_data_$sourceKey" else "js_source_data", Context.MODE_PRIVATE)
     val htmlStore = JsHtmlStore()
 
     @Volatile internal var requestJob: kotlinx.coroutines.Job? = null
@@ -115,7 +117,7 @@ class JsMessageHandler(
 
     /** 用 Cronet（Chromium 网络栈）直接下载图片字节，用于 H@H 等 OkHttp 握手不兼容的图床。 */
     fun fetchImageBytes(url: String, headers: Map<String, String>, job: kotlinx.coroutines.Job? = null): ByteArray? {
-        if (useProxyRoute(url)) {
+        if (userImported || useProxyRoute(url)) {
             return runCatching {
                 val builder = Request.Builder().url(url)
                 headers.forEach { (k, v) -> builder.header(k, v) }
@@ -245,6 +247,7 @@ class JsMessageHandler(
             requireSecureCredentials(request.url.toString(), request.headers.names())
             chain.proceed(request)
         }
+        if (userImported) builder.restrictImportedComicNetwork()
         if (sourceKey == "aimanhua") {
             context.assets.open("certificates/isrg-root-x2.pem").use { AimanhuaTls.configure(builder, it) }
         }
@@ -454,7 +457,7 @@ class JsMessageHandler(
             }
 
             val proxied = useProxyRoute(url)
-            if (!proxied && !AimanhuaTls.route(sourceKey, url) && !(sourceKey == "jm" && httpMethod == "GET")) {
+            if (!userImported && !proxied && !AimanhuaTls.route(sourceKey, url) && !(sourceKey == "jm" && httpMethod == "GET")) {
                 // 走 Cronet（Chromium 网络栈）：浏览器级 TLS 指纹，绕过按 Java 客户端封禁的站点
                 var res = cronetRequest(httpMethod, url, effectiveHeaders, bodyBytes,
                     timeoutMs = if (sourceKey == "jm") 10_000 else if (httpMethod == "GET" && !bytes) 20_000 else 60_000)
@@ -888,7 +891,7 @@ class JsMessageHandler(
                 )
             }).toString()
             "delete" -> {
-                JsCookieJar.clear(context, hostOf(url))
+                JsCookieJar.clear(context, hostOf(url), cookieScope)
                 null
             }
             else -> null
@@ -1025,13 +1028,13 @@ class JsMessageHandler(
         }
     }
 
-    private fun getCookiesFor(url: String): String = JsCookieJar.cookieHeader(context, url)
+    private fun getCookiesFor(url: String): String = JsCookieJar.cookieHeader(context, url, cookieScope)
 
     private fun saveCookieList(host: String, cookies: List<String>) {
-        JsCookieJar.saveCookiePairs(context, host, cookies)
+        JsCookieJar.saveCookiePairs(context, host, cookies, cookieScope)
     }
 
     private fun saveCookies(url: String, setCookies: List<String>) {
-        JsCookieJar.saveSetCookies(context, url, setCookies)
+        JsCookieJar.saveSetCookies(context, url, setCookies, cookieScope)
     }
 }

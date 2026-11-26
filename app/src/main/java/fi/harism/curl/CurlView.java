@@ -153,6 +153,18 @@ public class CurlView extends GLSurfaceView implements View.OnTouchListener,
 		return mAnimate;
 	}
 
+	/** A new drag can pick up a page that is settling back to the same spread. */
+	protected boolean prepareForDrag() {
+		synchronized (mRenderer) {
+			if (!mAnimate) return true;
+			boolean returning = (mCurlState == CURL_LEFT && mAnimationTargetEvent == SET_CURL_TO_LEFT)
+					|| (mCurlState == CURL_RIGHT && mAnimationTargetEvent == SET_CURL_TO_RIGHT);
+			if (!returning) return false;
+			finishAnimation();
+			return true;
+		}
+	}
+
 	// Project adaptation (round 6): never-curled background mesh.
 	private CurlMesh mBackgroundMesh;
 

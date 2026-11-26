@@ -193,6 +193,9 @@ object ComicDownloadManager {
         _tasks.value[id]?.let { _tasks.value=_tasks.value+(id to it.copy(status=ComicDownloadStatus.PAUSED)); persist() }
     }
     internal suspend fun source(context:Context,id:String):ComicSource? {
+        if (com.example.source.js.ImportedComicSources.isImportedId(id)) {
+            return com.example.source.js.ImportedComicSources.find(context, id)
+        }
         sources[id]?.let { return it }
         val manager=SourceManager(SharedPreferencesSourceStorage(context))
         manager.initialize()
