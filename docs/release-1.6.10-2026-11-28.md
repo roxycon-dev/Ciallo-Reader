@@ -56,4 +56,4 @@
 - [打开 GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.6.10) 下载正式 APK 和 SHA-256 校验文件。支持 Android 7.0+ 和 ARM64。
 - QQ 反馈群 `1131953681`。欢迎反馈 Bug 或提建议。[查看群二维码](https://github.com/roxycon-dev/Ciallo-Reader#qq-反馈群)
 
-感谢群友@Skuld、@  、@鱼干的反馈
+感谢群友\@Skuld、\@  、\@鱼干的反馈
