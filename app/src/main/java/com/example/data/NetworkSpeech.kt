@@ -54,7 +54,18 @@ internal class NetworkSpeech {
                 val name = item.optString("ShortName")
                 val locale = item.optString("Locale")
                 if (voiceName.matches(name) && name.startsWith("$locale-", true)) {
-                    add(EdgeVoice(name, locale, item.optString("FriendlyName", name)))
+                    // FriendlyName 形如 "Microsoft Xiaoxiao Online (Natural) - Chinese (Mainland)"，
+                    // 太长会在窄面板里换行被截断；这里只留短名，列表再拼 " · locale"。
+                    // 只取拉丁短名：任何非拉丁字符都回退到 ShortName 的拉丁部分，
+                    // 避免个别音色的本地化名字在列表里变成方框/乱码。
+                    val friendly = item.optString("FriendlyName", name)
+                    val candidate = friendly.removePrefix("Microsoft ")
+                        .substringBefore(" Online").trim()
+                    val latin = candidate.filter { it.code < 0x0250 || it in "·- " }.trim()
+                    val short = latin.ifBlank {
+                        name.removeSuffix("Neural").substringAfter(locale + "-", name).trim()
+                    }.ifBlank { name }
+                    add(EdgeVoice(name, locale, short))
                 }
             }
         }.sortedBy { it.locale }

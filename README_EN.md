@@ -77,7 +77,7 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 </tr>
 </table>
 
-- Start listening at your reading position or a selected paragraph with Android system voices, online Edge voices, or a custom speech endpoint. Follow the highlighted text, resume listening, or change chapters. Adjust speed, pitch, pauses, and the sleep timer.
+- Start listening at your reading position or a selected paragraph with Android system voices, online Edge voices, or a custom speech endpoint; the voice list is searchable and scrolls through every available voice. Follow the highlighted text, resume listening, or change chapters. Adjust speed, pitch, pauses, and the sleep timer.
 - Skip 15 seconds backward or forward with Edge and custom voices. Keep listening in the background, use media controls on the lock screen or in notifications, and continue into the next chapter.
 - Long-press text to look up the selection, or enter a word in the dictionary panel. Import StarDict, common MDX v1/v2 files, and MOBI/PRC dictionaries with readable entries for offline use. Manage or disable imported dictionaries, or use a browser lookup.
 - Select a passage to copy, highlight, underline, or annotate it. Save or share a Reading Moment PNG with the selected text, title, and chapter.

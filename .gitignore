@@ -69,3 +69,4 @@ lits*.txt
 HANDOFF_PERF.md
 .audit_prefs.py
 verify_perf.ps1
+/*.log

@@ -31,12 +31,16 @@
 设置 → 数据管理 → 密码箱：加密保存需要登录的书源账号。登录时自动填入、成功后自动更新；
 同签名覆盖安装与升级都会保留。按设计不进入备份与设备互传，换设备需要重新录入。
 
+## 听书音色
+
+- Edge 与系统语音的「选择音色」改为独立的**全屏列表**：可搜索、可滚动浏览全部音色，每行单行省略，不再被弹窗高度裁成半行；
+- 音色名只保留拉丁短名（例如 `Aysha`），个别本地化名字不会再显示成方框或半截字。
 ## 验证
 
 - `:app:compileDebugKotlin` 通过；新增 23 项单测（爱丽丝书屋 JSON/HTML 解析、发现页路由、
   线路发现、密码箱存储）全部通过。
-- 正式包：`Ciallo-Reader-v1.6.10.apk`，31,510,206 B，arm64-v8a，`versionCode 271`；
-  SHA-256 `464e8303964f734801f3ee3ae5376d34e17cf7ca58355a6f8984db00593295e4`。
+- 正式包：`Ciallo-Reader-v1.6.10.apk`，31,510,670 B，arm64-v8a，`versionCode 271`；
+  SHA-256 `d597150cc70b2c48c8e07cef67c3adec94180def819d1b6fb7744ef0f2ebfa5d`。
 - 签名沿用固定证书 `CN=Ciallo Reader Release`（SHA-256 `3ee5fb40…0794`），与 1.6.9 同证书，
   versionCode 递增，可直接覆盖安装；`debuggable=false`、ZIP 完整性校验通过。
 - 未连接实体手机：网页登录、爱丽丝书屋在线搜索/下载、键盘遮挡修复只在 JVM 单测与代码层
@@ -51,3 +55,5 @@
 
 - [打开 GitHub Release](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.6.10) 下载正式 APK 和 SHA-256 校验文件。支持 Android 7.0+ 和 ARM64。
 - QQ 反馈群 `1131953681`。欢迎反馈 Bug 或提建议。[查看群二维码](https://github.com/roxycon-dev/Ciallo-Reader#qq-反馈群)
+
+感谢群友@Skuld、@  、@鱼干的反馈

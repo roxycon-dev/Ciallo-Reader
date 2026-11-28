@@ -88,6 +88,7 @@ internal fun ReaderListeningPanel(
     var edgeLoading by remember { mutableStateOf(false) }
     var edgeError by remember { mutableStateOf(false) }
     var edgeRetry by remember { mutableIntStateOf(0) }
+    var voicePicker by remember { mutableStateOf(false) }
     LaunchedEffect(voices, provider, edgeRetry) {
         if (!voices || provider != SpeechSource.Edge) return@LaunchedEffect
         edgeLoading = true
@@ -238,10 +239,11 @@ internal fun ReaderListeningPanel(
                     }
                     ListeningOption(tr("本章结束"), state.timer == -1) { manager.setTimer(if (state.timer == -1) 0 else -1) }
                     Text(tr("语音来源"), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
-                    Row {
+                    Row(Modifier.fillMaxWidth()) {
                         listOf(SpeechSource.System to "系统语音", SpeechSource.Edge to "Edge 语音",
                             SpeechSource.Custom to "自定义语音").forEach { (source, label) ->
-                            ListeningOption(tr(label), provider == source) {
+                            // 三个 chip 等分宽度：不再让"自定义语音"挤到第二行被裁掉。
+                            ListeningOption(tr(label), provider == source, Modifier.weight(1f)) {
                                 provider = source
                                 voices = false
                                 showCustom = false
@@ -266,75 +268,47 @@ internal fun ReaderListeningPanel(
                             }
                         }
                     } else {
-                        PullOutTextButton(onClick = { voices = !voices },
+                        // 音色列表改为独立全屏选择器：弹窗内联列表会被定高容器裁成半行。
+                        PullOutTextButton(onClick = { voicePicker = true },
                             enabled = provider == SpeechSource.Edge || state.engineReady) {
-                            Text(tr(if (voices) "收起音色" else "选择音色"))
-                        }
-                    }
-                    AnimatedVisibility(
-                        voices && provider == SpeechSource.Edge,
-                        enter = if (motion) expandVertically(tween(WenkuMotion.ENTER_MS, easing = WenkuMotion.ease)) + fadeIn() else EnterTransition.None,
-                        exit = if (motion) shrinkVertically(tween(WenkuMotion.EXIT_MS, easing = WenkuMotion.ease)) + fadeOut() else ExitTransition.None
-                    ) {
-                        ListeningOption(tr("自动匹配"), edgeVoice.isEmpty()) {
-                            edgeVoice = ""
-                            manager.selectEdgeVoice("")
-                            voices = false
-                        }
-                        if (edgeLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
-                        if (edgeError) PullOutTextButton(onClick = { edgeRetry++ }) { Text(tr("重试在线音色")) }
-                        var filter by remember { mutableStateOf("") }
-                        OutlinedTextField(filter, { filter = it }, Modifier.fillMaxWidth(),
-                            label = { Text(tr("搜索语言或音色")) }, singleLine = true)
-                        val defaultVoices = listOf(
-                            EdgeVoice("zh-CN-XiaoxiaoNeural", "zh-CN", "晓晓"),
-                            EdgeVoice("zh-CN-YunxiNeural", "zh-CN", "云希"),
-                            EdgeVoice("ja-JP-NanamiNeural", "ja-JP", "Nanami"),
-                            EdgeVoice("en-US-EmmaMultilingualNeural", "en-US", "Emma")
-                        )
-                        (defaultVoices + edgeVoices).distinctBy { it.name }.filter {
-                            it.name.contains(filter, true) || it.label.contains(filter, true) || it.locale.contains(filter, true)
-                        }.take(30).forEach { item ->
-                            ListeningOption(item.label + " · " + item.locale, edgeVoice == item.name) {
-                                edgeVoice = item.name
-                                manager.selectEdgeVoice(item.name)
-                                voices = false
-                            }
-                        }
-                    }
-                    AnimatedVisibility(
-                        voices && provider == SpeechSource.System,
-                        enter = if (motion) expandVertically(tween(WenkuMotion.ENTER_MS, easing = WenkuMotion.ease)) + fadeIn() else EnterTransition.None,
-                        exit = if (motion) shrinkVertically(tween(WenkuMotion.EXIT_MS, easing = WenkuMotion.ease)) + fadeOut() else ExitTransition.None
-                    ) {
-                        ListeningOption(tr("自动匹配"), voice.isEmpty()) {
-                            voice = ""
-                            manager.selectVoice("")
-                            voices = false
-                        }
-                        var filter by remember { mutableStateOf("") }
-                        OutlinedTextField(filter, { filter = it }, Modifier.fillMaxWidth(),
-                            label = { Text(tr("搜索语言或音色")) }, singleLine = true)
-                        val matches = remember(systemVoices, filter, voice) {
-                            systemVoices.filter {
-                                it.name.contains(filter, true) || it.locale.displayName.contains(filter, true) ||
-                                    it.locale.toLanguageTag().contains(filter, true)
-                            }.sortedBy { it.name != voice }.take(24)
-                        }
-                        if (matches.isEmpty()) {
-                            Text(tr("没有匹配的系统音色"), style = MaterialTheme.typography.bodySmall)
-                        }
-                        matches.forEach { item ->
-                            ListeningOption("${item.locale.displayName} · ${item.name}", voice == item.name) {
-                                voice = item.name
-                                manager.selectVoice(item.name)
-                                voices = false
-                            }
+                            Text(tr("选择音色"))
                         }
                     }
                 }
             }
         }
+    }
+    if (voicePicker) {
+        val edgeDefaults = listOf(
+            EdgeVoice("zh-CN-XiaoxiaoNeural", "zh-CN", "晓晓"),
+            EdgeVoice("zh-CN-YunxiNeural", "zh-CN", "云希"),
+            EdgeVoice("ja-JP-NanamiNeural", "ja-JP", "Nanami"),
+            EdgeVoice("en-US-EmmaMultilingualNeural", "en-US", "Emma"),
+        )
+        val edgeRows = (edgeDefaults + edgeVoices).distinctBy { it.name }
+            .map { VoiceRow(it.name, it.label, it.locale) }
+        val systemRows = systemVoices.map { VoiceRow(it.name, it.locale.displayName, it.name) }
+        val isEdge = provider == SpeechSource.Edge
+        VoicePickerDialog(
+            title = tr("选择音色"),
+            rows = if (isEdge) edgeRows else systemRows,
+            selectedId = if (isEdge) edgeVoice else voice,
+            loading = isEdge && edgeLoading,
+            error = if (isEdge && edgeError) tr("在线音色列表加载失败") else null,
+            onRetry = if (isEdge) ({ edgeRetry++ }) else null,
+            autoLabel = tr("自动匹配"),
+            onPick = { id ->
+                if (isEdge) {
+                    edgeVoice = id
+                    manager.selectEdgeVoice(id)
+                } else {
+                    voice = id
+                    manager.selectVoice(id)
+                }
+                voicePicker = false
+            },
+            onDismiss = { voicePicker = false },
+        )
     }
 }
 
@@ -357,13 +331,20 @@ private fun ListeningValue(label: String, value: Float, range: ClosedFloatingPoi
 }
 
 @Composable
-private fun ListeningOption(label: String, active: Boolean, onClick: () -> Unit) {
+private fun ListeningOption(
+    label: String,
+    active: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     val colors = MaterialTheme.colorScheme
     val background = if (active) colors.primaryContainer else colors.primaryContainer.copy(alpha = 0f)
     val motion = rememberWenkuAccessibility().decorativeMotion && LocalWenkuDecorativeMotion.current
     val tint = if (motion) animateColorAsState(background, label = "listeningOption").value else background
-    PullOutTextButton(onClick = onClick, modifier = Modifier.semantics { selected = active }) {
-        Text(label, modifier = Modifier.clip(RoundedCornerShape(10.dp))
+    // 单行显示：窄面板里宁可省略号，也不要把第二行裁成半截字（会像乱码）。
+    PullOutTextButton(onClick = onClick, modifier = modifier.semantics { selected = active }) {
+        Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.clip(RoundedCornerShape(10.dp))
             .background(tint)
             .padding(horizontal = 6.dp, vertical = 4.dp),
             color = if (active) colors.onPrimaryContainer else colors.onSurfaceVariant,

@@ -274,6 +274,10 @@ fun rememberStrings(): StringTable = LocalStrings.current
  * 换成 "Continue Reading" 就会把按钮撑破，所以这里统一用短词。
  */
 private val EN: Map<String, String> = mapOf(
+    "共 %s 项" to "%s items",
+    "没有匹配的音色" to "No matching voices",
+    "在线音色列表加载失败" to "Could not load the online voice list",
+
     "网页登录" to "Web sign-in",
     "登录成功会自动返回；页面可上下滑动" to "Signs in and returns automatically; the page scrolls normally",
     "没有找到登录表单，请在网页中手动登录" to "No sign-in form found; please sign in manually on the page",
