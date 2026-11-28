@@ -386,6 +386,7 @@ fun WenkuSheetHost(
     viewportContent: Boolean = false,
     dismissGesturesEnabled: Boolean = true,
     additionalBottomInsetPx: Int = 0,
+    alignCenter: Boolean = false,
     wideMaxWidth: Dp = 560.dp,
     content: @Composable () -> Unit
 ) {
@@ -562,7 +563,9 @@ fun WenkuSheetHost(
                 )
             )
             val left = safe.center.x - widthPx / 2f
-            val top = bottomEdge - placeable.height
+            // 登录类弹窗要求垂直居中（键盘弹起时随 safe 区上移）；默认仍贴底。
+            val centeredTop = safe.top + max(0f, (bottomEdge - safe.top - placeable.height) / 2f)
+            val top = if (alignCenter && anchorBounds == null) centeredTop else bottomEdge - placeable.height
             layout(constraints.maxWidth, constraints.maxHeight) {
                 placeable.place(left.roundToInt(), top.roundToInt())
             }
@@ -1037,6 +1040,7 @@ fun WenkuSheetDialog(
     grabber: Boolean = true,
     dismissGesturesEnabled: Boolean = true,
     fitKeyboard: Boolean = false,
+    alignCenter: Boolean = false,
     requestDismiss: Boolean = false,
     wideMaxWidth: Dp = 560.dp,
     content: @Composable () -> Unit
@@ -1083,6 +1087,7 @@ fun WenkuSheetDialog(
             dismissRequested = dismissRequested || requestDismiss,
             dismissGesturesEnabled = dismissGesturesEnabled,
             additionalBottomInsetPx = bottomInset,
+            alignCenter = alignCenter,
             wideMaxWidth = wideMaxWidth,
             modifier = Modifier.fillMaxSize()
         ) {

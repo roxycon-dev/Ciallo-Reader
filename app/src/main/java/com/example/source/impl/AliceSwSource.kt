@@ -27,13 +27,17 @@ import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
- * 爱丽丝书屋（alicesw.com）—— 成人向免费小说创作站，章节式在线正文，作品页免登录。
+ * 爱丽丝书屋（发布页 alicesw.net，线路 alicesw*.homes 等）—— 成人向免费小说创作站，
+ * 2026-11 起为 Next.js 新站：搜索/详情/目录/正文全部走 /api/v1/… JSON 接口，页面作为
+ * 兜底（见 [AliceSwParser] 的契约注释）。作品标识用内部 id，章节标识是 chapter_no。
  *
- * 站点同时运营多条线路，不同线路在墙内可达性不一样（有的域名 TLS 握手直接被重置），
- * 所以选路交给 [AliceSwEndpoints]：并行探活 → 首个真实站点线路入选 → 失败线路冷却。
+ * 站点同时运营多条线路，可达性随线路与网络变化，选路交给 [AliceSwEndpoints]：
+ * 并行探活 → 首个真实站点线路入选 → 失败线路冷却。发布页（alicesw.net / alicesw.click /
+ * alicesw.quest 等）只用于发现新域名，探活时会被明确排除。
  *
  * 该源没有整本文件可下，整本下载走 [com.example.download.AliceSwEpub]：逐章抓正文在
  * 本地打包 EPUB，任一章失败即整体作废（与书阁同一套约定）。
@@ -70,45 +74,71 @@ class AliceSwSource(
         val query = keyword.trim()
         if (query.isEmpty()) return@result emptyList()
         val encoded = java.net.URLEncoder.encode(query, "UTF-8").replace("+", "%20")
-        AliceSwParser.books(fetch("/search?q=" + encoded), id)
+        val base = baseUrlOrThrow()
+        val json = runCatching { JSONObject(fetch("$base/api/v1/search?q=$encoded&page_size=20")) }.getOrNull()
+        if (json != null && json.optJSONObject("data") != null) {
+            return@result AliceSwParser.searchFromApi(json, id, base)
+        }
+        // 接口不可用（改版/线路只挂了旧版页面）时退回搜索页 HTML
+        AliceSwParser.booksFromHtml(fetch("/search?q=$encoded"), id, base)
     }
 
     override suspend fun getDetail(bookId: String): SourceResult<SearchBook> = result {
         val id = requireBookId(bookId)
-        AliceSwParser.detail(fetch("/novel/$id.html"), id, this@AliceSwSource.id)
+        val base = baseUrlOrThrow()
+        val json = fetch("$base/api/v1/books/$id")
+        AliceSwParser.detailFromApi(JSONObject(json), this@AliceSwSource.id, base)
     }
 
     override suspend fun refreshNovelDetail(bookId: String): SourceResult<SearchBook> = getDetail(bookId)
 
     override suspend fun discoverCatalog(resolveDynamic: Boolean): SourceResult<DiscoverCatalog> = result {
-        catalogFor(baseUrlOrThrow(), force = true)
+        val base = baseUrlOrThrow()
+        catalogFor(base, force = true)
     }
 
     override suspend fun discover(query: DiscoverQuery): SourceResult<DiscoverPage> = result {
         val base = baseUrlOrThrow()
         val catalog = catalogFor(base, force = false)
-        val target = AliceSwDiscover.route(base, catalog, query) ?: return@result AliceSwDiscover.notice()
-        val html = fetch(target)
-        val ranked = AliceSwDiscover.isRanked(query)
-        val entries = AliceSwDiscover.entries(html, id, ranked, query.offset)
-        val next = if (ranked) null else AliceSwDiscover.nextPage(html, target)
-        DiscoverPage(
-            entries = entries,
-            hasMore = next != null,
-            nextCursor = next,
-            catalog = catalog,
-            native = true,
-            notice = if (entries.isEmpty()) "源站没有返回这个栏目的作品" else null
-        )
+        val target = AliceSwDiscover.route(base, query) ?: return@result AliceSwDiscover.notice()
+        val raw = fetch(absoluteUrl(base, target.url))
+        if (target.json) {
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+                ?: throw SourceException.ParseError("爱丽丝书屋接口返回了网页而非数据")
+            val data = json.optJSONObject("data")
+                ?: throw SourceException.ParseError("爱丽丝书屋接口返回缺少数据")
+            val entries = AliceSwDiscover.entriesFromApi(data, id, base, target.ranked, query.offset)
+            val next = AliceSwDiscover.nextApiUrl(target.url, data)
+            DiscoverPage(
+                entries = entries,
+                hasMore = next != null,
+                nextCursor = next,
+                catalog = catalog,
+                native = true,
+                notice = if (entries.isEmpty()) "源站没有返回这个栏目的作品" else null
+            )
+        } else {
+            val entries = AliceSwDiscover.entriesFromHtml(raw, id, base, target.ranked, query.offset)
+            val next = AliceSwDiscover.nextPageHtml(raw, target.url)
+            DiscoverPage(
+                entries = entries,
+                hasMore = next != null,
+                nextCursor = next,
+                catalog = catalog,
+                native = true,
+                notice = if (entries.isEmpty()) "源站没有返回这个栏目的作品" else null
+            )
+        }
     }
 
-    /** 分类/排行入口来自首页导航；10 分钟内复用，避免每次切栏目都重拉首页。 */
+    /** 分类目录来自 /api/v1/categories；10 分钟内复用，避免每次切栏目都重拉。 */
     private suspend fun catalogFor(base: String, force: Boolean): DiscoverCatalog = catalogMutex.withLock {
         val cached = catalogCache
         if (!force && cached != null && cached.first == base &&
             System.currentTimeMillis() - catalogFetchedAt < CATALOG_TTL_MS
         ) return@withLock cached.second
-        val catalog = AliceSwDiscover.catalog(fetch("/"), base)
+        val categoriesJson = runCatching { fetch("$base/api/v1/categories") }.getOrNull()
+        val catalog = AliceSwDiscover.catalog(categoriesJson)
         catalogCache = base to catalog
         catalogFetchedAt = System.currentTimeMillis()
         catalog
@@ -116,12 +146,23 @@ class AliceSwSource(
 
     override suspend fun getChapters(bookId: String): SourceResult<List<ComicChapter>> = result {
         val id = requireBookId(bookId)
-        AliceSwParser.chapters(fetch("/other/chapters/id/$id.html"), this@AliceSwSource.id)
+        val base = baseUrlOrThrow()
+        val json = runCatching { JSONObject(fetch("$base/api/v1/books/$id/chapters")) }.getOrNull()
+        if (json != null && json.optJSONArray("data") != null) {
+            return@result AliceSwParser.chaptersFromApi(json, this@AliceSwSource.id)
+        }
+        throw SourceException.ParseError("爱丽丝书屋目录接口不可用，请稍后重试")
     }
 
     override suspend fun getChapterText(chapterId: String): SourceResult<String> = result {
-        val (bookKey, hash) = AliceSwParser.parseChapterId(chapterId)
-        AliceSwParser.chapterText(fetch("/book/$bookKey/$hash.html"))
+        val id = requireChapterId(chapterId)
+        val base = baseUrlOrThrow()
+        val json = runCatching { JSONObject(fetch("$base/api/v1/chapters/$id")) }.getOrNull()
+        if (json != null && json.optJSONObject("data") != null) {
+            return@result AliceSwParser.chapterTextFromApi(json)
+        }
+        // 接口不可用时退回服务端渲染正文页（/read/{chapter_no}）
+        AliceSwParser.chapterTextFromHtml(fetch("/read/$id"))
     }
 
     override suspend fun getChapterImages(chapterId: String): SourceResult<List<String>> =
@@ -137,7 +178,7 @@ class AliceSwSource(
         }
         val fileName = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { id }
         DownloadInfo(
-            url = "$base/novel/$id.html#$EPUB_MARKER",
+            url = "$base/ciallo-epub/$id#$EPUB_MARKER",
             fileName = "$fileName.epub",
             format = "epub",
             referer = "$base/"
@@ -147,7 +188,10 @@ class AliceSwSource(
     override suspend fun getShareUrl(bookId: String): String? {
         if (!AliceSwParser.isBookId(bookId)) return null
         val base = endpoints.currentBase() ?: runCatching { endpoints.baseUrl() }.getOrNull() ?: return null
-        return DetailLink.valid("$base/novel/$bookId.html")
+        val bookNo = AliceSwParser.bookNoFor(bookId) ?: runCatching {
+            (getDetail(bookId) as? SourceResult.Success)?.let { AliceSwParser.bookNoFor(bookId) }
+        }.getOrNull() ?: return null
+        return DetailLink.valid("$base/books/$bookNo")
     }
 
     override suspend fun login(credential: LoginCredential): SourceResult<Boolean> =
@@ -202,7 +246,7 @@ class AliceSwSource(
         val request = Request.Builder()
             .url(target)
             .header("User-Agent", USER_AGENT)
-            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .header("Accept", "application/json,text/html,application/xhtml+xml;q=0.9,*/*;q=0.8")
             .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
             .header("Referer", "$base/")
             .get()
@@ -216,10 +260,10 @@ class AliceSwSource(
                 throw SourceException.NetworkError("爱丽丝书屋跳转到了站外地址")
             }
             val bytes = response.body?.byteStream()?.use { it.readImportBytes(8 * 1024 * 1024) }
-                ?: throw java.io.IOException("爱丽丝书屋返回空页面")
-            val html = bytes.toString(Charsets.UTF_8)
-            SourceResponse.problem(html)?.let { throw SourceException.ParseError(it) }
-            html
+                ?: throw java.io.IOException("爱丽丝书屋返回空响应")
+            val body = bytes.toString(Charsets.UTF_8)
+            SourceResponse.problem(body)?.let { throw SourceException.ParseError(it) }
+            body
         }
     }
 
@@ -241,6 +285,13 @@ class AliceSwSource(
     private fun requireBookId(bookId: String): String {
         if (!AliceSwParser.isBookId(bookId)) throw SourceException.ParseError("爱丽丝书屋作品标识无效")
         return bookId
+    }
+
+    private fun requireChapterId(chapterId: String): String {
+        if (!chapterId.matches(Regex("""\d{1,15}"""))) {
+            throw SourceException.ParseError("爱丽丝书屋章节标识无效")
+        }
+        return chapterId
     }
 
     @Volatile

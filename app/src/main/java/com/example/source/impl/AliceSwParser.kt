@@ -4,59 +4,188 @@ import com.example.source.ComicChapter
 import com.example.source.NovelInfo
 import com.example.source.SearchBook
 import com.example.source.SourceException
+import org.json.JSONObject
 import org.jsoup.Jsoup
-import org.jsoup.nodes.Document
-import org.jsoup.nodes.Element
+import java.util.concurrent.ConcurrentHashMap
 
 /**
- * 爱丽丝书屋（alicesw）页面解析。
+ * 爱丽丝书屋解析（2026-11 站点重写后）。
  *
- * 站点是传统服务端渲染的 PHP 站点，搜索/详情/目录/正文都能直接拿完整 HTML，
- * 正文免登录。作品页 `/novel/{作品id}.html`，目录页 `/other/chapters/id/{作品id}.html`，
- * 正文页 `/book/{书库id}/{章节hash}.html`——注意目录页用的是作品 id，正文链接里的是
- * 书库 id，两者不同，所以章节标识保存为 `书库id/章节hash`。
+ * 站点从 PHP 重写为 Next.js：可达线路（alicesw1/2/4/5/6.homes、www.alicesw.tw）对外是
+ * 服务端渲染页面，对内是 /api/v1/… JSON 接口；alicesw.net / alicesw.click / alicesw.club /
+ * 爱丽丝.als1007.space 只挂发布页。解析按两套来源实现，JSON 优先、页面兜底：
  *
- * 解析与网络分离，便于用真实页面快照做离线回归（站点改版时这些用例先红）。
+ *  - 搜索  `/api/v1/search?q=&sort=&page=&page_size=`（sort 省略 = 相关度；latest = 最近更新；
+ *          favorites = 收藏序；不带 q 只返回精选，不能当全站目录用）
+ *  - 详情  `/api/v1/books/{内部id}`（页面地址是 /books/{book_no}，两个号不同，JSON 里都有）
+ *  - 目录  `/api/v1/books/{内部id}/chapters`
+ *  - 正文  `/api/v1/chapters/{chapter_no}`，data.content 按 \n 分段，带 can_read / 前后章节号
+ *  - 分类  `/api/v1/categories`；分类列表 `/api/v1/books?category_id=&page=`
+ *  - 封面  cover_url 是站内路径（/api/v1/media/{hash}），按当前线路补全
+ *
+ * 作品标识统一用内部 id（纯数字）；章节标识就是 chapter_no（纯数字）。
+ * 旧站 PHP 结构的解析已删除——所有可达线路都已是新版（旧实现见 git 历史）。
  */
 internal object AliceSwParser {
 
-    private val NOVEL_HREF = Regex("""/novel/(\d{1,9})\.html""")
-    private val CHAPTER_HREF = Regex("""/book/(\d{1,9})/([0-9a-f]{8,16})\.html""")
-    private val WORD_COUNT = Regex("""字数：\s*([0-9]+(?:\.[0-9]+)?万?)""")
-    private val UPDATED_AT = Regex("""更新时间：\s*([0-9]{4}-[0-9]{2}-[0-9]{2})""")
-    private val TAG_PREFIX = Regex("""^#\s*""")
-    private val LIST_INDEX_PREFIX = Regex("""^\d+[.、]\s*""")
+    private val BOOK_HREF = Regex("""/books/(\d{1,12})""")
+    private val META_WORD = Regex("""([0-9]+(?:\.[0-9]+)?)万""")
+    private val META_STATUS = Regex("""(已完结|连载中|完本)""")
+    private val API_DATE = Regex("""(\d{4}-\d{2}-\d{2})""")
 
-    /** 搜索结果列表；关键字命中高亮用 `<em>` 包住，text() 后自然还原。 */
-    fun books(html: String, sourceId: String): List<SearchBook> {
+    /** 详情/搜索解析出来的 book_no 缓存（id → 页面地址里的公开书号），供分享链接使用。 */
+    private val bookNos = ConcurrentHashMap<String, String>()
+
+    fun bookNoFor(bookId: String): String? = bookNos[bookId]
+
+    private fun rememberBookNo(id: String, bookNo: String?) {
+        if (!bookNo.isNullOrBlank() && bookNos.size > 800) bookNos.clear()
+        bookNo?.let { bookNos[id] = it }
+    }
+
+    // ---------- JSON（主路径） ----------
+
+    internal class ApiBook(val book: SearchBook, val bookNo: String?)
+
+    /**
+     * 搜索条目（/api/v1/search 的 items）、列表条目（/api/v1/books 的 books）与详情
+     * （/api/v1/books/{id} 的 data）共用一套字段解析；搜索是扁平 author_name + 字符串
+     * tags，列表/详情是 author 对象 + 对象 tags，两种形态都接。
+     */
+    fun bookFromApi(item: JSONObject, sourceId: String, base: String, categoryOverride: String? = null): ApiBook? {
+        val id = item.optString("id").trim()
+        val title = item.optString("title").trim()
+        if (id.isEmpty() || title.isEmpty()) return null
+        val synopsis = item.optString("synopsis").trim().takeIf { it.isNotEmpty() }
+        val category = categoryOverride?.takeIf { it.isNotBlank() }
+        val book = SearchBook(
+            id = id,
+            sourceId = sourceId,
+            title = title,
+            author = authorOf(item).ifBlank { "未知作者" },
+            cover = coverFromApi(item, base),
+            description = synopsis,
+            format = "epub",
+            language = "中文",
+            novelInfo = NovelInfo(
+                synopsis = synopsis,
+                status = statusOf(item),
+                category = category,
+                updatedAt = API_DATE.find(item.optString("updated_at"))?.groupValues?.get(1),
+                chapterCount = item.optInt("chapter_count", 0).takeIf { it > 0 },
+                wordCount = formatWordCount(item.optLong("word_count", 0L)),
+                tags = tagsOf(item),
+                translation = "中文"
+            )
+        )
+        val bookNo = item.optString("book_no").trim().takeIf { it.isNotEmpty() }
+        rememberBookNo(id, bookNo)
+        return ApiBook(book, bookNo)
+    }
+
+    /** /api/v1/search 的 data.items → 搜索结果。 */
+    fun searchFromApi(json: JSONObject, sourceId: String, base: String): List<SearchBook> {
+        val arr = json.optJSONObject("data")?.optJSONArray("items") ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i ->
+            arr.optJSONObject(i)?.let { bookFromApi(it, sourceId, base) }?.book
+        }
+    }
+
+    /** /api/v1/books 的 data.books → 发现列表。 */
+    fun listFromApi(json: JSONObject, sourceId: String, base: String): List<SearchBook> {
+        val arr = json.optJSONObject("data")?.optJSONArray("books") ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i ->
+            arr.optJSONObject(i)?.let { bookFromApi(it, sourceId, base) }?.book
+        }
+    }
+
+    /** /api/v1/books/{id} 的 data → 详情；顺带记下 book_no 供分享链接使用。 */
+    fun detailFromApi(json: JSONObject, sourceId: String, base: String): SearchBook {
+        val data = json.optJSONObject("data") ?: throw SourceException.ParseError("爱丽丝书屋详情接口返回缺少数据")
+        val category = data.optJSONObject("category")?.optString("name")?.trim()?.takeIf { it.isNotEmpty() }
+        val parsed = bookFromApi(data, sourceId, base, categoryOverride = category)
+            ?: throw SourceException.ParseError("爱丽丝书屋详情缺少作品标识，页面可能已变化")
+        return parsed.book
+    }
+
+    /** /api/v1/books/{id}/chapters 的 data 数组 → 目录；顺序即阅读顺序。 */
+    fun chaptersFromApi(json: JSONObject, sourceId: String): List<ComicChapter> {
+        val arr = json.optJSONArray("data") ?: return emptyList()
+        val chapters = mutableListOf<ComicChapter>()
+        for (i in 0 until arr.length()) {
+            val item = arr.optJSONObject(i) ?: continue
+            val no = item.optString("chapter_no").trim()
+            if (no.isEmpty()) continue
+            val title = (item.optString("display_title").ifBlank { item.optString("title") })
+                .trim().ifBlank { "第 ${chapters.size + 1} 节" }
+            chapters += ComicChapter(id = no, title = title, order = (chapters.size + 1).toFloat())
+        }
+        return chapters.distinctBy { it.id }
+    }
+
+    /** /api/v1/chapters/{no} 的 data.content（\n 分段）→ 阅读器正文（\n\n 分段）。 */
+    fun chapterTextFromApi(json: JSONObject): String {
+        val data = json.optJSONObject("data") ?: throw SourceException.ParseError("爱丽丝书屋正文接口返回缺少数据")
+        if (!data.optBoolean("can_read", true)) {
+            throw SourceException.ParseError("该章节未解锁或需要登录后阅读")
+        }
+        val content = data.optString("content")
+        val paragraphs = content.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+        if (paragraphs.isEmpty()) throw SourceException.ParseError("本章正文为空，可能已下架或需要登录")
+        return paragraphs.joinToString("\n\n")
+    }
+
+    /** /api/v1/categories 的 data → (id, 名称) 列表。 */
+    fun categoriesFromApi(json: JSONObject): List<Pair<Int, String>> {
+        val arr = json.optJSONArray("data") ?: return emptyList()
+        val out = mutableListOf<Pair<Int, String>>()
+        for (i in 0 until arr.length()) {
+            val item = arr.optJSONObject(i) ?: continue
+            val id = item.optInt("id", 0)
+            val name = item.optString("name").trim()
+            if (id > 0 && name.isNotEmpty()) out += id to name
+        }
+        return out
+    }
+
+    // ---------- HTML（兜底路径） ----------
+
+    /**
+     * 服务端渲染列表页（/search、/rankings、首页栏目）的卡片：
+     * `article.book-feature`，链接 `a.book-feature__link[href="/books/{book_no}"]`。
+     * 注意卡片链接用的是公开书号 book_no，与 API 的内部 id 不同。
+     */
+    fun booksFromHtml(html: String, sourceId: String, base: String): List<SearchBook> {
         val doc = Jsoup.parse(html)
-        val items = doc.select("div.list-group div.list-group-item")
         val books = mutableListOf<SearchBook>()
-        for (item in items) {
-            val link = item.selectFirst("h5 a[href]") ?: continue
-            val bookId = NOVEL_HREF.find(link.attr("href"))?.groupValues?.get(1) ?: continue
-            // 列表标题带序号前缀（"1. xxx"），去掉后再入库，否则书名会被污染。
-            val title = link.text().trim().replace(LIST_INDEX_PREFIX, "").trim()
+        for (article in doc.select("article.book-feature")) {
+            val link = article.selectFirst("a.book-feature__link[href]") ?: continue
+            val bookNo = BOOK_HREF.find(link.attr("href"))?.groupValues?.get(1) ?: continue
+            // 标题三种来源：卡片 h3 → 无封面占位文案 → 封面图 alt（部分栏目只有图卡片）
+            val title = article.selectFirst("h3.book-feature__title")?.text()?.trim()
+                ?: article.selectFirst(".book-cover span.line-clamp-2")?.text()?.trim()
+                ?: article.selectFirst("img[alt]")?.attr("alt")?.trim()
+                ?: continue
             if (title.isEmpty()) continue
-            val meta = item.selectFirst("p.mb-1")?.text().orEmpty()
-            val author = item.selectFirst("p.mb-1 a[href*=f=author]")?.text()?.trim().orEmpty()
-            val intro = item.selectFirst("p.content-txt")?.text()?.trim()?.takeIf { it.isNotEmpty() }
-            val tags = tagsOf(item.select("p.text-muted a[href]"))
-            val updatedAt = UPDATED_AT.find(item.selectFirst("p.timedesc")?.text().orEmpty())
-                ?.groupValues?.get(1)
+            val author = article.selectFirst("p.book-feature__author span[data-zh-skip]")?.text()?.trim().orEmpty()
+            val summary = article.selectFirst("p.book-feature__summary")?.text()?.trim()?.takeIf { it.isNotEmpty() }
+            val meta = article.selectFirst("p.book-feature__meta")?.text()?.trim().orEmpty()
+            val tags = article.select("p.book-feature__tags span[title]").eachAttr("title")
+                .map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+            val wordCount = META_WORD.find(meta)?.groupValues?.get(1)?.let { "${it}万" }
             books += SearchBook(
-                id = bookId,
+                id = bookNo,
                 sourceId = sourceId,
                 title = title,
                 author = author.ifBlank { "未知作者" },
-                description = intro,
+                cover = coverFromHtml(article, base),
+                description = summary,
                 format = "epub",
                 language = "中文",
                 novelInfo = NovelInfo(
-                    synopsis = intro,
-                    status = statusOf(item.selectFirst("h5 small")?.text()),
-                    updatedAt = updatedAt,
-                    wordCount = WORD_COUNT.find(meta)?.groupValues?.get(1),
+                    synopsis = summary,
+                    status = META_STATUS.find(meta)?.groupValues?.get(1),
+                    wordCount = wordCount,
                     tags = tags,
                     translation = "中文"
                 )
@@ -65,40 +194,37 @@ internal object AliceSwParser {
         return books.distinctBy { it.id }
     }
 
-    /** 作品详情页：书名、作者、分类、字数、章节数、最新章节、标签与简介。 */
-    fun detail(html: String, bookId: String, sourceId: String): SearchBook {
+    /** /books/{book_no} 详情页兜底：标题/作者/简介/标签/徽章 + 章节列表（ChapterList）。 */
+    fun detailFromHtml(html: String, bookNo: String, sourceId: String, base: String): SearchBook {
         val doc = Jsoup.parse(html)
-        val title = doc.selectFirst("div.novel_title")?.text()?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?: doc.selectFirst("div.mu_h1 h1")?.text()?.trim()?.takeIf { it.isNotEmpty() }
+        val title = doc.selectFirst("h1[data-zh-skip]")?.text()?.trim()?.takeIf { it.isNotEmpty() }
             ?: throw SourceException.ParseError("爱丽丝书屋未返回作品标题，页面可能已变化")
-        val info = infoFields(doc)
-        val synopsis = doc.selectFirst("div.jianjie p")?.text()?.trim()?.takeIf { it.isNotEmpty() }
-            ?: doc.selectFirst("div.jianjie")?.text()?.trim()
-                ?.removePrefix("内容简介：")?.takeIf { it.isNotEmpty() }
-        val latestRow = info["最新"].orEmpty()
-        val latestUpdatedAt = doc.selectFirst("div.book_newchap div.con li em")
-            ?.text()?.let { UPDATED_AT.find(it)?.groupValues?.get(1) }
-            ?.takeIf { it.isNotEmpty() } ?: ""
-        val tags = tagsOf(doc.select("div.tags_list a[href]"))
-        val chapterCount = info["章节"]?.toIntOrNull()
+        val author = doc.select("a[href*=\"search?q=\"]")
+            .firstOrNull { it.text().trim().isNotEmpty() && it.attr("href").contains("tag=").not() }
+            ?.text()?.trim().orEmpty()
+        val synopsis = doc.selectFirst("meta[name=description]")?.attr("content")?.trim()?.takeIf { it.isNotEmpty() }
+        val tags = doc.select("a[href*=\"search?tag=\"]").eachText().map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        val status = doc.select("span[data-tone=completed]").takeIf { it.isNotEmpty() }?.let { "已完结" }
+            ?: META_STATUS.find(doc.body().text().take(4000))?.groupValues?.get(1)
+        val wordCount = META_WORD.find(doc.body().text().take(4000))?.groupValues?.get(1)?.let { "${it}万" }
+        val chapters = chaptersFromHtml(html, sourceId)
+        val coverRoot = doc.selectFirst("div[class*=page_cover]") ?: doc.body()
         return SearchBook(
-            id = bookId,
+            id = bookNo,
             sourceId = sourceId,
             title = title,
-            author = info["作者"].orEmpty().ifBlank { "未知作者" },
-            cover = coverOf(doc),
+            author = author.ifBlank { "未知作者" },
+            cover = coverFromHtml(coverRoot, base),
             description = synopsis,
             format = "epub",
             language = "中文",
             novelInfo = NovelInfo(
                 synopsis = synopsis,
-                status = info["状态"]?.takeIf { it.isNotBlank() },
-                category = info["分类"]?.takeIf { it.isNotBlank() },
-                latestChapter = latestRow.ifBlank { null },
-                updatedAt = latestUpdatedAt.ifBlank { null },
-                chapterCount = chapterCount?.takeIf { it > 0 },
-                wordCount = info["字数"]?.takeIf { it.isNotBlank() },
+                status = status,
+                updatedAt = null,
+                chapterCount = chapters.size.takeIf { it > 0 },
+                latestChapter = chapters.firstOrNull()?.title,
+                wordCount = wordCount,
                 tags = tags,
                 translation = "中文",
                 notice = "正文免登录公开；整本下载会逐章抓取并复核目录，任何一章失败都不会标记完成。"
@@ -106,81 +232,101 @@ internal object AliceSwParser {
         )
     }
 
-    /** 目录页：`ul.mulu_list` 里的顺序就是阅读顺序，order 直接取列表位置。 */
-    fun chapters(html: String, sourceId: String): List<ComicChapter> {
+    /** 详情页章节列表：`a[data-chapter-row][href="/read/{no}"]`，DOM 顺序即阅读顺序。 */
+    fun chaptersFromHtml(html: String, sourceId: String): List<ComicChapter> {
         val doc = Jsoup.parse(html)
         val chapters = mutableListOf<ComicChapter>()
-        for (link in doc.select("ul.mulu_list li a[href]")) {
-            val match = CHAPTER_HREF.find(link.attr("href")) ?: continue
-            val title = link.text().trim().ifBlank { "第 ${chapters.size + 1} 节" }
-            chapters += ComicChapter(
-                id = "${match.groupValues[1]}/${match.groupValues[2]}",
-                title = title,
-                order = (chapters.size + 1).toFloat()
-            )
+        for (row in doc.select("a[data-chapter-row][href]")) {
+            val no = row.attr("data-chapter-row").trim()
+            if (!no.matches(Regex("""\d{1,15}"""))) continue
+            val title = row.selectFirst("span[class*=ChapterList_title]")?.text()?.trim()
+                ?: row.text().trim().ifBlank { "第 ${chapters.size + 1} 节" }
+            chapters += ComicChapter(id = no, title = title, order = (chapters.size + 1).toFloat())
         }
         return chapters.distinctBy { it.id }
     }
 
-    /** 正文页：`div.read-content` 内的 `<p>` 段落，用空行拼接成纯文本。 */
-    fun chapterText(html: String): String {
+    /** /read/{no} 兜底：`div[class*=ChapterContent_content]` 内的 `div[data-indent-line]` 段落。 */
+    fun chapterTextFromHtml(html: String): String {
         val doc = Jsoup.parse(html)
-        val body = doc.selectFirst("div.read-content")
+        val body = doc.selectFirst("div[class*=ChapterContent_content]")
+            ?: doc.selectFirst("article[class*=page_article]")
             ?: throw SourceException.BookNotFound
-        val paragraphs = body.select("p").map { it.text().trim() }.filter { it.isNotEmpty() }
-        if (paragraphs.isEmpty()) {
-            throw SourceException.ParseError("本章正文为空，可能已下架或需要登录")
-        }
+        val paragraphs = body.select("div[data-indent-line]").map { it.text().trim() }
+            .filter { it.isNotEmpty() }
+            .ifEmpty { body.select("p").map { it.text().trim() }.filter { it.isNotEmpty() } }
+        if (paragraphs.isEmpty()) throw SourceException.ParseError("本章正文为空，可能已下架或需要登录")
         return paragraphs.joinToString("\n\n")
     }
 
-    /** 详情页信息行：同一行可能用 `·` 并排两个字段（如「字 数：12.12万 · 章 节：11」）。 */
-    private fun infoFields(doc: Document): Map<String, String> {
-        val fields = LinkedHashMap<String, String>()
-        for (row in doc.select("div.novel_info p")) {
-            for (segment in row.text().split("·")) {
-                val index = segment.indexOf('：')
-                if (index <= 0) continue
-                val key = segment.substring(0, index)
-                    .replace(" ", "").replace("\u00a0", "").trim()
-                val value = segment.substring(index + 1).trim()
-                if (key.isNotEmpty() && value.isNotEmpty()) fields[key] = value
-            }
+    // ---------- 字段辅助 ----------
+
+    private fun authorOf(item: JSONObject): String = sequence {
+        yield(item.optString("author_name"))
+        yield(item.optJSONObject("author")?.optString("pen_name"))
+        yield(item.optString("original_author"))
+    }.filterNot { it.isNullOrBlank() }.firstOrNull()?.trim().orEmpty()
+
+    private fun tagsOf(item: JSONObject): List<String> {
+        val arr = item.optJSONArray("tags") ?: return emptyList()
+        val out = mutableListOf<String>()
+        for (i in 0 until arr.length()) {
+            val value = arr.opt(i) ?: continue
+            val name = when (value) {
+                is String -> value
+                is JSONObject -> value.optString("name")
+                else -> null
+            } ?: continue
+            if (name.isNotBlank()) out.add(name.trim())
         }
-        return fields
+        return out.distinct()
     }
 
-    /** 只认站内的标签链接（`?f=tag`）；列表项里的作者链接同样是 text-muted 子节点。 */
-    private fun tagsOf(links: List<Element>): List<String> = links.mapNotNull { link ->
-        if (!link.attr("href").contains("f=tag")) return@mapNotNull null
-        val text = link.text().trim().replace(TAG_PREFIX, "").trim()
-        text.takeIf { it.isNotEmpty() }
-    }.distinct()
+    /** is_finished 是搜索条目专属；列表/详情用 status=="completed" 判断，"published" 不能编造成连载。 */
+    private fun statusOf(item: JSONObject): String? = when {
+        item.has("is_finished") -> if (item.optBoolean("is_finished")) "已完结" else "连载中"
+        item.optString("status") == "completed" -> "已完结"
+        else -> null
+    }
 
-    private fun statusOf(raw: String?): String? = raw?.trim()
-        ?.removeSurrounding("[", "]")
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
+    private fun formatWordCount(count: Long): String? = when {
+        count <= 0L -> null
+        count >= 10000L -> {
+            val wan = count / 10000.0
+            val text = "%.1f".format(wan).removeSuffix(".0")
+            "${text}万"
+        }
+        else -> count.toString()
+    }
 
-    private fun coverOf(doc: Document): String? {
-        val img = doc.selectFirst("div.box_intro img") ?: return null
-        val raw = img.attr("data-src").ifBlank { img.attr("src") }.trim()
-        if (raw.isEmpty()) return null
+    /** cover_url / 页面图片统一补全成当前线路上的绝对地址。 */
+    private fun coverFromApi(item: JSONObject, base: String): String? =
+        absolutizeCover(item.optString("cover_url"), base)
+
+    private fun coverFromHtml(root: org.jsoup.nodes.Element, base: String): String? {
+        val img = root.selectFirst("img[src]") ?: return null
+        return absolutizeCover(img.attr("src").trim(), base)
+    }
+
+    private fun absolutizeCover(raw: String, base: String): String? {
+        if (raw.isBlank()) return null
         return when {
-            raw.startsWith("//") -> "https:$raw"
-            raw.startsWith("http://") -> raw.replaceFirst("http://", "https://")
             raw.startsWith("https://") -> raw
+            raw.startsWith("http://") -> raw.replaceFirst("http://", "https://")
+            raw.startsWith("/_next/image?url=") -> {
+                // /_next/image?url=%2Fapi%2Fv1%2Fmedia%2F{hash}&w=… → 还原出真实媒体路径
+                val decoded = runCatching {
+                    raw.substringAfter('?').split('&').firstOrNull { it.startsWith("url=") }
+                        ?.substringAfter('=')
+                        ?.let { java.net.URLDecoder.decode(it, "UTF-8") }
+                }.getOrNull()
+                absolutizeCover(decoded.orEmpty(), base)
+            }
+            raw.startsWith("/") -> base + raw
             else -> null
         }
     }
 
-    /** 站点列表页/详情页里作品 id 的合法性（纯数字作品号）。 */
-    fun isBookId(raw: String): Boolean = raw.matches(Regex("""\d{1,9}"""))
-
-    /** 章节标识必须是 `书库id/章节hash`，避免把站外地址塞进下载链路。 */
-    fun parseChapterId(raw: String): Pair<String, String> {
-        val match = Regex("""(\d{1,9})/([0-9a-f]{8,16})""").matchEntire(raw.trim())
-            ?: throw SourceException.ParseError("爱丽丝书屋章节标识无效")
-        return match.groupValues[1] to match.groupValues[2]
-    }
+    /** 站内作品标识的合法性（纯数字内部 id 或公开书号）。 */
+    fun isBookId(raw: String): Boolean = raw.matches(Regex("""\d{1,12}"""))
 }

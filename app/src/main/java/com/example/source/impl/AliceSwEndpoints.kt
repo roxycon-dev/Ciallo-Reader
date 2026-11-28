@@ -155,26 +155,38 @@ class AliceSwEndpoints(
         hosts.distinct()
     }
 
-    private fun isAlicePage(html: String): Boolean =
-        html.isNotBlank() && (html.contains("alicesw", ignoreCase = true) || html.contains("爱丽丝书屋"))
+    private fun isAlicePage(html: String): Boolean {
+        if (html.isBlank()) return false
+        val mentionsAlice = html.contains("alicesw", ignoreCase = true) || html.contains("爱丽丝书屋")
+        if (!mentionsAlice) return false
+        // 发布页同样写着“爱丽丝书屋”，探活时必须排除——发布页不是可阅读线路。
+        if (html.contains("发布地址") || html.contains("发布页") || html.contains("请截图保存")) return false
+        // 新站是 Next.js（2026-11 起），旧 PHP 站标记也保留，避免还活着的旧线路被误判。
+        return html.contains("self.__next_f") || html.contains("book-feature") ||
+            html.contains("novel_title") || html.contains("list-group")
+    }
 
     private fun hostOf(base: String): String? = runCatching {
         java.net.URI(base.trim()).host
     }.getOrNull()?.lowercase()
 
     companion object {
-        /** 站点自报的线路，按实测可用性排序；全部不可用时才会去线路页找新域名。 */
+        /** 站点自报的线路，按 2026-11-28 实测可达性排序；全部不可用时才会去发布页找新域名。 */
         val PRESET_HOSTS = listOf(
-            "alicesw4.homes",
-            "alicesw3.homes",
-            "alicesw2.homes",
-            "alicesw1.homes",
-            "alicesw.com"
+            "alicesw1.homes",   // 官方发布 txt 的「大陆备用地址」，实测 200
+            "alicesw2.homes",   // 实测 200
+            "alicesw4.homes",   // 实测 200
+            "alicesw5.homes",   // 站点页脚自曝的新线路，实测 200
+            "alicesw6.homes",   // 站点页脚自曝的新线路，实测 200
+            "www.alicesw.tw",   // 站点首页披露的台湾线路，实测 200
+            "www.alicesw.com"   // 官方「海外永久地址」，本机超时但保留给墙外/代理网络
         )
 
-        /** 线路页与跳转页：只用来发现域名，不参与选路。 */
+        /** 发布页与跳转页：只用来发现域名，不参与选路。 */
         val DISCOVERY_SEEDS = listOf(
-            "https://www.alicesw1.quest/",
+            "https://alicesw.net/",
+            "https://alicesw.click/",
+            "https://www.alicesw.quest/",
             "https://xn--vcsx64d.als1007.space/"
         )
 

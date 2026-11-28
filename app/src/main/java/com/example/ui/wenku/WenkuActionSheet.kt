@@ -25,12 +25,13 @@ internal fun WenkuActionSheet(
     onDismiss: () -> Unit,
     dismissEnabled: Boolean = true,
     fitKeyboard: Boolean = false,
+    centerVertically: Boolean = false,
     requestDismiss: Boolean = false,
     content: @Composable ColumnScope.() -> Unit
 ) {
     WenkuSheetDialog(
         onDismissRequest = onDismiss, dismissGesturesEnabled = dismissEnabled,
-        fitKeyboard = fitKeyboard, requestDismiss = requestDismiss
+        fitKeyboard = fitKeyboard, alignCenter = centerVertically, requestDismiss = requestDismiss
     ) {
         WenkuLoadedContentSequence {
             Column(

@@ -1,125 +1,109 @@
 package com.example.source.impl
 
-import com.example.source.SourceException
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 /**
- * 爱丽丝书屋解析回归（2026-11-06 抓取的真实页面快照，正文文字已替换为中性占位）。
- *
- * 站点改版时这里会先红，避免线上解析悄悄失效：
- * - 搜索列表靠 `div.list-group div.list-group-item`；
- * - 详情靠 `div.novel_title` / `div.novel_info p` / `div.jianjie` / `div.tags_list`；
- * - 目录靠 `ul.mulu_list li a`（顺序即阅读顺序）；
- * - 正文靠 `div.read-content > p`。
+ * 爱丽丝书屋 2026-11 新站解析回归：JSON 接口优先、页面 HTML 兜底，全部用真实页面
+ * 快照（正文已由发布流程脱敏成占位段落）。站点改版时这些用例先红。
  */
+@RunWith(RobolectricTestRunner::class)
 class AliceSwParserTest {
 
     private fun resource(name: String): String =
-        checkNotNull(javaClass.getResourceAsStream("/alicesw/$name")) { "缺少测试资源 $name" }
+        checkNotNull(javaClass.getResourceAsStream("/alicesw-net/$name")) { "缺少测试资源 $name" }
             .use { it.readBytes().toString(Charsets.UTF_8) }
 
-    @Test
-    fun `search page yields ten books with author and tags`() {
-        val books = AliceSwParser.books(resource("search.html"), AliceSwSource.SOURCE_ID)
-        assertEquals(10, books.size)
+    private val base = "https://alicesw1.homes"
 
+    @Test
+    fun `search api json parses items`() {
+        val books = AliceSwParser.searchFromApi(JSONObject(resource("api_search.json")), "alicesw", base)
+        assertEquals(3, books.size)
         val first = books.first()
-        assertEquals("35647", first.id)
-        assertEquals("我是美母骑士(美母骑士爆改无绿版)", first.title)
-        assertEquals("许仙曰过蛇", first.author)
-        assertEquals("這才是许仙曰过蛇真作品", first.description)
+        assertEquals("7361", first.id)
+        assertEquals("骑士王子恋爱冒险", first.title)
+        assertEquals("Akuma_Maiden", first.author)
         assertEquals("已完结", first.novelInfo?.status)
-        assertEquals("12.12万", first.novelInfo?.wordCount)
-        assertEquals("2025-06-08", first.novelInfo?.updatedAt)
-        assertEquals(listOf("乱伦", "人妻", "母子", "小马拉大车"), first.novelInfo?.tags)
-        assertTrue(books.all { AliceSwParser.isBookId(it.id) })
-        assertTrue(books.all { it.sourceId == AliceSwSource.SOURCE_ID })
-        assertEquals(books.size, books.distinctBy { it.id }.size)
+        assertEquals("4.9万", first.novelInfo?.wordCount)
+        assertTrue(first.novelInfo?.tags.orEmpty().contains("后宫"))
+        assertNotNull(first.description)
     }
 
     @Test
-    fun `detail page yields metadata, cover and synopsis`() {
-        val book = AliceSwParser.detail(resource("detail.html"), "35647", AliceSwSource.SOURCE_ID)
-        assertEquals("我是美母骑士(美母骑士爆改无绿版)", book.title)
-        assertEquals("许仙曰过蛇", book.author)
-        assertEquals("乱伦", book.novelInfo?.category)
+    fun `book detail api json parses with category and bookNo`() {
+        val book = AliceSwParser.detailFromApi(JSONObject(resource("api_book_7361.json")), "alicesw", base)
+        assertEquals("7361", book.id)
+        assertEquals("骑士王子恋爱冒险", book.title)
+        assertEquals("搬运机器人", book.author)
+        assertEquals("反差", book.novelInfo?.category)
+        assertEquals(8, book.novelInfo?.chapterCount)
         assertEquals("已完结", book.novelInfo?.status)
-        assertEquals(11, book.novelInfo?.chapterCount)
-        assertEquals("12.12万", book.novelInfo?.wordCount)
-        assertEquals("第九章 实践班与进修班", book.novelInfo?.latestChapter)
-        assertEquals("2025-06-07", book.novelInfo?.updatedAt)
-        assertEquals("這才是许仙曰过蛇真作品", book.novelInfo?.synopsis)
-        assertEquals(listOf("乱伦", "人妻", "母子", "小马拉大车"), book.novelInfo?.tags)
-        assertTrue(book.cover.orEmpty().startsWith("https://img.321cdn.com/"))
-        assertTrue(book.novelInfo?.notice.orEmpty().isNotBlank())
+        assertEquals("512134", AliceSwParser.bookNoFor("7361"))
     }
 
     @Test
-    fun `table of contents keeps site order and uses shelf book key`() {
-        val chapters = AliceSwParser.chapters(resource("toc.html"), AliceSwSource.SOURCE_ID)
-        assertEquals(11, chapters.size)
-        assertEquals("序章", chapters.first().title)
-        assertEquals("第九章 实践班与进修班", chapters.last().title)
-        assertEquals(
-            listOf(
-                "37187/58d8b3fbe6791",
-                "37187/6bb6d5bbfc8fc",
-                "37187/202c8902a3c78"
-            ),
-            chapters.take(3).map { it.id }
-        )
-        assertEquals(chapters.map { it.order }, chapters.indices.map { (it + 1).toFloat() })
-        assertTrue(chapters.all { AliceSwParser.parseChapterId(it.id).first == "37187" })
+    fun `chapters api json keeps reading order`() {
+        val chapters = AliceSwParser.chaptersFromApi(JSONObject(resource("api_chapters_7361.json")), "alicesw")
+        assertEquals(8, chapters.size)
+        assertEquals("99187399", chapters.first().id)
+        assertTrue(chapters.first().title.contains("序章"))
+        assertEquals("27116718", chapters[2].id)
+        assertEquals(3f, chapters[2].order)
     }
 
     @Test
-    fun `chapter page yields every paragraph as plain text`() {
-        val text = AliceSwParser.chapterText(resource("chapter.html"))
-        val paragraphs = text.split("\n\n")
-        assertEquals(158, paragraphs.size)
-        assertEquals("示例正文第1段。", paragraphs.first())
-        assertEquals("示例正文第158段。", paragraphs.last())
-        assertTrue(paragraphs.none { it.isBlank() })
-        assertTrue(text.none { it == '\u0000' })
+    fun `chapter content api json splits paragraphs`() {
+        val text = AliceSwParser.chapterTextFromApi(JSONObject(resource("api_chapter_99187399.json")))
+        val paragraphs = text.split("\n\n").filter { it.isNotBlank() }
+        assertTrue("应解析出多段正文：$paragraphs", paragraphs.size >= 2)
+        assertTrue(text.contains("示例正文第1段。"))
+        assertTrue(paragraphs.all { it.isNotBlank() })
     }
 
     @Test
-    fun `missing chapter page reports book not found instead of empty text`() {
-        try {
-            AliceSwParser.chapterText(resource("missing_chapter.html"))
-            fail("下架章节页应该抛出 BookNotFound")
-        } catch (expected: SourceException.BookNotFound) {
-            // 站点返回“章节不存在或获取失败”提示页，必须当作缺书而不是空正文
-        }
+    fun `categories api json maps id to name`() {
+        val categories = AliceSwParser.categoriesFromApi(JSONObject(resource("api_categories.json")))
+        assertTrue("分类数应充足：${categories.size}", categories.size >= 25)
+        assertTrue(categories.contains(5 to "反差"))
     }
 
     @Test
-    fun `invalid ids are rejected before any request`() {
-        assertTrue(AliceSwParser.isBookId("35647"))
-        assertTrue(!AliceSwParser.isBookId("../etc/passwd"))
-        assertTrue(!AliceSwParser.isBookId("35647.html"))
-
-        val (bookKey, hash) = AliceSwParser.parseChapterId("37187/972abf63ec2c2")
-        assertEquals("37187", bookKey)
-        assertEquals("972abf63ec2c2", hash)
-        try {
-            AliceSwParser.parseChapterId("https://evil.example/book/1/2.html")
-            fail("站外地址不能被当成章节标识")
-        } catch (expected: SourceException.ParseError) {
-            // 只接受 `书库id/章节hash`
-        }
+    fun `search html page parses book feature cards`() {
+        val books = AliceSwParser.booksFromHtml(resource("search_q.html"), "alicesw", base)
+        assertTrue("应解析出整页卡片：${books.size}", books.size >= 15)
+        val first = books.first()
+        assertEquals("512134", first.id)
+        assertEquals("骑士王子恋爱冒险", first.title)
+        assertEquals("Akuma_Maiden", first.author)
+        assertEquals("已完结", first.novelInfo?.status)
+        assertEquals("4.9万", first.novelInfo?.wordCount)
+        assertTrue(first.novelInfo?.tags.orEmpty().contains("中国语"))
     }
 
     @Test
-    fun `page without title reports parse error`() {
-        try {
-            AliceSwParser.detail("<html><body>暂无数据</body></html>", "1", AliceSwSource.SOURCE_ID)
-            fail("没有标题应该抛 ParseError")
-        } catch (expected: SourceException.ParseError) {
-            // 页面结构变化必须报解析错误，不能编造一本空书
-        }
+    fun `book page html parses toc rows`() {
+        val chapters = AliceSwParser.chaptersFromHtml(resource("book_512134.html"), "alicesw")
+        assertEquals(8, chapters.size)
+        assertEquals("99187399", chapters.first().id)
+        assertTrue(chapters.first().title.contains("序章"))
+    }
+
+    @Test
+    fun `read page html extracts indented paragraphs`() {
+        val text = AliceSwParser.chapterTextFromHtml(resource("read_99187399.html"))
+        assertTrue(text.contains("示例正文第1段。"))
+        assertTrue(text.split("\n\n").size >= 2)
+    }
+
+    @Test
+    fun `book id must be digits`() {
+        assertTrue(AliceSwParser.isBookId("512134"))
+        assertTrue(!AliceSwParser.isBookId("book/512134"))
     }
 }

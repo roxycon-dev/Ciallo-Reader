@@ -1195,6 +1195,7 @@ class MainActivity : ComponentActivity() {
                                                 onRenderQualityChange = { viewModel.updateRenderQuality(it) },
                                                 onOpenCardTweaks = { navController.openPaperPage("card_appearance") },
                                                 onOpenCacheManager = { navController.openPaperPage("cache_management") },
+                                                onOpenCredentialVault = { navController.openPaperPage("credential_vault") },
                                                 /* ── 隐私模式（第七轮第 6.4 条；第八轮审查修复：
                                                     底部 Tab 的设置页此前漏传隐私参数，全部落到默认
                                                     { false }——隐私模式在 Tab 设置页永远无法开启） ── */
@@ -1301,6 +1302,7 @@ class MainActivity : ComponentActivity() {
                                 onRenderQualityChange = { viewModel.updateRenderQuality(it) },
                                 onOpenCardTweaks = { navController.openPaperPage("card_appearance") },
                                 onOpenCacheManager = { navController.openPaperPage("cache_management") },
+                                onOpenCredentialVault = { navController.openPaperPage("credential_vault") },
                                 /* ── 隐私模式（第七轮第 6.4 条） ── */
                                 privacyModeEnabled = viewModel.privacyModeEnabled.collectAsStateWithLifecycle().value,
                                 onEnablePrivacyMode = { pin -> viewModel.enablePrivacyMode(pin) },
@@ -2043,6 +2045,13 @@ class MainActivity : ComponentActivity() {
 
                         paperComposable("cache_management", navController, revealContent = true) {
                             com.example.ui.CacheManagementScreen(onBack = { navController.dismissPaperPage() })
+                        }
+
+                        paperComposable("credential_vault", navController, revealContent = true) {
+                            com.example.ui.CredentialVaultScreen(
+                                sources = sourceViewModel.allSources.collectAsStateWithLifecycle().value,
+                                onBack = { navController.dismissPaperPage() },
+                            )
                         }
 
                         paperComposable("theme_palette", navController, revealContent = true) {

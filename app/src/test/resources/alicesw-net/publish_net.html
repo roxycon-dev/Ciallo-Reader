@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>爱丽丝书屋发布页</title>
+    <meta name="yandex-verification" content="0acdf426615182fd" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "爱丽丝书屋发布页",
+  "url": "https://alicesw.click/"
+}
+</script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #dceeff, #e3f2ff);
+            text-align: center;
+            color: #377BB5;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+
+            /* --- 问题修复 START --- */
+            /* 将 align-items 从 center 改为 flex-start，让内容从顶部开始排列 */
+            align-items: flex-start;
+            /* 将 height 改为 min-height，允许 body 高度随内容增加而撑开，从而实现滚动 */
+            min-height: 100vh;
+            /* 添加 box-sizing，让 padding 和 height 的计算更符合直觉 */
+            box-sizing: border-box;
+            /* --- 问题修复 END --- */
+
+            margin: 0;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 600px;
+            background: white;
+            padding: 20px 20px 30px;
+            border-radius: 20px;
+            box-shadow: 0 6px 20px rgba(126, 182, 255, 0.35);
+            transition: max-width 0.3s ease-in-out;
+        }
+
+        img {
+            width: 100%;
+            max-width: 500px;
+            border-radius: 12px;
+            margin-top: 10px;
+        }
+
+        .button-box {
+            display: block;
+            background-color: #62A0FF;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            text-decoration: none;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 10px;
+            border: 2px solid #4A90E2;
+            box-shadow: 0 4px 10px rgba(74, 144, 226, 0.3);
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+        }
+
+        .button-box:hover {
+            background-color: #5090FF;
+            transform: scale(1.03);
+        }
+
+        .notice {
+            margin-top: 18px;
+            font-size: 14px;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .browser-warning {
+            background-color: #fff8e1;
+            color: #d84315;
+            border: 1px solid #ffd180;
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 22px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .browser-warning strong {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 15px;
+        }
+
+        .browser-warning a {
+            color: #1e88e5;
+            text-decoration: underline;
+        }
+
+        @media screen and (min-width: 768px) {
+            .container {
+                max-width: 800px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>请截图保存以下发布地址</h2>
+
+        <img src="/fbdz.jpg" alt="发布域名图片">
+
+        <a class="button-box" href="javascript:jump('aHR0cHM6Ly93d3cuYWxpY2Vzdy5jb20v')">🌐 访问永久地址</a>
+        <a class="button-box" href="javascript:jump('aHR0cHM6Ly94bi0tdmNzeDY0ZC5hbHMxMDA3LnNwYWNl')">🔗 访问备用地址</a>
+        <a class="button-box" href="/爱丽丝书屋发布地址.txt" download="爱丽丝书屋发布地址.txt">📥 下载发布文档</a>
+
+        <div class="browser-warning">
+            <strong>⚠️ 本站不支持以下浏览器</strong>
+            请勿使用夸克、UC、360、QQ 等浏览器访问本站，可能导致内容缺失、功能异常。<br>
+            <br>
+            ✅ 推荐使用：<br>
+            <a href="https://www.google.cn/chrome/" target="_blank">Google Chrome（谷歌浏览器）</a><br>
+            <a href="https://www.microsoft.com/edge" target="_blank">Microsoft Edge（微软浏览器）</a><br>
+            <a href="https://www.firefox.com/zh-CN/" target="_blank">Mozilla Firefox（火狐浏览器）</a><br>
+            <br>
+            </div>
+
+        <p class="notice">联系邮箱：<strong>support@alicesw.com</strong></p>
+    </div> <script>
+        function jump(encoded, isRelative = false) {
+            try {
+                let url = atob(encoded);if (isRelative) {
+                    window.location.href = url;
+                } else {
+                    window.open(url, '_blank');
+                }
+            } catch (e) {
+                alert('跳转失败，请手动复制链接');
+            }
+        }
+    </script>
+
+</body>
+</html>

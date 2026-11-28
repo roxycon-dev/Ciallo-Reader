@@ -653,32 +653,12 @@ fun SourceManagementScreen(
     }
     if (showLoginDialog) {
         LibraryLoginDialog(
-            message = loginMessage,
-            loading = loginLoading,
-            onLogin = { email, pass, close ->
-                loginLoading = true
-                loginMessage = tr("登录中…")
-                scope.launch {
-                    val src = zlibSource
-                    if (src == null) {
-                        loginLoading = false
-                        loginMessage = tr("Z-Library 源不可用")
-                        return@launch
-                    }
-                    when (val result = src.login(LoginCredential(username = email, password = pass))) {
-                        is SourceResult.Success -> {
-                            loginLoading = false
-                            loginMessage = tr("登录成功")
-                            loggedIn = true
-                            sourceAuthEpoch.intValue++
-                            close()
-                        }
-                        is SourceResult.Error -> {
-                            loginLoading = false
-                            loginMessage = result.exception.message ?: com.example.i18n.tr("登录失败，请检查账号密码")
-                        }
-                    }
-                }
+            initialMessage = loginMessage,
+            source = zlibSource,
+            onAuthenticated = {
+                loggedIn = true
+                sourceAuthEpoch.intValue++
+                showLoginDialog = false
             },
             onDismiss = { showLoginDialog = false }
         )

@@ -5306,3 +5306,51 @@ Commit `8d6e3847b1a8fd53df9adbee0ded4f89701bdc4e`；Release 413307957：https://
 
 - 真机网络下自动过盾的首次成功率需设备验证（本机出口为数据中心 IP，CF 始终挑战，无法证明；真机真实 IP 是 solver 生效的前提）。
 - 未改版本号、未发版。
+
+## 101. 第一百零七轮执行（2026-11-28：爱丽丝书屋改版重写、登录链路修复与密码箱）
+
+### 爱丽丝书屋：站点重写为 Next.js，解析整体重做
+
+2026-11 站点改版后，旧 PHP 结构（`/novel/{id}.html`、`/book/{书库id}/{hash}.html`、`div.list-group`）在线上已不存在——所有可达线路都是新版 Next.js（服务端渲染页面 + `/api/v1/…` 接口），旧解析因此全部失效。本轮接口契约（2026-11-28 实测 `alicesw1.homes`）：
+
+| 用途 | 接口 | 说明 |
+| --- | --- | --- |
+| 搜索 | `GET /api/v1/search?q=&page=&page_size=` | `sort` 省略=相关度，`latest`=最近更新，`favorites`=收藏；不带 q 只返回 69 本精选，不能当全站目录 |
+| 详情 | `GET /api/v1/books/{内部id}` | 页面地址是 `/books/{book_no}`，两个号不同，JSON 里都有 |
+| 目录 | `GET /api/v1/books/{内部id}/chapters` | 数组顺序即阅读顺序，`chapter_no` 是章节标识 |
+| 正文 | `GET /api/v1/chapters/{chapter_no}` | `data.content` 按 `\n` 分段，带 `can_read` 与前后章节号 |
+| 分类 | `GET /api/v1/categories`；`GET /api/v1/books?category_id=&page=` | `sort` 参数被服务端忽略（实测），排序类维度只能走 `/api/v1/search` |
+| 封面 | `cover_url` = `/api/v1/media/{hash}` | 页面图片经 `/_next/image?url=…` 代理，解析时还原 |
+
+页面兜底结构（`/search`、`/books/{book_no}`、`/read/{chapter_no}`）：卡片 `article.book-feature` + `a.book-feature__link[href="/books/{book_no}"]`，标题 `h3.book-feature__title`（缺 h3 时退 `img[alt]`），作者 `p.book-feature__author span[data-zh-skip]`，元信息 `p.book-feature__meta`，标签 `p.book-feature__tags span[title]`，简介 `p.book-feature__summary`；目录行 `a[data-chapter-row][href="/read/{no}"]`（标题 `span[class*=ChapterList_title]`）；正文 `div[class*=ChapterContent_content] div[data-indent-line]`。榜单页 `/rankings?tab=…` 的 tab 是客户端渲染（服务端永远返回默认热度序），且页面流式渲染、首屏之后是骨架屏，所以 HTML 榜单只拿首屏卡片。
+
+线路池（`AliceSwEndpoints`，2026-11-28 实测）：`alicesw1/2/4/5/6.homes`、`www.alicesw.tw` 均 200；`alicesw3.homes` 与 `www.alicesw1.quest` 连接被重置；`www.alicesw.com` 超时（官方"海外永久地址"，保留给墙外）；`alicesw.net` / `alicesw.click` / `alicesw.club` / `www.alicesw.quest` / `爱丽丝.als1007.space` 都是发布页（约 4.8KB）。`isAlicePage` 现在明确排除含"发布地址/发布页/请截图保存"的页面；发布页的 `jump('base64')` 由 `AliceSwDiscovery` 解码。
+
+### Z-Library 登录：失败原因分类 + 网页登录兜底
+
+- `SourceException` 新增 `LoginFailureKind`（CREDENTIALS / NEEDS_VERIFICATION / RATE_LIMITED / SERVER_ERROR / NO_REACHABLE_NODE / UNRECOGNIZED_RESPONSE / NETWORK）与 `LoginError(kind, detail)`。
+- `ZLibrarySource.login` 重写：rpc.php 响应按 `CRED/VERIFY/RATE/SERVER/HTTP/BROKEN` 打标；eapi 兜底改为返回原始 JSON，取 `error` 字段作为具体原因。
+- `library/ZLibraryWebLoginView`：WebView 载入 `/login`，自动填表提交、代点 DiamWall 复选框、轮询 `remix_userid/remix_userkey`；成功后把 Cookie 交回 `source.login(LoginCredential(cookie=…))`（复用已有 Cookie 登录路径写进加密存储）。
+- 两个登录弹窗（`library/LibraryLoginDialog`、`ui/source/ZLibraryLoginDialog`）在 CREDENTIALS / NEEDS_VERIFICATION / UNRECOGNIZED_RESPONSE / RATE_LIMITED 时自动切网页登录，并都保留手动入口。
+
+### 登录弹窗居中
+
+`WenkuActionSheet(centerVertically=…)` → `WenkuSheetDialog(alignCenter=…)` → `WenkuSheetHost(alignCenter=…)`：居中时 `top = safe.top + max(0, (bottomEdge - safe.top - height)/2)`，flag 默认 false，其他弹层行为不变。登录弹窗传 true；键盘弹起时 `bottomInset` 增大，居中位置随 safe 区上移。
+
+### 密码箱
+
+`data/CredentialVault`（EncryptedSharedPreferences `credential_vault`，AES256_SIV/GCM + Keystore 主密钥）+ `ui/CredentialVaultScreen`。每条 `VaultCredential(sourceId, sourceName, username, password, updatedAt)`，sourceId 唯一；API：save/get/list/delete/isAvailable，单测用 `testPrefs` 注入普通 SharedPreferences。入口：设置 → 数据管理 → 密码箱（paper 页 `credential_vault`）。登录弹窗勾选"保存到密码箱"后成功即写回，打开时自动填充。有意不进备份/互传；缓存清理不碰 shared_prefs。
+
+### 构建踩坑
+
+- 本机 JDK17 走**用户级** `~/.gradle/gradle.properties` 的 `org.gradle.java.home`：项目 `gradle.properties` 里作者的 `D:/android studio/jbr` 优先级更高，命令行 `-Dorg.gradle.java.home` 不生效。
+- Kotlin 块注释可嵌套：注释里写 `/api/v1/*` 会开启新的注释层，导致 `Unclosed comment`，已改成 `/api/v1/…`。
+- 验证：`:app:compileDebugKotlin` 通过；`AliceSw*` + `CredentialVault*` 共 23 项单测全过。
+
+### 未做
+
+- Z-Library 内置节点清单未刷新（需逐域实测墙内/墙外可达性，本轮被模型提供方内容审核拦截）；节点管理仍支持"全部检测"与自定义节点。
+
+### 文件
+
+`source/impl/AliceSw{Endpoints,Discovery,Parser,Source,Discover}.kt`、`download/AliceSwEpub.kt`（未改，接口兼容）、`data/CredentialVault.kt`、`ui/CredentialVaultScreen.kt`、`library/ZLibraryWebLoginView.kt`、`library/LibraryLoginDialog.kt`、`ui/source/ZLibraryLoginDialog.kt`、`source/SourceException.kt`、`source/zlibrary/{ZLibrarySource,ZLibraryEapiClient}.kt`、`ui/wenku/{WenkuActionSheet,WenkuMenuHost}.kt`、`ui/SettingsTabScreen.kt`、`MainActivity.kt`、`i18n/Strings.kt`、测试 `AliceSw*Test`/`CredentialVaultTest` 与夹具 `app/src/test/resources/alicesw-net/`。

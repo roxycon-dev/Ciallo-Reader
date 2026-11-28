@@ -1039,32 +1039,12 @@ fun LibraryScreen(
 
                 // 原生登录弹窗
                 if (showLoginDialog) {
-                    LibraryLoginDialog(
-                        message = loginMessage,
-                        loading = loginLoading,
-                        onLogin = { email, pass, close ->
-                            val src = currentSource
-                            if (src == null) {
-                                loginLoading = false
-                                loginMessage = com.example.i18n.AppLocale.t("当前书源不可用")
-                                return@LibraryLoginDialog
-                            }
-                            loginLoading = true
-                            loginMessage = com.example.i18n.AppLocale.t("登录中…")
-                            scope.launch {
-                                when (val result = src.login(LoginCredential(username = email, password = pass))) {
-                                    is SourceResult.Success -> {
-                                        loginLoading = false
-                                        loginMessage = com.example.i18n.AppLocale.t("登录成功")
-                                        close()
-                                        viewModel.checkSourceLoginStatus()
-                                    }
-                                    is SourceResult.Error -> {
-                                        loginLoading = false
-                                        loginMessage = result.exception.message ?: com.example.i18n.AppLocale.t("登录失败，请检查账号密码")
-                                    }
-                                }
-                            }
+LibraryLoginDialog(
+                        initialMessage = loginMessage,
+                        source = currentSource,
+                        onAuthenticated = {
+                            showLoginDialog = false
+                            viewModel.checkSourceLoginStatus()
                         },
                         onDismiss = { showLoginDialog = false }
                     )

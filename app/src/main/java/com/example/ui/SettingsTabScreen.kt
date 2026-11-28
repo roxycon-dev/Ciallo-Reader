@@ -117,6 +117,7 @@ fun SettingsTabScreen(
     onOpenThemePalette: (() -> Unit)? = null,
     onOpenCardTweaks: (() -> Unit)? = null,
     onOpenCacheManager: (() -> Unit)? = null,
+    onOpenCredentialVault: (() -> Unit)? = null,
     /* ── 神回（GodMoment）设置分组 ── */
     godSettings: com.example.god.GodMomentSettingsStore? = null,
     onOpenGodRanking: (() -> Unit)? = null,
@@ -955,6 +956,11 @@ fun SettingsTabScreen(
                             str.t("设备互传与备份"), WenkuSymbol.Sync,
                             modifier = Modifier.testTag("device_transfer_entry"),
                             onClick = { com.example.transfer.TransferManager.get(context).show() }
+                        )
+                        SettingsNavigationCard(
+                            str.t("密码箱"), WenkuSymbol.Shield,
+                            modifier = Modifier.testTag("credential_vault_entry"),
+                            onClick = { onOpenCredentialVault?.invoke() }
                         )
                     }
                 }

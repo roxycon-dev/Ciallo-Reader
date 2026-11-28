@@ -12,6 +12,7 @@ import com.example.source.zlibrary.network.ZLibraryNetworkLogger
 import com.example.source.zlibrary.network.ZLibrarySessionManager
 import com.example.source.zlibrary.parser.ZLibraryParserManager
 import okhttp3.FormBody
+import org.json.JSONObject
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.jsoup.Jsoup
 import java.net.URLEncoder
@@ -135,7 +136,15 @@ class ZLibrarySource(
                 (listOfNotNull(preferred) + deferred.awaitAll().filterNotNull()).distinct().take(4)
             }.ifEmpty { reachable.take(4) }
 
-            var lastError: String? = null
+            // 失败分类（登录窗口要能区分"密码错了"和"网络不通"）：
+            //  - credentialsRejected：站点明确拒绝邮箱/密码（含 eapi 的 error 字段）
+            //  - verificationNeeded：命中 Cloudflare/DiamWall 挑战页，内置接口过不去
+            //  - interfaceBroken：接口响应不符合预期（站点改版）
+            //  - httpIssue：HTTP 层问题（429/5xx/其他状态码）
+            var credentialsRejected: String? = null
+            var verificationNeeded = false
+            var interfaceBroken: String? = null
+            var httpIssue: String? = null
             var reachedLogin = false
             for (candidate in candidates) {
                 val outcome = withTimeoutOrNull(8000) {
@@ -167,7 +176,18 @@ class ZLibrarySource(
                         val responseUrl = response.request.url
 
                         if (!response.isSuccessful) {
-                            return@runCatching "登录接口返回异常 HTTP ${response.code}"
+                            return@runCatching when (response.code) {
+                                429 -> "RATE:请求过于频繁，请稍后再试（HTTP 429）"
+                                in 500..599 -> "SERVER:登录接口服务端错误（HTTP ${response.code}）"
+                                else -> "HTTP:登录接口返回异常 HTTP ${response.code}"
+                            }
+                        }
+                        val looksChallenge = htmlOrJson.contains("Just a moment", ignoreCase = true) ||
+                            htmlOrJson.contains("diamwall", ignoreCase = true) ||
+                            htmlOrJson.contains("cf-chl", ignoreCase = true) ||
+                            htmlOrJson.contains("Verifying your browser", ignoreCase = true)
+                        if (looksChallenge) {
+                            return@runCatching "VERIFY:站点要求人机验证，内置登录无法通过"
                         }
                         val hasSession = httpClient.cookieJar.loadForRequest(responseUrl).any { it.name == "remix_userkey" } ||
                             httpClient.cookieJar.loadForRequest(responseUrl).any { it.name == "remix_userid" }
@@ -184,39 +204,70 @@ class ZLibrarySource(
                             return@runCatching "OK"
                         }
                         val doc = Jsoup.parse(htmlOrJson)
-                        doc.select(".alert-danger, .error, .message").text().ifBlank {
-                            Regex("alert\\(\"([^\"]+)\"\\)").find(htmlOrJson)?.groupValues?.get(1)
-                                ?: "登录失败，请检查账号密码或 Cookie"
+                        val siteMessage = doc.select(".alert-danger, .error, .message").text().ifBlank {
+                            Regex("alert\\(\"([^\"]+)\"\\)").find(htmlOrJson)?.groupValues?.get(1).orEmpty()
                         }
-                    }.getOrElse { e -> e.message ?: "登录失败" }
-                }
-                when (outcome) {
-                    "OK" -> return SourceResult.Success(true)
-                    null -> Unit // 超时或非 Z-Library 首页：跳过该候选
-                    else -> lastError = outcome
+                        if (siteMessage.isNotBlank()) "CRED:$siteMessage"
+                        else "BROKEN:登录接口未按预期响应，站点可能已改版"
+                    }.getOrElse { e -> "NET:${e.message ?: "连接失败"}" }
+                } ?: "NET:连接超时"
+                when {
+                    outcome == "OK" -> return SourceResult.Success(true)
+                    outcome.startsWith("CRED:") -> credentialsRejected = outcome.removePrefix("CRED:")
+                    outcome.startsWith("VERIFY:") -> verificationNeeded = true
+                    outcome.startsWith("BROKEN:") -> interfaceBroken = outcome.removePrefix("BROKEN:")
+                    outcome.startsWith("RATE:") -> httpIssue = outcome.removePrefix("RATE:")
+                    outcome.startsWith("SERVER:") -> httpIssue = outcome.removePrefix("SERVER:")
+                    outcome.startsWith("HTTP:") -> httpIssue = outcome.removePrefix("HTTP:")
+                    else -> Unit // 网络层失败：继续尝试下一个候选
                 }
             }
             // 兜底：rpc.php 全部失败时走 eapi 登录（bipinkrish 方案）
+            var eapiError: String? = null
             for (candidate in candidates) {
-                val ok = withTimeoutOrNull(8000) {
-                    runCatching { eapiClient.login(credential.username, credential.password, candidate) }
-                        .getOrDefault(false)
-                } ?: false
-                if (ok) {
+                val json = withTimeoutOrNull(8000) {
+                    runCatching { eapiClient.login(credential.username, credential.password, candidate) }.getOrNull()
+                }
+                if (json != null && json.optInt("success", 0) == 1) {
                     syncCookiesToWebView(candidate)
                     ZLibraryNodeManager.selectNode(context, candidate)
                     domainResolver.saveToCache(candidate)
                     return SourceResult.Success(true)
                 }
+                if (json != null && eapiError == null) {
+                    eapiError = json.optString("error").ifBlank { null }
+                }
             }
-            SourceResult.Error(SourceException.NetworkError(lastError ?: if (reachedLogin)
-                "登录失败，请检查账号密码或 Cookie" else tr("当前网络无法连接可登录的 Z-Library 节点，已尝试备用入口")))
+            // 站点明确拒绝过账号/密码（rpc.php 表单或 eapi error），这是最具体的一类
+            if (eapiError != null && credentialsRejected == null) credentialsRejected = eapiError
+            val error = when {
+                credentialsRejected != null -> SourceException.LoginError(
+                    SourceException.LoginFailureKind.CREDENTIALS,
+                    tr("邮箱或密码未通过站点校验") + "：" + credentialsRejected
+                )
+                verificationNeeded -> SourceException.LoginError(
+                    SourceException.LoginFailureKind.NEEDS_VERIFICATION,
+                    tr("站点要求人机验证，内置登录无法通过，可改用内置网页登录")
+                )
+                !reachedLogin -> SourceException.LoginError(
+                    SourceException.LoginFailureKind.NO_REACHABLE_NODE,
+                    tr("当前网络无法连接可登录的 Z-Library 节点，已尝试备用入口")
+                )
+                interfaceBroken != null -> SourceException.LoginError(
+                    SourceException.LoginFailureKind.UNRECOGNIZED_RESPONSE,
+                    interfaceBroken!!
+                )
+                else -> SourceException.LoginError(
+                    SourceException.LoginFailureKind.NETWORK,
+                    httpIssue ?: tr("登录超时，请检查网络后重试")
+                )
+            }
+            SourceResult.Error(error)
         } catch (e: Exception) {
             currentCoroutineContext().ensureActive()
-            SourceResult.Error(SourceException.NetworkError("登录过程异常: ${e.message}"))
+            SourceResult.Error(SourceException.NetworkError("登录过程异常: " + e.message))
         }
     }
-
     override suspend fun logout() {
         credentialStorage.clear()
         sessionManager.invalidateSession()

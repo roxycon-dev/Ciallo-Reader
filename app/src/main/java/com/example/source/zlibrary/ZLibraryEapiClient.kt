@@ -74,7 +74,7 @@ class ZLibraryEapiClient(
         java.security.MessageDigest.getInstance("MD5").digest(s.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
 
-    suspend fun login(email: String, password: String, domain: String): Boolean {
+    suspend fun login(email: String, password: String, domain: String): JSONObject? {
         val md5Pass = md5Hex(password)
         val transformed = md5Hex("$email:$password:$md5Pass")
         val json = postJson(
@@ -86,7 +86,7 @@ class ZLibraryEapiClient(
                 "action" to "login"
             ),
             referer = "https://$domain/"
-        ) ?: return false
+        ) ?: return null
         val ok = json.optInt("success", 0) == 1
         if (ok) {
             val user = json.optJSONObject("user")
@@ -100,7 +100,7 @@ class ZLibraryEapiClient(
                 cookies = credentialStorage.getCookies()
             )
         }
-        return ok
+        return json
     }
 
     /** 每日下载额度：(今日已用, 上限)。查询失败返回 null，调用方不应因此阻断下载。 */
