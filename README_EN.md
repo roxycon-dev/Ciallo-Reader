@@ -18,7 +18,7 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 <a href="docs/readme-media/qq-feedback.jpg"><img src="docs/readme-media/qq-feedback.jpg" width="220" alt="QR code for the Ciallo Reader QQ feedback group, 1131953681"></a>
 
-[1.6.9 release notes](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.6.9)
+[1.6.10 release notes](https://github.com/roxycon-dev/Ciallo-Reader/releases/tag/v1.6.10)
 
 [Discovery and shelf](#discovery-and-shelf) · [Novels and ebooks](#novels-and-ebooks) · [Listening and annotations](#listening-dictionaries-and-annotations) · [Manga](#manga) · [Stats and appearance](#stats-and-appearance) · [Built-in sources](#built-in-sources) · [Backups and transfers](#backups-and-device-transfer) · [Getting started](#getting-started)
 
@@ -115,7 +115,7 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 - View reading time, streaks, history, calendar, and trends. Rate favorite chapters and change how the ranking is displayed.
 - Customize accent colors, light or dark themes, backgrounds, startup artwork, graphics quality, haptics, and orientation lock. Switch between Chinese and English.
 - Use phone, tablet, and landscape layouts with minimal graphics and reduced-motion options.
-- Use a PIN to protect selected shelf categories and favorites. Settings also provides storage cleanup, eye comfort, reading reminders, and data management.
+- Use a PIN to protect selected shelf categories and favorites. Settings also provides storage cleanup, eye comfort, reading reminders, and data management. The password vault (Settings → Data management) encrypts sign-in accounts for sources that require them: logins are filled in automatically, it survives app updates, and it is not included in backups.
 
 ## Built-in sources
 
@@ -125,8 +125,8 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 | Built-in source | What the app supports |
 | --- | --- |
-| **Z-Library** | Multilingual ebook search, details, available file formats, account sign-in, and node selection and testing. Downloads follow the source and account rules. |
-| **Alice’s Library (爱丽丝书屋)** | Automatic endpoint selection, search, and complete EPUB downloads. Browse categories, updates, and daily, weekly, monthly, and overall rankings. |
+| **Z-Library** | Multilingual ebook search, details, available file formats, account sign-in, and node selection and testing. Downloads follow the source and account rules. When sign-in fails, the dialog says whether the password, a site check, or the network is at fault, and you can finish in the site web page inside the app. |
+| **Alice’s Library (爱丽丝书屋)** | Automatic endpoint selection, search, and complete EPUB downloads. The site was rewritten in November 2026 and is now read through its current API; Discovery offers the hot list, favorites, recent updates, and categories. |
 | **Fanqie Novel (public aggregator)** | Public title search, book IDs and official links, chapter lists, online reading for available chapters, and chapter-by-chapter EPUB downloads. |
 | **Novelia** | Search light novels and translations, view long chapter lists, read online, and download complete books. Discovery shows the source’s public daily ranking. |
 | **Wenku8 Library** | Find light novels, view catalog metadata, download complete EPUBs, and browse by public popularity or update date. |
@@ -166,7 +166,7 @@ Android 7.0+ · ARM64 · [Changelog](CHANGELOG.md)
 
 - Export books, progress, favorites, annotations, history, settings, and sources as a portable `.ciallo` backup. Preview imports, merge or migrate the whole device, and undo the last migration. Enable automatic backups to restore an empty shelf when prompted.
 - Transfer files over the same Wi-Fi network, a hotspot, or Wi-Fi Direct. Confirm the pairing code for encrypted transfers with progress, cancellation, and resume. [Device transfer and backup guide](docs/device-transfer.md)
-- Import older ZIP backups as well. Merging keeps local settings and matching sources while keeping the latest reading position. Unlock protected content with its PIN before including it. Sign-in sessions, secrets, and PINs are set up again on the receiving device.
+- Import older ZIP backups as well. Merging keeps local settings and matching sources while keeping the latest reading position. Unlock protected content with its PIN before including it. Sign-in sessions, secrets, the password vault, and PINs are set up again on the receiving device.
 
 ## Getting started
 

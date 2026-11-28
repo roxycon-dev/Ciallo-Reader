@@ -274,6 +274,12 @@ fun rememberStrings(): StringTable = LocalStrings.current
  * 换成 "Continue Reading" 就会把按钮撑破，所以这里统一用短词。
  */
 private val EN: Map<String, String> = mapOf(
+    "网页登录" to "Web sign-in",
+    "登录成功会自动返回；页面可上下滑动" to "Signs in and returns automatically; the page scrolls normally",
+    "没有找到登录表单，请在网页中手动登录" to "No sign-in form found; please sign in manually on the page",
+    "登录表单的结构已变化，请在网页中手动登录" to "The sign-in form has changed; please sign in manually on the page",
+    "页面已加载，可以上下滑动操作；登录成功后窗口会自动关闭" to "Page loaded. You can scroll and interact; this window closes automatically after sign-in.",
+
     "密码箱" to "Password vault",
     "加密保存在本机，升级 App 不会丢；不随备份迁移到新设备" to "Encrypted on this device. Survives app updates, but is not included in backups.",
     "系统安全存储不可用，密码箱暂时无法读写。请在设备解锁后重试，或检查系统安全设置。" to "Secure storage is unavailable, so the password vault cannot be read or written. Unlock the device and try again, or check the system security settings.",

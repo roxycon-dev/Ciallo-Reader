@@ -116,118 +116,103 @@ fun LibraryLoginDialog(
         tr("登录 Z-Library"),
         onDismiss,
         dismissEnabled = !loading,
-        fitKeyboard = !webLogin,
+        fitKeyboard = true,
         centerVertically = true,
     ) {
         val keyboard = LocalSoftwareKeyboardController.current
 
-        if (webLogin) {
+        SourceCredentialFields(
+            email,
+            { email = it; message = "" },
+            password,
+            { password = it; message = "" },
+            !loading,
+            { if (!loading && email.isNotBlank() && password.isNotBlank()) { keyboard?.hide(); submit() } },
+        )
+        if (saved != null && email == saved.username && password == saved.password) {
             Text(
-                tr("内置接口登录没有成功，已自动改用站点网页登录。账号密码会自动填入；如果页面出现人机验证，按页面提示点一下即可。"),
+                tr("已从密码箱自动填入账号；登录成功后会自动更新密码箱"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (message.isNotBlank()) {
-                Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-            }
-            ZLibraryWebLoginView(
-                domain = ZLibraryNodeConfig.domain.ifBlank { ZLibraryNodeManager.DEFAULT_NODE },
-                email = email.trim(),
-                password = password,
-                onOutcome = { cookies, host, outcomeMessage ->
-                    val src = source
-                    if (cookies != null && src != null) {
-                        message = tr("网页登录成功，正在同步登录状态…")
-                        scope.launch {
-                            val result = src.login(
-                                LoginCredential(
-                                    cookie = cookies,
-                                    extraData = mapOf("domain" to (host ?: ZLibraryNodeConfig.domain))
-                                )
-                            )
-                            when (result) {
-                                is SourceResult.Success -> finishSuccess()
-                                is SourceResult.Error -> message = result.exception.message
-                                    ?: tr("网页登录成功但会话同步失败，请重试")
-                            }
-                        }
-                    } else {
-                        message = outcomeMessage
-                    }
-                }
-            )
-            WenkuTextButton(
-                tr("返回账号密码登录"),
-                { webLogin = false },
-                Modifier.fillMaxWidth(),
-                enabled = !loading,
-                compact = true,
-                wenkuSymbol = WenkuSymbol.Check,
-            )
-        } else {
-            SourceCredentialFields(
-                email,
-                { email = it; message = "" },
-                password,
-                { password = it; message = "" },
-                !loading,
-                { if (!loading && email.isNotBlank() && password.isNotBlank()) { keyboard?.hide(); submit() } },
-            )
-            if (saved != null && email == saved.username && password == saved.password) {
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = saveToVault, onCheckedChange = { saveToVault = it }, enabled = !loading)
+            Column(Modifier.weight(1f)) {
+                Text(tr("保存到密码箱"), style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    tr("已从密码箱自动填入账号；登录成功后会自动更新密码箱"),
+                    tr("加密保存在本机，升级 App 不会丢"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = saveToVault, onCheckedChange = { saveToVault = it }, enabled = !loading)
-                Column(Modifier.weight(1f)) {
-                    Text(tr("保存到密码箱"), style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        tr("加密保存在本机，升级 App 不会丢"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            if (message.isNotBlank()) {
-                Text(
-                    message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (loading) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error
-                )
-            }
-            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            WenkuTextButton(
-                if (loading) tr("登录中") else tr("确认登录"),
-                { if (!loading && email.isNotBlank() && password.isNotBlank()) { keyboard?.hide(); submit() } },
-                Modifier.fillMaxWidth(),
-                selected = true,
-                enabled = !loading && email.isNotBlank() && password.isNotBlank(),
-                wenkuSymbol = WenkuSymbol.Check,
-            )
-            WenkuTextButton(
-                tr("改用内置网页登录（可过人机验证）"),
-                { webLogin = true },
-                Modifier.fillMaxWidth(),
-                enabled = !loading,
-                compact = true,
-                wenkuSymbol = WenkuSymbol.Shield,
-            )
-            WenkuTextButton(
-                tr("没有账号？去注册"),
-                onClick = {
-                    val url = "https://${ZLibraryNodeConfig.domain}/registration"
-                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }.onFailure {
-                        AppToast.makeText(context, tr("无法打开注册页面"), Toast.LENGTH_SHORT).show()
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !loading,
-                compact = true,
-                wenkuSymbol = WenkuSymbol.External,
+        }
+        if (message.isNotBlank()) {
+            Text(
+                message,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (loading) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error
             )
         }
+        if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+        WenkuTextButton(
+            if (loading) tr("登录中") else tr("确认登录"),
+            { if (!loading && email.isNotBlank() && password.isNotBlank()) { keyboard?.hide(); submit() } },
+            Modifier.fillMaxWidth(),
+            selected = true,
+            enabled = !loading && email.isNotBlank() && password.isNotBlank(),
+            wenkuSymbol = WenkuSymbol.Check,
+        )
+        WenkuTextButton(
+            tr("改用内置网页登录（可过人机验证）"),
+            { webLogin = true },
+            Modifier.fillMaxWidth(),
+            enabled = !loading,
+            compact = true,
+            wenkuSymbol = WenkuSymbol.Shield,
+        )
+        WenkuTextButton(
+            tr("没有账号？去注册"),
+            onClick = {
+                val url = "https://${ZLibraryNodeConfig.domain}/registration"
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }.onFailure {
+                    AppToast.makeText(context, tr("无法打开注册页面"), Toast.LENGTH_SHORT).show()
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !loading,
+            compact = true,
+            wenkuSymbol = WenkuSymbol.External,
+        )
+    }
+
+    if (webLogin) {
+        ZLibraryWebLoginDialog(
+            domain = ZLibraryNodeConfig.domain.ifBlank { ZLibraryNodeManager.DEFAULT_NODE },
+            email = email.trim(),
+            password = password,
+            onOutcome = { cookies, host, outcomeMessage ->
+                val src = source
+                if (cookies != null && src != null) {
+                    message = tr("网页登录成功，正在同步登录状态…")
+                    scope.launch {
+                        val result = src.login(
+                            LoginCredential(
+                                cookie = cookies,
+                                extraData = mapOf("domain" to (host ?: ZLibraryNodeConfig.domain))
+                            )
+                        )
+                        when (result) {
+                            is SourceResult.Success -> finishSuccess()
+                            is SourceResult.Error -> message = result.exception.message
+                                ?: tr("网页登录成功但会话同步失败，请重试")
+                        }
+                    }
+                } else {
+                    message = outcomeMessage
+                }
+            },
+            onDismiss = { webLogin = false },
+        )
     }
 }

@@ -7,9 +7,18 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -19,31 +28,39 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.i18n.tr
+import com.example.ui.components.AppIconButton
+import com.example.ui.wenku.WenkuSymbol
 import kotlinx.coroutines.delay
 import org.json.JSONObject
 import java.net.URI
 
 /**
- * 内置网页登录：把站点登录页装进 WebView，自动填入账号密码并代点 DiamWall 复选框；
- * 遇到验证码或页面改版时，用户可以直接在页面里手动完成。App 侧每 2 秒轮询
- * `remix_userid / remix_userkey` Cookie，建立会话后把整串 Cookie 交回书源
- * （走 Cookie 登录路径落到加密存储），随后自动关闭登录窗口。
+ * 内置网页登录（全屏）。把站点登录页装进 WebView，自动填入账号密码并代点 DiamWall
+ * 复选框；遇到验证码或页面改版时，用户可以直接在页面里手动完成。App 侧每 2 秒轮询
+ * `remix_userid / remix_userkey` Cookie，建立会话后把整串 Cookie 交回书源（走 Cookie
+ * 登录路径落到加密存储）。
  *
- * 为什么要它：站点把登录接口（rpc.php / eapi）挡在人机验证后面，HTTP 客户端过不去，
- * 而浏览器里登录是通的——这正是用户实测“网页登录可以成功、App 内登录总是失败”的原因。
+ * 为什么是独立全屏窗口而不是嵌在登录弹窗里：弹层的内容列本身带 verticalScroll，
+ * WebView 再放进去会被外层滚动手势截走，页面滚不动。这里让 WebView 直接占满剩余高度，
+ * 自己滚动；键盘弹起时用 imePadding 缩小 WebView 而不是盖住它。
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun ZLibraryWebLoginView(
+fun ZLibraryWebLoginDialog(
     domain: String,
     email: String,
     password: String,
-    onOutcome: (cookies: String?, host: String?, message: String) -> Unit
+    onOutcome: (cookies: String?, host: String?, message: String) -> Unit,
+    onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
     var status by remember { mutableStateOf(tr("正在打开站点登录页…")) }
@@ -70,10 +87,10 @@ fun ZLibraryWebLoginView(
                                 val text = result?.trim('"').orEmpty()
                                 if (text == "nofields") {
                                     submitted = false
-                                    status = tr("没有找到登录表单，请在下方网页中手动登录")
+                                    status = tr("没有找到登录表单，请在网页中手动登录")
                                 } else if (text == "noform") {
                                     submitted = false
-                                    status = tr("登录表单的结构已变化，请在下方网页中手动登录")
+                                    status = tr("登录表单的结构已变化，请在网页中手动登录")
                                 }
                             }
                         }
@@ -86,7 +103,7 @@ fun ZLibraryWebLoginView(
                             }
                         }
                         hasForm && submitted -> status = tr("已提交账号，等待站点建立会话…")
-                        else -> status = tr("页面已加载，请在下方网页中完成登录（成功后自动返回）")
+                        else -> status = tr("页面已加载，可以上下滑动操作；登录成功后窗口会自动关闭")
                     }
                 }
             }
@@ -118,31 +135,6 @@ fun ZLibraryWebLoginView(
         }
     }
 
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            status,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        AndroidView(
-            modifier = Modifier.fillMaxWidth().height(340.dp),
-            factory = { ctx ->
-                WebView(ctx).apply {
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    settings.loadWithOverviewMode = true
-                    settings.useWideViewPort = true
-                    settings.userAgentString = MOBILE_UA
-                    CookieManager.getInstance().setAcceptCookie(true)
-                    CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
-                    webViewClient = client
-                    webView = this
-                    loadUrl("https://$domain/login")
-                }
-            }
-        )
-    }
-
     DisposableEffect(Unit) {
         onDispose {
             webView?.let { wv ->
@@ -151,6 +143,73 @@ fun ZLibraryWebLoginView(
                 runCatching { wv.destroy() }
             }
             webView = null
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnClickOutside = false,
+            decorFitsSystemWindows = false,
+        ),
+    ) {
+        Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .imePadding(),
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(tr("网页登录"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            tr("登录成功会自动返回；页面可上下滑动"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    AppIconButton(
+                        Icons.Filled.Close,
+                        tr("关闭"),
+                        onClick = onDismiss,
+                        wenkuSymbol = WenkuSymbol.Close,
+                    )
+                }
+                Text(
+                    status,
+                    modifier = Modifier.padding(horizontal = 18.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Column(
+                    Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp),
+                ) {
+                    AndroidView(
+                        modifier = Modifier.fillMaxSize(),
+                        factory = { ctx ->
+                            WebView(ctx).apply {
+                                settings.javaScriptEnabled = true
+                                settings.domStorageEnabled = true
+                                settings.loadWithOverviewMode = true
+                                settings.useWideViewPort = true
+                                settings.userAgentString = MOBILE_UA
+                                CookieManager.getInstance().setAcceptCookie(true)
+                                CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                                isVerticalScrollBarEnabled = true
+                                webViewClient = client
+                                webView = this
+                                loadUrl("https://$domain/login")
+                            }
+                        },
+                    )
+                }
+            }
         }
     }
 }
